@@ -72,6 +72,10 @@ export const callDispositionEnum = pgEnum('call_disposition', [
   'dnc_request'
 ]);
 
+export const entityTypeEnum = pgEnum('entity_type', ['account', 'contact']);
+
+export const selectionTypeEnum = pgEnum('selection_type', ['explicit', 'filtered']);
+
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -408,6 +412,22 @@ export const savedFilters = pgTable("saved_filters", {
   entityTypeIdx: index("saved_filters_entity_type_idx").on(table.entityType),
 }));
 
+// Selection Contexts for bulk operations
+export const selectionContexts = pgTable("selection_contexts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  entityType: entityTypeEnum("entity_type").notNull(),
+  selectionType: selectionTypeEnum("selection_type").notNull(), // 'explicit' or 'filtered'
+  ids: text("ids").array(), // For explicit selections (≤10k records)
+  filterGroup: jsonb("filter_group"), // For filtered selections (all matching)
+  totalCount: integer("total_count").notNull(), // Total records in selection
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(), // 15 min from creation
+}, (table) => ({
+  userIdx: index("selection_contexts_user_idx").on(table.userId),
+  expiresIdx: index("selection_contexts_expires_idx").on(table.expiresAt),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ownedAccounts: many(accounts),
@@ -415,6 +435,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   campaignOrders: many(campaignOrders),
   auditLogs: many(auditLogs),
   savedFilters: many(savedFilters),
+  selectionContexts: many(selectionContexts),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -448,6 +469,10 @@ export const campaignOrdersRelations = relations(campaignOrders, ({ one, many })
 
 export const savedFiltersRelations = relations(savedFilters, ({ one }) => ({
   user: one(users, { fields: [savedFilters.userId], references: [users.id] }),
+}));
+
+export const selectionContextsRelations = relations(selectionContexts, ({ one }) => ({
+  user: one(users, { fields: [selectionContexts.userId], references: [users.id] }),
 }));
 
 // Insert Schemas
@@ -564,6 +589,30 @@ export const insertSavedFilterSchema = createInsertSchema(savedFilters).omit({
   updatedAt: true,
 });
 
+export const insertSelectionContextSchema = createInsertSchema(selectionContexts).omit({
+  id: true,
+  createdAt: true,
+}).refine(
+  (data) => {
+    // For explicit selections, enforce ≤10k IDs limit
+    if (data.selectionType === 'explicit' && data.ids && data.ids.length > 10000) {
+      return false;
+    }
+    // For explicit selections, ids must be provided
+    if (data.selectionType === 'explicit' && (!data.ids || data.ids.length === 0)) {
+      return false;
+    }
+    // For filtered selections, filterGroup must be provided
+    if (data.selectionType === 'filtered' && !data.filterGroup) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "Invalid selection: explicit selections require ≤10k IDs, filtered selections require filterGroup"
+  }
+);
+
 // Inferred Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -624,3 +673,6 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 export type SavedFilter = typeof savedFilters.$inferSelect;
 export type InsertSavedFilter = z.infer<typeof insertSavedFilterSchema>;
+
+export type SelectionContext = typeof selectionContexts.$inferSelect;
+export type InsertSelectionContext = z.infer<typeof insertSelectionContextSchema>;

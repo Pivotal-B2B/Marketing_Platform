@@ -7,6 +7,7 @@ import {
   users, accounts, contacts, campaigns, segments, lists, domainSets,
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
   campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
+  selectionContexts,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -24,6 +25,7 @@ import {
   type BulkImport, type InsertBulkImport,
   type AuditLog, type InsertAuditLog,
   type SavedFilter, type InsertSavedFilter,
+  type SelectionContext, type InsertSelectionContext,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -129,6 +131,12 @@ export interface IStorage {
   createSavedFilter(filter: InsertSavedFilter): Promise<SavedFilter>;
   updateSavedFilter(id: string, userId: string, filter: Partial<InsertSavedFilter>): Promise<SavedFilter | undefined>;
   deleteSavedFilter(id: string, userId: string): Promise<boolean>;
+  
+  // Selection Contexts (for bulk operations)
+  getSelectionContext(id: string, userId: string): Promise<SelectionContext | undefined>;
+  createSelectionContext(context: InsertSelectionContext): Promise<SelectionContext>;
+  deleteSelectionContext(id: string, userId: string): Promise<boolean>;
+  deleteExpiredSelectionContexts(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -586,6 +594,40 @@ export class DatabaseStorage implements IStorage {
       .delete(savedFilters)
       .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId)));
     return result.rowCount > 0;
+  }
+
+  // Selection Contexts (for bulk operations)
+  async getSelectionContext(id: string, userId: string): Promise<SelectionContext | undefined> {
+    const now = new Date();
+    const [context] = await db
+      .select()
+      .from(selectionContexts)
+      .where(and(
+        eq(selectionContexts.id, id),
+        eq(selectionContexts.userId, userId),
+        sql`${selectionContexts.expiresAt} > ${now}` // Only return non-expired contexts
+      ));
+    return context || undefined;
+  }
+
+  async createSelectionContext(insertContext: InsertSelectionContext): Promise<SelectionContext> {
+    const [context] = await db.insert(selectionContexts).values(insertContext).returning();
+    return context;
+  }
+
+  async deleteSelectionContext(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(selectionContexts)
+      .where(and(eq(selectionContexts.id, id), eq(selectionContexts.userId, userId)));
+    return result.rowCount > 0;
+  }
+
+  async deleteExpiredSelectionContexts(): Promise<number> {
+    const now = new Date();
+    const result = await db
+      .delete(selectionContexts)
+      .where(sql`${selectionContexts.expiresAt} < ${now}`);
+    return result.rowCount;
   }
 }
 

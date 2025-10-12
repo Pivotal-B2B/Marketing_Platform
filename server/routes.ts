@@ -17,7 +17,8 @@ import {
   insertListSchema,
   insertDomainSetSchema,
   insertUserSchema,
-  insertSavedFilterSchema
+  insertSavedFilterSchema,
+  insertSelectionContextSchema
 } from "@shared/schema";
 
 export function registerRoutes(app: Express) {
@@ -807,6 +808,67 @@ export function registerRoutes(app: Express) {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete saved filter" });
+    }
+  });
+
+  // ==================== SELECTION CONTEXTS (Bulk Operations) ====================
+  
+  app.get("/api/selection-contexts/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      
+      // Opportunistic cleanup of expired contexts
+      await storage.deleteExpiredSelectionContexts().catch(() => {});
+      
+      const context = await storage.getSelectionContext(req.params.id, userId);
+      if (!context) {
+        return res.status(404).json({ message: "Selection context not found or expired" });
+      }
+      res.json(context);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch selection context" });
+    }
+  });
+
+  app.post("/api/selection-contexts", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      
+      // Opportunistic cleanup of expired contexts
+      await storage.deleteExpiredSelectionContexts().catch(() => {});
+      
+      // Validate client payload (omit server-managed fields)
+      const clientSchema = insertSelectionContextSchema.omit({ userId: true, expiresAt: true });
+      const validated = clientSchema.parse(req.body);
+      
+      // Set expiration to 15 minutes from now
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      
+      const context = await storage.createSelectionContext({
+        ...validated,
+        userId,
+        expiresAt
+      });
+      
+      res.status(201).json(context);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create selection context" });
+    }
+  });
+
+  app.delete("/api/selection-contexts/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const deleted = await storage.deleteSelectionContext(req.params.id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Selection context not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete selection context" });
     }
   });
 
