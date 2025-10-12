@@ -5,8 +5,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TopBar } from "@/components/layout/top-bar";
+import { ProtectedRoute } from "@/components/protected-route";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -21,27 +23,9 @@ import OrdersPage from "@/pages/orders";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 
-function Router() {
-  return (
-    <Switch>
-      <Route path="/login" component={LoginPage} />
-      <Route path="/" component={Dashboard} />
-      <Route path="/accounts" component={AccountsPage} />
-      <Route path="/contacts" component={ContactsPage} />
-      <Route path="/segments" component={SegmentsPage} />
-      <Route path="/campaigns/email" component={EmailCampaignsPage} />
-      <Route path="/campaigns/telemarketing" component={TelemarketingPage} />
-      <Route path="/leads" component={LeadsPage} />
-      <Route path="/suppressions" component={SuppressionsPage} />
-      <Route path="/orders" component={OrdersPage} />
-      <Route path="/reports" component={ReportsPage} />
-      <Route path="/settings" component={SettingsPage} />
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
-
-function App() {
+function AuthenticatedApp() {
+  const { user } = useAuth();
+  
   // Custom sidebar width for enterprise CRM
   const style = {
     "--sidebar-width": "16rem",       // 256px for better navigation
@@ -49,23 +33,57 @@ function App() {
   };
 
   return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <AppSidebar userRole={user?.role || 'agent'} />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <TopBar userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || 'User'} />
+          <main className="flex-1 overflow-auto p-6 bg-background">
+            <Switch>
+              <Route path="/" component={Dashboard} />
+              <Route path="/accounts" component={AccountsPage} />
+              <Route path="/contacts" component={ContactsPage} />
+              <Route path="/segments" component={SegmentsPage} />
+              <Route path="/campaigns/email" component={EmailCampaignsPage} />
+              <Route path="/campaigns/telemarketing" component={TelemarketingPage} />
+              <Route path="/leads" component={LeadsPage} />
+              <Route path="/suppressions" component={SuppressionsPage} />
+              <Route path="/orders" component={OrdersPage} />
+              <Route path="/reports" component={ReportsPage} />
+              <Route path="/settings" component={SettingsPage} />
+              <Route component={NotFound} />
+            </Switch>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/login" component={LoginPage} />
+      <Route>
+        <ProtectedRoute>
+          <AuthenticatedApp />
+        </ProtectedRoute>
+      </Route>
+    </Switch>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light">
-        <TooltipProvider>
-          <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar userRole="admin" />
-              <div className="flex flex-col flex-1 overflow-hidden">
-                <TopBar userName="Admin User" />
-                <main className="flex-1 overflow-auto p-6 bg-background">
-                  <Router />
-                </main>
-              </div>
-            </div>
-          </SidebarProvider>
-          <Toaster />
-        </TooltipProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider defaultTheme="light">
+          <TooltipProvider>
+            <Router />
+            <Toaster />
+          </TooltipProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

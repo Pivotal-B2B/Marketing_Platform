@@ -1,4 +1,6 @@
-import { Search, Bell, HelpCircle } from "lucide-react";
+import { Search, Bell, HelpCircle, LogOut } from "lucide-react";
+import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -15,7 +17,14 @@ import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export function TopBar({ userName = "Admin User" }: { userName?: string }) {
+  const { logout } = useAuth();
+  const [, setLocation] = useLocation();
   const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase();
+
+  const handleLogout = () => {
+    logout();
+    setLocation('/login');
+  };
 
   return (
     <header className="flex items-center justify-between gap-4 border-b bg-background px-4 py-3">
@@ -64,7 +73,10 @@ export function TopBar({ userName = "Admin User" }: { userName?: string }) {
             <DropdownMenuItem data-testid="menu-profile">Profile</DropdownMenuItem>
             <DropdownMenuItem data-testid="menu-settings">Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem data-testid="menu-logout">Log out</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout} data-testid="menu-logout">
+              <LogOut className="mr-2 h-4 w-4" />
+              Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
