@@ -103,6 +103,7 @@ export interface IStorage {
   deleteOrderCampaignLink(id: string): Promise<void>;
   
   // Bulk Imports
+  getBulkImports(): Promise<BulkImport[]>;
   createBulkImport(bulkImport: InsertBulkImport): Promise<BulkImport>;
   getBulkImport(id: string): Promise<BulkImport | undefined>;
   updateBulkImport(id: string, bulkImport: Partial<InsertBulkImport>): Promise<BulkImport | undefined>;
@@ -453,6 +454,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Bulk Imports
+  async getBulkImports(): Promise<BulkImport[]> {
+    return await db.select().from(bulkImports).orderBy(desc(bulkImports.createdAt));
+  }
+
   async createBulkImport(insertBulkImport: InsertBulkImport): Promise<BulkImport> {
     const [bulkImport] = await db.insert(bulkImports).values(insertBulkImport).returning();
     return bulkImport;

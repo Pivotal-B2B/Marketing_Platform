@@ -20,6 +20,7 @@ import TelemarketingPage from "@/pages/telemarketing";
 import LeadsPage from "@/pages/leads";
 import SuppressionsPage from "@/pages/suppressions";
 import OrdersPage from "@/pages/orders";
+import ImportsPage from "@/pages/imports";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 
@@ -49,6 +50,7 @@ function AuthenticatedApp() {
               <Route path="/leads" component={LeadsPage} />
               <Route path="/suppressions" component={SuppressionsPage} />
               <Route path="/orders" component={OrdersPage} />
+              <Route path="/imports" component={ImportsPage} />
               <Route path="/reports" component={ReportsPage} />
               <Route path="/settings" component={SettingsPage} />
               <Route component={NotFound} />

@@ -52,7 +52,7 @@ import { CampaignLinkDialog } from "@/components/campaign-link-dialog";
 const orderFormSchema = insertCampaignOrderSchema.extend({
   orderNumber: z.string().min(1, "Order number required"),
   type: z.enum(['email', 'call', 'combo']),
-  leadGoal: z.number().min(1, "Lead goal must be at least 1"),
+  leadGoal: z.coerce.number().min(1, "Lead goal must be at least 1"),
   audienceNotes: z.string().optional(),
   qualificationCriteria: z.string().optional(),
 });

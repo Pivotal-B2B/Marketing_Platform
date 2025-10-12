@@ -673,6 +673,15 @@ export function registerRoutes(app: Express) {
 
   // ==================== BULK IMPORTS ====================
   
+  app.get("/api/imports", requireAuth, async (req, res) => {
+    try {
+      const imports = await storage.getBulkImports();
+      res.json(imports);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch imports" });
+    }
+  });
+
   app.post("/api/imports", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const validated = insertBulkImportSchema.parse(req.body);
