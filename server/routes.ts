@@ -218,6 +218,75 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Auto-linking endpoints
+  app.get("/api/accounts/:id/contacts", requireAuth, async (req, res) => {
+    try {
+      const contacts = await storage.getContactsByAccountId(req.params.id);
+      res.json(contacts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch account contacts" });
+    }
+  });
+
+  app.post("/api/contacts/auto-link", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      // Get all contacts without account_id
+      const contacts = await storage.getContacts();
+      const unlinkedContacts = contacts.filter(c => !c.accountId);
+      
+      let linkedCount = 0;
+      let failedCount = 0;
+
+      for (const contact of unlinkedContacts) {
+        try {
+          // Extract domain from email
+          const emailDomain = contact.email.split('@')[1]?.toLowerCase();
+          if (!emailDomain) continue;
+
+          // Find matching account by domain
+          const accounts = await storage.getAccounts();
+          const matchingAccount = accounts.find(a => 
+            a.domain?.toLowerCase() === emailDomain
+          );
+
+          if (matchingAccount) {
+            await storage.updateContact(contact.id, { accountId: matchingAccount.id });
+            linkedCount++;
+          }
+        } catch (err) {
+          failedCount++;
+        }
+      }
+
+      res.json({
+        message: "Auto-linking complete",
+        totalProcessed: unlinkedContacts.length,
+        linked: linkedCount,
+        failed: failedCount
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Auto-linking failed" });
+    }
+  });
+
+  app.post("/api/contacts/:id/link-account", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const { accountId } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ message: "accountId is required" });
+      }
+
+      const contact = await storage.updateContact(req.params.id, { accountId });
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+
+      res.json(contact);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to link contact to account" });
+    }
+  });
+
   // ==================== SEGMENTS ====================
   
   app.get("/api/segments", requireAuth, async (req, res) => {
