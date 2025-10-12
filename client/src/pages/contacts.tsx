@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon } from "lucide-react";
+import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon, Link as LinkIcon, Building2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -141,6 +141,26 @@ export default function ContactsPage() {
     },
   });
 
+  const autoLinkMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/contacts/auto-link', {});
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      toast({
+        title: "Auto-Linking Complete",
+        description: `Linked ${data?.linked || 0} contacts to accounts. ${(data?.failed || 0) > 0 ? `${data.failed} failed.` : ''}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Auto-Link Failed",
+        description: error.message,
+      });
+    },
+  });
+
   const filteredContacts = contacts?.filter(contact =>
     searchQuery === "" ||
     contact.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -159,6 +179,15 @@ export default function ContactsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => autoLinkMutation.mutate()}
+            disabled={autoLinkMutation.isPending}
+            data-testid="button-auto-link-contacts"
+          >
+            <LinkIcon className="mr-2 h-4 w-4" />
+            {autoLinkMutation.isPending ? "Linking..." : "Auto-Link"}
+          </Button>
           <Button variant="outline" data-testid="button-import-contacts">
             <Upload className="mr-2 h-4 w-4" />
             Import
@@ -395,7 +424,16 @@ export default function ContactsPage() {
                       </div>
                     </TableCell>
                     <TableCell>{contact.jobTitle || "-"}</TableCell>
-                    <TableCell>{account?.name || "-"}</TableCell>
+                    <TableCell>
+                      {account ? (
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{account.name}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm">{contact.directPhone || "-"}</span>
