@@ -93,7 +93,7 @@ export const accounts = pgTable("accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   industry: text("industry"),
-  annualRevenue: real("annual_revenue"),
+  annualRevenue: text("annual_revenue"),
   employeesSizeRange: text("employees_size_range"),
   staffCount: integer("staff_count"),
   description: text("description"),

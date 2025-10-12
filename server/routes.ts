@@ -590,6 +590,49 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== DASHBOARD STATS ====================
+  
+  app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
+    try {
+      const [
+        accounts,
+        contacts,
+        campaigns,
+        leads
+      ] = await Promise.all([
+        storage.getAccounts(),
+        storage.getContacts(),
+        storage.getCampaigns(),
+        storage.getLeads()
+      ]);
+
+      const activeCampaigns = campaigns.filter(c => c.status === 'active' || c.status === 'launched');
+      const emailCampaigns = activeCampaigns.filter(c => c.type === 'email').length;
+      const callCampaigns = activeCampaigns.filter(c => c.type === 'telemarketing').length;
+      
+      const thisMonth = new Date();
+      thisMonth.setDate(1);
+      thisMonth.setHours(0, 0, 0, 0);
+      
+      const leadsThisMonth = leads.filter(l => 
+        l.createdAt && new Date(l.createdAt) >= thisMonth
+      ).length;
+
+      res.json({
+        totalAccounts: accounts.length,
+        totalContacts: contacts.length,
+        activeCampaigns: activeCampaigns.length,
+        activeCampaignsBreakdown: {
+          email: emailCampaigns,
+          telemarketing: callCampaigns
+        },
+        leadsThisMonth
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
   // ==================== BULK IMPORTS ====================
   
   app.post("/api/imports", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
