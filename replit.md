@@ -4,6 +4,19 @@
 
 Pivotal CRM is an enterprise-grade B2B customer relationship management platform designed for Account-Based Marketing (ABM), multi-channel campaign management (Email + Telemarketing), lead qualification, and a client portal. It incorporates a unique "bridge model" for manual campaign-to-order linking, ensuring compliance management (DNC/Unsubscribe) and robust lead QA workflows. The system aims to provide a comprehensive solution for managing B2B sales and marketing operations.
 
+## Recent Progress (October 2025)
+
+**Quick Win Phases Completed:**
+- ✅ **Phase 1-2:** Schema enhancement (5 custom fields with GIN indexes) + auto-linking system (domain-based contact-account matching)
+- ✅ **Phase 3:** Record Detail Views - Account & Contact detail pages with tabbed interfaces, navigation, and quick actions
+
+**Phase 3 Deliverables (Completed):**
+- Account Detail Page (/accounts/:id) with tabs (Overview, Contacts, Activity, Notes), side panel stats, quick actions (Edit | Merge | Export), related contacts table
+- Contact Detail Page (/contacts/:id) with tabs (Overview, Account Info, Activity, Notes), breadcrumb navigation, linked account card with "View Company" button, Previous/Next record navigation
+- Clickable table rows in both accounts and contacts lists → navigate to detail pages
+- Cross-entity navigation (account → contacts, contact → account)
+- E2E tested and verified all navigation flows
+
 ## User Preferences
 
 - Clean, minimal enterprise design
