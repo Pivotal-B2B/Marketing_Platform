@@ -73,10 +73,22 @@ function buildCondition(condition: FilterCondition, table: TableType): SQL | und
     
     case 'between':
       const rangeValue = value as { from: string | number; to: string | number };
-      return and(
-        gte(column, rangeValue.from),
-        lte(column, rangeValue.to)
-      );
+      const conditions: SQL[] = [];
+      
+      // Only add from condition if value is present and not empty string
+      if (rangeValue.from !== '' && rangeValue.from !== null && rangeValue.from !== undefined) {
+        conditions.push(gte(column, rangeValue.from));
+      }
+      
+      // Only add to condition if value is present and not empty string
+      if (rangeValue.to !== '' && rangeValue.to !== null && rangeValue.to !== undefined) {
+        conditions.push(lte(column, rangeValue.to));
+      }
+      
+      // Return combined conditions or undefined if no valid bounds
+      if (conditions.length === 0) return undefined;
+      if (conditions.length === 1) return conditions[0];
+      return and(...conditions);
     
     case 'containsAny':
       // For array fields, check if any value in the filter array is in the column array

@@ -118,7 +118,10 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
             placeholder="From"
             value={rangeValue.from}
             onChange={(e) => updateCondition(condition.id, {
-              value: { ...rangeValue, from: isNumber ? Number(e.target.value) : e.target.value }
+              value: { 
+                ...rangeValue, 
+                from: isNumber ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value 
+              }
             })}
             data-testid={`input-value-from-${condition.id}`}
           />
@@ -127,7 +130,10 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
             placeholder="To"
             value={rangeValue.to}
             onChange={(e) => updateCondition(condition.id, {
-              value: { ...rangeValue, to: isNumber ? Number(e.target.value) : e.target.value }
+              value: { 
+                ...rangeValue, 
+                to: isNumber ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value 
+              }
             })}
             data-testid={`input-value-to-${condition.id}`}
           />

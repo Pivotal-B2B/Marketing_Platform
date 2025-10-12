@@ -393,12 +393,28 @@ export const auditLogs = pgTable("audit_logs", {
   createdAtIdx: index("audit_logs_created_at_idx").on(table.createdAt),
 }));
 
+// Saved Filters
+export const savedFilters = pgTable("saved_filters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  entityType: text("entity_type").notNull(),
+  filterGroup: jsonb("filter_group").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("saved_filters_user_idx").on(table.userId),
+  entityTypeIdx: index("saved_filters_entity_type_idx").on(table.entityType),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ownedAccounts: many(accounts),
   ownedContacts: many(contacts),
   campaignOrders: many(campaignOrders),
   auditLogs: many(auditLogs),
+  savedFilters: many(savedFilters),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -428,6 +444,10 @@ export const campaignOrdersRelations = relations(campaignOrders, ({ one, many })
   assets: many(orderAssets),
   qualificationQuestions: many(orderQualificationQuestions),
   campaignLinks: many(orderCampaignLinks),
+}));
+
+export const savedFiltersRelations = relations(savedFilters, ({ one }) => ({
+  user: one(users, { fields: [savedFilters.userId], references: [users.id] }),
 }));
 
 // Insert Schemas
@@ -538,6 +558,12 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   createdAt: true,
 });
 
+export const insertSavedFilterSchema = createInsertSchema(savedFilters).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Inferred Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -595,3 +621,6 @@ export type InsertBulkImport = z.infer<typeof insertBulkImportSchema>;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+export type SavedFilter = typeof savedFilters.$inferSelect;
+export type InsertSavedFilter = z.infer<typeof insertSavedFilterSchema>;

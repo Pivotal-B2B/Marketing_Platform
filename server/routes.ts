@@ -16,7 +16,8 @@ import {
   insertSegmentSchema,
   insertListSchema,
   insertDomainSetSchema,
-  insertUserSchema
+  insertUserSchema,
+  insertSavedFilterSchema
 } from "@shared/schema";
 
 export function registerRoutes(app: Express) {
@@ -753,6 +754,59 @@ export function registerRoutes(app: Express) {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  // ==================== SAVED FILTERS ====================
+  
+  app.get("/api/saved-filters", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const entityType = req.query.entityType as string | undefined;
+      const filters = await storage.getSavedFilters(userId, entityType);
+      res.json(filters);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch saved filters" });
+    }
+  });
+
+  app.post("/api/saved-filters", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const validated = insertSavedFilterSchema.parse(req.body);
+      const savedFilter = await storage.createSavedFilter({ ...validated, userId });
+      res.status(201).json(savedFilter);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create saved filter" });
+    }
+  });
+
+  app.patch("/api/saved-filters/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const filter = await storage.updateSavedFilter(req.params.id, userId, req.body);
+      if (!filter) {
+        return res.status(404).json({ message: "Saved filter not found" });
+      }
+      res.json(filter);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update saved filter" });
+    }
+  });
+
+  app.delete("/api/saved-filters/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const deleted = await storage.deleteSavedFilter(req.params.id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Saved filter not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete saved filter" });
     }
   });
 

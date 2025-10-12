@@ -6,7 +6,7 @@ import type { FilterGroup } from "@shared/filter-types";
 import {
   users, accounts, contacts, campaigns, segments, lists, domainSets,
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
-  campaignOrders, orderCampaignLinks, bulkImports, auditLogs,
+  campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -23,6 +23,7 @@ import {
   type OrderCampaignLink, type InsertOrderCampaignLink,
   type BulkImport, type InsertBulkImport,
   type AuditLog, type InsertAuditLog,
+  type SavedFilter, type InsertSavedFilter,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -121,6 +122,13 @@ export interface IStorage {
   // Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(filters?: any): Promise<AuditLog[]>;
+  
+  // Saved Filters
+  getSavedFilters(userId: string, entityType?: string): Promise<SavedFilter[]>;
+  getSavedFilter(id: string, userId: string): Promise<SavedFilter | undefined>;
+  createSavedFilter(filter: InsertSavedFilter): Promise<SavedFilter>;
+  updateSavedFilter(id: string, userId: string, filter: Partial<InsertSavedFilter>): Promise<SavedFilter | undefined>;
+  deleteSavedFilter(id: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -533,6 +541,51 @@ export class DatabaseStorage implements IStorage {
 
   async getAuditLogs(filters?: any): Promise<AuditLog[]> {
     return await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
+  }
+
+  // Saved Filters
+  async getSavedFilters(userId: string, entityType?: string): Promise<SavedFilter[]> {
+    let query = db.select().from(savedFilters).where(eq(savedFilters.userId, userId));
+    
+    if (entityType) {
+      return await query.where(
+        and(
+          eq(savedFilters.userId, userId),
+          eq(savedFilters.entityType, entityType)
+        )
+      ).orderBy(desc(savedFilters.createdAt));
+    }
+    
+    return await query.orderBy(desc(savedFilters.createdAt));
+  }
+
+  async getSavedFilter(id: string, userId: string): Promise<SavedFilter | undefined> {
+    const [filter] = await db
+      .select()
+      .from(savedFilters)
+      .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId)));
+    return filter || undefined;
+  }
+
+  async createSavedFilter(insertFilter: InsertSavedFilter): Promise<SavedFilter> {
+    const [filter] = await db.insert(savedFilters).values(insertFilter).returning();
+    return filter;
+  }
+
+  async updateSavedFilter(id: string, userId: string, updateData: Partial<InsertSavedFilter>): Promise<SavedFilter | undefined> {
+    const [filter] = await db
+      .update(savedFilters)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId)))
+      .returning();
+    return filter || undefined;
+  }
+
+  async deleteSavedFilter(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(savedFilters)
+      .where(and(eq(savedFilters.id, id), eq(savedFilters.userId, userId)));
+    return result.rowCount > 0;
   }
 }
 
