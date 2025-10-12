@@ -9,13 +9,20 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 **Quick Win Phases Completed:**
 - ✅ **Phase 1-2:** Schema enhancement (5 custom fields with GIN indexes) + auto-linking system (domain-based contact-account matching)
 - ✅ **Phase 3:** Record Detail Views - Account & Contact detail pages with tabbed interfaces, navigation, and quick actions
+- ✅ **Phase 4:** Advanced Filtering - Multi-criteria filter system with Sheet UI pattern, AND/OR logic, and saved filters backend
 
-**Phase 3 Deliverables (Completed):**
-- Account Detail Page (/accounts/:id) with tabs (Overview, Contacts, Activity, Notes), side panel stats, quick actions (Edit | Merge | Export), related contacts table
-- Contact Detail Page (/contacts/:id) with tabs (Overview, Account Info, Activity, Notes), breadcrumb navigation, linked account card with "View Company" button, Previous/Next record navigation
-- Clickable table rows in both accounts and contacts lists → navigate to detail pages
-- Cross-entity navigation (account → contacts, contact → account)
-- E2E tested and verified all navigation flows
+**Phase 4 Deliverables (Completed):**
+- Advanced filter infrastructure: Shared filter types (text/number/array/boolean), SQL query builder with Drizzle ORM integration
+- FilterBuilder UI component with dynamic field/operator/value selectors in Sheet pattern
+- Integrated filtering on Accounts and Contacts pages with filter badge indicators
+- Support for text operators (equals, contains, startsWith, endsWith, notEquals)
+- Support for numeric operators (equals, greaterThan, lessThan, between with open-ended ranges, notEquals)
+- Support for array operators (containsAny, containsAll, isEmpty, isNotEmpty)
+- Support for boolean operators (is true/false)
+- AND/OR logic switching for multi-condition filters
+- Saved filters database schema, API routes, and storage methods (UI pending as future enhancement)
+- Fixed numeric range bug: properly handles empty bounds without Postgres casting to zero
+- E2E tested and verified all filtering workflows on both entity types
 
 ## User Preferences
 
