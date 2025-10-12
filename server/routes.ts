@@ -811,6 +811,41 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== FILTER FIELDS REGISTRY ====================
+  
+  app.get("/api/filters/fields", requireAuth, async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const fields = await storage.getFilterFields(category);
+      
+      // Group by category for easier UI consumption
+      const grouped = fields.reduce((acc: any, field) => {
+        if (!acc[field.category]) {
+          acc[field.category] = [];
+        }
+        acc[field.category].push(field);
+        return acc;
+      }, {});
+      
+      res.json({
+        fields,
+        grouped,
+        categories: Object.keys(grouped)
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch filter fields" });
+    }
+  });
+
+  app.get("/api/filters/fields/entity/:entity", requireAuth, async (req, res) => {
+    try {
+      const fields = await storage.getFilterFieldsByEntity(req.params.entity);
+      res.json(fields);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch filter fields for entity" });
+    }
+  });
+
   // ==================== SELECTION CONTEXTS (Bulk Operations) ====================
   
   app.get("/api/selection-contexts/:id", requireAuth, async (req, res) => {

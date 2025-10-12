@@ -7,7 +7,7 @@ import {
   users, accounts, contacts, campaigns, segments, lists, domainSets,
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
   campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
-  selectionContexts,
+  selectionContexts, filterFieldRegistry,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -26,6 +26,7 @@ import {
   type AuditLog, type InsertAuditLog,
   type SavedFilter, type InsertSavedFilter,
   type SelectionContext, type InsertSelectionContext,
+  type FilterField,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -137,6 +138,10 @@ export interface IStorage {
   createSelectionContext(context: InsertSelectionContext): Promise<SelectionContext>;
   deleteSelectionContext(id: string, userId: string): Promise<boolean>;
   deleteExpiredSelectionContexts(): Promise<number>;
+  
+  // Filter Fields Registry
+  getFilterFields(category?: string): Promise<any[]>;
+  getFilterFieldsByEntity(entity: string): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -628,6 +633,39 @@ export class DatabaseStorage implements IStorage {
       .delete(selectionContexts)
       .where(sql`${selectionContexts.expiresAt} < ${now}`);
     return result.rowCount;
+  }
+
+  // Filter Fields Registry
+  async getFilterFields(category?: string): Promise<FilterField[]> {
+    let query = db
+      .select()
+      .from(filterFieldRegistry)
+      .where(eq(filterFieldRegistry.visibleInFilters, true))
+      .orderBy(filterFieldRegistry.category, filterFieldRegistry.sortOrder);
+    
+    if (category) {
+      query = query.where(
+        and(
+          eq(filterFieldRegistry.visibleInFilters, true),
+          eq(filterFieldRegistry.category, category)
+        )
+      ) as any;
+    }
+    
+    return await query;
+  }
+
+  async getFilterFieldsByEntity(entity: string): Promise<FilterField[]> {
+    return await db
+      .select()
+      .from(filterFieldRegistry)
+      .where(
+        and(
+          eq(filterFieldRegistry.entity, entity),
+          eq(filterFieldRegistry.visibleInFilters, true)
+        )
+      )
+      .orderBy(filterFieldRegistry.sortOrder);
   }
 }
 

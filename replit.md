@@ -11,6 +11,7 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - ✅ **Phase 3:** Record Detail Views - Account & Contact detail pages with tabbed interfaces, navigation, and quick actions
 - ✅ **Phase 4:** Advanced Filtering - Multi-criteria filter system with Sheet UI pattern, AND/OR logic, and saved filters backend
 - 🔄 **Phase 5 (In Progress):** Bulk Operations - Selection infrastructure with checkboxes, server-side selection contexts, bulk actions toolbar
+- 🔄 **Phase 6 (In Progress):** Dynamic Filter Field Registry - Scalable, category-based filtering with auto-propagation
 
 **Phase 4 Deliverables (Completed):**
 - Advanced filter infrastructure: Shared filter types (text/number/array/boolean), SQL query builder with Drizzle ORM integration
@@ -36,6 +37,17 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - 🔄 Global selection prompt ("Select all X records matching filter") (pending)
 - 🔄 Bulk operations implementation: Update Fields, Delete, Export, Assign Owner, Add to List (pending)
 - 🔄 Auto-invalidation of selection context when filters/search changes (pending)
+
+**Phase 6 Deliverables (In Progress):**
+- ✅ Dynamic filter field registry schema with 8 category enum (Contact, Account, Suppression, Email Campaign, Telemarketing, QA, List/Segment, Client Portal)
+- ✅ Seed script populated 52 filter fields with metadata (entity, key, label, type, operators, category, sortOrder)
+- ✅ Storage methods: getFilterFields(category?), getFilterFieldsByEntity(entity)
+- ✅ API endpoints: GET /api/filters/fields (returns fields + grouped by category), GET /api/filters/fields/entity/:entity
+- 🔄 FilterBuilder UI refactor: Replace static dropdowns with dynamic categorized collapsible panels (pending)
+- 🔄 Field search bar with type-to-filter across all 52+ fields (pending)
+- 🔄 Real-time count preview on filter changes (pending)
+- 🔄 Cross-entity join support in filter-builder.ts (Contacts ↔ Accounts ↔ Campaigns ↔ QA) (pending)
+- 🔄 Time-based operators (within_last_days, between_dates, not_updated_since) (pending)
 
 ## User Preferences
 
