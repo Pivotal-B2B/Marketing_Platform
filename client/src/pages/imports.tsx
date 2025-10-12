@@ -53,11 +53,7 @@ export default function ImportsPage() {
         uploadedById: user.id,
       };
 
-      return await apiRequest('/api/imports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(importData),
-      });
+      return await apiRequest('POST', '/api/imports', importData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/imports'], refetchType: 'active' });

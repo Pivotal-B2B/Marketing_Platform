@@ -92,11 +92,7 @@ export default function EmailCampaignsPage() {
           lists: selectedLists,
         },
       };
-      return await apiRequest('/api/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      return await apiRequest('POST', '/api/campaigns', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns'], refetchType: 'active' });
@@ -118,9 +114,7 @@ export default function EmailCampaignsPage() {
 
   const launchMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/campaigns/${id}/launch`, {
-        method: 'POST',
-      });
+      return await apiRequest('POST', `/api/campaigns/${id}/launch`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns'], refetchType: 'active' });

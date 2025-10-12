@@ -49,11 +49,7 @@ export default function LeadsPage() {
       if (!user?.id) {
         throw new Error("User not authenticated");
       }
-      return await apiRequest(`/api/leads/${id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ approvedById: user.id }),
-      });
+      return await apiRequest('POST', `/api/leads/${id}/approve`, { approvedById: user.id });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'], refetchType: 'active' });
@@ -73,11 +69,7 @@ export default function LeadsPage() {
 
   const rejectMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      return await apiRequest(`/api/leads/${id}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason }),
-      });
+      return await apiRequest('POST', `/api/leads/${id}/reject`, { reason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'], refetchType: 'active' });

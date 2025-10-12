@@ -86,11 +86,7 @@ export default function OrdersPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: OrderFormData) => {
-      return await apiRequest('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+      return await apiRequest('POST', '/api/orders', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/orders'], refetchType: 'active' });
@@ -112,9 +108,7 @@ export default function OrdersPage() {
 
   const submitMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/orders/${id}/submit`, {
-        method: 'POST',
-      });
+      return await apiRequest('POST', `/api/orders/${id}/submit`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/orders'], refetchType: 'active' });

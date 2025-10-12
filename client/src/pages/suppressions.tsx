@@ -89,11 +89,7 @@ export default function SuppressionsPage() {
   // Create email suppression
   const createEmailSuppression = useMutation({
     mutationFn: async (data: InsertSuppressionEmail) => {
-      return await apiRequest('/api/suppressions/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+      return await apiRequest('POST', '/api/suppressions/email', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/suppressions/email'], refetchType: 'active' });
@@ -116,11 +112,7 @@ export default function SuppressionsPage() {
   // Create phone suppression
   const createPhoneSuppression = useMutation({
     mutationFn: async (data: InsertSuppressionPhone) => {
-      return await apiRequest('/api/suppressions/phone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+      return await apiRequest('POST', '/api/suppressions/phone', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/suppressions/phone'], refetchType: 'active' });
@@ -143,9 +135,7 @@ export default function SuppressionsPage() {
   // Delete email suppression
   const deleteEmailSuppression = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/suppressions/email/${id}`, {
-        method: 'DELETE',
-      });
+      return await apiRequest('DELETE', `/api/suppressions/email/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/suppressions/email'], refetchType: 'active' });
@@ -166,9 +156,7 @@ export default function SuppressionsPage() {
   // Delete phone suppression
   const deletePhoneSuppression = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/suppressions/phone/${id}`, {
-        method: 'DELETE',
-      });
+      return await apiRequest('DELETE', `/api/suppressions/phone/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/suppressions/phone'], refetchType: 'active' });

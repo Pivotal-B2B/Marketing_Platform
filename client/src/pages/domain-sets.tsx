@@ -69,14 +69,10 @@ export default function DomainSetsPage() {
         .map(d => d.trim().toLowerCase())
         .filter(d => d.length > 0);
 
-      return await apiRequest('/api/domain-sets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: data.name,
-          domains,
-          ownerId: user?.id,
-        }),
+      return await apiRequest('POST', '/api/domain-sets', {
+        name: data.name,
+        domains,
+        ownerId: user?.id,
       });
     },
     onSuccess: () => {
