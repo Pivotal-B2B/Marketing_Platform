@@ -254,6 +254,15 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.delete("/api/segments/:id", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
+    try {
+      await storage.deleteSegment(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete segment" });
+    }
+  });
+
   // ==================== LISTS ====================
   
   app.get("/api/lists", requireAuth, async (req, res) => {
@@ -275,6 +284,15 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create list" });
+    }
+  });
+
+  app.delete("/api/lists/:id", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
+    try {
+      await storage.deleteList(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete list" });
     }
   });
 

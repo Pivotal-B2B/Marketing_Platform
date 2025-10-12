@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, ListFilter, Users, Upload } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Search, ListFilter, Users, Upload, Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
   Table,
@@ -14,24 +18,150 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertSegmentSchema, insertListSchema, type InsertSegment, type InsertList, type Segment, type List, type DomainSet } from "@shared/schema";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 export default function SegmentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [createSegmentDialogOpen, setCreateSegmentDialogOpen] = useState(false);
+  const [createListDialogOpen, setCreateListDialogOpen] = useState(false);
+  const { toast } = useToast();
 
-  const segments = [
-    { id: "1", name: "Enterprise Accounts", type: "dynamic", contacts: 1847, filters: "Revenue > $10M AND Employees > 1000" },
-    { id: "2", name: "Tech Decision Makers", type: "dynamic", contacts: 423, filters: "Industry = Technology AND Title contains 'VP, Director'" },
-  ];
+  const { data: segments, isLoading: segmentsLoading } = useQuery<Segment[]>({
+    queryKey: ['/api/segments'],
+  });
 
-  const lists = [
-    { id: "1", name: "Q1 2024 Trade Show Leads", type: "static", contacts: 256, createdAt: "2024-01-15" },
-    { id: "2", name: "Webinar Attendees - March", type: "static", contacts: 189, createdAt: "2024-03-20" },
-  ];
+  const { data: lists, isLoading: listsLoading } = useQuery<List[]>({
+    queryKey: ['/api/lists'],
+  });
 
-  const domainSets = [
-    { id: "1", name: "Fortune 500 Domains", domains: 500, matchRate: 94, contacts: 4782 },
-    { id: "2", name: "SaaS Target List", domains: 1200, matchRate: 78, contacts: 3421 },
-  ];
+  const { data: domainSets, isLoading: domainSetsLoading } = useQuery<DomainSet[]>({
+    queryKey: ['/api/domain-sets'],
+  });
+
+  const segmentForm = useForm<InsertSegment>({
+    resolver: zodResolver(insertSegmentSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      definitionJson: {},
+    },
+  });
+
+  const listForm = useForm<InsertList>({
+    resolver: zodResolver(insertListSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      contactIds: [],
+    },
+  });
+
+  const createSegmentMutation = useMutation({
+    mutationFn: async (data: InsertSegment) => {
+      await apiRequest('POST', '/api/segments', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/segments'] });
+      setCreateSegmentDialogOpen(false);
+      segmentForm.reset();
+      toast({
+        title: "Success",
+        description: "Segment created successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const createListMutation = useMutation({
+    mutationFn: async (data: InsertList) => {
+      await apiRequest('POST', '/api/lists', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
+      setCreateListDialogOpen(false);
+      listForm.reset();
+      toast({
+        title: "Success",
+        description: "List created successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const deleteSegmentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('DELETE', `/api/segments/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/segments'], refetchType: 'active' });
+      toast({
+        title: "Success",
+        description: "Segment deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const deleteListMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('DELETE', `/api/lists/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/lists'], refetchType: 'active' });
+      toast({
+        title: "Success",
+        description: "List deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const filteredSegments = segments?.filter(seg =>
+    searchQuery === "" ||
+    seg.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
+  const filteredLists = lists?.filter(list =>
+    searchQuery === "" ||
+    list.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
 
   return (
     <div className="space-y-6">
@@ -64,37 +194,110 @@ export default function SegmentsPage() {
                 data-testid="input-search-segments"
               />
             </div>
-            <Button data-testid="button-create-segment">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Segment
-            </Button>
+            <Dialog open={createSegmentDialogOpen} onOpenChange={setCreateSegmentDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-segment">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Segment
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Create Dynamic Segment</DialogTitle>
+                  <DialogDescription>
+                    Build a dynamic segment with custom filters
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...segmentForm}>
+                  <form onSubmit={segmentForm.handleSubmit((data) => createSegmentMutation.mutate(data))} className="space-y-4">
+                    <FormField
+                      control={segmentForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Segment Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enterprise Decision Makers" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={segmentForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="Target segment description..." {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="rounded-lg border p-4">
+                      <p className="text-sm font-medium mb-2">Segment Filters (Query Builder)</p>
+                      <p className="text-sm text-muted-foreground">
+                        Visual query builder coming soon. For now, segments created with basic filters.
+                      </p>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" disabled={createSegmentMutation.isPending}>
+                        {createSegmentMutation.isPending ? "Creating..." : "Create Segment"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </div>
 
-          {segments.length > 0 ? (
+          {segmentsLoading ? (
             <div className="grid gap-4">
-              {segments.map((segment) => (
+              {[1, 2].map((i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-full mt-2" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-8 w-32" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : filteredSegments.length > 0 ? (
+            <div className="grid gap-4">
+              {filteredSegments.map((segment) => (
                 <Card key={segment.id} className="hover-elevate" data-testid={`card-segment-${segment.id}`}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>{segment.name}</CardTitle>
                       <Badge variant="outline">Dynamic</Badge>
                     </div>
-                    <CardDescription className="font-mono text-xs">
-                      {segment.filters}
+                    <CardDescription>
+                      {segment.description || "No description"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Users className="h-4 w-4" />
-                        <span data-testid={`segment-contacts-${segment.id}`}>{segment.contacts.toLocaleString()} contacts</span>
+                        <span data-testid={`segment-contacts-${segment.id}`}>Preview available after query execution</span>
                       </div>
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" data-testid={`button-edit-segment-${segment.id}`}>
                           Edit
                         </Button>
-                        <Button size="sm" data-testid={`button-use-segment-${segment.id}`}>
-                          Use in Campaign
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => deleteSegmentMutation.mutate(segment.id)}
+                          disabled={deleteSegmentMutation.isPending}
+                          data-testid={`button-delete-segment-${segment.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
                     </div>
@@ -105,10 +308,16 @@ export default function SegmentsPage() {
           ) : (
             <EmptyState
               icon={ListFilter}
-              title="No segments created"
-              description="Create dynamic segments with advanced filters to target specific audiences."
-              actionLabel="Create Segment"
-              onAction={() => {}}
+              title="No segments found"
+              description={searchQuery ? "Try adjusting your search query" : "Create your first dynamic segment to start targeting contacts"}
+              action={
+                !searchQuery ? (
+                  <Button onClick={() => setCreateSegmentDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Segment
+                  </Button>
+                ) : undefined
+              }
             />
           )}
         </TabsContent>
@@ -121,43 +330,117 @@ export default function SegmentsPage() {
                 type="search"
                 placeholder="Search lists..."
                 className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 data-testid="input-search-lists"
               />
             </div>
-            <Button data-testid="button-create-list">
-              <Plus className="mr-2 h-4 w-4" />
-              Create List
-            </Button>
+            <Dialog open={createListDialogOpen} onOpenChange={setCreateListDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-list">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create List
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Create Static List</DialogTitle>
+                  <DialogDescription>
+                    Create a static snapshot list of contacts
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...listForm}>
+                  <form onSubmit={listForm.handleSubmit((data) => createListMutation.mutate(data))} className="space-y-4">
+                    <FormField
+                      control={listForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>List Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Q1 2024 Trade Show Leads" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={listForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="List description..." {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button type="submit" disabled={createListMutation.isPending}>
+                        {createListMutation.isPending ? "Creating..." : "Create List"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </div>
 
-          {lists.length > 0 ? (
+          {listsLoading ? (
             <div className="border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>List Name</TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
                     <TableHead>Contacts</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="w-[150px]">Actions</TableHead>
+                    <TableHead className="w-[120px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lists.map((list) => (
+                  {[1, 2].map((i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-6 w-48" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-64" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-16" /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : filteredLists.length > 0 ? (
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Contacts</TableHead>
+                    <TableHead className="w-[120px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredLists.map((list) => (
                     <TableRow key={list.id} className="hover-elevate" data-testid={`row-list-${list.id}`}>
                       <TableCell className="font-medium">{list.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{list.description || "-"}</TableCell>
+                      <TableCell>{list.contactIds?.length || 0}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">Static</Badge>
-                      </TableCell>
-                      <TableCell>{list.contacts}</TableCell>
-                      <TableCell className="text-muted-foreground">{list.createdAt}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" data-testid={`button-view-list-${list.id}`}>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" data-testid={`button-view-list-${list.id}`}>
                             View
                           </Button>
-                          <Button size="sm" data-testid={`button-use-list-${list.id}`}>
-                            Use
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteListMutation.mutate(list.id)}
+                            disabled={deleteListMutation.isPending}
+                            data-testid={`button-delete-list-${list.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
                       </TableCell>
@@ -169,10 +452,16 @@ export default function SegmentsPage() {
           ) : (
             <EmptyState
               icon={Users}
-              title="No lists created"
-              description="Create static lists by selecting specific contacts or taking a snapshot of a segment."
-              actionLabel="Create List"
-              onAction={() => {}}
+              title="No lists found"
+              description={searchQuery ? "Try adjusting your search query" : "Create your first static list"}
+              action={
+                !searchQuery ? (
+                  <Button onClick={() => setCreateListDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create List
+                  </Button>
+                ) : undefined
+              }
             />
           )}
         </TabsContent>
@@ -185,16 +474,33 @@ export default function SegmentsPage() {
                 type="search"
                 placeholder="Search domain sets..."
                 className="pl-10"
-                data-testid="input-search-domain-sets"
+                data-testid="input-search-domains"
               />
             </div>
-            <Button data-testid="button-upload-domain-set">
+            <Button data-testid="button-create-domain-set">
               <Upload className="mr-2 h-4 w-4" />
               Upload Domain Set
             </Button>
           </div>
 
-          {domainSets.length > 0 ? (
+          {domainSetsLoading ? (
+            <div className="grid gap-4">
+              {[1, 2].map((i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-6 w-48" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4">
+                      <Skeleton className="h-8 w-full" />
+                      <Skeleton className="h-8 w-full" />
+                      <Skeleton className="h-8 w-full" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : domainSets && domainSets.length > 0 ? (
             <div className="grid gap-4">
               {domainSets.map((domainSet) => (
                 <Card key={domainSet.id} className="hover-elevate" data-testid={`card-domain-set-${domainSet.id}`}>
@@ -202,27 +508,19 @@ export default function SegmentsPage() {
                     <CardTitle>{domainSet.name}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="grid grid-cols-3 gap-4 text-center">
                       <div>
-                        <div className="text-2xl font-bold">{domainSet.domains}</div>
+                        <div className="text-2xl font-bold">{domainSet.domains?.length || 0}</div>
                         <div className="text-sm text-muted-foreground">Domains</div>
                       </div>
                       <div>
-                        <div className="text-2xl font-bold text-chart-2">{domainSet.matchRate}%</div>
+                        <div className="text-2xl font-bold">-</div>
                         <div className="text-sm text-muted-foreground">Match Rate</div>
                       </div>
                       <div>
-                        <div className="text-2xl font-bold">{domainSet.contacts.toLocaleString()}</div>
+                        <div className="text-2xl font-bold">-</div>
                         <div className="text-sm text-muted-foreground">Contacts</div>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" data-testid={`button-expand-domain-set-${domainSet.id}`}>
-                        Expand to Contacts
-                      </Button>
-                      <Button size="sm" data-testid={`button-use-domain-set-${domainSet.id}`}>
-                        Use in Campaign
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -231,10 +529,14 @@ export default function SegmentsPage() {
           ) : (
             <EmptyState
               icon={Upload}
-              title="No domain sets uploaded"
-              description="Upload a CSV or TXT file of company domains to match accounts and expand to contacts."
-              actionLabel="Upload Domain Set"
-              onAction={() => {}}
+              title="No domain sets found"
+              description="Upload your first domain set to start matching accounts"
+              action={
+                <Button>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Domain Set
+                </Button>
+              }
             />
           )}
         </TabsContent>
