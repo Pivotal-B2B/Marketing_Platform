@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, Users, ListFilter, Mail, Phone, CheckSquare, ShieldAlert, Upload, FileText, ShoppingCart, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, Users, ListFilter, Globe, Mail, Phone, CheckSquare, ShieldAlert, Upload, FileText, ShoppingCart, Settings, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -39,6 +39,12 @@ const getNavItems = (userRole: string) => {
       url: "/segments",
       icon: ListFilter,
       roles: ["admin", "campaign_manager", "data_ops"],
+    },
+    {
+      title: "Domain Sets",
+      url: "/domain-sets",
+      icon: Globe,
+      roles: ["admin", "data_ops"],
     },
     {
       title: "Email Campaigns",

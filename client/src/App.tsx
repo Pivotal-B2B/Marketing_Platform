@@ -15,6 +15,7 @@ import Dashboard from "@/pages/dashboard";
 import AccountsPage from "@/pages/accounts";
 import ContactsPage from "@/pages/contacts";
 import SegmentsPage from "@/pages/segments";
+import DomainSetsPage from "@/pages/domain-sets";
 import EmailCampaignsPage from "@/pages/email-campaigns";
 import TelemarketingPage from "@/pages/telemarketing";
 import LeadsPage from "@/pages/leads";
@@ -45,6 +46,7 @@ function AuthenticatedApp() {
               <Route path="/accounts" component={AccountsPage} />
               <Route path="/contacts" component={ContactsPage} />
               <Route path="/segments" component={SegmentsPage} />
+              <Route path="/domain-sets" component={DomainSetsPage} />
               <Route path="/campaigns/email" component={EmailCampaignsPage} />
               <Route path="/campaigns/telemarketing" component={TelemarketingPage} />
               <Route path="/leads" component={LeadsPage} />
