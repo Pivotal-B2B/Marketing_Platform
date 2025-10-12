@@ -19,6 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useSelection } from "@/hooks/use-selection";
+import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar";
 import {
   Dialog,
   DialogContent,
@@ -191,6 +194,17 @@ export default function ContactsPage() {
     contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contact.title?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
+
+  const {
+    selectedIds,
+    selectedCount,
+    selectItem,
+    selectAll,
+    clearSelection,
+    isSelected,
+    isAllSelected,
+    isSomeSelected,
+  } = useSelection(filteredContacts);
 
   return (
     <div className="space-y-6">
@@ -381,6 +395,12 @@ export default function ContactsPage() {
         </Button>
       </div>
 
+      <BulkActionsToolbar
+        selectedCount={selectedCount}
+        totalCount={filteredContacts.length}
+        onClearSelection={clearSelection}
+      />
+
       {contactsLoading ? (
         <div className="border rounded-lg">
           <Table>
@@ -411,6 +431,14 @@ export default function ContactsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={isAllSelected ? true : isSomeSelected ? "indeterminate" : false}
+                    onCheckedChange={() => isAllSelected ? clearSelection() : selectAll()}
+                    aria-label="Select all"
+                    data-testid="checkbox-select-all"
+                  />
+                </TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Account</TableHead>
@@ -433,6 +461,14 @@ export default function ContactsPage() {
                     onClick={() => setLocation(`/contacts/${contact.id}`)}
                     data-testid={`row-contact-${contact.id}`}
                   >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isSelected(contact.id)}
+                        onCheckedChange={() => selectItem(contact.id)}
+                        aria-label={`Select ${fullName || contact.email}`}
+                        data-testid={`checkbox-contact-${contact.id}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
