@@ -62,19 +62,22 @@ export default function EmailCampaignsPage() {
     queryKey: ['/api/lists'],
   });
 
-  const createForm = useForm<InsertCampaign>({
-    resolver: zodResolver(insertCampaignSchema.extend({
-      selectedSegments: z.array(z.string()).optional(),
-      selectedLists: z.array(z.string()).optional(),
-    })),
+  const campaignFormSchema = insertCampaignSchema.extend({
+    selectedSegments: z.array(z.string()).optional(),
+    selectedLists: z.array(z.string()).optional(),
+  });
+
+  const createForm = useForm({
+    resolver: zodResolver(campaignFormSchema),
     defaultValues: {
-      type: "email",
+      type: "email" as const,
       name: "",
-      status: "draft",
+      status: "draft" as const,
       emailSubject: "",
       emailHtmlContent: "",
-      selectedSegments: [],
-      selectedLists: [],
+      brandId: "",
+      selectedSegments: [] as string[],
+      selectedLists: [] as string[],
     },
   });
 
@@ -308,9 +311,93 @@ export default function EmailCampaignsPage() {
                   </FormItem>
                 )}
               />
-              <div className="text-sm font-medium">Audience Selection (Optional for MVP)</div>
-              <div className="text-xs text-muted-foreground mb-2">
-                Select segments or lists to target. Leave empty to configure later.
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={createForm.control}
+                  name="selectedSegments"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Segments (Optional)</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          const current = field.value || [];
+                          if (!current.includes(value)) {
+                            field.onChange([...current, value]);
+                          }
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-segments">
+                            <SelectValue placeholder="Add segments..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {segments.map((segment) => (
+                            <SelectItem key={segment.id} value={segment.id}>
+                              {segment.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {field.value && field.value.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {field.value.map((id: string) => {
+                            const segment = segments.find(s => s.id === id);
+                            return segment ? (
+                              <Badge key={id} variant="secondary" className="text-xs">
+                                {segment.name}
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={createForm.control}
+                  name="selectedLists"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lists (Optional)</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          const current = field.value || [];
+                          if (!current.includes(value)) {
+                            field.onChange([...current, value]);
+                          }
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-lists">
+                            <SelectValue placeholder="Add lists..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {lists.map((list) => (
+                            <SelectItem key={list.id} value={list.id}>
+                              {list.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {field.value && field.value.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {field.value.map((id: string) => {
+                            const list = lists.find(l => l.id === id);
+                            return list ? (
+                              <Badge key={id} variant="secondary" className="text-xs">
+                                {list.name}
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
               <DialogFooter>
                 <Button 
