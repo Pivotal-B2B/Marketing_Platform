@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Download, Upload, Users, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -35,8 +35,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertContactSchema, type InsertContact, type Contact, type Account } from "@shared/schema";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { 
+  insertContactSchema, 
+  type InsertContact, 
+  type Contact, 
+  type Account,
+  type SuppressionEmail,
+  type SuppressionPhone 
+} from "@shared/schema";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 
 export default function ContactsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,6 +58,24 @@ export default function ContactsPage() {
     queryKey: ['/api/accounts'],
   });
 
+  // Fetch suppression lists for validation
+  const { data: emailSuppressions = [] } = useQuery<SuppressionEmail[]>({
+    queryKey: ['/api/suppressions/email'],
+  });
+
+  const { data: phoneSuppressions = [] } = useQuery<SuppressionPhone[]>({
+    queryKey: ['/api/suppressions/phone'],
+  });
+
+  // Helper functions to check suppressions
+  const isEmailSuppressed = (email: string) => {
+    return emailSuppressions.some(s => s.email.toLowerCase() === email.toLowerCase());
+  };
+
+  const isPhoneSuppressed = (phone: string) => {
+    return phoneSuppressions.some(s => s.phoneE164 === phone);
+  };
+
   const createForm = useForm<InsertContact>({
     resolver: zodResolver(insertContactSchema),
     defaultValues: {
@@ -63,6 +88,14 @@ export default function ContactsPage() {
       accountId: "",
     },
   });
+
+  // Watch email and phone for real-time suppression checks
+  const watchedEmail = createForm.watch("email");
+  const watchedPhone = createForm.watch("directPhone");
+  
+  const emailIsSuppressed = watchedEmail ? isEmailSuppressed(watchedEmail) : false;
+  // Note: Assuming phone is entered in E.164 format for suppression check
+  const phoneIsSuppressed = watchedPhone ? isPhoneSuppressed(watchedPhone) : false;
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertContact) => {
@@ -181,8 +214,20 @@ export default function ContactsPage() {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="john.smith@company.com" {...field} />
+                          <Input 
+                            type="email" 
+                            placeholder="john.smith@company.com" 
+                            {...field}
+                            className={emailIsSuppressed ? "border-destructive" : ""}
+                            data-testid="input-contact-email"
+                          />
                         </FormControl>
+                        {emailIsSuppressed && (
+                          <FormDescription className="flex items-center gap-1 text-destructive">
+                            <ShieldAlert className="h-3 w-3" />
+                            Warning: This email is on the suppression list
+                          </FormDescription>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -194,8 +239,20 @@ export default function ContactsPage() {
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
                         <FormControl>
-                          <Input placeholder="+1234567890" {...field} value={field.value || ""} />
+                          <Input 
+                            placeholder="+1234567890" 
+                            {...field} 
+                            value={field.value || ""}
+                            className={phoneIsSuppressed ? "border-destructive" : ""}
+                            data-testid="input-contact-phone"
+                          />
                         </FormControl>
+                        {phoneIsSuppressed && (
+                          <FormDescription className="flex items-center gap-1 text-destructive">
+                            <ShieldAlert className="h-3 w-3" />
+                            Warning: This phone is on the DNC list
+                          </FormDescription>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -313,6 +370,8 @@ export default function ContactsPage() {
                 const account = accounts?.find(a => a.id === contact.accountId);
                 const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
                 const initials = `${contact.firstName?.[0] || ''}${contact.lastName?.[0] || ''}`.toUpperCase();
+                const contactEmailSuppressed = isEmailSuppressed(contact.email);
+                const contactPhoneSuppressed = contact.directPhoneE164 ? isPhoneSuppressed(contact.directPhoneE164) : false;
                 
                 return (
                   <TableRow key={contact.id} className="hover-elevate" data-testid={`row-contact-${contact.id}`}>
@@ -321,15 +380,33 @@ export default function ContactsPage() {
                         <Avatar className="h-8 w-8">
                           <AvatarFallback>{initials}</AvatarFallback>
                         </Avatar>
-                        <div>
+                        <div className="flex-1">
                           <div className="font-medium">{fullName || "No name"}</div>
-                          <div className="text-sm text-muted-foreground font-mono">{contact.email}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground font-mono">{contact.email}</span>
+                            {contactEmailSuppressed && (
+                              <Badge variant="destructive" className="text-xs" data-testid={`badge-email-suppressed-${contact.id}`}>
+                                <MailIcon className="h-3 w-3 mr-1" />
+                                Suppressed
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>{contact.jobTitle || "-"}</TableCell>
                     <TableCell>{account?.name || "-"}</TableCell>
-                    <TableCell className="font-mono text-sm">{contact.directPhone || "-"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm">{contact.directPhone || "-"}</span>
+                        {contactPhoneSuppressed && (
+                          <Badge variant="destructive" className="text-xs" data-testid={`badge-phone-suppressed-${contact.id}`}>
+                            <PhoneIcon className="h-3 w-3 mr-1" />
+                            DNC
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Button 
