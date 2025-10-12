@@ -41,8 +41,8 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 
 **Core Entities:**
 - **Users** - Authentication with role-based access (admin, campaign_manager, data_ops, qa_analyst, agent, client_user)
-- **Accounts** - Company records with domain-based matching, custom fields (JSONB)
-- **Contacts** - Individual contacts linked to accounts, E.164 phone validation
+- **Accounts** - Company records with domain-based matching, linkedin_specialties, parent_account_id for hierarchies, tags, custom fields (JSONB)
+- **Contacts** - Individual contacts linked to accounts, E.164 phone validation, phone_verified_at, tags
 - **Segments** - Dynamic audience filters with AND/OR logic
 - **Lists** - Static contact snapshots
 - **Domain Sets** - Upload domains, normalize, match to accounts, expand to contacts

@@ -106,11 +106,14 @@ export const accounts = pgTable("accounts", {
   naicsCode: text("naics_code"),
   domain: text("domain").unique(),
   linkedinUrl: text("linkedin_url"),
+  linkedinSpecialties: text("linkedin_specialties").array(),
   mainPhone: text("main_phone"),
   mainPhoneE164: text("main_phone_e164"),
   mainPhoneExtension: text("main_phone_extension"),
   intentTopics: text("intent_topics").array(),
   techStack: text("tech_stack").array(),
+  parentAccountId: varchar("parent_account_id").references(() => accounts.id, { onDelete: 'set null' }),
+  tags: text("tags").array(),
   ownerId: varchar("owner_id").references(() => users.id),
   customFields: jsonb("custom_fields"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -119,6 +122,9 @@ export const accounts = pgTable("accounts", {
   domainIdx: index("accounts_domain_idx").on(table.domain),
   ownerIdx: index("accounts_owner_idx").on(table.ownerId),
   nameIdx: index("accounts_name_idx").on(table.name),
+  specialtiesGinIdx: index("accounts_specialties_gin_idx").using('gin', table.linkedinSpecialties),
+  techStackGinIdx: index("accounts_tech_stack_gin_idx").using('gin', table.techStack),
+  tagsGinIdx: index("accounts_tags_gin_idx").using('gin', table.tags),
 }));
 
 // Contacts table
@@ -134,11 +140,13 @@ export const contacts = pgTable("contacts", {
   directPhone: text("direct_phone"),
   directPhoneE164: text("direct_phone_e164"),
   phoneExtension: text("phone_extension"),
+  phoneVerifiedAt: timestamp("phone_verified_at"),
   seniorityLevel: text("seniority_level"),
   department: text("department"),
   address: text("address"),
   linkedinUrl: text("linkedin_url"),
   intentTopics: text("intent_topics").array(),
+  tags: text("tags").array(),
   consentBasis: text("consent_basis"),
   consentSource: text("consent_source"),
   consentTimestamp: timestamp("consent_timestamp"),
@@ -153,6 +161,7 @@ export const contacts = pgTable("contacts", {
   accountIdx: index("contacts_account_idx").on(table.accountId),
   phoneIdx: index("contacts_phone_idx").on(table.directPhoneE164),
   ownerIdx: index("contacts_owner_idx").on(table.ownerId),
+  tagsGinIdx: index("contacts_tags_gin_idx").using('gin', table.tags),
 }));
 
 // Segments table (dynamic filters)
