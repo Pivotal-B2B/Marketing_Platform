@@ -26,13 +26,16 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - E2E tested and verified all filtering workflows on both entity types
 
 **Phase 5 Deliverables (In Progress):**
-- Backend selection context infrastructure: selectionContexts table with entityType/selectionType enums, TTL enforcement (15min expiration)
-- API routes for selection contexts (GET/POST/DELETE) with validation, auth, and opportunistic cleanup
-- Reusable useSelection hook for managing page-level and global selections in frontend
-- BulkActionsToolbar component with dynamic counter, Clear Selection, and bulk action buttons
-- Checkbox columns added to Accounts page with "Select All on This Page" functionality
-- Selection state persists across table interactions, ready for pagination enhancement
-- Foundation for bulk operations (update/delete/export/add-to-list) with placeholder implementations
+- ✅ Backend selection context infrastructure: selectionContexts table with entityType/selectionType enums, TTL enforcement (15min expiration)
+- ✅ API routes for selection contexts (GET/POST/DELETE) with validation, auth, and opportunistic cleanup
+- ✅ Reusable useSelection hook for managing page-level and global selections in frontend
+- ✅ BulkActionsToolbar component with dynamic counter showing "X selected of Y", Clear Selection, and bulk action buttons
+- ✅ Checkbox columns added to Accounts and Contacts pages with tri-state "Select All on This Page" functionality
+- ✅ Selection state with proper indeterminate checkbox state, stopPropagation for row navigation
+- 🔄 Sticky selection persistence across pagination (pending)
+- 🔄 Global selection prompt ("Select all X records matching filter") (pending)
+- 🔄 Bulk operations implementation: Update Fields, Delete, Export, Assign Owner, Add to List (pending)
+- 🔄 Auto-invalidation of selection context when filters/search changes (pending)
 
 ## User Preferences
 
