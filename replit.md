@@ -10,6 +10,7 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - ✅ **Phase 1-2:** Schema enhancement (5 custom fields with GIN indexes) + auto-linking system (domain-based contact-account matching)
 - ✅ **Phase 3:** Record Detail Views - Account & Contact detail pages with tabbed interfaces, navigation, and quick actions
 - ✅ **Phase 4:** Advanced Filtering - Multi-criteria filter system with Sheet UI pattern, AND/OR logic, and saved filters backend
+- 🔄 **Phase 5 (In Progress):** Bulk Operations - Selection infrastructure with checkboxes, server-side selection contexts, bulk actions toolbar
 
 **Phase 4 Deliverables (Completed):**
 - Advanced filter infrastructure: Shared filter types (text/number/array/boolean), SQL query builder with Drizzle ORM integration
@@ -23,6 +24,15 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - Saved filters database schema, API routes, and storage methods (UI pending as future enhancement)
 - Fixed numeric range bug: properly handles empty bounds without Postgres casting to zero
 - E2E tested and verified all filtering workflows on both entity types
+
+**Phase 5 Deliverables (In Progress):**
+- Backend selection context infrastructure: selectionContexts table with entityType/selectionType enums, TTL enforcement (15min expiration)
+- API routes for selection contexts (GET/POST/DELETE) with validation, auth, and opportunistic cleanup
+- Reusable useSelection hook for managing page-level and global selections in frontend
+- BulkActionsToolbar component with dynamic counter, Clear Selection, and bulk action buttons
+- Checkbox columns added to Accounts page with "Select All on This Page" functionality
+- Selection state persists across table interactions, ready for pagination enhancement
+- Foundation for bulk operations (update/delete/export/add-to-list) with placeholder implementations
 
 ## User Preferences
 

@@ -4,8 +4,11 @@ import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Filter, Download, Building2, Pencil, Trash2 } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
+import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar";
+import { useSelection } from "@/hooks/use-selection";
 import type { FilterGroup } from "@shared/filter-types";
 import {
   Table,
@@ -123,6 +126,17 @@ export default function AccountsPage() {
     account.domain?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     account.industry?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
+
+  const {
+    selectedIds,
+    selectedCount,
+    selectItem,
+    selectAll,
+    clearSelection,
+    isSelected,
+    isAllSelected,
+    isSomeSelected,
+  } = useSelection(filteredAccounts);
 
   return (
     <div className="space-y-6">
@@ -250,11 +264,24 @@ export default function AccountsPage() {
         </Button>
       </div>
 
+      <BulkActionsToolbar
+        selectedCount={selectedCount}
+        totalCount={filteredAccounts.length}
+        onClearSelection={clearSelection}
+        onBulkExport={() => toast({ title: "Bulk export coming soon" })}
+        onBulkDelete={() => toast({ title: "Bulk delete coming soon" })}
+        onBulkUpdate={() => toast({ title: "Bulk update coming soon" })}
+        onBulkAddToList={() => toast({ title: "Bulk add to list coming soon" })}
+      />
+
       {isLoading ? (
         <div className="border rounded-lg">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Skeleton className="h-4 w-4" />
+                </TableHead>
                 <TableHead>Account Name</TableHead>
                 <TableHead>Domain</TableHead>
                 <TableHead>Industry</TableHead>
@@ -266,6 +293,7 @@ export default function AccountsPage() {
             <TableBody>
               {[1, 2, 3].map((i) => (
                 <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                   <TableCell><Skeleton className="h-8 w-48" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
@@ -282,6 +310,14 @@ export default function AccountsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={isAllSelected ? true : isSomeSelected ? "indeterminate" : false}
+                    onCheckedChange={() => isAllSelected ? clearSelection() : selectAll()}
+                    aria-label="Select all"
+                    data-testid="checkbox-select-all"
+                  />
+                </TableHead>
                 <TableHead>Account Name</TableHead>
                 <TableHead>Domain</TableHead>
                 <TableHead>Industry</TableHead>
@@ -298,6 +334,14 @@ export default function AccountsPage() {
                   onClick={() => setLocation(`/accounts/${account.id}`)}
                   data-testid={`row-account-${account.id}`}
                 >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={isSelected(account.id)}
+                      onCheckedChange={() => selectItem(account.id)}
+                      aria-label={`Select ${account.name}`}
+                      data-testid={`checkbox-account-${account.id}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
