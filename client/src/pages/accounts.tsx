@@ -5,6 +5,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Download, Building2, Pencil, Trash2 } from "lucide-react";
+import { FilterBuilder } from "@/components/filter-builder";
+import type { FilterGroup } from "@shared/filter-types";
 import {
   Table,
   TableBody,
@@ -36,11 +38,23 @@ export default function AccountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
-    queryKey: ['/api/accounts'],
+    queryKey: ['/api/accounts', filterGroup],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filterGroup) {
+        params.set('filters', JSON.stringify(filterGroup));
+      }
+      const response = await fetch(`/api/accounts?${params.toString()}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch accounts');
+      return response.json();
+    },
   });
 
   const createForm = useForm<InsertAccount>({
@@ -218,10 +232,11 @@ export default function AccountsPage() {
             data-testid="input-search-accounts"
           />
         </div>
-        <Button variant="outline" data-testid="button-filter">
-          <Filter className="mr-2 h-4 w-4" />
-          Filters
-        </Button>
+        <FilterBuilder
+          entityType="account"
+          onApplyFilter={setFilterGroup}
+          initialFilter={filterGroup}
+        />
         <Button variant="outline" data-testid="button-export">
           <Download className="mr-2 h-4 w-4" />
           Export
