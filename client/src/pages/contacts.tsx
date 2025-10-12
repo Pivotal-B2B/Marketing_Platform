@@ -5,6 +5,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon, Link as LinkIcon, Building2 } from "lucide-react";
+import { FilterBuilder } from "@/components/filter-builder";
+import type { FilterGroup } from "@shared/filter-types";
 import {
   Table,
   TableBody,
@@ -49,11 +51,30 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 export default function ContactsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const { data: contacts, isLoading: contactsLoading } = useQuery<Contact[]>({
-    queryKey: ['/api/contacts'],
+    queryKey: ['/api/contacts', filterGroup],
+    queryFn: async () => {
+      const token = localStorage.getItem('auth_token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const params = new URLSearchParams();
+      if (filterGroup) {
+        params.set('filters', JSON.stringify(filterGroup));
+      }
+      const response = await fetch(`/api/contacts?${params.toString()}`, {
+        headers,
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch contacts');
+      return response.json();
+    },
   });
 
   const { data: accounts } = useQuery<Account[]>({
@@ -349,10 +370,11 @@ export default function ContactsPage() {
             data-testid="input-search-contacts"
           />
         </div>
-        <Button variant="outline" data-testid="button-filter">
-          <Filter className="mr-2 h-4 w-4" />
-          Advanced Filters
-        </Button>
+        <FilterBuilder
+          entityType="contact"
+          onApplyFilter={setFilterGroup}
+          initialFilter={filterGroup}
+        />
         <Button variant="outline" data-testid="button-export">
           <Download className="mr-2 h-4 w-4" />
           Export

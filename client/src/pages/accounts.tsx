@@ -45,11 +45,18 @@ export default function AccountsPage() {
   const { data: accounts, isLoading } = useQuery<Account[]>({
     queryKey: ['/api/accounts', filterGroup],
     queryFn: async () => {
+      const token = localStorage.getItem('auth_token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const params = new URLSearchParams();
       if (filterGroup) {
         params.set('filters', JSON.stringify(filterGroup));
       }
       const response = await fetch(`/api/accounts?${params.toString()}`, {
+        headers,
         credentials: 'include',
       });
       if (!response.ok) throw new Error('Failed to fetch accounts');
