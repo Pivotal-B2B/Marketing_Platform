@@ -76,6 +76,17 @@ export const entityTypeEnum = pgEnum('entity_type', ['account', 'contact']);
 
 export const selectionTypeEnum = pgEnum('selection_type', ['explicit', 'filtered']);
 
+export const filterFieldCategoryEnum = pgEnum('filter_field_category', [
+  'contact_fields',
+  'account_fields', 
+  'suppression_fields',
+  'email_campaign_fields',
+  'telemarketing_campaign_fields',
+  'qa_fields',
+  'list_segment_fields',
+  'client_portal_fields'
+]);
+
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -428,6 +439,27 @@ export const selectionContexts = pgTable("selection_contexts", {
   expiresIdx: index("selection_contexts_expires_idx").on(table.expiresAt),
 }));
 
+// Filter Field Registry - Dynamic field definitions for scalable filtering
+export const filterFieldRegistry = pgTable("filter_field_registry", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entity: text("entity").notNull(), // 'contact', 'account', 'campaign', etc.
+  key: text("key").notNull(), // Field key in database (e.g., 'linkedin_url', 'job_title')
+  label: text("label").notNull(), // Display name (e.g., 'LinkedIn Profile URL')
+  type: text("type").notNull(), // 'string', 'number', 'boolean', 'array', 'date'
+  operators: text("operators").array().notNull(), // Allowed operators for this field type
+  category: filterFieldCategoryEnum("category").notNull(), // Categorization for UI grouping
+  isCustom: boolean("is_custom").notNull().default(false), // Custom vs. system field
+  visibleInFilters: boolean("visible_in_filters").notNull().default(true), // Show in filter UI
+  description: text("description"), // Helper text for users
+  sortOrder: integer("sort_order").default(0), // Display order within category
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  entityKeyIdx: index("filter_field_registry_entity_key_idx").on(table.entity, table.key),
+  categoryIdx: index("filter_field_registry_category_idx").on(table.category),
+  visibleIdx: index("filter_field_registry_visible_idx").on(table.visibleInFilters),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ownedAccounts: many(accounts),
@@ -613,6 +645,12 @@ export const insertSelectionContextSchema = createInsertSchema(selectionContexts
   }
 );
 
+export const insertFilterFieldSchema = createInsertSchema(filterFieldRegistry).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Inferred Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -676,3 +714,6 @@ export type InsertSavedFilter = z.infer<typeof insertSavedFilterSchema>;
 
 export type SelectionContext = typeof selectionContexts.$inferSelect;
 export type InsertSelectionContext = z.infer<typeof insertSelectionContextSchema>;
+
+export type FilterField = typeof filterFieldRegistry.$inferSelect;
+export type InsertFilterField = z.infer<typeof insertFilterFieldSchema>;
