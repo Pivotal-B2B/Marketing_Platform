@@ -506,6 +506,26 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.delete("/api/suppressions/email/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteEmailSuppression(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete email suppression" });
+    }
+  });
+
+  app.delete("/api/suppressions/phone/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deletePhoneSuppression(id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete phone suppression" });
+    }
+  });
+
   // ==================== CAMPAIGN ORDERS (Client Portal) ====================
   
   app.get("/api/orders", requireAuth, async (req, res) => {

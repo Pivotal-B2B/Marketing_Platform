@@ -84,9 +84,11 @@ export interface IStorage {
   // Suppressions
   getEmailSuppressions(): Promise<SuppressionEmail[]>;
   addEmailSuppression(suppression: InsertSuppressionEmail): Promise<SuppressionEmail>;
+  deleteEmailSuppression(id: number): Promise<void>;
   isEmailSuppressed(email: string): Promise<boolean>;
   getPhoneSuppressions(): Promise<SuppressionPhone[]>;
   addPhoneSuppression(suppression: InsertSuppressionPhone): Promise<SuppressionPhone>;
+  deletePhoneSuppression(id: number): Promise<void>;
   isPhoneSuppressed(phoneE164: string): Promise<boolean>;
   
   // Campaign Orders
@@ -373,6 +375,10 @@ export class DatabaseStorage implements IStorage {
     return suppression;
   }
 
+  async deleteEmailSuppression(id: number): Promise<void> {
+    await db.delete(suppressionEmails).where(eq(suppressionEmails.id, id));
+  }
+
   async isEmailSuppressed(email: string): Promise<boolean> {
     const [result] = await db
       .select()
@@ -389,6 +395,10 @@ export class DatabaseStorage implements IStorage {
   async addPhoneSuppression(insertSuppression: InsertSuppressionPhone): Promise<SuppressionPhone> {
     const [suppression] = await db.insert(suppressionPhones).values(insertSuppression).returning();
     return suppression;
+  }
+
+  async deletePhoneSuppression(id: number): Promise<void> {
+    await db.delete(suppressionPhones).where(eq(suppressionPhones.id, id));
   }
 
   async isPhoneSuppressed(phoneE164: string): Promise<boolean> {
