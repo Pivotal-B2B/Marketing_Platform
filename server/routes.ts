@@ -97,7 +97,15 @@ export function registerRoutes(app: Express) {
   
   app.get("/api/accounts", requireAuth, async (req, res) => {
     try {
-      const accounts = await storage.getAccounts();
+      let filters = undefined;
+      if (req.query.filters) {
+        try {
+          filters = JSON.parse(req.query.filters as string);
+        } catch (e) {
+          return res.status(400).json({ message: "Invalid filters format" });
+        }
+      }
+      const accounts = await storage.getAccounts(filters);
       res.json(accounts);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch accounts" });
@@ -154,7 +162,15 @@ export function registerRoutes(app: Express) {
   
   app.get("/api/contacts", requireAuth, async (req, res) => {
     try {
-      const contacts = await storage.getContacts();
+      let filters = undefined;
+      if (req.query.filters) {
+        try {
+          filters = JSON.parse(req.query.filters as string);
+        } catch (e) {
+          return res.status(400).json({ message: "Invalid filters format" });
+        }
+      }
+      const contacts = await storage.getContacts(filters);
       res.json(contacts);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch contacts" });

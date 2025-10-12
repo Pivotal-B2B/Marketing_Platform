@@ -1,6 +1,8 @@
 // Storage layer - referenced from blueprint:javascript_database
 import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
 import { db } from "./db";
+import { buildFilterQuery, buildSuppressionFilter } from "./filter-builder";
+import type { FilterGroup } from "@shared/filter-types";
 import {
   users, accounts, contacts, campaigns, segments, lists, domainSets,
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
@@ -31,14 +33,14 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   
   // Accounts
-  getAccounts(filters?: any): Promise<Account[]>;
+  getAccounts(filters?: FilterGroup): Promise<Account[]>;
   getAccount(id: string): Promise<Account | undefined>;
   createAccount(account: InsertAccount): Promise<Account>;
   updateAccount(id: string, account: Partial<InsertAccount>): Promise<Account | undefined>;
   deleteAccount(id: string): Promise<void>;
   
   // Contacts
-  getContacts(filters?: any): Promise<Contact[]>;
+  getContacts(filters?: FilterGroup): Promise<Contact[]>;
   getContact(id: string): Promise<Contact | undefined>;
   getContactsByAccountId(accountId: string): Promise<Contact[]>;
   createContact(contact: InsertContact): Promise<Contact>;
@@ -144,8 +146,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Accounts
-  async getAccounts(filters?: any): Promise<Account[]> {
-    return await db.select().from(accounts).orderBy(desc(accounts.createdAt));
+  async getAccounts(filters?: FilterGroup): Promise<Account[]> {
+    let query = db.select().from(accounts);
+    
+    if (filters) {
+      const filterCondition = buildFilterQuery(filters, accounts);
+      if (filterCondition) {
+        query = query.where(filterCondition) as any;
+      }
+    }
+    
+    return await query.orderBy(desc(accounts.createdAt));
   }
 
   async getAccount(id: string): Promise<Account | undefined> {
@@ -172,8 +183,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Contacts
-  async getContacts(filters?: any): Promise<Contact[]> {
-    return await db.select().from(contacts).orderBy(desc(contacts.createdAt));
+  async getContacts(filters?: FilterGroup): Promise<Contact[]> {
+    let query = db.select().from(contacts);
+    
+    if (filters) {
+      const filterCondition = buildFilterQuery(filters, contacts);
+      if (filterCondition) {
+        query = query.where(filterCondition) as any;
+      }
+    }
+    
+    return await query.orderBy(desc(contacts.createdAt));
   }
 
   async getContact(id: string): Promise<Contact | undefined> {
