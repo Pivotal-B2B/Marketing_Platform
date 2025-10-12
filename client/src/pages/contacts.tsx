@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 export default function ContactsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const { data: contacts, isLoading: contactsLoading } = useQuery<Contact[]>({
@@ -403,7 +405,12 @@ export default function ContactsPage() {
                 const contactPhoneSuppressed = contact.directPhoneE164 ? isPhoneSuppressed(contact.directPhoneE164) : false;
                 
                 return (
-                  <TableRow key={contact.id} className="hover-elevate" data-testid={`row-contact-${contact.id}`}>
+                  <TableRow 
+                    key={contact.id} 
+                    className="hover-elevate cursor-pointer"
+                    onClick={() => setLocation(`/contacts/${contact.id}`)}
+                    data-testid={`row-contact-${contact.id}`}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-8 w-8">
@@ -450,6 +457,10 @@ export default function ContactsPage() {
                         <Button 
                           variant="ghost" 
                           size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/contacts/${contact.id}`);
+                          }}
                           data-testid={`button-view-contact-${contact.id}`}
                         >
                           View
@@ -457,7 +468,10 @@ export default function ContactsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => deleteMutation.mutate(contact.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteMutation.mutate(contact.id);
+                          }}
                           disabled={deleteMutation.isPending}
                           data-testid={`button-delete-contact-${contact.id}`}
                         >

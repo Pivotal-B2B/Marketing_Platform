@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ export default function AccountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
@@ -268,7 +270,12 @@ export default function AccountsPage() {
             </TableHeader>
             <TableBody>
               {filteredAccounts.map((account) => (
-                <TableRow key={account.id} className="hover-elevate" data-testid={`row-account-${account.id}`}>
+                <TableRow 
+                  key={account.id} 
+                  className="hover-elevate cursor-pointer" 
+                  onClick={() => setLocation(`/accounts/${account.id}`)}
+                  data-testid={`row-account-${account.id}`}
+                >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
@@ -289,7 +296,11 @@ export default function AccountsPage() {
                     <div className="flex items-center gap-2">
                       <Button 
                         variant="ghost" 
-                        size="sm" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/accounts/${account.id}`);
+                        }}
                         data-testid={`button-view-account-${account.id}`}
                       >
                         View
@@ -297,7 +308,10 @@ export default function AccountsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteMutation.mutate(account.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteMutation.mutate(account.id);
+                        }}
                         disabled={deleteMutation.isPending}
                         data-testid={`button-delete-account-${account.id}`}
                       >

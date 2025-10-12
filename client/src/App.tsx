@@ -13,7 +13,9 @@ import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import AccountsPage from "@/pages/accounts";
+import AccountDetailPage from "@/pages/account-detail";
 import ContactsPage from "@/pages/contacts";
+import ContactDetailPage from "@/pages/contact-detail";
 import SegmentsPage from "@/pages/segments";
 import DomainSetsPage from "@/pages/domain-sets";
 import EmailCampaignsPage from "@/pages/email-campaigns";
@@ -43,7 +45,9 @@ function AuthenticatedApp() {
           <main className="flex-1 overflow-auto p-6 bg-background">
             <Switch>
               <Route path="/" component={Dashboard} />
+              <Route path="/accounts/:id" component={AccountDetailPage} />
               <Route path="/accounts" component={AccountsPage} />
+              <Route path="/contacts/:id" component={ContactDetailPage} />
               <Route path="/contacts" component={ContactsPage} />
               <Route path="/segments" component={SegmentsPage} />
               <Route path="/domain-sets" component={DomainSetsPage} />
