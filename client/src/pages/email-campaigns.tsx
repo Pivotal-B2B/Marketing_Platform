@@ -1,70 +1,164 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Mail, Play, Pause, BarChart3 } from "lucide-react";
+import { Plus, Search, Mail, Play, BarChart3, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { 
+  type Campaign, 
+  type InsertCampaign,
+  type Segment,
+  type List,
+  insertCampaignSchema 
+} from "@shared/schema";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function EmailCampaignsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const { toast } = useToast();
 
-  const campaigns = [
-    {
-      id: "1",
-      name: "Q2 Product Launch - Enterprise",
-      status: "active",
-      subject: "Introducing our new enterprise features",
-      sent: 4523,
-      delivered: 4498,
-      opened: 1876,
-      clicked: 432,
-      target: 5000
+  const { data: campaigns, isLoading: campaignsLoading } = useQuery<Campaign[]>({
+    queryKey: ['/api/campaigns'],
+  });
+
+  const { data: segments = [] } = useQuery<Segment[]>({
+    queryKey: ['/api/segments'],
+  });
+
+  const { data: lists = [] } = useQuery<List[]>({
+    queryKey: ['/api/lists'],
+  });
+
+  const createForm = useForm<InsertCampaign>({
+    resolver: zodResolver(insertCampaignSchema.extend({
+      selectedSegments: z.array(z.string()).optional(),
+      selectedLists: z.array(z.string()).optional(),
+    })),
+    defaultValues: {
+      type: "email",
+      name: "",
+      status: "draft",
+      emailSubject: "",
+      emailHtmlContent: "",
+      selectedSegments: [],
+      selectedLists: [],
     },
-    {
-      id: "2",
-      name: "Webinar Invitation - AI Trends",
-      status: "scheduled",
-      subject: "Join us for an exclusive webinar on AI trends",
-      sent: 0,
-      delivered: 0,
-      opened: 0,
-      clicked: 0,
-      target: 2500
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      // Build audienceRefs from selected segments and lists
+      const { selectedSegments = [], selectedLists = [], ...campaignData } = data;
+      const payload = {
+        ...campaignData,
+        audienceRefs: {
+          segments: selectedSegments,
+          lists: selectedLists,
+        },
+      };
+      return await apiRequest('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
     },
-    {
-      id: "3",
-      name: "Follow-up Campaign - Demo Requests",
-      status: "completed",
-      subject: "Thank you for requesting a demo",
-      sent: 189,
-      delivered: 187,
-      opened: 124,
-      clicked: 78,
-      target: 189
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns'], refetchType: 'active' });
+      setCreateDialogOpen(false);
+      createForm.reset();
+      toast({
+        title: "Success",
+        description: "Campaign created successfully",
+      });
     },
-  ];
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create campaign",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const launchMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest(`/api/campaigns/${id}/launch`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns'], refetchType: 'active' });
+      toast({
+        title: "Success",
+        description: "Campaign launched successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to launch campaign",
+        variant: "destructive",
+      });
+    },
+  });
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "outline"> = {
       active: "default",
-      scheduled: "secondary",
+      draft: "secondary",
       completed: "outline",
+      paused: "outline",
     };
-    return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
+    return <Badge variant={variants[status] || "outline"} data-testid={`badge-status-${status}`}>{status}</Badge>;
   };
+
+  const filteredCampaigns = campaigns?.filter(campaign =>
+    campaign.name.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Email Campaigns</h1>
+          <h1 className="text-3xl font-bold" data-testid="heading-email-campaigns">Email Campaigns</h1>
           <p className="text-muted-foreground mt-1">
             Create, manage, and track your email marketing campaigns
           </p>
         </div>
-        <Button data-testid="button-create-email-campaign">
+        <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-email-campaign">
           <Plus className="mr-2 h-4 w-4" />
           Create Campaign
         </Button>
@@ -84,32 +178,43 @@ export default function EmailCampaignsPage() {
         </div>
       </div>
 
-      {campaigns.length > 0 ? (
+      {campaignsLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-48 w-full" />
+          ))}
+        </div>
+      ) : filteredCampaigns.length > 0 ? (
         <div className="grid gap-4">
-          {campaigns.map((campaign) => (
+          {filteredCampaigns.map((campaign) => (
             <Card key={campaign.id} className="hover-elevate" data-testid={`card-campaign-${campaign.id}`}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <CardTitle>{campaign.name}</CardTitle>
+                      <CardTitle data-testid={`text-campaign-name-${campaign.id}`}>{campaign.name}</CardTitle>
                       {getStatusBadge(campaign.status)}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Subject: {campaign.subject}
-                    </p>
+                    {campaign.emailSubject && (
+                      <p className="text-sm text-muted-foreground" data-testid={`text-campaign-subject-${campaign.id}`}>
+                        Subject: {campaign.emailSubject}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2">
-                    {campaign.status === "active" && (
-                      <Button variant="outline" size="sm" data-testid={`button-pause-campaign-${campaign.id}`}>
-                        <Pause className="mr-2 h-4 w-4" />
-                        Pause
-                      </Button>
-                    )}
-                    {campaign.status === "scheduled" && (
-                      <Button size="sm" data-testid={`button-launch-campaign-${campaign.id}`}>
-                        <Play className="mr-2 h-4 w-4" />
-                        Launch Now
+                    {campaign.status === "draft" && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => launchMutation.mutate(campaign.id)}
+                        disabled={launchMutation.isPending}
+                        data-testid={`button-launch-campaign-${campaign.id}`}
+                      >
+                        {launchMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="mr-2 h-4 w-4" />
+                        )}
+                        Launch
                       </Button>
                     )}
                     <Button variant="outline" size="sm" data-testid={`button-view-stats-${campaign.id}`}>
@@ -120,46 +225,9 @@ export default function EmailCampaignsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {campaign.status === "active" && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Progress</span>
-                        <span className="font-medium">{campaign.sent} / {campaign.target}</span>
-                      </div>
-                      <Progress value={(campaign.sent / campaign.target) * 100} />
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-4 gap-4">
-                    <div>
-                      <div className="text-2xl font-bold" data-testid={`campaign-sent-${campaign.id}`}>
-                        {campaign.sent.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Sent</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-chart-2" data-testid={`campaign-delivered-${campaign.id}`}>
-                        {campaign.delivered.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Delivered</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-chart-1" data-testid={`campaign-opened-${campaign.id}`}>
-                        {campaign.opened.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Opened ({campaign.delivered > 0 ? Math.round((campaign.opened / campaign.delivered) * 100) : 0}%)
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-chart-4" data-testid={`campaign-clicked-${campaign.id}`}>
-                        {campaign.clicked.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Clicked ({campaign.opened > 0 ? Math.round((campaign.clicked / campaign.opened) * 100) : 0}%)
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">
+                    Type: {campaign.type} | Created: {new Date(campaign.createdAt).toLocaleDateString()}
                   </div>
                 </div>
               </CardContent>
@@ -170,11 +238,104 @@ export default function EmailCampaignsPage() {
         <EmptyState
           icon={Mail}
           title="No email campaigns yet"
-          description="Create your first email campaign with our wizard to start engaging your audience."
+          description="Create your first email campaign to start engaging your audience."
           actionLabel="Create Campaign"
-          onAction={() => {}}
+          onAction={() => setCreateDialogOpen(true)}
         />
       )}
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]" data-testid="dialog-create-campaign">
+          <DialogHeader>
+            <DialogTitle>Create Email Campaign</DialogTitle>
+            <DialogDescription>
+              Set up a new email campaign to engage your audience
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...createForm}>
+            <form onSubmit={createForm.handleSubmit((data) => createMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={createForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Campaign Name</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Q1 Product Launch" 
+                        {...field} 
+                        data-testid="input-campaign-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={createForm.control}
+                name="emailSubject"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Subject</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Introducing our latest features" 
+                        {...field} 
+                        value={field.value || ""}
+                        data-testid="input-email-subject"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={createForm.control}
+                name="emailHtmlContent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email Content</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Enter email HTML content..." 
+                        {...field}
+                        value={field.value || ""}
+                        rows={4}
+                        data-testid="input-email-content"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="text-sm font-medium">Audience Selection (Optional for MVP)</div>
+              <div className="text-xs text-muted-foreground mb-2">
+                Select segments or lists to target. Leave empty to configure later.
+              </div>
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setCreateDialogOpen(false)}
+                  data-testid="button-cancel-campaign"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createMutation.isPending}
+                  data-testid="button-submit-campaign"
+                >
+                  {createMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Create Campaign
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
