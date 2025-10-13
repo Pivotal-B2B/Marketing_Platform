@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { Filter, Plus, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Filter, Plus, X, Search, ChevronDown, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   FilterGroup, 
   FilterCondition, 
@@ -13,8 +15,6 @@ import {
   numberOperators,
   arrayOperators,
   booleanOperators,
-  accountFilterFields,
-  contactFilterFields,
   type TextOperator,
   type NumberOperator,
   type ArrayOperator,
@@ -29,6 +29,19 @@ interface FilterBuilderProps {
   initialFilter?: FilterGroup;
 }
 
+interface FilterFieldConfig {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'array' | 'boolean';
+  operators: string[];
+  category: string;
+}
+
+interface FilterFieldsResponse {
+  fields: FilterFieldConfig[];
+  grouped: Record<string, FilterFieldConfig[]>;
+}
+
 export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: FilterBuilderProps) {
   const [filterGroup, setFilterGroup] = useState<FilterGroup>(
     initialFilter || {
@@ -37,13 +50,69 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
     }
   );
   const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
-  const filterFields = entityType === 'account' ? accountFilterFields : contactFilterFields;
+  // Fetch dynamic filter fields from API
+  const { data: filterFieldsData } = useQuery<FilterFieldsResponse>({
+    queryKey: ['/api/filters/fields', 'entity', entityType],
+  });
+
+  // Auto-expand first category on load
+  useEffect(() => {
+    if (filterFieldsData?.grouped && Object.keys(expandedCategories).length === 0) {
+      const firstCategory = Object.keys(filterFieldsData.grouped)[0];
+      if (firstCategory) {
+        setExpandedCategories({ [firstCategory]: true });
+      }
+    }
+  }, [filterFieldsData]);
+
+  const filterFields = filterFieldsData?.fields || [];
+  const groupedFields = filterFieldsData?.grouped || {};
+
+  // Filter fields by search term
+  const filteredGroupedFields = Object.entries(groupedFields).reduce((acc, [category, fields]) => {
+    if (!searchTerm) {
+      acc[category] = fields;
+      return acc;
+    }
+    
+    const matchingFields = fields.filter(field => 
+      field.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      field.key.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    if (matchingFields.length > 0) {
+      acc[category] = matchingFields;
+    }
+    
+    return acc;
+  }, {} as Record<string, FilterFieldConfig[]>);
+
+  // Auto-expand categories when searching
+  useEffect(() => {
+    if (searchTerm) {
+      const newExpanded: Record<string, boolean> = {};
+      Object.keys(filteredGroupedFields).forEach(cat => {
+        newExpanded[cat] = true;
+      });
+      setExpandedCategories(newExpanded);
+    }
+  }, [searchTerm]);
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
 
   const addCondition = () => {
+    const firstField = filterFields[0];
     const newCondition: FilterCondition = {
       id: `${Date.now()}-${Math.random()}`,
-      field: Object.keys(filterFields)[0],
+      field: firstField?.key || 'name',
       operator: 'equals',
       value: ''
     };
@@ -69,8 +138,12 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
     });
   };
 
+  const getFieldConfig = (fieldKey: string): FilterFieldConfig | undefined => {
+    return filterFields.find(f => f.key === fieldKey);
+  };
+
   const getOperatorsForField = (field: string) => {
-    const fieldConfig = filterFields[field as keyof typeof filterFields];
+    const fieldConfig = getFieldConfig(field);
     const fieldType = fieldConfig?.type;
     switch (fieldType) {
       case 'text':
@@ -87,7 +160,7 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
   };
 
   const renderValueInput = (condition: FilterCondition) => {
-    const fieldConfig = filterFields[condition.field as keyof typeof filterFields];
+    const fieldConfig = getFieldConfig(condition.field);
     const fieldType = fieldConfig?.type || 'text';
     const operator = condition.operator;
 
@@ -236,76 +309,123 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
 
           {/* Conditions */}
           <div className="space-y-4">
-            {filterGroup.conditions.map((condition, index) => (
-              <div key={condition.id} className="border rounded-lg p-4 space-y-3" data-testid={`filter-condition-${condition.id}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Condition {index + 1}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeCondition(condition.id)}
-                    data-testid={`button-remove-condition-${condition.id}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="grid gap-3">
-                  {/* Field Selector */}
-                  <div>
-                    <Label className="text-xs">Field</Label>
-                    <Select
-                      value={condition.field}
-                      onValueChange={(val) => {
-                        const operators = getOperatorsForField(val);
-                        updateCondition(condition.id, {
-                          field: val,
-                          operator: operators[0] as any,
-                          value: ''
-                        });
-                      }}
+            {filterGroup.conditions.map((condition, index) => {
+              const fieldConfig = getFieldConfig(condition.field);
+              return (
+                <div key={condition.id} className="border rounded-lg p-4 space-y-3" data-testid={`filter-condition-${condition.id}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Condition {index + 1}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeCondition(condition.id)}
+                      data-testid={`button-remove-condition-${condition.id}`}
                     >
-                      <SelectTrigger data-testid={`select-field-${condition.id}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(filterFields).map(([key, config]) => (
-                          <SelectItem key={key} value={key}>
-                            {config.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
 
-                  {/* Operator Selector */}
-                  <div>
-                    <Label className="text-xs">Operator</Label>
-                    <Select
-                      value={condition.operator}
-                      onValueChange={(val) => updateCondition(condition.id, { operator: val as any, value: '' })}
-                    >
-                      <SelectTrigger data-testid={`select-operator-${condition.id}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getOperatorsForField(condition.field).map((op) => (
-                          <SelectItem key={op} value={op}>
-                            {op.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div className="grid gap-3">
+                    {/* Field Selector with Categories */}
+                    <div>
+                      <Label className="text-xs">Field</Label>
+                      <Select
+                        value={condition.field}
+                        onValueChange={(val) => {
+                          const operators = getOperatorsForField(val);
+                          updateCondition(condition.id, {
+                            field: val,
+                            operator: operators[0] as any,
+                            value: ''
+                          });
+                        }}
+                      >
+                        <SelectTrigger data-testid={`select-field-${condition.id}`}>
+                          <SelectValue>
+                            {fieldConfig?.label || condition.field}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[400px]">
+                          <div className="px-2 py-2 sticky top-0 bg-background z-10">
+                            <div className="relative">
+                              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Search fields..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-8 h-9"
+                                data-testid="input-search-fields"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2">
+                            {Object.entries(filteredGroupedFields).map(([category, fields]) => (
+                              <Collapsible
+                                key={category}
+                                open={expandedCategories[category]}
+                                onOpenChange={() => toggleCategory(category)}
+                              >
+                                <CollapsibleTrigger className="flex items-center gap-2 w-full px-2 py-1.5 text-sm font-medium hover:bg-accent rounded-sm">
+                                  {expandedCategories[category] ? (
+                                    <ChevronDown className="h-3 w-3" />
+                                  ) : (
+                                    <ChevronRight className="h-3 w-3" />
+                                  )}
+                                  {category}
+                                  <Badge variant="secondary" className="ml-auto h-5 px-1.5 text-xs">
+                                    {fields.length}
+                                  </Badge>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="pl-4">
+                                  {fields.map((field) => (
+                                    <SelectItem key={field.key} value={field.key}>
+                                      {field.label}
+                                    </SelectItem>
+                                  ))}
+                                </CollapsibleContent>
+                              </Collapsible>
+                            ))}
+                            
+                            {Object.keys(filteredGroupedFields).length === 0 && (
+                              <div className="text-center py-4 text-sm text-muted-foreground">
+                                No fields match "{searchTerm}"
+                              </div>
+                            )}
+                          </div>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  {/* Value Input */}
-                  <div>
-                    <Label className="text-xs">Value</Label>
-                    {renderValueInput(condition)}
+                    {/* Operator Selector */}
+                    <div>
+                      <Label className="text-xs">Operator</Label>
+                      <Select
+                        value={condition.operator}
+                        onValueChange={(val) => updateCondition(condition.id, { operator: val as any, value: '' })}
+                      >
+                        <SelectTrigger data-testid={`select-operator-${condition.id}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {getOperatorsForField(condition.field).map((op) => (
+                            <SelectItem key={op} value={op}>
+                              {op.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Value Input */}
+                    <div>
+                      <Label className="text-xs">Value</Label>
+                      {renderValueInput(condition)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {filterGroup.conditions.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
@@ -320,6 +440,7 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
             onClick={addCondition}
             className="w-full"
             data-testid="button-add-condition"
+            disabled={filterFields.length === 0}
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Condition
