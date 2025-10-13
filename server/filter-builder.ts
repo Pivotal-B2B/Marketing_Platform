@@ -4,6 +4,23 @@ import { accounts, contacts } from "@shared/schema";
 
 type TableType = typeof accounts | typeof contacts;
 
+// Map filter field names to actual database column names
+const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
+  accounts: {
+    'industry': 'industryStandardized',
+    'companySize': 'companySize',
+    'revenue': 'revenue',
+  },
+  contacts: {
+    // Contacts don't have direct industry field - would need to join with accounts
+  }
+};
+
+function getColumnName(field: string, table: TableType): string {
+  const tableName = table === accounts ? 'accounts' : 'contacts';
+  return FIELD_MAPPINGS[tableName]?.[field] || field;
+}
+
 export function buildFilterQuery(filterGroup: FilterGroup, table: TableType): SQL | undefined {
   if (!filterGroup.conditions || filterGroup.conditions.length === 0) {
     return undefined;
@@ -41,10 +58,13 @@ function buildCondition(condition: FilterCondition, table: TableType): SQL | und
     return boolValue ? isNotNull(contacts.accountId) : isNull(contacts.accountId);
   }
 
+  // Get the actual column name from field mapping
+  const columnName = getColumnName(field, table);
+  
   // Get the column from the table
-  const column = (table as any)[field];
+  const column = (table as any)[columnName];
   if (!column) {
-    console.warn(`Field ${field} not found in table`);
+    console.warn(`Field ${field} (mapped to ${columnName}) not found in table`);
     return undefined;
   }
 
