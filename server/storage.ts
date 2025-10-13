@@ -1,5 +1,5 @@
 // Storage layer - referenced from blueprint:javascript_database
-import { eq, and, or, like, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, like, desc, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { buildFilterQuery, buildSuppressionFilter } from "./filter-builder";
 import type { FilterGroup } from "@shared/filter-types";
@@ -7,7 +7,7 @@ import {
   users, accounts, contacts, campaigns, segments, lists, domainSets,
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
   campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
-  selectionContexts, filterFieldRegistry,
+  selectionContexts, filterFieldRegistry, fieldChangeLog,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -394,8 +394,14 @@ export class DatabaseStorage implements IStorage {
       return { contact: updated, action: 'updated' };
     } else {
       // CREATE: New contact
+      // Compute fullName if not provided
+      const fullName = data.fullName || 
+        (data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : 
+         data.firstName || data.lastName || data.email);
+      
       const insertData: InsertContact = {
         ...data,
+        fullName,
         emailNormalized,
         sourceSystem: options?.sourceSystem,
         sourceRecordId: options?.sourceRecordId,
