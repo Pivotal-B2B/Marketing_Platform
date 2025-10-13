@@ -79,9 +79,10 @@ export default function ResourcesCentre() {
     queryKey: ["/api/sponsors"],
   });
 
-  const syncMutation = useMutation({
+  const syncMutation = useMutation<SyncResult, Error, void>({
     mutationFn: async () => {
-      return await apiRequest<SyncResult>("/api/sync/resources-centre", "POST");
+      const response = await apiRequest("POST", "/api/sync/resources-centre");
+      return await response.json();
     },
     onSuccess: (data: SyncResult) => {
       setSyncResult(data);
