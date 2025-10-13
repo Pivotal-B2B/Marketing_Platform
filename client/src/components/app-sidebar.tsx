@@ -70,7 +70,7 @@ const getNavStructure = (): NavItem[] => [
     roles: ["admin", "campaign_manager", "data_ops"],
     items: [
       { title: "All Accounts", url: "/accounts", roles: ["admin", "campaign_manager", "data_ops"] },
-      { title: "Segments & Lists", url: "/segments", roles: ["admin", "campaign_manager", "data_ops"] },
+      { title: "Segments & Lists", url: "/segments?entity=account", roles: ["admin", "campaign_manager", "data_ops"] },
       { title: "Domain Sets", url: "/domain-sets", roles: ["admin", "data_ops"] },
     ],
   },
@@ -80,7 +80,7 @@ const getNavStructure = (): NavItem[] => [
     roles: ["admin", "campaign_manager", "data_ops"],
     items: [
       { title: "All Contacts", url: "/contacts", roles: ["admin", "campaign_manager", "data_ops"] },
-      { title: "Segments & Lists", url: "/segments", roles: ["admin", "campaign_manager", "data_ops"] },
+      { title: "Segments & Lists", url: "/segments?entity=contact", roles: ["admin", "campaign_manager", "data_ops"] },
       { title: "Bulk Import", url: "/imports", roles: ["admin", "data_ops"] },
     ],
   },
@@ -118,10 +118,10 @@ const getNavStructure = (): NavItem[] => [
     icon: Settings,
     roles: ["admin"],
     items: [
-      { title: "User & Role Management", url: "/settings", roles: ["admin"] },
+      { title: "User & Role Management", url: "/settings/users", roles: ["admin"] },
       { title: "Suppression Management", url: "/suppressions", roles: ["admin"] },
-      { title: "Compliance Center", url: "/settings", roles: ["admin"] },
-      { title: "Integrations & APIs", url: "/settings", roles: ["admin"] },
+      { title: "Compliance Center", url: "/settings/compliance", roles: ["admin"] },
+      { title: "Integrations & APIs", url: "/settings/integrations", roles: ["admin"] },
     ],
   },
 ];
@@ -141,8 +141,33 @@ export function AppSidebar({ userRole = "admin" }: { userRole?: string }) {
   const navItems = filterNavByRole(getNavStructure(), userRole);
 
   const isActive = (url?: string, items?: SubNavItem[]) => {
-    if (url) return location === url;
-    if (items) return items.some(item => location === item.url);
+    if (url) {
+      // Handle URLs with query parameters
+      const urlWithoutParams = url.split('?')[0];
+      const locationWithoutParams = location.split('?')[0];
+      
+      // Exact match for simple URLs
+      if (location === url) return true;
+      
+      // Base path match for URLs with query params
+      if (url.includes('?') && locationWithoutParams === urlWithoutParams) {
+        return location.includes(url.split('?')[1]);
+      }
+      
+      return false;
+    }
+    if (items) {
+      return items.some(item => {
+        const itemUrlWithoutParams = item.url.split('?')[0];
+        const locationWithoutParams = location.split('?')[0];
+        
+        if (location === item.url) return true;
+        if (item.url.includes('?') && locationWithoutParams === itemUrlWithoutParams) {
+          return location.includes(item.url.split('?')[1]);
+        }
+        return false;
+      });
+    }
     return false;
   };
 

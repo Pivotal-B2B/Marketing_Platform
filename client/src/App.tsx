@@ -62,6 +62,9 @@ function AuthenticatedApp() {
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />
               <Route path="/reports" component={ReportsPage} />
+              <Route path="/settings/users" component={SettingsPage} />
+              <Route path="/settings/compliance" component={SettingsPage} />
+              <Route path="/settings/integrations" component={SettingsPage} />
               <Route path="/settings" component={SettingsPage} />
               <Route component={NotFound} />
             </Switch>
