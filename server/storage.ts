@@ -15,6 +15,7 @@ import {
   events, resources, news,
   softphoneProfiles, callRecordingAccessLogs,
   campaignContentLinks,
+  speakers, organizers, sponsors,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -58,6 +59,9 @@ import {
   type Event, type InsertEvent,
   type Resource, type InsertResource,
   type News, type InsertNews,
+  type Speaker, type InsertSpeaker,
+  type Organizer, type InsertOrganizer,
+  type Sponsor, type InsertSponsor,
   domainAuth, trackingDomains, ipPools, warmupPlans, sendPolicies,
   domainReputationSnapshots, perDomainStats,
   type DomainAuth, type InsertDomainAuth,
@@ -157,6 +161,25 @@ export interface IStorage {
   getCampaignContentLink(id: number): Promise<CampaignContentLink | undefined>;
   createCampaignContentLink(link: InsertCampaignContentLink): Promise<CampaignContentLink>;
   deleteCampaignContentLink(id: number): Promise<void>;
+  
+  // Speakers, Organizers, Sponsors
+  getSpeakers(): Promise<Speaker[]>;
+  getSpeaker(id: number): Promise<Speaker | undefined>;
+  createSpeaker(speaker: InsertSpeaker): Promise<Speaker>;
+  updateSpeaker(id: number, speaker: Partial<InsertSpeaker>): Promise<Speaker | undefined>;
+  deleteSpeaker(id: number): Promise<void>;
+  
+  getOrganizers(): Promise<Organizer[]>;
+  getOrganizer(id: number): Promise<Organizer | undefined>;
+  createOrganizer(organizer: InsertOrganizer): Promise<Organizer>;
+  updateOrganizer(id: number, organizer: Partial<InsertOrganizer>): Promise<Organizer | undefined>;
+  deleteOrganizer(id: number): Promise<void>;
+  
+  getSponsors(): Promise<Sponsor[]>;
+  getSponsor(id: number): Promise<Sponsor | undefined>;
+  createSponsor(sponsor: InsertSponsor): Promise<Sponsor>;
+  updateSponsor(id: number, sponsor: Partial<InsertSponsor>): Promise<Sponsor | undefined>;
+  deleteSponsor(id: number): Promise<void>;
   
   // Qualification Responses
   createQualificationResponse(response: InsertQualificationResponse): Promise<QualificationResponse>;
@@ -1118,6 +1141,78 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCampaignContentLink(id: number): Promise<void> {
     await db.delete(campaignContentLinks).where(eq(campaignContentLinks.id, id));
+  }
+
+  // Speakers
+  async getSpeakers(): Promise<Speaker[]> {
+    return await db.select().from(speakers).orderBy(speakers.name);
+  }
+
+  async getSpeaker(id: number): Promise<Speaker | undefined> {
+    const [speaker] = await db.select().from(speakers).where(eq(speakers.id, id));
+    return speaker || undefined;
+  }
+
+  async createSpeaker(insertSpeaker: InsertSpeaker): Promise<Speaker> {
+    const [speaker] = await db.insert(speakers).values(insertSpeaker).returning();
+    return speaker;
+  }
+
+  async updateSpeaker(id: number, updateData: Partial<InsertSpeaker>): Promise<Speaker | undefined> {
+    const [speaker] = await db.update(speakers).set({ ...updateData, updatedAt: new Date() }).where(eq(speakers.id, id)).returning();
+    return speaker || undefined;
+  }
+
+  async deleteSpeaker(id: number): Promise<void> {
+    await db.delete(speakers).where(eq(speakers.id, id));
+  }
+
+  // Organizers
+  async getOrganizers(): Promise<Organizer[]> {
+    return await db.select().from(organizers).orderBy(organizers.name);
+  }
+
+  async getOrganizer(id: number): Promise<Organizer | undefined> {
+    const [organizer] = await db.select().from(organizers).where(eq(organizers.id, id));
+    return organizer || undefined;
+  }
+
+  async createOrganizer(insertOrganizer: InsertOrganizer): Promise<Organizer> {
+    const [organizer] = await db.insert(organizers).values(insertOrganizer).returning();
+    return organizer;
+  }
+
+  async updateOrganizer(id: number, updateData: Partial<InsertOrganizer>): Promise<Organizer | undefined> {
+    const [organizer] = await db.update(organizers).set({ ...updateData, updatedAt: new Date() }).where(eq(organizers.id, id)).returning();
+    return organizer || undefined;
+  }
+
+  async deleteOrganizer(id: number): Promise<void> {
+    await db.delete(organizers).where(eq(organizers.id, id));
+  }
+
+  // Sponsors
+  async getSponsors(): Promise<Sponsor[]> {
+    return await db.select().from(sponsors).orderBy(sponsors.name);
+  }
+
+  async getSponsor(id: number): Promise<Sponsor | undefined> {
+    const [sponsor] = await db.select().from(sponsors).where(eq(sponsors.id, id));
+    return sponsor || undefined;
+  }
+
+  async createSponsor(insertSponsor: InsertSponsor): Promise<Sponsor> {
+    const [sponsor] = await db.insert(sponsors).values(insertSponsor).returning();
+    return sponsor;
+  }
+
+  async updateSponsor(id: number, updateData: Partial<InsertSponsor>): Promise<Sponsor | undefined> {
+    const [sponsor] = await db.update(sponsors).set({ ...updateData, updatedAt: new Date() }).where(eq(sponsors.id, id)).returning();
+    return sponsor || undefined;
+  }
+
+  async deleteSponsor(id: number): Promise<void> {
+    await db.delete(sponsors).where(eq(sponsors.id, id));
   }
 
   // Qualification Responses

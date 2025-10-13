@@ -2013,6 +2013,74 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== SPEAKERS, ORGANIZERS, SPONSORS ====================
+  
+  app.get("/api/speakers", requireAuth, async (req, res) => {
+    try {
+      const speakers = await storage.getSpeakers();
+      res.json(speakers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch speakers" });
+    }
+  });
+
+  app.post("/api/speakers", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertSpeakerSchema.parse(req.body);
+      const speaker = await storage.createSpeaker(validated);
+      res.status(201).json(speaker);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create speaker" });
+    }
+  });
+
+  app.get("/api/organizers", requireAuth, async (req, res) => {
+    try {
+      const organizers = await storage.getOrganizers();
+      res.json(organizers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch organizers" });
+    }
+  });
+
+  app.post("/api/organizers", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertOrganizerSchema.parse(req.body);
+      const organizer = await storage.createOrganizer(validated);
+      res.status(201).json(organizer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create organizer" });
+    }
+  });
+
+  app.get("/api/sponsors", requireAuth, async (req, res) => {
+    try {
+      const sponsors = await storage.getSponsors();
+      res.json(sponsors);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sponsors" });
+    }
+  });
+
+  app.post("/api/sponsors", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertSponsorSchema.parse(req.body);
+      const sponsor = await storage.createSponsor(validated);
+      res.status(201).json(sponsor);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create sponsor" });
+    }
+  });
+
   // ==================== EMAIL INFRASTRUCTURE (Phase 26) ====================
   
   // Sender Profiles

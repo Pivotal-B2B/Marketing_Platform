@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Event } from "@shared/schema";
+import { Check, ChevronsUpDown, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 const eventFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -21,6 +26,7 @@ const eventFormSchema = z.object({
   community: z.enum(["hr", "finance", "marketing", "it", "cx_ux", "data_ai", "ops"]),
   organizer: z.string().optional(),
   sponsor: z.string().optional(),
+  speakers: z.array(z.string()).optional(),
   startIso: z.string().min(1, "Start date is required"),
   endIso: z.string().optional(),
   timezone: z.string().optional(),
@@ -42,6 +48,22 @@ interface EventFormDialogProps {
 export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogProps) {
   const { toast } = useToast();
   const isEdit = !!event;
+  const [speakerSearch, setSpeakerSearch] = useState("");
+
+  const { data: speakers = [] } = useQuery<any[]>({ 
+    queryKey: ["/api/speakers"],
+    enabled: open
+  });
+  
+  const { data: organizers = [] } = useQuery<any[]>({ 
+    queryKey: ["/api/organizers"],
+    enabled: open
+  });
+  
+  const { data: sponsors = [] } = useQuery<any[]>({ 
+    queryKey: ["/api/sponsors"],
+    enabled: open
+  });
 
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventFormSchema),
@@ -53,6 +75,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
       community: event?.community || "marketing",
       organizer: event?.organizer || "",
       sponsor: event?.sponsor || "",
+      speakers: (event?.speakers as string[]) || [],
       startIso: event?.startIso || "",
       endIso: event?.endIso || "",
       timezone: event?.timezone || "",
@@ -114,6 +137,11 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
       createMutation.mutate(data);
     }
   };
+
+  const selectedSpeakers = form.watch("speakers") || [];
+  const availableSpeakers = speakers.filter(s => 
+    s.name.toLowerCase().includes(speakerSearch.toLowerCase())
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -235,11 +263,22 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 control={form.control}
                 name="organizer"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Organizer (Optional)</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Organizer name" data-testid="input-organizer" />
-                    </FormControl>
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Organizer</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-organizer">
+                          <SelectValue placeholder="Select organizer" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {organizers.map((org: any) => (
+                          <SelectItem key={org.id} value={org.name}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -248,16 +287,112 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 control={form.control}
                 name="sponsor"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sponsor (Optional)</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Sponsor name" data-testid="input-sponsor" />
-                    </FormControl>
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Sponsor</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-sponsor">
+                          <SelectValue placeholder="Select sponsor" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {sponsors.map((sponsor: any) => (
+                          <SelectItem key={sponsor.id} value={sponsor.name}>
+                            {sponsor.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="speakers"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Speakers</FormLabel>
+                  <div className="space-y-2">
+                    {selectedSpeakers.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {selectedSpeakers.map((speakerName: string) => {
+                          const speaker = speakers.find((s: any) => s.name === speakerName);
+                          return (
+                            <Badge key={speakerName} variant="secondary" className="gap-1">
+                              {speaker?.name || speakerName}
+                              <X
+                                className="h-3 w-3 cursor-pointer"
+                                onClick={() => {
+                                  const newSpeakers = selectedSpeakers.filter(s => s !== speakerName);
+                                  form.setValue("speakers", newSpeakers);
+                                }}
+                              />
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn("w-full justify-between", !selectedSpeakers.length && "text-muted-foreground")}
+                            data-testid="button-select-speakers"
+                          >
+                            {selectedSpeakers.length > 0 ? `${selectedSpeakers.length} speaker(s) selected` : "Select speakers"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search speakers..." 
+                            value={speakerSearch}
+                            onValueChange={setSpeakerSearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>No speakers found.</CommandEmpty>
+                            <CommandGroup>
+                              {availableSpeakers.map((speaker: any) => {
+                                const isSelected = selectedSpeakers.includes(speaker.name);
+                                return (
+                                  <CommandItem
+                                    key={speaker.id}
+                                    onSelect={() => {
+                                      const newSpeakers = isSelected
+                                        ? selectedSpeakers.filter((s: string) => s !== speaker.name)
+                                        : [...selectedSpeakers, speaker.name];
+                                      form.setValue("speakers", newSpeakers);
+                                    }}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                                    <div className="flex flex-col">
+                                      <span>{speaker.name}</span>
+                                      {speaker.title && speaker.company && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {speaker.title} at {speaker.company}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-3 gap-4">
               <FormField

@@ -1583,6 +1583,50 @@ export const resources = pgTable("resources", {
   statusIdx: index("resources_status_idx").on(table.status),
 }));
 
+// Speakers, Organizers, Sponsors (Resources Centre Reference Data)
+export const speakers = pgTable("speakers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  title: text("title"), // Job title
+  company: text("company"),
+  bio: text("bio"),
+  photoUrl: text("photo_url"),
+  linkedinUrl: text("linkedin_url"),
+  externalId: varchar("external_id", { length: 255 }), // ID from Resources Centre
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (t) => ({
+  nameIdx: index("speakers_name_idx").on(t.name),
+  externalIdIdx: uniqueIndex("speakers_external_id_idx").on(t.externalId)
+}));
+
+export const organizers = pgTable("organizers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  websiteUrl: text("website_url"),
+  externalId: varchar("external_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (t) => ({
+  nameIdx: index("organizers_name_idx").on(t.name)
+}));
+
+export const sponsors = pgTable("sponsors", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  tier: varchar("tier", { length: 50 }), // platinum, gold, silver, bronze
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  websiteUrl: text("website_url"),
+  externalId: varchar("external_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (t) => ({
+  nameIdx: index("sponsors_name_idx").on(t.name)
+}));
+
 // News table
 export const news = pgTable("news", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1661,6 +1705,34 @@ export type InsertAIContentGeneration = z.infer<typeof insertAIContentGeneration
 
 export type ContentAssetPush = typeof contentAssetPushes.$inferSelect;
 export type InsertContentAssetPush = z.infer<typeof insertContentAssetPushSchema>;
+
+// Insert schemas for Speakers, Organizers, Sponsors
+export const insertSpeakerSchema = createInsertSchema(speakers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertOrganizerSchema = createInsertSchema(organizers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export const insertSponsorSchema = createInsertSchema(sponsors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export type Speaker = typeof speakers.$inferSelect;
+export type InsertSpeaker = z.infer<typeof insertSpeakerSchema>;
+
+export type Organizer = typeof organizers.$inferSelect;
+export type InsertOrganizer = z.infer<typeof insertOrganizerSchema>;
+
+export type Sponsor = typeof sponsors.$inferSelect;
+export type InsertSponsor = z.infer<typeof insertSponsorSchema>;
 
 // Insert schemas for Events, Resources, and News
 export const insertEventSchema = createInsertSchema(events).omit({
