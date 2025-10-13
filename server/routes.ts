@@ -2009,4 +2009,67 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to delete news" });
     }
   });
+
+  // ==================== EMAIL INFRASTRUCTURE (Phase 26) ====================
+  
+  // Sender Profiles
+  app.get("/api/sender-profiles", requireAuth, async (req, res) => {
+    try {
+      const profiles = await storage.getSenderProfiles();
+      res.json(profiles);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sender profiles" });
+    }
+  });
+
+  app.post("/api/sender-profiles", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const validated = insertSenderProfileSchema.parse(req.body);
+      const profile = await storage.createSenderProfile({ ...validated, createdBy: userId });
+      res.status(201).json(profile);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create sender profile" });
+    }
+  });
+
+  app.get("/api/sender-profiles/:id", requireAuth, async (req, res) => {
+    try {
+      const profile = await storage.getSenderProfile(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Sender profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sender profile" });
+    }
+  });
+
+  app.put("/api/sender-profiles/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertSenderProfileSchema.partial().parse(req.body);
+      const profile = await storage.updateSenderProfile(req.params.id, validated);
+      if (!profile) {
+        return res.status(404).json({ message: "Sender profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update sender profile" });
+    }
+  });
+
+  app.delete("/api/sender-profiles/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      await storage.deleteSenderProfile(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete sender profile" });
+    }
+  });
 }
