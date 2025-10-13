@@ -965,7 +965,21 @@ export function registerRoutes(app: Express) {
   app.get("/api/filters/fields/entity/:entity", async (req, res) => {
     try {
       const fields = await storage.getFilterFieldsByEntity(req.params.entity);
-      res.json(fields);
+      
+      // Group by category for easier UI consumption (same format as /api/filters/fields)
+      const grouped = fields.reduce((acc: any, field) => {
+        if (!acc[field.category]) {
+          acc[field.category] = [];
+        }
+        acc[field.category].push(field);
+        return acc;
+      }, {});
+      
+      res.json({
+        fields,
+        grouped,
+        categories: Object.keys(grouped)
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch filter fields for entity" });
     }
