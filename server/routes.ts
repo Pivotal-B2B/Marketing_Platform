@@ -18,7 +18,9 @@ import {
   insertDomainSetSchema,
   insertUserSchema,
   insertSavedFilterSchema,
-  insertSelectionContextSchema
+  insertSelectionContextSchema,
+  updateAccountIndustrySchema,
+  reviewAccountIndustryAISchema
 } from "@shared/schema";
 
 export function registerRoutes(app: Express) {
@@ -148,6 +150,50 @@ export function registerRoutes(app: Express) {
       res.json(account);
     } catch (error) {
       res.status(500).json({ message: "Failed to update account" });
+    }
+  });
+
+  // Dual-Industry Management (Phase 8)
+  app.patch("/api/accounts/:id/industry", requireAuth, requireRole('admin', 'data_ops', 'campaign_manager'), async (req, res) => {
+    try {
+      const validatedData = updateAccountIndustrySchema.parse(req.body);
+      const account = await storage.updateAccountIndustry(req.params.id, validatedData);
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+      res.json(account);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update account industry" });
+    }
+  });
+  
+  app.post("/api/accounts/:id/industry/ai-review", requireAuth, requireRole('admin', 'data_ops', 'campaign_manager'), async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const validatedReview = reviewAccountIndustryAISchema.parse(req.body);
+      const account = await storage.reviewAccountIndustryAI(req.params.id, userId, validatedReview);
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+      res.json(account);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to review AI suggestions" });
+    }
+  });
+  
+  app.get("/api/accounts/ai-review/pending", requireAuth, requireRole('admin', 'data_ops', 'campaign_manager'), async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const accounts = await storage.getAccountsNeedingReview(limit);
+      res.json(accounts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch accounts needing review" });
     }
   });
 
