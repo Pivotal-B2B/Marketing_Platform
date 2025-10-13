@@ -41,6 +41,13 @@ The system utilizes a modern web stack: **React 18 + Vite, TypeScript, TailwindC
     - **AI Content Generator:** Multi-format AI-powered content creation supporting blog posts, social posts, email copy, ad copy with persona-based tone customization and CTA integration.
     - **Social Media Publisher:** Multi-platform publishing (LinkedIn, Twitter/X, Facebook, Instagram, YouTube) with platform-specific scheduling, multi-account posting, preview capabilities, and approval workflows.
     - **Asset Management:** Support for multiple content types (email_template, landing_page, social_post, pdf, image, video) with tags, versioning, and reusability across campaigns.
+- **Inter-Repl Communication (Push to Resources Center):** Secure content distribution system enabling Dashboard-to-Resources-Center publishing:
+    - **Push Tracking:** content_asset_pushes table tracks push attempts, status, retry counts, and responses with full audit trail.
+    - **Push API:** POST /api/content-assets/:id/push endpoint with HMAC-SHA256 authentication for secure inter-Repl communication.
+    - **Status Management:** Push states (pending, in_progress, success, failed, retrying) with exponential backoff retry logic (max 3 attempts).
+    - **Security:** HMAC signature validation (X-Signature header) with timestamp-based replay prevention (X-Timestamp header). Secrets managed via Replit environment variables.
+    - **Resources Center Integration:** Dashboard sends content to Resources Center POST /api/import/content endpoint. Resources Center responds with externalId for tracking.
+    - **Sync Status Display:** UI shows push history, attempt counts, success/failure status with manual retry capability.
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)

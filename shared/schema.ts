@@ -1383,6 +1383,37 @@ export const aiContentGenerations = pgTable("ai_content_generations", {
   createdAtIdx: index("ai_content_generations_created_at_idx").on(table.createdAt),
 }));
 
+// Push Status enum for inter-Repl communication
+export const pushStatusEnum = pgEnum('push_status', [
+  'pending',
+  'in_progress',
+  'success',
+  'failed',
+  'retrying'
+]);
+
+// Content Asset Pushes table (track push attempts to Resources Center)
+export const contentAssetPushes = pgTable("content_asset_pushes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id").notNull().references(() => contentAssets.id, { onDelete: 'cascade' }),
+  targetUrl: text("target_url").notNull(), // Resources Center URL
+  status: pushStatusEnum("status").notNull().default('pending'),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  successAt: timestamp("success_at"),
+  errorMessage: text("error_message"),
+  responsePayload: jsonb("response_payload"), // Response from Resources Center
+  externalId: text("external_id"), // ID returned from Resources Center
+  pushedBy: varchar("pushed_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  assetIdIdx: index("content_asset_pushes_asset_id_idx").on(table.assetId),
+  statusIdx: index("content_asset_pushes_status_idx").on(table.status),
+  targetUrlIdx: index("content_asset_pushes_target_url_idx").on(table.targetUrl),
+}));
+
 // Insert schemas for Content Studio
 export const insertContentAssetSchema = createInsertSchema(contentAssets).omit({
   id: true,
@@ -1414,6 +1445,12 @@ export const insertAIContentGenerationSchema = createInsertSchema(aiContentGener
   createdAt: true,
 });
 
+export const insertContentAssetPushSchema = createInsertSchema(contentAssetPushes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Export types for Content Studio
 export type ContentAsset = typeof contentAssets.$inferSelect;
 export type InsertContentAsset = z.infer<typeof insertContentAssetSchema>;
@@ -1429,3 +1466,6 @@ export type InsertSocialPost = z.infer<typeof insertSocialPostSchema>;
 
 export type AIContentGeneration = typeof aiContentGenerations.$inferSelect;
 export type InsertAIContentGeneration = z.infer<typeof insertAIContentGenerationSchema>;
+
+export type ContentAssetPush = typeof contentAssetPushes.$inferSelect;
+export type InsertContentAssetPush = z.infer<typeof insertContentAssetPushSchema>;

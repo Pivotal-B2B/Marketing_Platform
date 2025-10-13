@@ -1591,6 +1591,147 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== CONTENT PUSH TO RESOURCES CENTER ====================
+  
+  app.post("/api/content-assets/:id/push", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { targetUrl } = req.body;
+      
+      // Get the asset
+      const asset = await storage.getContentAsset(id);
+      if (!asset) {
+        return res.status(404).json({ message: "Content asset not found" });
+      }
+
+      // Create push record
+      const pushRecord = await storage.createContentPush({
+        assetId: id,
+        targetUrl: targetUrl || process.env.RESOURCES_CENTER_URL || '',
+        status: 'pending',
+        attemptCount: 0,
+        maxAttempts: 3,
+      });
+
+      // Update push to in_progress
+      await storage.updateContentPush(pushRecord.id, { status: 'in_progress', attemptCount: 1 });
+
+      // Attempt push using push service
+      const { pushContentToResourcesCenter } = await import('./push-service');
+      const result = await pushContentToResourcesCenter(asset, targetUrl);
+
+      if (result.success) {
+        // Update push record with success
+        await storage.updateContentPush(pushRecord.id, {
+          status: 'success',
+          externalId: result.externalId,
+          responsePayload: result.responsePayload,
+        });
+
+        res.json({
+          message: "Content pushed successfully",
+          pushId: pushRecord.id,
+          externalId: result.externalId,
+        });
+      } else {
+        // Update push record with failure
+        await storage.updateContentPush(pushRecord.id, {
+          status: 'failed',
+          errorMessage: result.error,
+          responsePayload: result.responsePayload,
+        });
+
+        res.status(500).json({
+          message: "Push failed",
+          error: result.error,
+          pushId: pushRecord.id,
+        });
+      }
+    } catch (error) {
+      console.error("Error pushing content:", error);
+      res.status(500).json({ 
+        message: "Failed to push content", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  app.get("/api/content-assets/:id/pushes", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const pushes = await storage.getContentPushes(id);
+      res.json(pushes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch push history" });
+    }
+  });
+
+  app.post("/api/content-pushes/:id/retry", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get push record
+      const pushRecord = await storage.getContentPush(id);
+      if (!pushRecord) {
+        return res.status(404).json({ message: "Push record not found" });
+      }
+
+      // Check if max attempts reached
+      if (pushRecord.attemptCount >= pushRecord.maxAttempts) {
+        return res.status(400).json({ message: "Max retry attempts reached" });
+      }
+
+      // Get the asset
+      const asset = await storage.getContentAsset(pushRecord.assetId);
+      if (!asset) {
+        return res.status(404).json({ message: "Content asset not found" });
+      }
+
+      // Update attempt count and status
+      const newAttemptCount = pushRecord.attemptCount + 1;
+      await storage.updateContentPush(id, { 
+        status: 'retrying', 
+        attemptCount: newAttemptCount 
+      });
+
+      // Retry push
+      const { pushContentToResourcesCenter } = await import('./push-service');
+      const result = await pushContentToResourcesCenter(asset, pushRecord.targetUrl);
+
+      if (result.success) {
+        await storage.updateContentPush(id, {
+          status: 'success',
+          externalId: result.externalId,
+          responsePayload: result.responsePayload,
+        });
+
+        res.json({
+          message: "Retry successful",
+          pushId: id,
+          externalId: result.externalId,
+        });
+      } else {
+        await storage.updateContentPush(id, {
+          status: 'failed',
+          errorMessage: result.error,
+          responsePayload: result.responsePayload,
+        });
+
+        res.status(500).json({
+          message: "Retry failed",
+          error: result.error,
+          pushId: id,
+        });
+      }
+    } catch (error) {
+      console.error("Error retrying push:", error);
+      res.status(500).json({ 
+        message: "Failed to retry push", 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // ==================== SOCIAL MEDIA POSTS ====================
   
   app.get("/api/social-posts", requireAuth, async (req, res) => {

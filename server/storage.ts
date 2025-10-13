@@ -11,7 +11,7 @@ import {
   companySizeReference, revenueRangeReference,
   campaignAudienceSnapshots, senderProfiles, emailTemplates, emailSends, emailEvents,
   callScripts, callAttempts, callEvents, qualificationResponses,
-  contentAssets, socialPosts, aiContentGenerations,
+  contentAssets, socialPosts, aiContentGenerations, contentAssetPushes,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -48,6 +48,7 @@ import {
   type ContentAsset, type InsertContentAsset,
   type SocialPost, type InsertSocialPost,
   type AIContentGeneration, type InsertAIContentGeneration,
+  type ContentAssetPush, type InsertContentAssetPush,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -1980,6 +1981,41 @@ export class DatabaseStorage implements IStorage {
         .orderBy(aiContentGenerations.createdAt);
     }
     return await db.select().from(aiContentGenerations).orderBy(aiContentGenerations.createdAt);
+  }
+
+  // ==================== CONTENT PUSH TRACKING ====================
+  
+  async createContentPush(data: InsertContentAssetPush): Promise<ContentAssetPush> {
+    const result = await db.insert(contentAssetPushes).values(data).returning();
+    return result[0];
+  }
+
+  async getContentPushes(assetId: string): Promise<ContentAssetPush[]> {
+    return await db.select().from(contentAssetPushes)
+      .where(eq(contentAssetPushes.assetId, assetId))
+      .orderBy(contentAssetPushes.createdAt);
+  }
+
+  async getContentPush(id: string): Promise<ContentAssetPush | null> {
+    const result = await db.select().from(contentAssetPushes)
+      .where(eq(contentAssetPushes.id, id));
+    return result[0] || null;
+  }
+
+  async updateContentPush(id: string, data: Partial<InsertContentAssetPush>): Promise<ContentAssetPush | null> {
+    const result = await db.update(contentAssetPushes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(contentAssetPushes.id, id))
+      .returning();
+    return result[0] || null;
+  }
+
+  async getLatestContentPush(assetId: string): Promise<ContentAssetPush | null> {
+    const result = await db.select().from(contentAssetPushes)
+      .where(eq(contentAssetPushes.assetId, assetId))
+      .orderBy(desc(contentAssetPushes.createdAt))
+      .limit(1);
+    return result[0] || null;
   }
 }
 
