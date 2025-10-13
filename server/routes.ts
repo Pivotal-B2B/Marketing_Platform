@@ -26,6 +26,8 @@ import {
   insertCallScriptSchema,
   insertEmailSendSchema,
   insertCallAttemptSchema,
+  insertSoftphoneProfileSchema,
+  insertCallRecordingAccessLogSchema,
   insertContentAssetSchema,
   insertSocialPostSchema,
   insertAIContentGenerationSchema,
@@ -2070,6 +2072,96 @@ export function registerRoutes(app: Express) {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete sender profile" });
+    }
+  });
+
+  // ==================== PHASE 27: TELEPHONY - SOFTPHONE & CALL RECORDING ====================
+  
+  // Softphone Profile Routes
+  app.get("/api/softphone/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const profile = await storage.getSoftphoneProfile(userId);
+      if (!profile) {
+        return res.status(404).json({ message: "Softphone profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch softphone profile" });
+    }
+  });
+
+  app.put("/api/softphone/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const validated = insertSoftphoneProfileSchema.parse(req.body);
+      const profile = await storage.upsertSoftphoneProfile({ ...validated, userId });
+      res.json(profile);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to save softphone profile" });
+    }
+  });
+
+  // Call Recording Access Routes
+  app.post("/api/calls/:attemptId/recording/access", requireAuth, requireRole('admin', 'qa_specialist'), async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { attemptId } = req.params;
+      const { action } = req.body; // 'play' or 'download'
+      
+      if (!action || !['play', 'download'].includes(action)) {
+        return res.status(400).json({ message: "Invalid action. Must be 'play' or 'download'" });
+      }
+
+      // Get the call attempt to verify it exists
+      const attempt = await storage.getCallAttempt(attemptId);
+      if (!attempt) {
+        return res.status(404).json({ message: "Call attempt not found" });
+      }
+
+      // Log the access
+      const accessLog = await storage.createCallRecordingAccessLog({
+        callAttemptId: attemptId,
+        userId,
+        action,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      // TODO: Generate signed URL for recording from Telnyx or storage provider
+      // For now, return mock URL
+      const recordingUrl = `https://recordings.example.com/${attemptId}?token=mock-signed-token`;
+
+      res.json({
+        accessLog,
+        recordingUrl,
+        expiresIn: 3600, // URL expires in 1 hour
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to access recording" });
+    }
+  });
+
+  app.get("/api/calls/:attemptId/recording/access-logs", requireAuth, requireRole('admin', 'qa_specialist'), async (req, res) => {
+    try {
+      const { attemptId } = req.params;
+      
+      // Verify call attempt exists
+      const attempt = await storage.getCallAttempt(attemptId);
+      if (!attempt) {
+        return res.status(404).json({ message: "Call attempt not found" });
+      }
+
+      const logs = await storage.getCallRecordingAccessLogs(attemptId);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch access logs" });
     }
   });
 }
