@@ -986,6 +986,35 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== INDUSTRY REFERENCE ====================
+  
+  // Get all standardized industries
+  app.get("/api/industries", async (req, res) => {
+    try {
+      const industries = await storage.getIndustries();
+      res.json(industries);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch industries" });
+    }
+  });
+  
+  // Search industries by name (with autocomplete)
+  app.get("/api/industries/search", async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      
+      if (!query) {
+        return res.status(400).json({ message: "Search query 'q' is required" });
+      }
+      
+      const industries = await storage.searchIndustries(query, limit);
+      res.json(industries);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to search industries" });
+    }
+  });
+
   // ==================== SELECTION CONTEXTS (Bulk Operations) ====================
   
   app.get("/api/selection-contexts/:id", requireAuth, async (req, res) => {
