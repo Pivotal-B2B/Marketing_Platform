@@ -1,15 +1,21 @@
 import crypto from 'crypto';
-import type { ContentAsset, ContentAssetPush } from '@shared/schema';
+import type { ContentAsset, ContentAssetPush, Event, Resource, News } from '@shared/schema';
 
 // Get secrets from environment variables
 const RESOURCES_CENTER_URL = process.env.RESOURCES_CENTER_URL || '';
 const PUSH_SECRET_KEY = process.env.PUSH_SECRET_KEY || '';
 
+// Union type for all pushable content
+export type PushableContent = ContentAsset | Event | Resource | News;
+
 interface PushPayload {
-  assetId: string;
-  assetType: string;
+  contentId: string;
+  contentType: 'content_asset' | 'event' | 'resource' | 'news';
+  assetType?: string;
+  eventType?: string;
+  resourceType?: string;
   title: string;
-  slug?: string;
+  slug: string;
   summary?: string;
   bodyHtml?: string;
   thumbnailUrl?: string;
@@ -17,6 +23,19 @@ interface PushPayload {
   formId?: string;
   tags?: string[];
   metadata?: any;
+  
+  // Event-specific fields
+  eventDate?: string;
+  eventEndDate?: string;
+  locationType?: string;
+  location?: string;
+  registrationUrl?: string;
+  communities?: string[];
+  
+  // Resource-specific fields
+  downloadUrl?: string;
+  gatedByForm?: boolean;
+  
   syncedAt: string;
 }
 
@@ -32,10 +51,75 @@ export function generateHMACSignature(payload: string, timestamp: string): strin
 }
 
 /**
- * Push content asset to Resources Center
+ * Helper function to determine content type
+ */
+function getContentType(content: PushableContent): 'content_asset' | 'event' | 'resource' | 'news' {
+  if ('assetType' in content) return 'content_asset';
+  if ('eventType' in content) return 'event';
+  if ('resourceType' in content) return 'resource';
+  return 'news';
+}
+
+/**
+ * Transform content into push payload
+ */
+function transformContentToPayload(content: PushableContent): PushPayload {
+  const contentType = getContentType(content);
+  
+  const basePayload = {
+    contentId: content.id,
+    contentType,
+    title: content.title,
+    slug: content.slug,
+    summary: content.description || undefined,
+    bodyHtml: content.bodyHtml || undefined,
+    thumbnailUrl: content.thumbnailUrl || undefined,
+    tags: content.tags || undefined,
+    metadata: content.metadata || undefined,
+    syncedAt: new Date().toISOString(),
+  };
+
+  // Add type-specific fields
+  if (contentType === 'content_asset') {
+    const asset = content as ContentAsset;
+    return {
+      ...basePayload,
+      assetType: asset.assetType,
+      ctaLink: asset.fileUrl || undefined,
+      formId: undefined,
+    };
+  } else if (contentType === 'event') {
+    const event = content as Event;
+    return {
+      ...basePayload,
+      eventType: event.eventType,
+      eventDate: event.eventDate?.toISOString(),
+      eventEndDate: event.eventEndDate?.toISOString() || undefined,
+      locationType: event.locationType,
+      location: event.location || undefined,
+      registrationUrl: event.registrationUrl || undefined,
+      communities: event.communities || undefined,
+    };
+  } else if (contentType === 'resource') {
+    const resource = content as Resource;
+    return {
+      ...basePayload,
+      resourceType: resource.resourceType,
+      downloadUrl: resource.downloadUrl || undefined,
+      gatedByForm: resource.gatedByForm,
+      formId: resource.formId || undefined,
+    };
+  } else {
+    // News content
+    return basePayload;
+  }
+}
+
+/**
+ * Push content to Resources Center
  */
 export async function pushContentToResourcesCenter(
-  asset: ContentAsset,
+  content: PushableContent,
   targetUrl?: string
 ): Promise<{ success: boolean; externalId?: string; error?: string; responsePayload?: any }> {
   try {
@@ -49,21 +133,8 @@ export async function pushContentToResourcesCenter(
       throw new Error('Push secret key not configured');
     }
 
-    // Prepare payload
-    const payload: PushPayload = {
-      assetId: asset.id,
-      assetType: asset.assetType,
-      title: asset.title,
-      slug: asset.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      summary: asset.description || undefined,
-      bodyHtml: asset.contentHtml || asset.content || undefined,
-      thumbnailUrl: asset.thumbnailUrl || undefined,
-      ctaLink: asset.fileUrl || undefined,
-      tags: asset.tags || undefined,
-      metadata: asset.metadata || undefined,
-      syncedAt: new Date().toISOString(),
-    };
-
+    // Transform content to payload
+    const payload = transformContentToPayload(content);
     const payloadString = JSON.stringify(payload);
     const timestamp = Date.now().toString();
     const signature = generateHMACSignature(payloadString, timestamp);
@@ -119,7 +190,7 @@ export async function pushContentToResourcesCenter(
  * Retry push with exponential backoff
  */
 export async function retryPushWithBackoff(
-  asset: ContentAsset,
+  content: PushableContent,
   pushRecord: ContentAssetPush,
   targetUrl?: string
 ): Promise<{ success: boolean; externalId?: string; error?: string; responsePayload?: any }> {
@@ -140,5 +211,5 @@ export async function retryPushWithBackoff(
   await new Promise(resolve => setTimeout(resolve, delay));
 
   // Attempt push
-  return await pushContentToResourcesCenter(asset, targetUrl);
+  return await pushContentToResourcesCenter(content, targetUrl);
 }
