@@ -1,7 +1,7 @@
 # Pivotal B2B CRM
 
 ## Overview
-Pivotal CRM is an enterprise-grade B2B customer relationship management platform specializing in Account-Based Marketing (ABM), multi-channel campaign management (Email & Telemarketing), lead qualification, and a client portal. Its core purpose is to provide an integrated solution for B2B sales and marketing operations, focusing on efficient customer engagement, robust compliance (DNC/Unsubscribe), and comprehensive lead QA workflows. The system features a "bridge model" for manual campaign-to-order linking and aims to streamline customer relationship management for B2B enterprises.
+Pivotal CRM is an enterprise-grade B2B customer relationship management platform designed to streamline B2B sales and marketing operations. It specializes in Account-Based Marketing (ABM), multi-channel campaign management (Email & Telemarketing), lead qualification, and includes a client portal. The platform emphasizes efficient customer engagement, robust compliance (DNC/Unsubscribe), comprehensive lead QA workflows, and features a "bridge model" for linking campaigns to orders.
 
 ## User Preferences
 - Clean, minimal enterprise design
@@ -11,17 +11,18 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - Comprehensive but not overwhelming
 
 ## System Architecture
-The system utilizes a modern web stack: **React 18 + Vite, TypeScript, TailwindCSS, and shadcn/ui** for the frontend, and **Node.js + Express + TypeScript** with a **PostgreSQL (Neon) database via Drizzle ORM** for the backend. JWT authentication secures role-based access.
+The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCSS, and shadcn/ui** for the frontend, and **Node.js + Express + TypeScript** with a **PostgreSQL (Neon) database via Drizzle ORM** for the backend. JWT authentication provides role-based access control.
 
 **UI/UX Design:**
 - **Color Scheme:** Primary blue (220 90% 56%) with adaptive light/dark surfaces and semantic status colors.
 - **Typography:** Inter font for text, JetBrains Mono for data.
-- **Components:** shadcn/ui for consistent enterprise components, including role-based sidebar navigation, global search, data tables, and step wizards.
+- **Components:** shadcn/ui ensures consistent enterprise components, including role-based sidebar navigation, global search, data tables, and step wizards.
 - **Dark Mode:** Fully implemented with theme toggle and localStorage persistence.
+- **Global UX/UI Upgrade:** Introduced reusable components like `HeaderActionBar`, `IconButton`, and `SectionCard` for consistent interaction patterns across Account and Contact Details pages, featuring sticky headers, one-click actions, and responsive layouts.
 
 **Technical Implementations & Features:**
-- **Data Model:** Core entities include Users (with RBAC), Accounts (with AI enrichment), Contacts (with validation and deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
-- **Audience Management:** Advanced multi-criteria filtering with AND/OR logic, dynamic segments with real-time counts, static lists, and domain set uploader.
+- **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
+- **Audience Management:** Advanced multi-criteria filtering, dynamic segments, static lists, and domain set uploaders.
 - **Data Quality & Deduplication:** Deterministic upsert with field-level survivorship, normalization, source tracking, and soft deletes.
 - **Bulk Operations:** Multi-page record selection with bulk actions (Export, Add to List, Update, Delete).
 - **Campaign Management:**
@@ -29,67 +30,19 @@ The system utilizes a modern web stack: **React 18 + Vite, TypeScript, TailwindC
     - **Telemarketing:** Telnyx WebRTC integration, call scripts, qualification forms, DNC handling.
     - **Advanced Campaign Features:** Audience snapshotting, compliance guardrails, pacing/throttling, frequency caps, multi-provider email support, A/B/n testing, pre-flight checklists, and reporting.
 - **Lead QA Workflow:** Multi-stage workflow (New → Under Review → Approved/Rejected → Published) with checklist validation.
-- **Client Portal (Bridge Model):** Allows clients to specify campaign order requirements; internal operations manually link campaigns to orders. Provides order-scoped dashboards.
+- **Client Portal (Bridge Model):** Allows clients to specify campaign order requirements, linked manually to internal campaigns.
 - **Compliance:** Real-time enforcement of global DNC and email unsubscribe lists; consent tracking.
 - **Security:** JWT token generation, bcrypt password hashing, and role-based access control (RBAC).
-- **Lists & Segmentation Engine:** Enhanced schemas for segments and lists, segment preview API, segment to list conversion, and list export functionality.
-- **Domain Sets Upgrade:** Advanced domain normalization, validation, and matching engine (exact and fuzzy) with confidence scoring. Supports bulk upload, expansion to contacts, and conversion to lists for ABM.
-- **Menu & Navigation Architecture:** Simplified role-based navigation with 7 primary categories and collapsible nested dropdowns for improved UX and scalability.
-- **Campaign Builder UI & Workflow:** A 5-step wizard for creating email and telemarketing campaigns, including audience selection, content setup (rich HTML editor, call script builder), scheduling/pacing, compliance review, and launch. Features dynamic placeholders, conditional content, and role-based access.
-- **Content Studio & Social Media Management:** Centralized creative workspace featuring:
-    - **Asset Library:** Unified repository for managing email templates, landing pages, social posts, PDFs, images, and videos with version control and approval workflows.
-    - **AI Content Generator:** Multi-format AI-powered content creation supporting blog posts, social posts, email copy, ad copy with persona-based tone customization and CTA integration.
-    - **Social Media Publisher:** Multi-platform publishing (LinkedIn, Twitter/X, Facebook, Instagram, YouTube) with platform-specific scheduling, multi-account posting, preview capabilities, and approval workflows.
-    - **Asset Management:** Support for multiple content types (email_template, landing_page, social_post, pdf, image, video) with tags, versioning, and reusability across campaigns.
-- **Inter-Repl Communication (Push to Resources Center):** Secure content distribution system enabling Dashboard-to-Resources-Center publishing:
-    - **Push Tracking:** content_asset_pushes table tracks push attempts, status, retry counts, and responses with full audit trail.
-    - **Push API:** POST /api/content-assets/:id/push endpoint with HMAC-SHA256 authentication for secure inter-Repl communication.
-    - **Status Management:** Push states (pending, in_progress, success, failed, retrying) with max 3 attempts enforced before retry execution.
-    - **Security:** HMAC-SHA256 signature validation (X-Signature header) with mandatory timestamp validation (5-minute window) for replay attack prevention. Resources Center MUST validate timestamp freshness and use timing-safe signature comparison. Secrets managed via Replit environment variables.
-    - **Error Handling:** Graceful handling of non-JSON responses with fallback to text parsing for accurate diagnostics during push failures.
-    - **Resources Center Integration:** Dashboard sends content to Resources Center POST /api/import/content endpoint. Resources Center responds with externalId for tracking. Full API specification in RESOURCES_CENTER_API_SPEC.md.
-    - **Sync Status Display:** UI shows push history, attempt counts, success/failure status with manual retry capability.
-- **Phase 25: Global UX/UI Upgrade:** Modern interaction patterns for Account & Contact Details pages:
-    - **Reusable Components:**
-        - **HeaderActionBar:** Sticky header with avatar, title, subtitle, badges, and one-click action buttons (LinkedIn, Website, Call, Email, Copy).
-        - **IconButton:** Reusable button with icon and tooltip support for consistent interactions.
-        - **SectionCard:** Content card wrapper with title, icon, optional description and action button.
-    - **Account Details Page:** Two-column responsive layout (2/3 primary content, 1/3 sidebar) featuring:
-        - One-click actions in sticky header (LinkedIn, Website, Call, Email, Copy domain)
-        - Overview section with industry, employee size, revenue, HQ location
-        - Related contacts table with inline navigation
-        - AI Industry Suggestions review interface
-        - Activity Timeline placeholder
-        - Sidebar with Quick Actions, Compliance & Health, Account Summary
-    - **Contact Details Page:** Follows same pattern with:
-        - Breadcrumb navigation (Contacts > Account > Contact)
-        - One-click actions (LinkedIn, Call, Email, Copy email)
-        - Prev/Next contact navigation in header
-        - Contact Information section with email, phone, job details
-        - Linked Account section with click-to-navigate
-        - Sidebar with Quick Actions, Contact Status, Tags, Metadata
-    - **Interaction Patterns:** Tooltips on all action buttons, disabled states for missing data, responsive grid layouts, clean information hierarchy.
-- **Resources Centre Content Management:** Structured content types for publishing to external Resources Centre:
-    - **Events:** Webinars, forums, executive dinners, roundtables, conferences with event type, location type (virtual/in-person/hybrid), community targeting, speaker management, start/end dates with timezone, overview HTML, learning bullets, CTA links, and optional form gating.
-    - **Resources:** eBooks, infographics, white papers, guides, case studies with resource type, community targeting, overview/body HTML, bullet points, CTA links, optional form gating, and SEO metadata.
-    - **News:** News articles with community targeting, overview/body HTML, comma-separated authors field (transforms to text array), published date, and SEO metadata.
-    - **Content Distribution:** Generalized push service supports all content types with type-specific payload transformation for Resources Centre API integration.
-    - **Management UI:** Dedicated pages for Events (/events), Resources (/resources), and News (/news) with list views, CRUD operations, status management (draft/published), and delete functionality.
-- **Phase 26: Email Infrastructure Settings (MVP):** Enterprise-grade email deliverability management system:
-    - **Database Schema:** Comprehensive email infrastructure tables including domainAuth (SPF/DKIM/DMARC records), trackingDomains (click/open tracking), ipPools (IP management and warmup), warmupPlans (progressive volume increase), sendPolicies (STO rules and throttling), domainReputationSnapshots (health monitoring), and perDomainStats (performance metrics).
-    - **Enhanced Sender Profiles:** Core senderProfiles table enhanced with Phase 26 fields including isDefault (default profile flag), espProvider (SendGrid/SES/Mailgun), domainAuthId (FK to domain authentication), isVerified (email verification status), reputationScore (0-100 sender reputation), warmupStatus (not_started/in_progress/completed/paused), and createdBy (user tracking).
-    - **Storage Layer:** Complete IStorage interface with CRUD methods for all email infrastructure entities (sender profiles, domain auth, tracking domains, IP pools, send policies) implemented in DatabaseStorage class.
-    - **API Layer:** RESTful API endpoints for Sender Profiles management (GET /api/sender-profiles, POST, PUT, DELETE) with role-based access control (admin/campaign_manager) and Zod validation.
-    - **Sender Profiles UI:** Full CRUD management interface at /email-infrastructure/sender-profiles featuring card-based list view with profile details, status badges (default, warmup status), verification status icons, reputation scores, ESP provider display, and dialog-based create/edit forms with comprehensive field validation.
-    - **Navigation:** New "Email Infrastructure" section in admin-only sidebar with "Sender Profiles" submenu item.
-    - **Future Enhancements:** UI expansion to include domain authentication management, IP pool warmup controls, send policy configuration, domain health dashboards, and advanced relationship management (linking profiles to domain auth, IP pools, tracking domains).
-- **Phase 27: Telephony - Softphone UI & Compliance (In Progress):** Browser-based calling interface with comprehensive compliance and QA features:
-    - **Database Schema:** softphoneProfiles table (per-agent audio device preferences with mic/speaker device IDs, test results JSON, last test timestamp), callRecordingAccessLogs table (audit trail for QA/Admin playback and downloads with IP address, user agent tracking), extended callAttempts table with wrapupSeconds, scriptVersionId, and qaLocked fields.
-    - **Storage Layer:** IStorage methods for softphone profile management (getSoftphoneProfile, upsertSoftphoneProfile with conflict handling on userId) and recording access audit logging (createCallRecordingAccessLog, getCallRecordingAccessLogs).
-    - **API Layer:** RESTful telephony endpoints including GET/PUT /api/softphone/profile (authenticated user profile management), POST /api/calls/:attemptId/recording/access (QA/Admin-only recording access with action validation and audit logging), GET /api/calls/:attemptId/recording/access-logs (audit trail retrieval).
-    - **Agent Console UI:** Three-pane layout at /agent-console featuring: (1) Left pane - Call queue with contact cards showing priority badges and account info, (2) Center pane - Softphone controls with call status badges, circular dial/hangup buttons, mute/speaker toggles, call duration timer, contact avatar and info display, (3) Right pane - Call script panel, notes textarea using shadcn Textarea, qualification questions using shadcn Select components, and disposition bar (wrap-up state).
-    - **Navigation:** "Agent Console" top-level menu item with Phone icon, accessible to admin/campaign_manager/agent roles.
-    - **Status:** Backend complete (schema, storage, API with PASS from architect), frontend MVP complete (three-pane layout, basic call simulation, shadcn components), pending enhancements (device settings modal, real Telnyx WebRTC integration, disposition modal with auto-actions, keyboard shortcuts, compliance features).
+- **Segmentation Engine:** Enhanced schemas for segments and lists, segment preview API, segment to list conversion, and list export.
+- **Domain Sets Upgrade:** Advanced normalization, validation, and matching engine (exact and fuzzy) for ABM.
+- **Content Studio & Social Media Management:**
+    - **Asset Library:** Unified repository for managing various content types (email templates, landing pages, social posts, PDFs, images, videos) with version control and approval workflows.
+    - **AI Content Generator:** AI-powered content creation for multiple formats with persona-based tone customization.
+    - **Social Media Publisher:** Multi-platform publishing (LinkedIn, Twitter/X, Facebook, Instagram, YouTube) with scheduling, multi-account posting, and approval workflows.
+- **Inter-Repl Communication (Push to Resources Center):** Secure content distribution to an external Resources Center via a dedicated Push API with HMAC-SHA256 authentication, timestamp validation, and robust error handling for content assets like Events, Resources, and News.
+- **Email Infrastructure Settings:** Enterprise-grade email deliverability management including database schemas for domain authentication (SPF/DKIM/DMARC), tracking domains, IP pools, warmup plans, and send policies. Features enhanced sender profiles with ESP provider integration, reputation scores, and warmup status. Provides a full CRUD management UI for sender profiles.
+- **Campaign-Content Linking & Tracking URL System:** Strategic integration with Resources Centre for linking campaigns to external content (Events, Resources) and generating personalized tracking URLs with contact parameters and campaign attribution.
+- **Telephony - Softphone UI & Compliance:** Browser-based calling interface with database schemas for softphone profiles (agent audio preferences) and call recording access logs (audit trail). Includes an Agent Console UI with call queue, softphone controls (dial, hangup, mute), call script panel, notes, qualification questions, and disposition bar.
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)
@@ -102,5 +55,5 @@ The system utilizes a modern web stack: **React 18 + Vite, TypeScript, TailwindC
 - **Authentication:** JWT
 - **Password Hashing:** bcrypt
 - **Telephony Integration:** Telnyx WebRTC
-- **Email Service Providers:** SendGrid/SES/Mailgun
-- **Job Queue:** BullMQ + Redis
+- **Email Service Providers:** SendGrid, AWS SES, Mailgun
+- **Job Queue:** BullMQ (powered by Redis)
