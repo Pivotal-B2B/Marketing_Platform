@@ -89,8 +89,8 @@ export class ResourcesCentreSync {
     const result = { created: 0, updated: 0, errors: 0 };
 
     try {
-      const data = await this.fetchFromResourcesCentre<{ speakers: ResourcesCentreSpeaker[] }>('/api/v1/speakers');
-      const remoteSpeakers = data.speakers;
+      const response = await this.fetchFromResourcesCentre<{ data: ResourcesCentreSpeaker[] }>('/api/v1/speakers');
+      const remoteSpeakers = response.data;
 
       // Get existing speakers
       const existingSpeakers = await storage.getSpeakers();
@@ -139,8 +139,8 @@ export class ResourcesCentreSync {
     const result = { created: 0, updated: 0, errors: 0 };
 
     try {
-      const data = await this.fetchFromResourcesCentre<{ organizers: ResourcesCentreOrganizer[] }>('/api/v1/organizers');
-      const remoteOrganizers = data.organizers;
+      const response = await this.fetchFromResourcesCentre<{ data: ResourcesCentreOrganizer[] }>('/api/v1/organizers');
+      const remoteOrganizers = response.data;
 
       const existingOrganizers = await storage.getOrganizers();
 
@@ -184,8 +184,8 @@ export class ResourcesCentreSync {
     const result = { created: 0, updated: 0, errors: 0 };
 
     try {
-      const data = await this.fetchFromResourcesCentre<{ sponsors: ResourcesCentreSponsor[] }>('/api/v1/sponsors');
-      const remoteSponsors = data.sponsors;
+      const response = await this.fetchFromResourcesCentre<{ data: ResourcesCentreSponsor[] }>('/api/v1/sponsors');
+      const remoteSponsors = response.data;
 
       const existingSponsors = await storage.getSponsors();
 
