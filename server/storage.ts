@@ -142,6 +142,11 @@ export interface IStorage {
   // Filter Fields Registry
   getFilterFields(category?: string): Promise<any[]>;
   getFilterFieldsByEntity(entity: string): Promise<any[]>;
+  
+  // Dual-Industry Management (Phase 8)
+  updateAccountIndustry(id: string, data: { primary?: string; secondary?: string[]; code?: string }): Promise<Account | undefined>;
+  reviewAccountIndustryAI(id: string, userId: string, review: { accept_primary?: string; add_secondary?: string[]; reject?: string[] }): Promise<Account | undefined>;
+  getAccountsNeedingReview(limit?: number): Promise<Account[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1074,6 +1079,94 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(filterFieldRegistry.sortOrder);
+  }
+  
+  // Dual-Industry Management (Phase 8)
+  async updateAccountIndustry(
+    id: string, 
+    data: { primary?: string; secondary?: string[]; code?: string }
+  ): Promise<Account | undefined> {
+    const updateData: any = { updatedAt: new Date() };
+    
+    if (data.primary !== undefined) {
+      updateData.industryStandardized = data.primary;
+    }
+    if (data.secondary !== undefined) {
+      updateData.industrySecondary = data.secondary;
+    }
+    if (data.code !== undefined) {
+      updateData.industryCode = data.code;
+    }
+    
+    const [account] = await db
+      .update(accounts)
+      .set(updateData)
+      .where(eq(accounts.id, id))
+      .returning();
+    
+    return account || undefined;
+  }
+  
+  async reviewAccountIndustryAI(
+    id: string, 
+    userId: string, 
+    review: { accept_primary?: string; add_secondary?: string[]; reject?: string[] }
+  ): Promise<Account | undefined> {
+    const account = await this.getAccount(id);
+    if (!account) return undefined;
+    
+    const updateData: any = {
+      industryAiReviewedBy: userId,
+      updatedAt: new Date(),
+    };
+    
+    // Handle accept_primary - replaces primary industry
+    if (review.accept_primary) {
+      updateData.industryStandardized = review.accept_primary;
+    }
+    
+    // Handle add_secondary - appends to secondary industries array
+    if (review.add_secondary && review.add_secondary.length > 0) {
+      const currentSecondary = account.industrySecondary || [];
+      updateData.industrySecondary = [
+        ...currentSecondary,
+        ...review.add_secondary.filter(s => !currentSecondary.includes(s))
+      ];
+    }
+    
+    // Determine AI status based on review actions
+    if (review.accept_primary && !review.add_secondary?.length && !review.reject?.length) {
+      updateData.industryAiStatus = 'accepted';
+    } else if (review.reject && review.reject.length > 0 && !review.accept_primary && !review.add_secondary?.length) {
+      updateData.industryAiStatus = 'rejected';
+    } else if ((review.accept_primary || review.add_secondary?.length) && review.reject?.length) {
+      updateData.industryAiStatus = 'partial';
+    } else if (review.accept_primary || review.add_secondary?.length) {
+      updateData.industryAiStatus = 'accepted';
+    }
+    
+    const [updated] = await db
+      .update(accounts)
+      .set(updateData)
+      .where(eq(accounts.id, id))
+      .returning();
+    
+    return updated || undefined;
+  }
+  
+  async getAccountsNeedingReview(limit: number = 50): Promise<Account[]> {
+    return await db
+      .select()
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.industryAiStatus, 'pending'),
+          sql`${accounts.industryAiConfidence}::float >= 0.5`,
+          sql`${accounts.deletedAt} IS NULL`
+        )
+      )
+      .orderBy(sql`${accounts.industryAiConfidence}::float DESC`)
+      .limit(limit);
   }
 }
 
