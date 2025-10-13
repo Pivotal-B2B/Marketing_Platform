@@ -92,22 +92,41 @@ X-Timestamp: <unix-timestamp-ms>
 **Request Payload**:
 ```typescript
 interface ContentImportPayload {
-  assetId: string;           // Original asset ID from Dashboard
-  assetType: string;         // Type: landing_page, blog_post, event, etc.
-  title: string;             // Asset title
-  slug?: string;             // URL-friendly slug (auto-generated if not provided)
+  contentId: string;         // Original content ID from Dashboard
+  contentType: 'content_asset' | 'event' | 'resource' | 'news';
+  
+  // Common fields (all types)
+  title: string;             // Content title
+  slug: string;              // URL-friendly slug
   summary?: string;          // Short description/excerpt
   bodyHtml?: string;         // Full HTML content
   thumbnailUrl?: string;     // Featured image URL
-  ctaLink?: string;          // Call-to-action link
-  formId?: string;           // Associated form ID (if applicable)
   tags?: string[];           // Content tags/categories
   metadata?: any;            // Additional custom metadata
   syncedAt: string;          // ISO 8601 timestamp of sync
+  
+  // Content Asset specific fields (contentType: 'content_asset')
+  assetType?: string;        // landing_page, email_template, social_post, pdf, image, video
+  ctaLink?: string;          // Call-to-action link
+  formId?: string;           // Associated form ID (if applicable)
+  
+  // Event specific fields (contentType: 'event')
+  eventType?: string;        // webinar, forum, executive_dinner, roundtable, conference
+  eventDate?: string;        // ISO 8601 timestamp
+  eventEndDate?: string;     // ISO 8601 timestamp (optional)
+  locationType?: string;     // virtual, in_person, hybrid
+  location?: string;         // Physical address or virtual platform
+  registrationUrl?: string;  // Event registration link
+  communities?: string[];    // finance, marketing, it, hr, cx_ux, data_ai, ops
+  
+  // Resource specific fields (contentType: 'resource')
+  resourceType?: string;     // ebook, infographic, white_paper, guide, case_study
+  downloadUrl?: string;      // Direct download link
+  gatedByForm?: boolean;     // Whether form is required
 }
 ```
 
-**Example Request**:
+**Example Request - Content Asset**:
 ```bash
 POST https://resources.pivotal-b2b.com/api/import/content
 Headers:
@@ -117,7 +136,8 @@ Headers:
 
 Body:
 {
-  "assetId": "ast_123xyz",
+  "contentId": "ast_123xyz",
+  "contentType": "content_asset",
   "assetType": "landing_page",
   "title": "The Business Owner's Guide to Simplifying HR",
   "slug": "simplify-hr-guide",
@@ -130,6 +150,95 @@ Body:
   "metadata": {
     "industry": "Professional Services",
     "wordCount": 1500
+  },
+  "syncedAt": "2025-10-13T09:00:00Z"
+}
+```
+
+**Example Request - Event**:
+```bash
+POST https://resources.pivotal-b2b.com/api/import/content
+Headers:
+  Content-Type: application/json
+  X-Signature: <signature>
+  X-Timestamp: <timestamp>
+
+Body:
+{
+  "contentId": "evt_456abc",
+  "contentType": "event",
+  "eventType": "webinar",
+  "title": "Future of AI in B2B Marketing",
+  "slug": "future-ai-b2b-marketing-webinar",
+  "summary": "Join industry experts for a deep dive into AI-powered marketing strategies",
+  "bodyHtml": "<h1>Webinar Details</h1><p>Agenda and speakers...</p>",
+  "thumbnailUrl": "https://assets.pivotal.com/ai-webinar.jpg",
+  "eventDate": "2025-11-15T14:00:00Z",
+  "eventEndDate": "2025-11-15T15:30:00Z",
+  "locationType": "virtual",
+  "location": "Zoom",
+  "registrationUrl": "https://events.pivotal.com/register/ai-webinar",
+  "communities": ["marketing", "data_ai"],
+  "tags": ["AI", "Marketing", "Webinar"],
+  "metadata": {
+    "speakers": ["Dr. Jane Smith", "John Doe"],
+    "capacity": 500
+  },
+  "syncedAt": "2025-10-13T09:00:00Z"
+}
+```
+
+**Example Request - Resource**:
+```bash
+POST https://resources.pivotal-b2b.com/api/import/content
+Headers:
+  Content-Type: application/json
+  X-Signature: <signature>
+  X-Timestamp: <timestamp>
+
+Body:
+{
+  "contentId": "res_789def",
+  "contentType": "resource",
+  "resourceType": "ebook",
+  "title": "The Complete Guide to Account-Based Marketing",
+  "slug": "complete-guide-account-based-marketing",
+  "summary": "A comprehensive 50-page guide to implementing ABM strategies",
+  "bodyHtml": "<h1>Table of Contents</h1><p>Preview content...</p>",
+  "thumbnailUrl": "https://assets.pivotal.com/abm-guide-cover.jpg",
+  "downloadUrl": "https://cdn.pivotal.com/resources/abm-guide.pdf",
+  "gatedByForm": true,
+  "formId": "frm_204",
+  "tags": ["ABM", "Marketing", "eBook"],
+  "metadata": {
+    "pageCount": 50,
+    "fileSize": "5.2MB"
+  },
+  "syncedAt": "2025-10-13T09:00:00Z"
+}
+```
+
+**Example Request - News**:
+```bash
+POST https://resources.pivotal-b2b.com/api/import/content
+Headers:
+  Content-Type: application/json
+  X-Signature: <signature>
+  X-Timestamp: <timestamp>
+
+Body:
+{
+  "contentId": "news_321ghi",
+  "contentType": "news",
+  "title": "Pivotal CRM Announces New AI-Powered Lead Scoring",
+  "slug": "pivotal-crm-ai-lead-scoring-announcement",
+  "summary": "New machine learning capabilities help sales teams prioritize high-value leads",
+  "bodyHtml": "<h1>Press Release</h1><p>Full announcement...</p>",
+  "thumbnailUrl": "https://assets.pivotal.com/news-ai-scoring.jpg",
+  "tags": ["Product Update", "AI", "Lead Scoring"],
+  "metadata": {
+    "author": "PR Team",
+    "category": "Product News"
   },
   "syncedAt": "2025-10-13T09:00:00Z"
 }
@@ -199,15 +308,26 @@ CREATE INDEX idx_imported_content_tags ON imported_content USING GIN(tags);
 
 ## Content Types & Routing
 
-### Supported Asset Types
-| Asset Type      | Public Route                    | Use Case                          |
-|-----------------|---------------------------------|-----------------------------------|
-| landing_page    | /resources/:slug                | Gated content, lead gen          |
-| blog_post       | /blog/:slug                     | SEO content, thought leadership  |
-| event           | /events/:slug                   | Webinars, conferences            |
-| case_study      | /case-studies/:slug             | Customer success stories         |
-| whitepaper      | /resources/whitepapers/:slug    | Technical documents              |
-| ebook           | /resources/ebooks/:slug         | Long-form guides                 |
+### Supported Content Types
+| Content Type    | Sub Type        | Public Route                    | Use Case                          |
+|-----------------|-----------------|----------------------------------|------------------------------------|
+| content_asset   | landing_page    | /resources/:slug                 | Gated content, lead gen           |
+| content_asset   | email_template  | N/A (internal use)               | Email campaign templates          |
+| content_asset   | social_post     | N/A (external platforms)         | Social media content              |
+| content_asset   | pdf             | /resources/:slug                 | Downloadable documents            |
+| content_asset   | image           | /media/:slug                     | Visual assets                     |
+| content_asset   | video           | /media/videos/:slug              | Video content                     |
+| event           | webinar         | /events/:slug                    | Virtual webinars                  |
+| event           | forum           | /events/:slug                    | Discussion forums                 |
+| event           | executive_dinner| /events/:slug                    | Executive networking              |
+| event           | roundtable      | /events/:slug                    | Round table discussions           |
+| event           | conference      | /events/:slug                    | Large conferences                 |
+| resource        | ebook           | /resources/ebooks/:slug          | Long-form guides                  |
+| resource        | infographic     | /resources/infographics/:slug    | Visual data presentations         |
+| resource        | white_paper     | /resources/whitepapers/:slug     | Technical documents               |
+| resource        | guide           | /resources/guides/:slug          | How-to guides                     |
+| resource        | case_study      | /case-studies/:slug              | Customer success stories          |
+| news            | N/A             | /news/:slug                      | Press releases, announcements     |
 
 ### Dynamic Routing Example
 ```javascript
