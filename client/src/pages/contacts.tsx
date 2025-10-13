@@ -192,7 +192,7 @@ export default function ContactsPage() {
     contact.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contact.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.title?.toLowerCase().includes(searchQuery.toLowerCase())
+    contact.jobTitle?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
   const {
@@ -342,7 +342,7 @@ export default function ContactsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Account</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || undefined}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select account" />
@@ -399,6 +399,10 @@ export default function ContactsPage() {
         selectedCount={selectedCount}
         totalCount={filteredContacts.length}
         onClearSelection={clearSelection}
+        onBulkExport={() => toast({ title: "Bulk export coming soon" })}
+        onBulkDelete={() => toast({ title: "Bulk delete coming soon" })}
+        onBulkUpdate={() => toast({ title: "Bulk update coming soon" })}
+        onBulkAddToList={() => toast({ title: "Bulk add to list coming soon" })}
       />
 
       {contactsLoading ? (
@@ -548,14 +552,8 @@ export default function ContactsPage() {
           icon={Users}
           title="No contacts found"
           description={searchQuery ? "Try adjusting your search query" : "Get started by creating your first contact"}
-          action={
-            !searchQuery ? (
-              <Button onClick={() => setCreateDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Contact
-              </Button>
-            ) : undefined
-          }
+          actionLabel={!searchQuery ? "Create Contact" : undefined}
+          onAction={!searchQuery ? () => setCreateDialogOpen(true) : undefined}
         />
       )}
     </div>

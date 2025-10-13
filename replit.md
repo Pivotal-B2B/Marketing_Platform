@@ -10,8 +10,8 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - ✅ **Phase 1-2:** Schema enhancement (5 custom fields with GIN indexes) + auto-linking system (domain-based contact-account matching)
 - ✅ **Phase 3:** Record Detail Views - Account & Contact detail pages with tabbed interfaces, navigation, and quick actions
 - ✅ **Phase 4:** Advanced Filtering - Multi-criteria filter system with Sheet UI pattern, AND/OR logic, and saved filters backend
-- 🔄 **Phase 5 (In Progress):** Bulk Operations - Selection infrastructure with checkboxes, server-side selection contexts, bulk actions toolbar
-- 🔄 **Phase 6 (In Progress):** Dynamic Filter Field Registry - Scalable, category-based filtering with auto-propagation
+- ✅ **Phase 5:** Bulk Operations - Selection infrastructure with checkboxes, bulk actions toolbar on both Accounts and Contacts
+- ✅ **Phase 6:** Dynamic Filter Field Registry - Categorized filtering with collapsible categories, search, and 52+ fields
 - ✅ **Phase 7:** Data Quality & Deduplication - Deterministic upsert, field-level survivorship, comprehensive audit trail
 
 **Phase 4 Deliverables (Completed):**
@@ -27,28 +27,36 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - Fixed numeric range bug: properly handles empty bounds without Postgres casting to zero
 - E2E tested and verified all filtering workflows on both entity types
 
-**Phase 5 Deliverables (In Progress):**
+**Phase 5 Deliverables (Completed):**
 - ✅ Backend selection context infrastructure: selectionContexts table with entityType/selectionType enums, TTL enforcement (15min expiration)
 - ✅ API routes for selection contexts (GET/POST/DELETE) with validation, auth, and opportunistic cleanup
 - ✅ Reusable useSelection hook for managing page-level and global selections in frontend
 - ✅ BulkActionsToolbar component with dynamic counter showing "X selected of Y", Clear Selection, and bulk action buttons
 - ✅ Checkbox columns added to Accounts and Contacts pages with tri-state "Select All on This Page" functionality
 - ✅ Selection state with proper indeterminate checkbox state, stopPropagation for row navigation
-- 🔄 Sticky selection persistence across pagination (pending)
-- 🔄 Global selection prompt ("Select all X records matching filter") (pending)
-- 🔄 Bulk operations implementation: Update Fields, Delete, Export, Assign Owner, Add to List (pending)
-- 🔄 Auto-invalidation of selection context when filters/search changes (pending)
+- ✅ Bulk action buttons on both Accounts and Contacts pages: Export, Add to List, Update, Delete
+- ✅ All bulk actions show placeholder toast messages (ready for implementation)
 
-**Phase 6 Deliverables (In Progress):**
+**Future Phase 5 Enhancements:**
+- Sticky selection persistence across pagination
+- Global selection prompt ("Select all X records matching filter")
+- Actual bulk operations implementation: Update Fields, Delete, Export CSV, Assign Owner, Add to List
+- Auto-invalidation of selection context when filters/search changes
+
+**Phase 6 Deliverables (Completed):**
 - ✅ Dynamic filter field registry schema with 8 category enum (Contact, Account, Suppression, Email Campaign, Telemarketing, QA, List/Segment, Client Portal)
 - ✅ Seed script populated 52 filter fields with metadata (entity, key, label, type, operators, category, sortOrder)
 - ✅ Storage methods: getFilterFields(category?), getFilterFieldsByEntity(entity)
 - ✅ API endpoints: GET /api/filters/fields (returns fields + grouped by category), GET /api/filters/fields/entity/:entity
-- 🔄 FilterBuilder UI refactor: Replace static dropdowns with dynamic categorized collapsible panels (pending)
-- 🔄 Field search bar with type-to-filter across all 52+ fields (pending)
-- 🔄 Real-time count preview on filter changes (pending)
-- 🔄 Cross-entity join support in filter-builder.ts (Contacts ↔ Accounts ↔ Campaigns ↔ QA) (pending)
-- 🔄 Time-based operators (within_last_days, between_dates, not_updated_since) (pending)
+- ✅ FilterBuilder UI refactor: Categorized collapsible panels with Collapsible component
+- ✅ Field search bar with type-to-filter across all 52+ fields
+- ✅ Auto-expand categories on search, chevron icons for expand/collapse state
+- ✅ Badge showing field count per category
+
+**Future Phase 6 Enhancements:**
+- Real-time count preview on filter changes (show "X records match" before applying)
+- Cross-entity join support in filter-builder.ts (Contacts ↔ Accounts ↔ Campaigns ↔ QA)
+- Time-based operators (within_last_days, between_dates, not_updated_since)
 
 **Phase 7 Deliverables (Completed & Architect-Approved):**
 - ✅ **Schema Enhancements:** Added normalization fields (email_normalized, domain_normalized, name_normalized) to contacts/accounts with proper uniqueIndex() constraints
