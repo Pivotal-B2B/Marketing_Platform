@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
+import { FilterBuilder } from "@/components/filter-builder";
 import {
   Table,
   TableBody,
@@ -33,11 +34,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertSegmentSchema, insertListSchema, type InsertSegment, type InsertList, type Segment, type List, type DomainSet } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import type { FilterGroup } from "@shared/filter-types";
 
 export default function SegmentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createSegmentDialogOpen, setCreateSegmentDialogOpen] = useState(false);
   const [createListDialogOpen, setCreateListDialogOpen] = useState(false);
+  const [segmentFilterGroup, setSegmentFilterGroup] = useState<FilterGroup | undefined>();
+  const [segmentEntityType, setSegmentEntityType] = useState<'contact' | 'account'>('contact');
   const { toast } = useToast();
 
   const { data: segments, isLoading: segmentsLoading } = useQuery<Segment[]>({
@@ -78,6 +82,13 @@ export default function SegmentsPage() {
     },
   });
 
+  const previewSegmentMutation = useMutation({
+    mutationFn: async (data: { definitionJson: FilterGroup; entityType: string }) => {
+      const response = await apiRequest('POST', '/api/segments/preview', data);
+      return await response.json();
+    },
+  });
+
   const createSegmentMutation = useMutation({
     mutationFn: async (data: InsertSegment) => {
       await apiRequest('POST', '/api/segments', data);
@@ -86,6 +97,7 @@ export default function SegmentsPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/segments'] });
       setCreateSegmentDialogOpen(false);
       segmentForm.reset();
+      setSegmentFilterGroup(undefined);
       toast({
         title: "Success",
         description: "Segment created successfully",
@@ -281,7 +293,13 @@ export default function SegmentsPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...segmentForm}>
-                  <form onSubmit={segmentForm.handleSubmit((data) => createSegmentMutation.mutate(data))} className="space-y-4">
+                  <form onSubmit={segmentForm.handleSubmit((data) => {
+                    const submitData = {
+                      ...data,
+                      definitionJson: segmentFilterGroup || { logic: 'AND' as const, conditions: [] }
+                    };
+                    createSegmentMutation.mutate(submitData);
+                  })} className="space-y-4">
                     <FormField
                       control={segmentForm.control}
                       name="name"
@@ -370,12 +388,38 @@ export default function SegmentsPage() {
                         </FormItem>
                       )}
                     />
-                    <div className="rounded-lg border p-4">
-                      <p className="text-sm font-medium mb-2">Segment Filters (Query Builder)</p>
-                      <p className="text-sm text-muted-foreground">
-                        Visual query builder coming soon. For now, segments created with basic filters.
-                      </p>
-                    </div>
+                    <FormField
+                      control={segmentForm.control}
+                      name="entityType"
+                      render={({ field }) => (
+                        <div className="space-y-2">
+                          <FormLabel className="text-base font-medium">Segment Filters</FormLabel>
+                          <FilterBuilder
+                            entityType={(field.value as 'contact' | 'account') || 'contact'}
+                            onApplyFilter={(filter) => {
+                              setSegmentFilterGroup(filter);
+                              // Trigger preview if filter has conditions
+                              if (filter && filter.conditions.length > 0) {
+                                previewSegmentMutation.mutate({
+                                  definitionJson: filter,
+                                  entityType: field.value || 'contact'
+                                });
+                              }
+                            }}
+                            initialFilter={segmentFilterGroup}
+                          />
+                          {previewSegmentMutation.data && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                              <Users className="h-4 w-4" />
+                              <span>Preview: {previewSegmentMutation.data.count} {field.value || 'contact'}s match this filter</span>
+                            </div>
+                          )}
+                          {previewSegmentMutation.isPending && (
+                            <div className="text-sm text-muted-foreground mt-2">Calculating preview...</div>
+                          )}
+                        </div>
+                      )}
+                    />
                     <DialogFooter>
                       <Button type="submit" disabled={createSegmentMutation.isPending}>
                         {createSegmentMutation.isPending ? "Creating..." : "Create Segment"}
