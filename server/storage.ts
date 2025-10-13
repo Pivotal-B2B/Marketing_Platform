@@ -1117,6 +1117,7 @@ export class DatabaseStorage implements IStorage {
     
     const updateData: any = {
       industryAiReviewedBy: userId,
+      industryAiReviewedAt: new Date(),
       updatedAt: new Date(),
     };
     
@@ -1144,6 +1145,9 @@ export class DatabaseStorage implements IStorage {
     } else if (review.accept_primary || review.add_secondary?.length) {
       updateData.industryAiStatus = 'accepted';
     }
+    
+    // Clear AI suggestions after review
+    updateData.industryAiCandidates = null;
     
     const [updated] = await db
       .update(accounts)

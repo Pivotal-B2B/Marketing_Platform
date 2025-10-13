@@ -12,7 +12,8 @@ import {
   uniqueIndex,
   serial,
   boolean,
-  real
+  real,
+  numeric
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -127,10 +128,11 @@ export const accounts = pgTable("accounts", {
   industryAiSuggested: text("industry_ai_suggested"),
   industryAiCandidates: jsonb("industry_ai_candidates"),
   industryAiTopk: text("industry_ai_topk").array(),
-  industryAiConfidence: text("industry_ai_confidence"),
+  industryAiConfidence: numeric("industry_ai_confidence", { precision: 5, scale: 4 }),
   industryAiSource: text("industry_ai_source"),
   industryAiSuggestedAt: timestamp("industry_ai_suggested_at"),
   industryAiReviewedBy: varchar("industry_ai_reviewed_by").references(() => users.id, { onDelete: 'set null' }),
+  industryAiReviewedAt: timestamp("industry_ai_reviewed_at"),
   industryAiStatus: industryAIStatusEnum("industry_ai_status"),
   
   annualRevenue: text("annual_revenue"),
