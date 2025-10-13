@@ -99,6 +99,12 @@ const getNavStructure = (): NavItem[] => [
     ],
   },
   {
+    title: "Agent Console",
+    url: "/agent-console",
+    icon: Phone,
+    roles: ["admin", "campaign_manager", "agent"],
+  },
+  {
     title: "Content Studio",
     icon: Sparkles,
     roles: ["admin", "campaign_manager"],

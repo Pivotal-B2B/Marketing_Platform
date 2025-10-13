@@ -37,6 +37,7 @@ import EventsPage from "@/pages/events";
 import ResourcesPage from "@/pages/resources";
 import NewsPage from "@/pages/news";
 import SenderProfilesPage from "@/pages/sender-profiles";
+import AgentConsolePage from "./pages/agent-console";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -76,6 +77,7 @@ function AuthenticatedApp() {
               <Route path="/events" component={EventsPage} />
               <Route path="/resources" component={ResourcesPage} />
               <Route path="/news" component={NewsPage} />
+              <Route path="/agent-console" component={AgentConsolePage} />
               <Route path="/email-infrastructure/sender-profiles" component={SenderProfilesPage} />
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />
