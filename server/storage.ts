@@ -8,6 +8,7 @@ import {
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
   campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
   selectionContexts, filterFieldRegistry, fieldChangeLog, industryReference,
+  companySizeReference, revenueRangeReference,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -28,6 +29,8 @@ import {
   type SelectionContext, type InsertSelectionContext,
   type FilterField,
   type IndustryReference,
+  type CompanySizeReference,
+  type RevenueRangeReference,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -148,6 +151,14 @@ export interface IStorage {
   getIndustries(activeOnly?: boolean): Promise<IndustryReference[]>;
   searchIndustries(query: string, limit?: number): Promise<IndustryReference[]>;
   getIndustryById(id: string): Promise<IndustryReference | undefined>;
+  
+  // Company Size Reference (Standardized Employee Ranges)
+  getCompanySizes(activeOnly?: boolean): Promise<CompanySizeReference[]>;
+  getCompanySizeByCode(code: string): Promise<CompanySizeReference | undefined>;
+  
+  // Revenue Range Reference (Standardized Annual Revenue Brackets)
+  getRevenueRanges(activeOnly?: boolean): Promise<RevenueRangeReference[]>;
+  getRevenueRangeByLabel(label: string): Promise<RevenueRangeReference | undefined>;
   
   // Dual-Industry Management (Phase 8)
   updateAccountIndustry(id: string, data: { primary?: string; secondary?: string[]; code?: string }): Promise<Account | undefined>;
@@ -1124,6 +1135,50 @@ export class DatabaseStorage implements IStorage {
       .from(industryReference)
       .where(eq(industryReference.id, id));
     return industry || undefined;
+  }
+  
+  // Company Size Reference (Standardized Employee Ranges)
+  async getCompanySizes(activeOnly: boolean = true): Promise<CompanySizeReference[]> {
+    let query = db
+      .select()
+      .from(companySizeReference)
+      .orderBy(companySizeReference.sortOrder);
+    
+    if (activeOnly) {
+      query = query.where(eq(companySizeReference.isActive, true)) as any;
+    }
+    
+    return await query;
+  }
+  
+  async getCompanySizeByCode(code: string): Promise<CompanySizeReference | undefined> {
+    const [size] = await db
+      .select()
+      .from(companySizeReference)
+      .where(eq(companySizeReference.code, code));
+    return size || undefined;
+  }
+  
+  // Revenue Range Reference (Standardized Annual Revenue Brackets)
+  async getRevenueRanges(activeOnly: boolean = true): Promise<RevenueRangeReference[]> {
+    let query = db
+      .select()
+      .from(revenueRangeReference)
+      .orderBy(revenueRangeReference.sortOrder);
+    
+    if (activeOnly) {
+      query = query.where(eq(revenueRangeReference.isActive, true)) as any;
+    }
+    
+    return await query;
+  }
+  
+  async getRevenueRangeByLabel(label: string): Promise<RevenueRangeReference | undefined> {
+    const [range] = await db
+      .select()
+      .from(revenueRangeReference)
+      .where(eq(revenueRangeReference.label, label));
+    return range || undefined;
   }
   
   // Dual-Industry Management (Phase 8)
