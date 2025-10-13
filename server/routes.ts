@@ -1676,9 +1676,13 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "Push record not found" });
       }
 
-      // Check if max attempts reached
+      // Enforce max attempts limit BEFORE updating or retrying
       if (pushRecord.attemptCount >= pushRecord.maxAttempts) {
-        return res.status(400).json({ message: "Max retry attempts reached" });
+        return res.status(400).json({ 
+          message: "Max retry attempts reached",
+          attemptCount: pushRecord.attemptCount,
+          maxAttempts: pushRecord.maxAttempts
+        });
       }
 
       // Get the asset
@@ -1687,8 +1691,17 @@ export function registerRoutes(app: Express) {
         return res.status(404).json({ message: "Content asset not found" });
       }
 
-      // Update attempt count and status
+      // Calculate new attempt count and verify it doesn't exceed max
       const newAttemptCount = pushRecord.attemptCount + 1;
+      if (newAttemptCount > pushRecord.maxAttempts) {
+        return res.status(400).json({ 
+          message: "Cannot retry: would exceed max attempts",
+          attemptCount: pushRecord.attemptCount,
+          maxAttempts: pushRecord.maxAttempts
+        });
+      }
+
+      // Update attempt count and status atomically
       await storage.updateContentPush(id, { 
         status: 'retrying', 
         attemptCount: newAttemptCount 

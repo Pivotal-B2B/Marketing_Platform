@@ -21,14 +21,22 @@ const signature = crypto
   .digest('hex');
 ```
 
-#### Signature Verification (Resources Center)
+#### Signature Verification (Resources Center) - **MANDATORY**
 ```javascript
 function verifyHMACSignature(payload, timestamp, receivedSignature) {
-  // Verify timestamp is recent (prevent replay attacks)
+  // CRITICAL: Verify timestamp is recent (prevent replay attacks)
+  // This check is MANDATORY and must be implemented
   const now = Date.now();
-  const age = now - parseInt(timestamp);
-  if (age > 300000) { // 5 minutes
-    throw new Error('Request timestamp too old');
+  const requestAge = now - parseInt(timestamp);
+  
+  // Reject requests older than 5 minutes
+  if (requestAge > 300000) { // 5 minutes = 300,000ms
+    throw new Error('Request timestamp too old - possible replay attack');
+  }
+  
+  // Reject requests from the future (clock skew tolerance: 1 minute)
+  if (requestAge < -60000) {
+    throw new Error('Request timestamp is in the future');
   }
 
   // Regenerate signature
@@ -38,14 +46,33 @@ function verifyHMACSignature(payload, timestamp, receivedSignature) {
     .update(message)
     .digest('hex');
 
-  // Compare signatures (timing-safe)
-  if (expectedSignature !== receivedSignature) {
+  // Timing-safe comparison to prevent timing attacks
+  if (!crypto.timingSafeEqual(
+    Buffer.from(expectedSignature, 'hex'),
+    Buffer.from(receivedSignature, 'hex')
+  )) {
     throw new Error('Invalid signature');
   }
 
   return true;
 }
 ```
+
+**⚠️ SECURITY REQUIREMENT**: The timestamp validation is NOT optional. Without it, captured requests can be replayed indefinitely if the shared secret is compromised. The 5-minute window provides a balance between security and allowing for minor clock drift between systems.
+
+**Security Considerations**:
+- The current implementation allows replay attacks within the 5-minute timestamp window
+- For enhanced security, consider implementing a nonce/request-ID tracking system:
+  ```javascript
+  // Store processed request IDs in Redis with 5-minute TTL
+  const requestId = crypto.randomUUID();
+  if (await redis.exists(`push:${requestId}`)) {
+    throw new Error('Duplicate request - possible replay');
+  }
+  await redis.setex(`push:${requestId}`, 300, '1'); // 5 min expiry
+  ```
+- The 5-minute window is acceptable for most use cases where content pushes are not highly sensitive
+- If stricter replay prevention is needed, reduce the window to 60 seconds and implement request-ID tracking
 
 ## Endpoint Specification
 

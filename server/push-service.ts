@@ -81,7 +81,18 @@ export async function pushContentToResourcesCenter(
       body: payloadString,
     });
 
-    const responseData = await response.json();
+    // Handle non-JSON responses gracefully
+    let responseData: any;
+    try {
+      responseData = await response.json();
+    } catch (jsonError) {
+      const responseText = await response.text();
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${responseText || 'Non-JSON response'}`,
+        responsePayload: { statusText: response.statusText, body: responseText },
+      };
+    }
 
     if (!response.ok) {
       return {

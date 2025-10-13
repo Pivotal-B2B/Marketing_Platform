@@ -44,9 +44,10 @@ The system utilizes a modern web stack: **React 18 + Vite, TypeScript, TailwindC
 - **Inter-Repl Communication (Push to Resources Center):** Secure content distribution system enabling Dashboard-to-Resources-Center publishing:
     - **Push Tracking:** content_asset_pushes table tracks push attempts, status, retry counts, and responses with full audit trail.
     - **Push API:** POST /api/content-assets/:id/push endpoint with HMAC-SHA256 authentication for secure inter-Repl communication.
-    - **Status Management:** Push states (pending, in_progress, success, failed, retrying) with exponential backoff retry logic (max 3 attempts).
-    - **Security:** HMAC signature validation (X-Signature header) with timestamp-based replay prevention (X-Timestamp header). Secrets managed via Replit environment variables.
-    - **Resources Center Integration:** Dashboard sends content to Resources Center POST /api/import/content endpoint. Resources Center responds with externalId for tracking.
+    - **Status Management:** Push states (pending, in_progress, success, failed, retrying) with max 3 attempts enforced before retry execution.
+    - **Security:** HMAC-SHA256 signature validation (X-Signature header) with mandatory timestamp validation (5-minute window) for replay attack prevention. Resources Center MUST validate timestamp freshness and use timing-safe signature comparison. Secrets managed via Replit environment variables.
+    - **Error Handling:** Graceful handling of non-JSON responses with fallback to text parsing for accurate diagnostics during push failures.
+    - **Resources Center Integration:** Dashboard sends content to Resources Center POST /api/import/content endpoint. Resources Center responds with externalId for tracking. Full API specification in RESOURCES_CENTER_API_SPEC.md.
     - **Sync Status Display:** UI shows push history, attempt counts, success/failure status with manual retry capability.
 
 ## External Dependencies
