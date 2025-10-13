@@ -74,6 +74,42 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
     - **Pre-Flight Checklist:** Audience health checks, compliance confirmations, pacing validation, seed testing
     - **Reporting:** Campaign stats (send/open/click rates, connect/talk time, disposition mix), order-scoped views with goal tracking
     - **API Endpoints:** /email-campaigns/*, /call-campaigns/*, /campaigns/:id/pause|resume|stop, /orders/:id/aggregate-stats
+- **Phase 21 - Domain Sets Upgrade (ABM & Campaign Audience Mapping) (October 2025):**
+    - **Data Model:**
+        - **DomainSets:** Main entity tracking upload metadata, match statistics, and processing status (processing/completed/error)
+        - **DomainSetItems:** Individual domain entries with normalized domains, account matching results (exact/fuzzy/none), match confidence scores, and contact counts
+        - **DomainSetContactLinks:** Links between domain sets and matched contacts with traceability (matched_via: domain/email/manual)
+    - **Domain Normalization & Validation:**
+        - Automatic normalization: lowercase, remove www/mail/m prefixes, strip protocols, extract root domain
+        - Typo detection and correction (e.g., example,com → example.com)
+        - Deduplication based on normalized domain comparison
+        - Valid TLD pattern validation
+    - **Matching Engine:**
+        - **Exact Match:** Direct match to account.domain or account.alternate_domains[]
+        - **Fuzzy Match:** Levenshtein distance ≤ 3 AND similarity ≥ 0.85 for domain or company name
+        - **Confidence Scoring:** 0.00 to 1.00 scale for match quality assessment
+        - **Auto Account Creation:** Optional stub account creation for unknown domains (flagged for review)
+    - **Bulk Operations:**
+        - CSV/TXT upload with parsing (domain, account_name, notes columns)
+        - Batch processing (100K+ domains with parallel execution)
+        - Real-time match rate reporting (matched accounts, matched contacts, unknown domains)
+    - **Expansion & Conversion:**
+        - **Expand to Contacts:** Pull all contacts from matched accounts with optional filtering (title, seniority, department)
+        - **Convert to List:** Instant list creation from expanded contact set
+        - **Assign to Campaign:** Direct assignment of matched audience to email/telemarketing campaigns
+    - **Integration Points:**
+        - **With Accounts:** Automatic linking via domain and alternate_domains[] arrays
+        - **With Contacts:** Email domain extraction for orphaned contact linking
+        - **With Lists:** Conversion to static lists for campaign targeting
+        - **With Campaigns:** Domain set as audience source in campaign builder
+        - **With Client Portal:** Auto-generate domain set when clients upload domain files in orders
+    - **API Endpoints:** 
+        - POST /api/domain-sets (upload & create)
+        - GET /api/domain-sets/:id/items (get matched items)
+        - POST /api/domain-sets/:id/process (trigger re-matching)
+        - POST /api/domain-sets/:id/expand (expand to contacts with filters)
+        - POST /api/domain-sets/:id/convert-to-list (create list from matches)
+        - DELETE /api/domain-sets/:id (archive/delete)
 
 ## External Dependencies
 
