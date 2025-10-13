@@ -792,6 +792,10 @@ export const callAttempts = pgTable("call_attempts", {
   endedAt: timestamp("ended_at"),
   duration: integer("duration"),
   notes: text("notes"),
+  // Phase 27: Telephony enhancements
+  wrapupSeconds: integer("wrapup_seconds"), // Time spent in wrap-up state
+  scriptVersionId: varchar("script_version_id"), // FK to call_scripts (version tracking)
+  qaLocked: boolean("qa_locked").default(false), // Prevents editing after QA review
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   campaignIdx: index("call_attempts_campaign_idx").on(table.campaignId),
@@ -809,6 +813,37 @@ export const callEvents = pgTable("call_events", {
 }, (table) => ({
   attemptIdx: index("call_events_attempt_idx").on(table.attemptId),
   typeIdx: index("call_events_type_idx").on(table.type),
+}));
+
+// ==================== PHASE 27: TELEPHONY - SOFTPHONE & COMPLIANCE ====================
+
+// Softphone Profile - Per-agent audio device preferences
+export const softphoneProfiles = pgTable("softphone_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull().unique(),
+  micDeviceId: text("mic_device_id"), // Browser audio input device ID
+  speakerDeviceId: text("speaker_device_id"), // Browser audio output device ID
+  lastTestAt: timestamp("last_test_at"), // Last time agent ran device test
+  testResultsJson: jsonb("test_results_json"), // { micLevel: 85, latency: 45, mos: 4.2 }
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("softphone_profiles_user_idx").on(table.userId),
+}));
+
+// Call Recording Access Log - Audit trail for QA/Admin playback & downloads
+export const callRecordingAccessLogs = pgTable("call_recording_access_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  callAttemptId: varchar("call_attempt_id").references(() => callAttempts.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  action: text("action").notNull(), // 'play' or 'download'
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  attemptIdx: index("call_recording_access_logs_attempt_idx").on(table.callAttemptId),
+  userIdx: index("call_recording_access_logs_user_idx").on(table.userId),
+  actionIdx: index("call_recording_access_logs_action_idx").on(table.action),
 }));
 
 // Qualification Responses
@@ -1071,6 +1106,17 @@ export const insertCallEventSchema = createInsertSchema(callEvents).omit({
   createdAt: true,
 });
 
+export const insertSoftphoneProfileSchema = createInsertSchema(softphoneProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCallRecordingAccessLogSchema = createInsertSchema(callRecordingAccessLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertQualificationResponseSchema = createInsertSchema(qualificationResponses).omit({
   id: true,
   createdAt: true,
@@ -1263,6 +1309,12 @@ export type InsertCallAttempt = z.infer<typeof insertCallAttemptSchema>;
 
 export type CallEvent = typeof callEvents.$inferSelect;
 export type InsertCallEvent = z.infer<typeof insertCallEventSchema>;
+
+export type SoftphoneProfile = typeof softphoneProfiles.$inferSelect;
+export type InsertSoftphoneProfile = z.infer<typeof insertSoftphoneProfileSchema>;
+
+export type CallRecordingAccessLog = typeof callRecordingAccessLogs.$inferSelect;
+export type InsertCallRecordingAccessLog = z.infer<typeof insertCallRecordingAccessLogSchema>;
 
 export type QualificationResponse = typeof qualificationResponses.$inferSelect;
 export type InsertQualificationResponse = z.infer<typeof insertQualificationResponseSchema>;
