@@ -25,7 +25,14 @@ import {
   Share2,
   Calendar,
   BarChart3,
-  Filter
+  Filter,
+  Cloud,
+  Upload,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  Clock,
+  ExternalLink
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,6 +65,8 @@ export default function ContentStudioPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [pushDialogOpen, setPushDialogOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<ContentAsset | null>(null);
   const { toast } = useToast();
 
   const { data: assets, isLoading } = useQuery<ContentAsset[]>({
@@ -101,6 +110,56 @@ export default function ContentStudioPage() {
       });
     },
   });
+
+  const { data: pushHistory } = useQuery({
+    queryKey: ['/api/content-assets', selectedAsset?.id, 'pushes'],
+    enabled: !!selectedAsset && pushDialogOpen,
+  });
+
+  const pushMutation = useMutation({
+    mutationFn: async (assetId: string) => {
+      return apiRequest('POST', `/api/content-assets/${assetId}/push`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/content-assets', selectedAsset?.id, 'pushes'] });
+      toast({
+        title: "Push initiated",
+        description: "Content is being pushed to Resources Center.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Push failed",
+        description: error.message || "Failed to push content. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const retryPushMutation = useMutation({
+    mutationFn: async (pushId: string) => {
+      return apiRequest('POST', `/api/content-pushes/${pushId}/retry`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/content-assets', selectedAsset?.id, 'pushes'] });
+      toast({
+        title: "Retry initiated",
+        description: "Retrying push to Resources Center.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Retry failed",
+        description: error.message || "Failed to retry push. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAssetClick = (asset: ContentAsset) => {
+    setSelectedAsset(asset);
+    setPushDialogOpen(true);
+  };
 
   const filteredAssets = assets?.filter(asset => {
     const matchesSearch = asset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -216,7 +275,7 @@ export default function ContentStudioPage() {
                   <Card 
                     key={asset.id} 
                     className="hover-elevate cursor-pointer transition-all"
-                    onClick={() => setLocation(`/content-studio/asset/${asset.id}`)}
+                    onClick={() => handleAssetClick(asset)}
                     data-testid={`asset-card-${asset.id}`}
                   >
                     <CardHeader>
@@ -369,6 +428,143 @@ export default function ContentStudioPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Push to Resources Center Dialog */}
+      <Dialog open={pushDialogOpen} onOpenChange={setPushDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Cloud className="w-5 h-5" />
+              Push to Resources Center
+            </DialogTitle>
+            <DialogDescription>
+              Publish this content asset to the public Resources Center
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedAsset && (
+            <div className="space-y-4">
+              {/* Asset Info */}
+              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                <div className="flex items-center gap-2">
+                  {getAssetIcon(selectedAsset.assetType)}
+                  <h3 className="font-semibold">{selectedAsset.title}</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {selectedAsset.description || "No description"}
+                </p>
+                {selectedAsset.tags && selectedAsset.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {selectedAsset.tags.map((tag) => (
+                      <Badge key={tag} variant="outline" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Push Button */}
+              <Button
+                onClick={() => pushMutation.mutate(selectedAsset.id)}
+                disabled={pushMutation.isPending}
+                className="w-full"
+                data-testid="button-push-asset"
+              >
+                {pushMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Pushing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Push to Resources Center
+                  </>
+                )}
+              </Button>
+
+              {/* Push History */}
+              {pushHistory && pushHistory.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Push History
+                  </h4>
+                  <div className="space-y-2">
+                    {pushHistory.map((push: any) => (
+                      <div
+                        key={push.id}
+                        className="p-3 border rounded-lg space-y-2"
+                        data-testid={`push-record-${push.id}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {push.status === 'success' && (
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            )}
+                            {push.status === 'failed' && (
+                              <XCircle className="w-4 h-4 text-red-500" />
+                            )}
+                            {(push.status === 'pending' || push.status === 'in_progress' || push.status === 'retrying') && (
+                              <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+                            )}
+                            <span className="text-sm font-medium capitalize">
+                              {push.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(push.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {push.externalId && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <ExternalLink className="w-3 h-3" />
+                            <span className="text-muted-foreground">
+                              External ID: {push.externalId}
+                            </span>
+                          </div>
+                        )}
+
+                        {push.errorMessage && (
+                          <div className="text-xs text-red-500 bg-red-50 dark:bg-red-950/20 p-2 rounded">
+                            {push.errorMessage}
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            Attempt {push.attemptCount} of {push.maxAttempts}
+                          </span>
+                          {push.status === 'failed' && push.attemptCount < push.maxAttempts && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => retryPushMutation.mutate(push.id)}
+                              disabled={retryPushMutation.isPending}
+                              data-testid={`button-retry-${push.id}`}
+                            >
+                              <RefreshCw className="w-3 h-3 mr-1" />
+                              Retry
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPushDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
