@@ -13,7 +13,8 @@ import {
   serial,
   boolean,
   real,
-  numeric
+  numeric,
+  foreignKey
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -156,7 +157,7 @@ export const accounts = pgTable("accounts", {
   mainPhoneExtension: text("main_phone_extension"),
   intentTopics: text("intent_topics").array(),
   techStack: text("tech_stack").array(),
-  parentAccountId: varchar("parent_account_id").references(() => accounts.id, { onDelete: 'set null' }),
+  parentAccountId: varchar("parent_account_id"),
   tags: text("tags").array(),
   ownerId: varchar("owner_id").references(() => users.id),
   customFields: jsonb("custom_fields"),
@@ -175,6 +176,11 @@ export const accounts = pgTable("accounts", {
   specialtiesGinIdx: index("accounts_specialties_gin_idx").using('gin', table.linkedinSpecialties),
   techStackGinIdx: index("accounts_tech_stack_gin_idx").using('gin', table.techStack),
   tagsGinIdx: index("accounts_tags_gin_idx").using('gin', table.tags),
+  parentAccountFk: foreignKey({
+    columns: [table.parentAccountId],
+    foreignColumns: [table.id],
+    name: "accounts_parent_account_id_fkey"
+  }).onDelete('set null'),
 }));
 
 // Contacts table
@@ -280,6 +286,19 @@ export const dedupeReviewQueue = pgTable("dedupe_review_queue", {
 }, (table) => ({
   statusIdx: index("dedupe_review_queue_status_idx").on(table.status),
   entityTypeIdx: index("dedupe_review_queue_entity_type_idx").on(table.entityType),
+}));
+
+// Industry Reference - Standardized taxonomy (LinkedIn/NAICS)
+export const industryReference = pgTable("industry_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  naicsCode: text("naics_code"),
+  synonyms: text("synonyms").array().default(sql`'{}'::text[]`),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("industry_reference_name_idx").on(table.name),
+  isActiveIdx: index("industry_reference_is_active_idx").on(table.isActive),
 }));
 
 // Segments table (dynamic filters)
@@ -787,6 +806,11 @@ export const insertDedupeReviewQueueSchema = createInsertSchema(dedupeReviewQueu
   createdAt: true,
 });
 
+export const insertIndustryReferenceSchema = createInsertSchema(industryReference).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Inferred Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -865,3 +889,6 @@ export type InsertFieldChangeLog = z.infer<typeof insertFieldChangeLogSchema>;
 
 export type DedupeReviewQueue = typeof dedupeReviewQueue.$inferSelect;
 export type InsertDedupeReviewQueue = z.infer<typeof insertDedupeReviewQueueSchema>;
+
+export type IndustryReference = typeof industryReference.$inferSelect;
+export type InsertIndustryReference = z.infer<typeof insertIndustryReferenceSchema>;
