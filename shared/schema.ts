@@ -137,6 +137,45 @@ export const contentToneEnum = pgEnum('content_tone', [
   'technical'
 ]);
 
+// Content distribution enums
+export const eventTypeEnum = pgEnum('event_type', [
+  'webinar',
+  'forum',
+  'executive_dinner',
+  'roundtable',
+  'conference'
+]);
+
+export const locationTypeEnum = pgEnum('location_type', [
+  'virtual',
+  'in_person',
+  'hybrid'
+]);
+
+export const communityEnum = pgEnum('community', [
+  'finance',
+  'marketing',
+  'it',
+  'hr',
+  'cx_ux',
+  'data_ai',
+  'ops'
+]);
+
+export const resourceTypeEnum = pgEnum('resource_type', [
+  'ebook',
+  'infographic',
+  'white_paper',
+  'guide',
+  'case_study'
+]);
+
+export const contentStatusEnum = pgEnum('content_status', [
+  'draft',
+  'published',
+  'archived'
+]);
+
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1414,6 +1453,90 @@ export const contentAssetPushes = pgTable("content_asset_pushes", {
   targetUrlIdx: index("content_asset_pushes_target_url_idx").on(table.targetUrl),
 }));
 
+// ============================================================================
+// EVENTS, RESOURCES, AND NEWS (Structured Content for Distribution)
+// ============================================================================
+
+// Events table
+export const events = pgTable("events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  eventType: eventTypeEnum("event_type").notNull(),
+  locationType: locationTypeEnum("location_type").notNull(),
+  community: communityEnum("community").notNull(),
+  organizer: text("organizer"),
+  sponsor: text("sponsor"),
+  speakers: jsonb("speakers").default(sql`'[]'::jsonb`), // Array of speaker objects
+  startIso: text("start_iso").notNull(),
+  endIso: text("end_iso"),
+  timezone: text("timezone"),
+  overviewHtml: text("overview_html"),
+  learnBullets: text("learn_bullets").array().default(sql`ARRAY[]::text[]`),
+  thumbnailUrl: text("thumbnail_url"),
+  ctaLink: text("cta_link"),
+  formId: text("form_id"),
+  seo: jsonb("seo"), // SEO metadata object
+  status: contentStatusEnum("status").notNull().default('draft'),
+  ownerId: varchar("owner_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index("events_slug_idx").on(table.slug),
+  eventTypeIdx: index("events_event_type_idx").on(table.eventType),
+  communityIdx: index("events_community_idx").on(table.community),
+  statusIdx: index("events_status_idx").on(table.status),
+  startIsoIdx: index("events_start_iso_idx").on(table.startIso),
+}));
+
+// Resources table
+export const resources = pgTable("resources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  resourceType: resourceTypeEnum("resource_type").notNull(),
+  community: communityEnum("community").notNull(),
+  overviewHtml: text("overview_html"),
+  bullets: text("bullets").array().default(sql`ARRAY[]::text[]`),
+  bodyHtml: text("body_html"),
+  thumbnailUrl: text("thumbnail_url"),
+  ctaLink: text("cta_link"),
+  formId: text("form_id"),
+  seo: jsonb("seo"), // SEO metadata object
+  status: contentStatusEnum("status").notNull().default('draft'),
+  ownerId: varchar("owner_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index("resources_slug_idx").on(table.slug),
+  resourceTypeIdx: index("resources_resource_type_idx").on(table.resourceType),
+  communityIdx: index("resources_community_idx").on(table.community),
+  statusIdx: index("resources_status_idx").on(table.status),
+}));
+
+// News table
+export const news = pgTable("news", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  community: communityEnum("community").notNull(),
+  overviewHtml: text("overview_html"),
+  bodyHtml: text("body_html"),
+  authors: text("authors").array().default(sql`ARRAY[]::text[]`),
+  publishedIso: text("published_iso"),
+  thumbnailUrl: text("thumbnail_url"),
+  seo: jsonb("seo"), // SEO metadata object
+  status: contentStatusEnum("status").notNull().default('draft'),
+  ownerId: varchar("owner_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index("news_slug_idx").on(table.slug),
+  communityIdx: index("news_community_idx").on(table.community),
+  statusIdx: index("news_status_idx").on(table.status),
+  publishedIsoIdx: index("news_published_iso_idx").on(table.publishedIso),
+}));
+
 // Insert schemas for Content Studio
 export const insertContentAssetSchema = createInsertSchema(contentAssets).omit({
   id: true,
@@ -1469,3 +1592,32 @@ export type InsertAIContentGeneration = z.infer<typeof insertAIContentGeneration
 
 export type ContentAssetPush = typeof contentAssetPushes.$inferSelect;
 export type InsertContentAssetPush = z.infer<typeof insertContentAssetPushSchema>;
+
+// Insert schemas for Events, Resources, and News
+export const insertEventSchema = createInsertSchema(events).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertResourceSchema = createInsertSchema(resources).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNewsSchema = createInsertSchema(news).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Export types for Events, Resources, and News
+export type Event = typeof events.$inferSelect;
+export type InsertEvent = z.infer<typeof insertEventSchema>;
+
+export type Resource = typeof resources.$inferSelect;
+export type InsertResource = z.infer<typeof insertResourceSchema>;
+
+export type News = typeof news.$inferSelect;
+export type InsertNews = z.infer<typeof insertNewsSchema>;
