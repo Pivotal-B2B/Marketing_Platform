@@ -77,6 +77,13 @@ export const entityTypeEnum = pgEnum('entity_type', ['account', 'contact']);
 
 export const selectionTypeEnum = pgEnum('selection_type', ['explicit', 'filtered']);
 
+export const industryAIStatusEnum = pgEnum('industry_ai_status', [
+  'pending',
+  'accepted', 
+  'rejected',
+  'partial'
+]);
+
 export const filterFieldCategoryEnum = pgEnum('filter_field_category', [
   'contact_fields',
   'account_fields', 
@@ -109,7 +116,23 @@ export const accounts = pgTable("accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   nameNormalized: text("name_normalized"),
-  industry: text("industry"),
+  
+  // Dual-Industry Field Strategy (Phase 8)
+  industryStandardized: text("industry_standardized"),
+  industrySecondary: text("industry_secondary").array(),
+  industryCode: text("industry_code"),
+  industryRaw: text("industry_raw"),
+  
+  // AI Enrichment Fields
+  industryAiSuggested: text("industry_ai_suggested"),
+  industryAiCandidates: jsonb("industry_ai_candidates"),
+  industryAiTopk: text("industry_ai_topk").array(),
+  industryAiConfidence: text("industry_ai_confidence"),
+  industryAiSource: text("industry_ai_source"),
+  industryAiSuggestedAt: timestamp("industry_ai_suggested_at"),
+  industryAiReviewedBy: varchar("industry_ai_reviewed_by").references(() => users.id, { onDelete: 'set null' }),
+  industryAiStatus: industryAIStatusEnum("industry_ai_status"),
+  
   annualRevenue: text("annual_revenue"),
   employeesSizeRange: text("employees_size_range"),
   staffCount: integer("staff_count"),
@@ -596,6 +619,19 @@ export const insertAccountSchema = createInsertSchema(accounts).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+// Industry update schemas (Phase 8: Dual-Industry Strategy)
+export const updateAccountIndustrySchema = z.object({
+  primary: z.string().optional(),
+  secondary: z.array(z.string()).optional(),
+  code: z.string().optional(),
+});
+
+export const reviewAccountIndustryAISchema = z.object({
+  accept_primary: z.string().optional(),
+  add_secondary: z.array(z.string()).optional(),
+  reject: z.array(z.string()).optional(),
 });
 
 export const insertContactSchema = createInsertSchema(contacts).omit({
