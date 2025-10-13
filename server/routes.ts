@@ -20,7 +20,12 @@ import {
   insertSavedFilterSchema,
   insertSelectionContextSchema,
   updateAccountIndustrySchema,
-  reviewAccountIndustryAISchema
+  reviewAccountIndustryAISchema,
+  insertSenderProfileSchema,
+  insertEmailTemplateSchema,
+  insertCallScriptSchema,
+  insertEmailSendSchema,
+  insertCallAttemptSchema
 } from "@shared/schema";
 
 export function registerRoutes(app: Express) {
@@ -644,6 +649,194 @@ export function registerRoutes(app: Express) {
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to launch campaign" });
+    }
+  });
+
+  // ==================== SENDER PROFILES ====================
+
+  app.get("/api/sender-profiles", requireAuth, async (req, res) => {
+    try {
+      const profiles = await storage.getSenderProfiles();
+      res.json(profiles);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sender profiles" });
+    }
+  });
+
+  app.get("/api/sender-profiles/:id", requireAuth, async (req, res) => {
+    try {
+      const profile = await storage.getSenderProfile(req.params.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Sender profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sender profile" });
+    }
+  });
+
+  app.post("/api/sender-profiles", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertSenderProfileSchema.parse(req.body);
+      const profile = await storage.createSenderProfile(validated);
+      res.status(201).json(profile);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create sender profile" });
+    }
+  });
+
+  app.patch("/api/sender-profiles/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const profile = await storage.updateSenderProfile(req.params.id, req.body);
+      if (!profile) {
+        return res.status(404).json({ message: "Sender profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update sender profile" });
+    }
+  });
+
+  app.delete("/api/sender-profiles/:id", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      await storage.deleteSenderProfile(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete sender profile" });
+    }
+  });
+
+  // ==================== EMAIL TEMPLATES ====================
+
+  app.get("/api/email-templates", requireAuth, async (req, res) => {
+    try {
+      const templates = await storage.getEmailTemplates();
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch email templates" });
+    }
+  });
+
+  app.get("/api/email-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const template = await storage.getEmailTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ message: "Email template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch email template" });
+    }
+  });
+
+  app.post("/api/email-templates", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertEmailTemplateSchema.parse(req.body);
+      const template = await storage.createEmailTemplate(validated);
+      res.status(201).json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create email template" });
+    }
+  });
+
+  app.patch("/api/email-templates/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const template = await storage.updateEmailTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ message: "Email template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update email template" });
+    }
+  });
+
+  app.post("/api/email-templates/:id/approve", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const template = await storage.approveEmailTemplate(req.params.id, userId);
+      if (!template) {
+        return res.status(404).json({ message: "Email template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to approve email template" });
+    }
+  });
+
+  app.delete("/api/email-templates/:id", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      await storage.deleteEmailTemplate(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete email template" });
+    }
+  });
+
+  // ==================== CALL SCRIPTS ====================
+
+  app.get("/api/call-scripts", requireAuth, async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      const scripts = await storage.getCallScripts(campaignId);
+      res.json(scripts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch call scripts" });
+    }
+  });
+
+  app.get("/api/call-scripts/:id", requireAuth, async (req, res) => {
+    try {
+      const script = await storage.getCallScript(req.params.id);
+      if (!script) {
+        return res.status(404).json({ message: "Call script not found" });
+      }
+      res.json(script);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch call script" });
+    }
+  });
+
+  app.post("/api/call-scripts", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertCallScriptSchema.parse(req.body);
+      const script = await storage.createCallScript(validated);
+      res.status(201).json(script);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create call script" });
+    }
+  });
+
+  app.patch("/api/call-scripts/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const script = await storage.updateCallScript(req.params.id, req.body);
+      if (!script) {
+        return res.status(404).json({ message: "Call script not found" });
+      }
+      res.json(script);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update call script" });
+    }
+  });
+
+  app.delete("/api/call-scripts/:id", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      await storage.deleteCallScript(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete call script" });
     }
   });
 
