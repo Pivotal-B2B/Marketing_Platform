@@ -2159,6 +2159,46 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== RESOURCES CENTRE SYNC ====================
+  
+  app.post("/api/sync/resources-centre", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const { resourcesCentreSync } = await import("./services/resourcesCentreSync");
+      const result = await resourcesCentreSync.syncAll();
+      
+      if (result.success) {
+        res.json({
+          message: "Sync completed successfully",
+          ...result
+        });
+      } else {
+        res.status(207).json({
+          message: "Sync completed with errors",
+          ...result
+        });
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes('environment variable')) {
+          return res.status(400).json({ 
+            message: "Configuration error", 
+            error: error.message 
+          });
+        }
+        if (error.message.includes('API key')) {
+          return res.status(401).json({ 
+            message: "Authentication failed with Resources Centre", 
+            error: error.message 
+          });
+        }
+      }
+      res.status(500).json({ 
+        message: "Sync failed", 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
   // ==================== EMAIL INFRASTRUCTURE (Phase 26) ====================
   
   // Sender Profiles
