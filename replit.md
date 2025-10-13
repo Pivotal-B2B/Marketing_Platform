@@ -35,6 +35,14 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Client Portal (Bridge Model):** Allows clients to specify audience, type, assets, and goals for campaign orders. Existing campaigns are manually linked to orders by internal operations (no auto-creation). Provides order-scoped dashboards and lead downloads.
 - **Compliance:** Real-time enforcement of global DNC and email unsubscribe lists. Supports consent tracking.
 - **Security:** JWT token generation, bcrypt password hashing, and role-based access control (RBAC) middleware for all API routes.
+- **Phase 11 - Lists & Segmentation Engine (October 2025):**
+    - **Enhanced Segments Schema:** Added entityType (contact/account), lastRefreshedAt, isActive flag, recordCountCache, tags[], and visibilityScope (private/team/global) for advanced segment management
+    - **Enhanced Lists Schema:** Entity-agnostic design with recordIds[] (replacing contactIds), sourceType enum (segment/manual_upload/selection/filter), sourceRef for traceability, snapshotTs timestamp, tags[], and visibilityScope
+    - **Segment Preview API:** Live count and sample IDs endpoint (POST /api/segments/preview) for real-time audience size estimation before segment creation
+    - **Segment to List Conversion:** Endpoint to convert dynamic segments to static lists (POST /api/segments/:id/convert-to-list) for campaign targeting
+    - **List Export:** CSV/JSON export functionality (POST /api/lists/:id/export) with proper headers and filename generation
+    - **Database Enums:** Created visibility_scope (private/team/global) and source_type (segment/manual_upload/selection/filter) PostgreSQL enums for data integrity
+    - **Updated UI:** Segments & Lists page updated to reflect new schema fields, including tags display, record counts, and proper entity type handling
 
 ## External Dependencies
 
