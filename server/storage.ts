@@ -1911,21 +1911,21 @@ export class DatabaseStorage implements IStorage {
   // ==================== CONTENT STUDIO ====================
   
   async getContentAssets(): Promise<ContentAsset[]> {
-    return await this.db.select().from(contentAssets).orderBy(contentAssets.updatedAt);
+    return await db.select().from(contentAssets).orderBy(contentAssets.updatedAt);
   }
 
   async getContentAsset(id: string): Promise<ContentAsset | null> {
-    const result = await this.db.select().from(contentAssets).where(eq(contentAssets.id, id));
+    const result = await db.select().from(contentAssets).where(eq(contentAssets.id, id));
     return result[0] || null;
   }
 
   async createContentAsset(data: InsertContentAsset): Promise<ContentAsset> {
-    const result = await this.db.insert(contentAssets).values(data).returning();
+    const result = await db.insert(contentAssets).values(data).returning();
     return result[0];
   }
 
   async updateContentAsset(id: string, data: Partial<InsertContentAsset>): Promise<ContentAsset | null> {
-    const result = await this.db.update(contentAssets)
+    const result = await db.update(contentAssets)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(contentAssets.id, id))
       .returning();
@@ -1933,28 +1933,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteContentAsset(id: string): Promise<boolean> {
-    const result = await this.db.delete(contentAssets).where(eq(contentAssets.id, id)).returning();
+    const result = await db.delete(contentAssets).where(eq(contentAssets.id, id)).returning();
     return result.length > 0;
   }
 
   // ==================== SOCIAL POSTS ====================
   
   async getSocialPosts(): Promise<SocialPost[]> {
-    return await this.db.select().from(socialPosts).orderBy(socialPosts.createdAt);
+    return await db.select().from(socialPosts).orderBy(socialPosts.createdAt);
   }
 
   async getSocialPost(id: string): Promise<SocialPost | null> {
-    const result = await this.db.select().from(socialPosts).where(eq(socialPosts.id, id));
+    const result = await db.select().from(socialPosts).where(eq(socialPosts.id, id));
     return result[0] || null;
   }
 
   async createSocialPost(data: InsertSocialPost): Promise<SocialPost> {
-    const result = await this.db.insert(socialPosts).values(data).returning();
+    const result = await db.insert(socialPosts).values(data).returning();
     return result[0];
   }
 
   async updateSocialPost(id: string, data: Partial<InsertSocialPost>): Promise<SocialPost | null> {
-    const result = await this.db.update(socialPosts)
+    const result = await db.update(socialPosts)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(socialPosts.id, id))
       .returning();
@@ -1962,24 +1962,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteSocialPost(id: string): Promise<boolean> {
-    const result = await this.db.delete(socialPosts).where(eq(socialPosts.id, id)).returning();
+    const result = await db.delete(socialPosts).where(eq(socialPosts.id, id)).returning();
     return result.length > 0;
   }
 
   // ==================== AI CONTENT GENERATION ====================
   
   async createAIContentGeneration(data: InsertAIContentGeneration): Promise<AIContentGeneration> {
-    const result = await this.db.insert(aiContentGenerations).values(data).returning();
+    const result = await db.insert(aiContentGenerations).values(data).returning();
     return result[0];
   }
 
   async getAIContentGenerations(userId?: string): Promise<AIContentGeneration[]> {
     if (userId) {
-      return await this.db.select().from(aiContentGenerations)
+      return await db.select().from(aiContentGenerations)
         .where(eq(aiContentGenerations.userId, userId))
         .orderBy(aiContentGenerations.createdAt);
     }
-    return await this.db.select().from(aiContentGenerations).orderBy(aiContentGenerations.createdAt);
+    return await db.select().from(aiContentGenerations).orderBy(aiContentGenerations.createdAt);
   }
 }
 

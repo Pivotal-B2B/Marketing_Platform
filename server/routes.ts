@@ -1532,15 +1532,26 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/content-assets", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
+      console.log("Creating content asset for user:", userId);
+      console.log("Request body:", JSON.stringify(req.body, null, 2));
       const validated = insertContentAssetSchema.parse(req.body);
-      const asset = await storage.createContentAsset({ ...validated, ownerId: userId });
+      console.log("Validated data:", JSON.stringify(validated, null, 2));
+      
+      // Clean up validated data - remove undefined values to let DB defaults work
+      const cleanData = Object.fromEntries(
+        Object.entries(validated).filter(([_, v]) => v !== undefined)
+      );
+      
+      const asset = await storage.createContentAsset({ ...cleanData, ownerId: userId });
+      console.log("Asset created:", asset.id);
       res.status(201).json(asset);
     } catch (error) {
+      console.error("Error creating content asset:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create content asset" });
+      res.status(500).json({ message: "Failed to create content asset", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -1593,7 +1604,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/social-posts", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const validated = insertSocialPostSchema.parse(req.body);
       const post = await storage.createSocialPost({ ...validated, ownerId: userId });
       res.status(201).json(post);

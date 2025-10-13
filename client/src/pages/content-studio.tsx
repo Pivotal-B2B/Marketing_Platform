@@ -35,7 +35,17 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const createAssetSchema = z.object({
-  assetType: z.enum(["email_template", "landing_page", "social_post", "pdf", "image", "video"]),
+  assetType: z.enum([
+    "email_template", 
+    "landing_page", 
+    "social_post", 
+    "ad_creative", 
+    "pdf_document", 
+    "video", 
+    "call_script", 
+    "sales_sequence", 
+    "blog_post"
+  ]),
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   tags: z.string().optional(), // Will be split into array
@@ -107,6 +117,9 @@ export default function ContentStudioPage() {
       case "ad_creative": return <Image className="w-4 h-4" />;
       case "video": return <Video className="w-4 h-4" />;
       case "pdf_document": return <FileText className="w-4 h-4" />;
+      case "call_script": return <FileText className="w-4 h-4" />;
+      case "sales_sequence": return <FileText className="w-4 h-4" />;
+      case "blog_post": return <FileText className="w-4 h-4" />;
       default: return <FileText className="w-4 h-4" />;
     }
   };
@@ -291,9 +304,12 @@ export default function ContentStudioPage() {
                         <SelectItem value="email_template">Email Template</SelectItem>
                         <SelectItem value="landing_page">Landing Page</SelectItem>
                         <SelectItem value="social_post">Social Post</SelectItem>
-                        <SelectItem value="pdf">PDF Document</SelectItem>
-                        <SelectItem value="image">Image</SelectItem>
+                        <SelectItem value="ad_creative">Ad Creative</SelectItem>
+                        <SelectItem value="pdf_document">PDF Document</SelectItem>
                         <SelectItem value="video">Video</SelectItem>
+                        <SelectItem value="call_script">Call Script</SelectItem>
+                        <SelectItem value="sales_sequence">Sales Sequence</SelectItem>
+                        <SelectItem value="blog_post">Blog Post</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
