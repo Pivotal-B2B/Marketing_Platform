@@ -4,7 +4,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, ListFilter, Users, Upload, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, ListFilter, Users, Upload, Trash2, Download, ArrowRightLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +57,11 @@ export default function SegmentsPage() {
     defaultValues: {
       name: "",
       description: "",
+      entityType: "contact",
       definitionJson: {},
+      tags: [],
+      visibilityScope: "private",
+      isActive: true,
     },
   });
 
@@ -65,7 +70,11 @@ export default function SegmentsPage() {
     defaultValues: {
       name: "",
       description: "",
+      entityType: "contact",
+      sourceType: "manual_upload",
       recordIds: [],
+      tags: [],
+      visibilityScope: "private",
     },
   });
 
@@ -142,6 +151,60 @@ export default function SegmentsPage() {
       toast({
         title: "Success",
         description: "List deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const convertToListMutation = useMutation({
+    mutationFn: async ({ segmentId, name }: { segmentId: string; name: string }) => {
+      await apiRequest('POST', `/api/segments/${segmentId}/convert-to-list`, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
+      toast({
+        title: "Success",
+        description: "Segment converted to list successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const exportListMutation = useMutation({
+    mutationFn: async ({ listId, format }: { listId: string; format: 'csv' | 'json' }) => {
+      const response = await fetch(`/api/lists/${listId}/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) throw new Error('Export failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'export.csv';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "List exported successfully",
       });
     },
     onError: (error: Error) => {
@@ -236,6 +299,68 @@ export default function SegmentsPage() {
                         </FormItem>
                       )}
                     />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={segmentForm.control}
+                        name="entityType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Entity Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="contact">Contact</SelectItem>
+                                <SelectItem value="account">Account</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={segmentForm.control}
+                        name="visibilityScope"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Visibility</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select visibility" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="private">Private</SelectItem>
+                                <SelectItem value="team">Team</SelectItem>
+                                <SelectItem value="global">Global</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={segmentForm.control}
+                      name="tags"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tags (comma-separated)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="enterprise, high-value, priority" 
+                              value={field.value?.join(", ") || ""}
+                              onChange={(e) => field.onChange(e.target.value.split(",").map(t => t.trim()).filter(Boolean))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <div className="rounded-lg border p-4">
                       <p className="text-sm font-medium mb-2">Segment Filters (Query Builder)</p>
                       <p className="text-sm text-muted-foreground">
@@ -272,23 +397,45 @@ export default function SegmentsPage() {
               {filteredSegments.map((segment) => (
                 <Card key={segment.id} className="hover-elevate" data-testid={`card-segment-${segment.id}`}>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <CardTitle>{segment.name}</CardTitle>
-                      <Badge variant="outline">Dynamic</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{segment.entityType || 'contact'}</Badge>
+                        <Badge variant="outline">{segment.visibilityScope || 'private'}</Badge>
+                      </div>
                     </div>
                     <CardDescription>
                       {segment.description || "No description"}
                     </CardDescription>
+                    {segment.tags && segment.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {segment.tags.map((tag, i) => (
+                          <Badge key={i} variant="outline" className="text-xs">{tag}</Badge>
+                        ))}
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Users className="h-4 w-4" />
-                        <span data-testid={`segment-contacts-${segment.id}`}>Preview available after query execution</span>
+                        <span data-testid={`segment-contacts-${segment.id}`}>
+                          {segment.recordCountCache || 0} records
+                        </span>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" data-testid={`button-edit-segment-${segment.id}`}>
-                          Edit
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const name = prompt("Enter name for the new list:", `${segment.name} (Static)`);
+                            if (name) convertToListMutation.mutate({ segmentId: segment.id, name });
+                          }}
+                          disabled={convertToListMutation.isPending}
+                          data-testid={`button-convert-segment-${segment.id}`}
+                        >
+                          <ArrowRightLeft className="h-4 w-4 mr-2" />
+                          To List
                         </Button>
                         <Button 
                           variant="ghost" 
@@ -371,6 +518,68 @@ export default function SegmentsPage() {
                         </FormItem>
                       )}
                     />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={listForm.control}
+                        name="entityType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Entity Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="contact">Contact</SelectItem>
+                                <SelectItem value="account">Account</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={listForm.control}
+                        name="visibilityScope"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Visibility</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select visibility" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="private">Private</SelectItem>
+                                <SelectItem value="team">Team</SelectItem>
+                                <SelectItem value="global">Global</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={listForm.control}
+                      name="tags"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tags (comma-separated)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="outbound, q1-2024, priority" 
+                              value={field.value?.join(", ") || ""}
+                              onChange={(e) => field.onChange(e.target.value.split(",").map(t => t.trim()).filter(Boolean))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <DialogFooter>
                       <Button type="submit" disabled={createListMutation.isPending}>
                         {createListMutation.isPending ? "Creating..." : "Create List"}
@@ -411,21 +620,47 @@ export default function SegmentsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Contacts</TableHead>
-                    <TableHead className="w-[120px]">Actions</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Records</TableHead>
+                    <TableHead>Tags</TableHead>
+                    <TableHead className="w-[180px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredLists.map((list) => (
                     <TableRow key={list.id} className="hover-elevate" data-testid={`row-list-${list.id}`}>
                       <TableCell className="font-medium">{list.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{list.description || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{list.entityType || 'contact'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{list.sourceType || 'manual'}</Badge>
+                      </TableCell>
                       <TableCell>{list.recordIds?.length || 0}</TableCell>
                       <TableCell>
+                        {list.tags && list.tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {list.tags.slice(0, 2).map((tag, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">{tag}</Badge>
+                            ))}
+                            {list.tags.length > 2 && (
+                              <Badge variant="outline" className="text-xs">+{list.tags.length - 2}</Badge>
+                            )}
+                          </div>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" data-testid={`button-view-list-${list.id}`}>
-                            View
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => exportListMutation.mutate({ listId: list.id, format: 'csv' })}
+                            disabled={exportListMutation.isPending}
+                            data-testid={`button-export-list-${list.id}`}
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            CSV
                           </Button>
                           <Button
                             variant="ghost"
