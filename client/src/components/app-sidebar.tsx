@@ -109,6 +109,14 @@ const getNavStructure = (): NavItem[] => [
     ],
   },
   {
+    title: "Email Infrastructure",
+    icon: Settings2,
+    roles: ["admin"],
+    items: [
+      { title: "Sender Profiles", url: "/email-infrastructure/sender-profiles", roles: ["admin"] },
+    ],
+  },
+  {
     title: "QA & Leads Delivery",
     url: "/leads",
     icon: CheckCircle,

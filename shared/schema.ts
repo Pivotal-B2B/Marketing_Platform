@@ -708,7 +708,15 @@ export const senderProfiles = pgTable("sender_profiles", {
   dailyCap: integer("daily_cap"),
   signatureHtml: text("signature_html"),
   isActive: boolean("is_active").default(true),
-  status: text("status").default('active'), // 'active' or 'suspended'  
+  status: text("status").default('active'), // 'active' or 'suspended'
+  // Phase 26: Email Infrastructure fields
+  isDefault: boolean("is_default").default(false),
+  espProvider: text("esp_provider"), // 'sendgrid', 'ses', 'mailgun'
+  domainAuthId: integer("domain_auth_id"), // FK to domain_auth
+  isVerified: boolean("is_verified"),
+  reputationScore: integer("reputation_score"), // 0-100
+  warmupStatus: text("warmup_status"), // 'not_started', 'in_progress', 'completed', 'paused'
+  createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
