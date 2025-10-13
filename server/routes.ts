@@ -2164,4 +2164,8 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to fetch access logs" });
     }
   });
+
+  // ==================== WEBHOOKS (Resources Centre Reverse Webhook) ====================
+  const webhooksRouter = await import("./routes/webhooks");
+  app.use("/api/webhooks", webhooksRouter.default);
 }

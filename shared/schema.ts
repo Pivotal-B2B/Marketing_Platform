@@ -1808,6 +1808,29 @@ export const perDomainStats = pgTable("per_domain_stats", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Content Events from Resources Centre (reverse webhook)
+export const contentEvents = pgTable("content_events", {
+  id: serial("id").primaryKey(),
+  eventName: varchar("event_name", { length: 50 }).notNull(), // page_view | form_submission
+  contentType: varchar("content_type", { length: 50 }), // event | resource | news
+  contentId: varchar("content_id", { length: 255 }),
+  slug: varchar("slug", { length: 255 }),
+  title: text("title"),
+  community: varchar("community", { length: 100 }),
+  contactId: varchar("contact_id", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  url: text("url"),
+  payloadJson: jsonb("payload_json"), // full event data
+  ts: timestamp("ts").notNull(),
+  uniqKey: varchar("uniq_key", { length: 500 }).notNull().unique(), // deduplication key
+  createdAt: timestamp("created_at").defaultNow()
+}, (t) => ({
+  eventNameIdx: index("content_events_event_name_idx").on(t.eventName),
+  contactIdIdx: index("content_events_contact_id_idx").on(t.contactId),
+  contentIdIdx: index("content_events_content_id_idx").on(t.contentId),
+  tsIdx: index("content_events_ts_idx").on(t.ts)
+}));
+
 // Insert Schemas
 export const insertDomainAuthSchema = createInsertSchema(domainAuth).omit({
   id: true,
@@ -1853,6 +1876,11 @@ export const insertPerDomainStatsSchema = createInsertSchema(perDomainStats).omi
   createdAt: true,
 });
 
+export const insertContentEventSchema = createInsertSchema(contentEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Export Types
 export type DomainAuth = typeof domainAuth.$inferSelect;
 export type InsertDomainAuth = z.infer<typeof insertDomainAuthSchema>;
@@ -1877,3 +1905,6 @@ export type InsertDomainReputationSnapshot = z.infer<typeof insertDomainReputati
 
 export type PerDomainStats = typeof perDomainStats.$inferSelect;
 export type InsertPerDomainStats = z.infer<typeof insertPerDomainStatsSchema>;
+
+export type ContentEvent = typeof contentEvents.$inferSelect;
+export type InsertContentEvent = z.infer<typeof insertContentEventSchema>;
