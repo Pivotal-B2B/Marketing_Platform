@@ -49,6 +49,26 @@ The system utilizes a modern web stack: **React 18 + Vite, TypeScript, TailwindC
     - **Error Handling:** Graceful handling of non-JSON responses with fallback to text parsing for accurate diagnostics during push failures.
     - **Resources Center Integration:** Dashboard sends content to Resources Center POST /api/import/content endpoint. Resources Center responds with externalId for tracking. Full API specification in RESOURCES_CENTER_API_SPEC.md.
     - **Sync Status Display:** UI shows push history, attempt counts, success/failure status with manual retry capability.
+- **Phase 25: Global UX/UI Upgrade:** Modern interaction patterns for Account & Contact Details pages:
+    - **Reusable Components:**
+        - **HeaderActionBar:** Sticky header with avatar, title, subtitle, badges, and one-click action buttons (LinkedIn, Website, Call, Email, Copy).
+        - **IconButton:** Reusable button with icon and tooltip support for consistent interactions.
+        - **SectionCard:** Content card wrapper with title, icon, optional description and action button.
+    - **Account Details Page:** Two-column responsive layout (2/3 primary content, 1/3 sidebar) featuring:
+        - One-click actions in sticky header (LinkedIn, Website, Call, Email, Copy domain)
+        - Overview section with industry, employee size, revenue, HQ location
+        - Related contacts table with inline navigation
+        - AI Industry Suggestions review interface
+        - Activity Timeline placeholder
+        - Sidebar with Quick Actions, Compliance & Health, Account Summary
+    - **Contact Details Page:** Follows same pattern with:
+        - Breadcrumb navigation (Contacts > Account > Contact)
+        - One-click actions (LinkedIn, Call, Email, Copy email)
+        - Prev/Next contact navigation in header
+        - Contact Information section with email, phone, job details
+        - Linked Account section with click-to-navigate
+        - Sidebar with Quick Actions, Contact Status, Tags, Metadata
+    - **Interaction Patterns:** Tooltips on all action buttons, disabled states for missing data, responsive grid layouts, clean information hierarchy.
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)
