@@ -25,6 +25,9 @@ import TelemarketingPage from "@/pages/telemarketing";
 import TelemarketingCreatePage from "@/pages/telemarketing-create";
 import CampaignConfigPage from "@/pages/campaign-config";
 import LeadsPage from "@/pages/leads";
+import ContentStudioPage from "@/pages/content-studio";
+import AIContentGeneratorPage from "@/pages/ai-content-generator";
+import SocialMediaPublisherPage from "@/pages/social-media-publisher";
 import SuppressionsPage from "@/pages/suppressions";
 import OrdersPage from "@/pages/orders";
 import ImportsPage from "@/pages/imports";
@@ -63,6 +66,9 @@ function AuthenticatedApp() {
               <Route path="/campaigns/config" component={CampaignConfigPage} />
               <Route path="/leads" component={LeadsPage} />
               <Route path="/suppressions" component={SuppressionsPage} />
+              <Route path="/content-studio/ai-generator" component={AIContentGeneratorPage} />
+              <Route path="/content-studio/social-publisher" component={SocialMediaPublisherPage} />
+              <Route path="/content-studio" component={ContentStudioPage} />
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />
               <Route path="/reports" component={ReportsPage} />

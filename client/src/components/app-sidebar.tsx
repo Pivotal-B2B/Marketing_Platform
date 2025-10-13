@@ -18,7 +18,10 @@ import {
   Upload,
   UserCog,
   Lock,
-  Zap
+  Zap,
+  Sparkles,
+  Share2,
+  FileText
 } from "lucide-react";
 import {
   Sidebar,
@@ -93,6 +96,16 @@ const getNavStructure = (): NavItem[] => [
       { title: "Email Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
       { title: "Phone Campaigns", url: "/campaigns/telemarketing", roles: ["admin", "campaign_manager", "agent"] },
       { title: "Campaign Configuration", url: "/campaigns/config", roles: ["admin", "campaign_manager"] },
+    ],
+  },
+  {
+    title: "Content Studio",
+    icon: Sparkles,
+    roles: ["admin", "campaign_manager"],
+    items: [
+      { title: "Content Library", url: "/content-studio", roles: ["admin", "campaign_manager"] },
+      { title: "AI Content Generator", url: "/content-studio/ai-generator", roles: ["admin", "campaign_manager"] },
+      { title: "Social Media Publisher", url: "/content-studio/social-publisher", roles: ["admin", "campaign_manager"] },
     ],
   },
   {

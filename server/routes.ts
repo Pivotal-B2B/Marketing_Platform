@@ -25,7 +25,10 @@ import {
   insertEmailTemplateSchema,
   insertCallScriptSchema,
   insertEmailSendSchema,
-  insertCallAttemptSchema
+  insertCallAttemptSchema,
+  insertContentAssetSchema,
+  insertSocialPostSchema,
+  insertAIContentGenerationSchema
 } from "@shared/schema";
 
 export function registerRoutes(app: Express) {
@@ -1513,6 +1516,133 @@ export function registerRoutes(app: Express) {
       res.json(bulkImport);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch import" });
+    }
+  });
+
+  // ==================== CONTENT STUDIO ====================
+  
+  app.get("/api/content-assets", requireAuth, async (req, res) => {
+    try {
+      const assets = await storage.getContentAssets();
+      res.json(assets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch content assets" });
+    }
+  });
+
+  app.post("/api/content-assets", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const validated = insertContentAssetSchema.parse(req.body);
+      const asset = await storage.createContentAsset({ ...validated, ownerId: userId });
+      res.status(201).json(asset);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create content asset" });
+    }
+  });
+
+  app.get("/api/content-assets/:id", requireAuth, async (req, res) => {
+    try {
+      const asset = await storage.getContentAsset(req.params.id);
+      if (!asset) {
+        return res.status(404).json({ message: "Content asset not found" });
+      }
+      res.json(asset);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch content asset" });
+    }
+  });
+
+  app.put("/api/content-assets/:id", requireAuth, async (req, res) => {
+    try {
+      const asset = await storage.updateContentAsset(req.params.id, req.body);
+      if (!asset) {
+        return res.status(404).json({ message: "Content asset not found" });
+      }
+      res.json(asset);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update content asset" });
+    }
+  });
+
+  app.delete("/api/content-assets/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const deleted = await storage.deleteContentAsset(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Content asset not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete content asset" });
+    }
+  });
+
+  // ==================== SOCIAL MEDIA POSTS ====================
+  
+  app.get("/api/social-posts", requireAuth, async (req, res) => {
+    try {
+      const posts = await storage.getSocialPosts();
+      res.json(posts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch social posts" });
+    }
+  });
+
+  app.post("/api/social-posts", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const validated = insertSocialPostSchema.parse(req.body);
+      const post = await storage.createSocialPost({ ...validated, ownerId: userId });
+      res.status(201).json(post);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create social post" });
+    }
+  });
+
+  app.get("/api/social-posts/:id", requireAuth, async (req, res) => {
+    try {
+      const post = await storage.getSocialPost(req.params.id);
+      if (!post) {
+        return res.status(404).json({ message: "Social post not found" });
+      }
+      res.json(post);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch social post" });
+    }
+  });
+
+  // ==================== AI CONTENT GENERATION ====================
+  
+  app.post("/api/ai-content", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { prompt, contentType, targetAudience, tone, ctaGoal } = req.body;
+      
+      // TODO: Integrate with OpenAI/Anthropic API for real generation
+      // For now, return mock generated content
+      const mockContent = `Generated ${contentType} content for ${targetAudience}`;
+      
+      const generation = await storage.createAIContentGeneration({
+        prompt: prompt || "Generate content",
+        contentType,
+        targetAudience,
+        tone,
+        ctaGoal,
+        generatedContent: mockContent,
+        model: "gpt-4",
+        tokensUsed: 500,
+        userId,
+      });
+      
+      res.status(201).json(generation);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to generate content" });
     }
   });
 }
