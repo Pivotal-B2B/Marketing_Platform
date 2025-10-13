@@ -294,11 +294,48 @@ export const industryReference = pgTable("industry_reference", {
   name: text("name").notNull().unique(),
   naicsCode: text("naics_code"),
   synonyms: text("synonyms").array().default(sql`'{}'::text[]`),
+  parentId: varchar("parent_id"), // For hierarchical grouping
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   nameIdx: index("industry_reference_name_idx").on(table.name),
   isActiveIdx: index("industry_reference_is_active_idx").on(table.isActive),
+  parentIdFk: foreignKey({
+    columns: [table.parentId],
+    foreignColumns: [table.id],
+    name: "industry_reference_parent_id_fkey"
+  }).onDelete('set null'),
+}));
+
+// Company Size Reference - Standardized employee ranges
+export const companySizeReference = pgTable("company_size_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // A, B, C, D, E, F, G, H, I
+  label: text("label").notNull(),
+  minEmployees: integer("min_employees").notNull(),
+  maxEmployees: integer("max_employees"), // NULL for "10,000+"
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  codeIdx: index("company_size_reference_code_idx").on(table.code),
+  sortOrderIdx: index("company_size_reference_sort_order_idx").on(table.sortOrder),
+}));
+
+// Revenue Range Reference - Standardized annual revenue brackets (USD)
+export const revenueRangeReference = pgTable("revenue_range_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  label: text("label").notNull().unique(),
+  description: text("description"),
+  minRevenue: numeric("min_revenue", { precision: 15, scale: 2 }),
+  maxRevenue: numeric("max_revenue", { precision: 15, scale: 2 }), // NULL for "Over $5B"
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  labelIdx: index("revenue_range_reference_label_idx").on(table.label),
+  sortOrderIdx: index("revenue_range_reference_sort_order_idx").on(table.sortOrder),
 }));
 
 // Segments table (dynamic filters)
@@ -809,6 +846,17 @@ export const insertDedupeReviewQueueSchema = createInsertSchema(dedupeReviewQueu
 export const insertIndustryReferenceSchema = createInsertSchema(industryReference).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCompanySizeReferenceSchema = createInsertSchema(companySizeReference).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertRevenueRangeReferenceSchema = createInsertSchema(revenueRangeReference).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Inferred Types
@@ -892,3 +940,9 @@ export type InsertDedupeReviewQueue = z.infer<typeof insertDedupeReviewQueueSche
 
 export type IndustryReference = typeof industryReference.$inferSelect;
 export type InsertIndustryReference = z.infer<typeof insertIndustryReferenceSchema>;
+
+export type CompanySizeReference = typeof companySizeReference.$inferSelect;
+export type InsertCompanySizeReference = z.infer<typeof insertCompanySizeReferenceSchema>;
+
+export type RevenueRangeReference = typeof revenueRangeReference.$inferSelect;
+export type InsertRevenueRangeReference = z.infer<typeof insertRevenueRangeReferenceSchema>;
