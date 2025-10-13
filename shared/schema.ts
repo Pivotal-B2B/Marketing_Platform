@@ -726,12 +726,15 @@ export const insertSegmentSchema = createInsertSchema(segments).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  recordCountCache: true,
+  lastRefreshedAt: true,
 });
 
 export const insertListSchema = createInsertSchema(lists).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  snapshotTs: true,
 });
 
 export const insertDomainSetSchema = createInsertSchema(domainSets).omit({
