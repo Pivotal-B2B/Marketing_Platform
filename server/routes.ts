@@ -560,27 +560,137 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // ==================== DOMAIN SETS ====================
+  // ==================== DOMAIN SETS (Phase 21) ====================
   
   app.get("/api/domain-sets", requireAuth, async (req, res) => {
     try {
-      const domainSets = await storage.getDomainSets();
+      const userId = (req as any).user?.id;
+      const domainSets = await storage.getDomainSets(userId);
       res.json(domainSets);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch domain sets" });
     }
   });
 
-  app.post("/api/domain-sets", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+  app.get("/api/domain-sets/:id", requireAuth, async (req, res) => {
     try {
-      const validated = insertDomainSetSchema.parse(req.body);
-      const domainSet = await storage.createDomainSet(validated);
+      const domainSet = await storage.getDomainSet(req.params.id);
+      if (!domainSet) {
+        return res.status(404).json({ message: "Domain set not found" });
+      }
+      res.json(domainSet);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch domain set" });
+    }
+  });
+
+  app.post("/api/domain-sets", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
+    try {
+      const { parseDomainsFromCSV, deduplicateDomains, normalizeDomain, fixCommonDomainTypos } = await import('@shared/domain-utils');
+      const userId = (req as any).user?.id;
+      
+      const { name, description, csvContent, tags } = req.body;
+      
+      if (!name || !csvContent) {
+        return res.status(400).json({ message: "Name and CSV content are required" });
+      }
+      
+      // Parse domains from CSV
+      const parsed = parseDomainsFromCSV(csvContent);
+      
+      // Fix typos and normalize
+      const fixedDomains = parsed.map(p => ({
+        ...p,
+        domain: fixCommonDomainTypos(p.domain)
+      }));
+      
+      // Deduplicate
+      const { unique, duplicates } = deduplicateDomains(fixedDomains.map(p => p.domain));
+      
+      // Create domain set
+      const domainSet = await storage.createDomainSet({
+        name,
+        description,
+        totalUploaded: parsed.length,
+        duplicatesRemoved: duplicates.length,
+        status: 'processing',
+        ownerId: userId,
+        tags: tags || [],
+      });
+      
+      // Create domain items
+      const items = unique.map(domain => ({
+        domainSetId: domainSet.id,
+        domain,
+        normalizedDomain: normalizeDomain(domain),
+      }));
+      
+      await storage.createDomainSetItemsBulk(items);
+      
+      // Trigger matching in background (in a real app, this would be a job queue)
+      storage.processDomainSetMatching(domainSet.id).catch(console.error);
+      
       res.status(201).json(domainSet);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Validation failed", errors: error.errors });
-      }
+      console.error('Create domain set error:', error);
       res.status(500).json({ message: "Failed to create domain set" });
+    }
+  });
+
+  app.get("/api/domain-sets/:id/items", requireAuth, async (req, res) => {
+    try {
+      const items = await storage.getDomainSetItems(req.params.id);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch domain set items" });
+    }
+  });
+
+  app.post("/api/domain-sets/:id/process", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
+    try {
+      await storage.processDomainSetMatching(req.params.id);
+      const updated = await storage.getDomainSet(req.params.id);
+      res.json(updated);
+    } catch (error) {
+      console.error('Process domain set error:', error);
+      res.status(500).json({ message: "Failed to process domain set" });
+    }
+  });
+
+  app.post("/api/domain-sets/:id/expand", requireAuth, async (req, res) => {
+    try {
+      const { filters } = req.body;
+      const contacts = await storage.expandDomainSetToContacts(req.params.id, filters);
+      res.json({ contacts, count: contacts.length });
+    } catch (error) {
+      console.error('Expand domain set error:', error);
+      res.status(500).json({ message: "Failed to expand domain set" });
+    }
+  });
+
+  app.post("/api/domain-sets/:id/convert-to-list", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      const { listName } = req.body;
+      
+      if (!listName) {
+        return res.status(400).json({ message: "List name is required" });
+      }
+      
+      const list = await storage.convertDomainSetToList(req.params.id, listName, userId);
+      res.status(201).json(list);
+    } catch (error) {
+      console.error('Convert domain set to list error:', error);
+      res.status(500).json({ message: "Failed to convert domain set to list" });
+    }
+  });
+
+  app.delete("/api/domain-sets/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      await storage.deleteDomainSet(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete domain set" });
     }
   });
 
