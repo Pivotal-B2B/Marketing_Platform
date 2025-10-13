@@ -15,13 +15,18 @@ import {
   DollarSign,
   MapPin,
   Linkedin,
-  Tag
+  Tag,
+  Sparkles,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 import { 
   Table,
   TableBody,
@@ -37,6 +42,11 @@ export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  // AI Industry Review state
+  const [selectedPrimary, setSelectedPrimary] = useState<string | null>(null);
+  const [selectedSecondary, setSelectedSecondary] = useState<string[]>([]);
+  const [selectedReject, setSelectedReject] = useState<string[]>([]);
 
   const { data: account, isLoading: accountLoading } = useQuery<Account>({
     queryKey: [`/api/accounts/${id}`],
@@ -58,6 +68,30 @@ export default function AccountDetailPage() {
         description: "Account deleted successfully",
       });
       setLocation('/accounts');
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+  
+  const reviewAIMutation = useMutation({
+    mutationFn: async (reviewData: { accept_primary?: string; add_secondary?: string[]; reject?: string[] }) => {
+      const response = await apiRequest('POST', `/api/accounts/${id}/industry/ai-review`, reviewData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/accounts/${id}`] });
+      setSelectedPrimary(null);
+      setSelectedSecondary([]);
+      setSelectedReject([]);
+      toast({
+        title: "Success",
+        description: "AI suggestions reviewed successfully",
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -156,6 +190,12 @@ export default function AccountDetailPage() {
                 <TabsTrigger value="contacts" data-testid="tab-contacts">
                   Contacts ({contacts.length})
                 </TabsTrigger>
+                <TabsTrigger value="ai-enrichment" data-testid="tab-ai-enrichment">
+                  AI Enrichment
+                  {account.industryAiStatus === 'pending' && (
+                    <Badge variant="secondary" className="ml-2">New</Badge>
+                  )}
+                </TabsTrigger>
                 <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>
                 <TabsTrigger value="notes" data-testid="tab-notes">Notes</TabsTrigger>
               </TabsList>
@@ -170,8 +210,8 @@ export default function AccountDetailPage() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Industry</p>
-                        <p className="font-medium">{account.industry || "-"}</p>
+                        <p className="text-sm text-muted-foreground">Primary Industry</p>
+                        <p className="font-medium">{account.industryStandardized || "-"}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Domain</p>
@@ -202,6 +242,17 @@ export default function AccountDetailPage() {
                         )}
                       </div>
                     </div>
+
+                    {account.industrySecondary && account.industrySecondary.length > 0 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-2">Secondary Industries</p>
+                        <div className="flex flex-wrap gap-2">
+                          {account.industrySecondary.map((industry, idx) => (
+                            <Badge key={idx} variant="outline">{industry}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {account.techStack && account.techStack.length > 0 && (
                       <div>
@@ -308,6 +359,140 @@ export default function AccountDetailPage() {
                     </CardContent>
                   </Card>
                 )}
+              </TabsContent>
+
+              <TabsContent value="ai-enrichment" className="mt-0 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      AI Industry Suggestions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {account.industryAiCandidates && typeof account.industryAiCandidates === 'object' && Array.isArray(account.industryAiCandidates) && account.industryAiCandidates.length > 0 ? (
+                      <div className="space-y-6">
+                        <div className="space-y-4">
+                          {account.industryAiCandidates.map((candidate: any, idx: number) => {
+                            const candidateName = candidate.name || candidate;
+                            const score = candidate.score || 0;
+                            const isPrimary = selectedPrimary === candidateName;
+                            const isSecondary = selectedSecondary.includes(candidateName);
+                            const isRejected = selectedReject.includes(candidateName);
+                            
+                            return (
+                              <div key={idx} className="flex items-center justify-between p-4 border rounded-lg hover-elevate">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3">
+                                    <h4 className="font-medium">{candidateName}</h4>
+                                    <Badge variant="secondary">
+                                      {Math.round(score * 100)}% confidence
+                                    </Badge>
+                                  </div>
+                                  <div className="mt-2 flex gap-4">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedPrimary(isPrimary ? null : candidateName);
+                                        if (isSecondary) setSelectedSecondary(prev => prev.filter(s => s !== candidateName));
+                                        if (isRejected) setSelectedReject(prev => prev.filter(s => s !== candidateName));
+                                      }}
+                                      className={`text-sm flex items-center gap-1 ${isPrimary ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                                      data-testid={`button-set-primary-${idx}`}
+                                    >
+                                      <CheckCircle2 className="h-4 w-4" />
+                                      Set as Primary
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (isSecondary) {
+                                          setSelectedSecondary(prev => prev.filter(s => s !== candidateName));
+                                        } else {
+                                          setSelectedSecondary(prev => [...prev, candidateName]);
+                                          if (isPrimary) setSelectedPrimary(null);
+                                          if (isRejected) setSelectedReject(prev => prev.filter(s => s !== candidateName));
+                                        }
+                                      }}
+                                      className={`text-sm flex items-center gap-1 ${isSecondary ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                                      data-testid={`button-add-secondary-${idx}`}
+                                    >
+                                      <Tag className="h-4 w-4" />
+                                      {isSecondary ? 'Remove from' : 'Add to'} Secondary
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (isRejected) {
+                                          setSelectedReject(prev => prev.filter(s => s !== candidateName));
+                                        } else {
+                                          setSelectedReject(prev => [...prev, candidateName]);
+                                          if (isPrimary) setSelectedPrimary(null);
+                                          if (isSecondary) setSelectedSecondary(prev => prev.filter(s => s !== candidateName));
+                                        }
+                                      }}
+                                      className={`text-sm flex items-center gap-1 ${isRejected ? 'text-destructive font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                                      data-testid={`button-reject-${idx}`}
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                      {isRejected ? 'Undo' : 'Reject'}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedPrimary(null);
+                              setSelectedSecondary([]);
+                              setSelectedReject([]);
+                            }}
+                            data-testid="button-clear-ai-review"
+                          >
+                            Clear Selection
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              const reviewData: any = {};
+                              if (selectedPrimary) reviewData.accept_primary = selectedPrimary;
+                              if (selectedSecondary.length > 0) reviewData.add_secondary = selectedSecondary;
+                              if (selectedReject.length > 0) reviewData.reject = selectedReject;
+                              
+                              if (!selectedPrimary && selectedSecondary.length === 0 && selectedReject.length === 0) {
+                                toast({
+                                  variant: "destructive",
+                                  title: "No Action Selected",
+                                  description: "Please select at least one action before submitting",
+                                });
+                                return;
+                              }
+                              
+                              reviewAIMutation.mutate(reviewData);
+                            }}
+                            disabled={reviewAIMutation.isPending}
+                            data-testid="button-submit-ai-review"
+                          >
+                            Submit Review
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-8 text-center">
+                        <Sparkles className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                        <p className="text-muted-foreground">No AI industry suggestions available</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {account.industryAiStatus === 'accepted' 
+                            ? 'AI suggestions have been reviewed and accepted' 
+                            : account.industryAiStatus === 'rejected'
+                            ? 'AI suggestions have been reviewed and rejected'
+                            : 'AI enrichment will run automatically when data is updated'}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="activity" className="mt-0">
