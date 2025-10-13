@@ -964,7 +964,8 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/filters/fields/entity/:entity", async (req, res) => {
     try {
-      const fields = await storage.getFilterFieldsByEntity(req.params.entity);
+      // Return all filter fields regardless of entity for maximum flexibility
+      const fields = await storage.getFilterFields();
       
       // Group by category for easier UI consumption (same format as /api/filters/fields)
       const grouped = fields.reduce((acc: any, field) => {
