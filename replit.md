@@ -69,6 +69,12 @@ The system utilizes a modern web stack: **React 18 + Vite, TypeScript, TailwindC
         - Linked Account section with click-to-navigate
         - Sidebar with Quick Actions, Contact Status, Tags, Metadata
     - **Interaction Patterns:** Tooltips on all action buttons, disabled states for missing data, responsive grid layouts, clean information hierarchy.
+- **Resources Centre Content Management:** Structured content types for publishing to external Resources Centre:
+    - **Events:** Webinars, forums, executive dinners, roundtables, conferences with event type, location type (virtual/in-person/hybrid), community targeting, speaker management, start/end dates with timezone, overview HTML, learning bullets, CTA links, and optional form gating.
+    - **Resources:** eBooks, infographics, white papers, guides, case studies with resource type, community targeting, overview/body HTML, bullet points, CTA links, optional form gating, and SEO metadata.
+    - **News:** News articles with community targeting, overview/body HTML, author management, published date, and SEO metadata.
+    - **Content Distribution:** Generalized push service supports all content types with type-specific payload transformation for Resources Centre API integration.
+    - **Management UI:** Dedicated pages for Events (/events), Resources (/resources), and News (/news) with list views, CRUD operations, status management (draft/published), and delete functionality.
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)

@@ -33,6 +33,9 @@ import OrdersPage from "@/pages/orders";
 import ImportsPage from "@/pages/imports";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
+import EventsPage from "@/pages/events";
+import ResourcesPage from "@/pages/resources";
+import NewsPage from "@/pages/news";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -69,6 +72,9 @@ function AuthenticatedApp() {
               <Route path="/content-studio/ai-generator" component={AIContentGeneratorPage} />
               <Route path="/content-studio/social-publisher" component={SocialMediaPublisherPage} />
               <Route path="/content-studio" component={ContentStudioPage} />
+              <Route path="/events" component={EventsPage} />
+              <Route path="/resources" component={ResourcesPage} />
+              <Route path="/news" component={NewsPage} />
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />
               <Route path="/reports" component={ReportsPage} />

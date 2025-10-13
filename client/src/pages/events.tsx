@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -7,9 +8,12 @@ import { Plus, Calendar, MapPin, Users, Trash2, Edit } from "lucide-react";
 import { format } from "date-fns";
 import type { Event } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { EventFormDialog } from "@/components/event-form-dialog";
 
 export default function Events() {
   const { toast } = useToast();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editEvent, setEditEvent] = useState<Event | undefined>(undefined);
 
   const { data: events = [], isLoading } = useQuery<Event[]>({
     queryKey: ["/api/events"],
@@ -54,7 +58,7 @@ export default function Events() {
           <Calendar className="h-6 w-6" />
           <h1 className="text-2xl font-bold">Events</h1>
         </div>
-        <Button data-testid="button-create-event">
+        <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-event">
           <Plus className="h-4 w-4 mr-2" />
           Create Event
         </Button>
@@ -69,7 +73,7 @@ export default function Events() {
               <p className="text-muted-foreground mb-4">
                 Create your first event to get started
               </p>
-              <Button data-testid="button-create-first-event">
+              <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-event">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Event
               </Button>
@@ -105,6 +109,7 @@ export default function Events() {
                     <Button 
                       size="icon" 
                       variant="ghost"
+                      onClick={() => setEditEvent(event)}
                       data-testid={`button-edit-${event.id}`}
                     >
                       <Edit className="h-4 w-4" />
@@ -146,6 +151,17 @@ export default function Events() {
           ))}
         </div>
       )}
+
+      <EventFormDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
+      
+      <EventFormDialog
+        open={!!editEvent}
+        onOpenChange={(open) => !open && setEditEvent(undefined)}
+        event={editEvent}
+      />
     </div>
   );
 }
