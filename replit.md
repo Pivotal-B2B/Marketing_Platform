@@ -43,6 +43,37 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
     - **List Export:** CSV/JSON export functionality (POST /api/lists/:id/export) with proper headers and filename generation
     - **Database Enums:** Created visibility_scope (private/team/global) and source_type (segment/manual_upload/selection/filter) PostgreSQL enums for data integrity
     - **Updated UI:** Segments & Lists page updated to reflect new schema fields, including tags display, record counts, and proper entity type handling
+- **Phase 20 - Campaigns Upgrade (Email + Telemarketing) (October 2025):**
+    - **Data Model Additions:**
+        - **CampaignAudienceSnapshots:** Persistent audience versioning with contactIds[], accountIds[], and audienceDefinition for reproducibility
+        - **Sender Profiles:** Email sender configuration (fromName, fromEmail, DKIM domain, tracking domain) with brand association
+        - **Email Templates:** Template management with HTML content, placeholders, versioning, and approval workflow
+        - **Email Sends:** Individual send records with templateId, senderProfileId, provider info, and send status tracking
+        - **Email Events:** Event tracking (delivered/opened/clicked/bounced/complaint) with metadata and timestamps
+        - **Call Scripts:** Versioned call scripts with content, changelog, and campaign association
+        - **Call Attempts:** Enhanced call tracking with Telnyx integration, agent info, recording URL, duration, disposition
+        - **Call Events:** Call event tracking (connect/disposition/voicemail/callback) with metadata
+        - **Qualification Responses:** Structured qualification data linked to call attempts or leads with schema versioning
+    - **Shared Foundations:**
+        - Audience selection & snapshotting for reproducibility
+        - Compliance guardrails (Unsubscribe/DNC enforcement at pre-enqueue and just-in-time stages)
+        - Pacing, throttling, and frequency caps (per-campaign and per-tenant TPS limits)
+        - Unified engagement model writing to Activity Timeline
+    - **Email Campaign Features:**
+        - Multi-provider support (AWS SES/SendGrid/Mailgun) via pluggable adapters
+        - Template editor with personalization placeholders and fallbacks
+        - Mandatory unsubscribe block and physical address
+        - Open/click tracking with UTM auto-tagging
+        - A/B/n testing and send-time optimization
+    - **Telemarketing Features:**
+        - Telnyx WebRTC embedded softphone
+        - Pre-dial DNC check and per-country recording prompts
+        - Scripts with merge tags and qualification forms
+        - Standard dispositions (No Answer/VM/Callback/Not Interested/Qualified/DNC/Wrong Number)
+        - Agent productivity dashboard (connect rate, talk time, conversions)
+    - **Pre-Flight Checklist:** Audience health checks, compliance confirmations, pacing validation, seed testing
+    - **Reporting:** Campaign stats (send/open/click rates, connect/talk time, disposition mix), order-scoped views with goal tracking
+    - **API Endpoints:** /email-campaigns/*, /call-campaigns/*, /campaigns/:id/pause|resume|stop, /orders/:id/aggregate-stats
 
 ## External Dependencies
 
