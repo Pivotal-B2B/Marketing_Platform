@@ -740,14 +740,22 @@ export class DatabaseStorage implements IStorage {
     // Apply filter criteria using SQL builder
     let query = db.select({ id: table.id }).from(table);
     
+    // Apply filters if criteria is a FilterGroup
+    if (criteria && criteria.conditions && criteria.conditions.length > 0) {
+      const filterSql = buildFilterQuery(criteria, table);
+      if (filterSql) {
+        query = query.where(filterSql);
+      }
+    }
+    
     // Execute query to get all matching IDs
     const results = await query;
     const allIds = results.map(r => r.id);
     
-    // Return count and sample IDs (first 10)
+    // Return count and sample IDs (first 100 for list conversion)
     return {
       count: allIds.length,
-      sampleIds: allIds.slice(0, 10)
+      sampleIds: allIds.slice(0, 100)
     };
   }
 
@@ -758,10 +766,10 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Segment not found');
     }
 
-    // Preview segment to get all matching IDs
+    // Preview segment to get ALL matching IDs (not just samples)
     const { sampleIds } = await this.previewSegment(
       segment.entityType || 'contact', 
-      segment.criteriaJson
+      segment.definitionJson
     );
 
     // Create a new list with the segment's record IDs

@@ -476,15 +476,15 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/segments/preview", requireAuth, async (req, res) => {
     try {
-      const { entityType, criteria } = req.body;
-      if (!entityType || !criteria) {
-        return res.status(400).json({ message: "Missing entityType or criteria" });
+      const { entityType, definitionJson } = req.body;
+      if (!entityType || !definitionJson) {
+        return res.status(400).json({ message: "Missing entityType or definitionJson" });
       }
-      const result = await storage.previewSegment(entityType, criteria);
+      const result = await storage.previewSegment(entityType, definitionJson);
       res.json(result);
     } catch (error) {
       console.error('Segment preview error:', error);
-      res.status(500).json({ message: "Failed to preview segment" });
+      res.status(500).json({ message: "Failed to preview segment", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
