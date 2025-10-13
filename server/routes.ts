@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { eq } from "drizzle-orm";
 import { storage } from "./storage";
 import { comparePassword, generateToken, requireAuth, requireRole, hashPassword } from "./auth";
+import webhooksRouter from "./routes/webhooks";
 import { z } from "zod";
 import { 
   insertAccountSchema, 
@@ -2166,6 +2167,5 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== WEBHOOKS (Resources Centre Reverse Webhook) ====================
-  const webhooksRouter = await import("./routes/webhooks");
-  app.use("/api/webhooks", webhooksRouter.default);
+  app.use("/api/webhooks", webhooksRouter);
 }
