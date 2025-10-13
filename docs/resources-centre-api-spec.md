@@ -9,11 +9,19 @@ All API endpoints should be protected with API key authentication:
 - The API key should be configurable in Resources Centre environment variables
 - Return 401 Unauthorized if the API key is invalid or missing
 
+## Base URL
+
+```
+https://workspace.wh5q8xynmq.repl.co/api/v1/
+```
+
+All endpoints use the `/api/v1/` prefix to match the existing Resources Centre API structure.
+
 ## Endpoints
 
 ### 1. Get All Speakers
 
-**Endpoint:** `GET /api/speakers`
+**Endpoint:** `GET /api/v1/speakers`
 
 **Headers:**
 ```
@@ -50,7 +58,7 @@ X-API-Key: <api_key>
 
 ### 2. Get All Organizers
 
-**Endpoint:** `GET /api/organizers`
+**Endpoint:** `GET /api/v1/organizers`
 
 **Headers:**
 ```
@@ -83,7 +91,7 @@ X-API-Key: <api_key>
 
 ### 3. Get All Sponsors
 
-**Endpoint:** `GET /api/sponsors`
+**Endpoint:** `GET /api/v1/sponsors`
 
 **Headers:**
 ```
@@ -120,7 +128,7 @@ For efficiency, the Resources Centre can optionally support delta syncs by accep
 
 **Example:**
 ```
-GET /api/speakers?since=2024-01-15T10:30:00Z
+GET /api/v1/speakers?since=2024-01-15T10:30:00Z
 ```
 
 This returns only records created or updated after the specified timestamp, reducing payload size for incremental syncs.
@@ -155,13 +163,14 @@ from flask import Blueprint, jsonify, request
 from functools import wraps
 import os
 
-api_bp = Blueprint('api', __name__, url_prefix='/api')
+api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
 
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         api_key = request.headers.get('X-API-Key')
-        if api_key != os.environ.get('API_KEY'):
+        expected_key = os.environ.get('API_KEY')  # Same key used for /api/v1/events
+        if api_key != expected_key:
             return jsonify({'error': 'Invalid or missing API key'}), 401
         return f(*args, **kwargs)
     return decorated_function
@@ -172,7 +181,18 @@ def get_speakers():
     # Query speakers from database
     speakers = Speaker.query.all()
     return jsonify({
-        'speakers': [speaker.to_dict() for speaker in speakers]
+        'speakers': [
+            {
+                'id': speaker.id,
+                'name': speaker.name,
+                'title': speaker.title,
+                'company': speaker.company,
+                'bio': speaker.bio,
+                'created_at': speaker.created_at.isoformat(),
+                'updated_at': speaker.updated_at.isoformat()
+            }
+            for speaker in speakers
+        ]
     })
 
 @api_bp.route('/organizers', methods=['GET'])
@@ -180,7 +200,16 @@ def get_speakers():
 def get_organizers():
     organizers = Organizer.query.all()
     return jsonify({
-        'organizers': [org.to_dict() for org in organizers]
+        'organizers': [
+            {
+                'id': org.id,
+                'name': org.name,
+                'website': org.website,
+                'created_at': org.created_at.isoformat(),
+                'updated_at': org.updated_at.isoformat()
+            }
+            for org in organizers
+        ]
     })
 
 @api_bp.route('/sponsors', methods=['GET'])
@@ -188,7 +217,16 @@ def get_organizers():
 def get_sponsors():
     sponsors = Sponsor.query.all()
     return jsonify({
-        'sponsors': [sponsor.to_dict() for sponsor in sponsors]
+        'sponsors': [
+            {
+                'id': sponsor.id,
+                'name': sponsor.name,
+                'website': sponsor.website,
+                'created_at': sponsor.created_at.isoformat(),
+                'updated_at': sponsor.updated_at.isoformat()
+            }
+            for sponsor in sponsors
+        ]
     })
 ```
 
@@ -200,16 +238,16 @@ Use curl or Postman to test the endpoints:
 
 ```bash
 # Test speakers endpoint
-curl -H "X-API-Key: your-api-key-here" \
-  https://workspace.wh5q8xynmq.repl.co/api/speakers
+curl -H "X-API-Key: pivotal_KtFoTEP2cRnOt6idBlcjIg4Cx1m7Mg04VINjMOeHn10" \
+  https://workspace.wh5q8xynmq.repl.co/api/v1/speakers
 
 # Test organizers endpoint
-curl -H "X-API-Key: your-api-key-here" \
-  https://workspace.wh5q8xynmq.repl.co/api/organizers
+curl -H "X-API-Key: pivotal_KtFoTEP2cRnOt6idBlcjIg4Cx1m7Mg04VINjMOeHn10" \
+  https://workspace.wh5q8xynmq.repl.co/api/v1/organizers
 
 # Test sponsors endpoint
-curl -H "X-API-Key: your-api-key-here" \
-  https://workspace.wh5q8xynmq.repl.co/api/sponsors
+curl -H "X-API-Key: pivotal_KtFoTEP2cRnOt6idBlcjIg4Cx1m7Mg04VINjMOeHn10" \
+  https://workspace.wh5q8xynmq.repl.co/api/v1/sponsors
 ```
 
 Expected response structure for each endpoint is documented above.

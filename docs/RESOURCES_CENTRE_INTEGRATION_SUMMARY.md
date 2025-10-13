@@ -35,11 +35,23 @@
 - ✅ `docs/resources-centre-sync-guide.md` - Complete usage guide
 - ✅ Updated `replit.md` with integration details
 
+## ✅ Configuration Complete
+
+### Environment Variables Set
+- ✅ `RESOURCES_CENTRE_URL` = `https://workspace.wh5q8xynmq.repl.co`
+- ✅ `RESOURCES_CENTRE_API_KEY` = configured securely
+- ✅ Sync service updated to use `/api/v1/` prefix
+
+### Existing Resources Centre Endpoints
+Currently available:
+- ✅ `GET /api/v1/events` - Returns events data
+- ✅ `GET /api/v1/stats` - Returns platform statistics
+
 ## 🔧 Required in Resources Centre
 
 ### API Endpoints to Implement
 
-The Resources Centre needs to add these REST API endpoints (full spec in `docs/resources-centre-api-spec.md`):
+The Resources Centre needs to add these 3 additional REST API endpoints (full spec in `docs/resources-centre-api-spec.md`):
 
 ```python
 # In Resources Centre Flask app
@@ -74,22 +86,37 @@ All endpoints should check for `X-API-Key` header and validate against an enviro
 
 ## 🔑 Configuration Steps
 
-### Step 1: Set Environment Variables in Pivotal CRM
+### Step 1: ✅ Environment Variables (COMPLETE)
 
-Go to Replit Secrets tab and add:
+Already configured in Pivotal CRM:
+- ✅ `RESOURCES_CENTRE_URL` = `https://workspace.wh5q8xynmq.repl.co`
+- ✅ `RESOURCES_CENTRE_API_KEY` = configured
 
+### Step 2: Implement Missing API Endpoints in Resources Centre
+
+Add these 3 endpoints to Resources Centre using the same authentication pattern as `/api/v1/events`:
+
+```python
+@api_bp.route('/api/v1/speakers', methods=['GET'])
+@require_api_key  # Use same X-API-Key validation as other endpoints
+def get_speakers():
+    # Return all speakers with id, name, title, company, bio, created_at, updated_at
+    pass
+
+@api_bp.route('/api/v1/organizers', methods=['GET'])
+@require_api_key
+def get_organizers():
+    # Return all organizers with id, name, website, created_at, updated_at
+    pass
+
+@api_bp.route('/api/v1/sponsors', methods=['GET'])
+@require_api_key
+def get_sponsors():
+    # Return all sponsors with id, name, website, created_at, updated_at
+    pass
 ```
-RESOURCES_CENTRE_URL=https://workspace.wh5q8xynmq.repl.co
-RESOURCES_CENTRE_API_KEY=<generate-a-secure-key>
-```
 
-### Step 2: Set API Key in Resources Centre
-
-In Resources Centre, add the same API key:
-
-```
-API_KEY=<same-secure-key-as-above>
-```
+See `docs/resources-centre-api-spec.md` for full implementation details.
 
 ### Step 3: Test the Connection
 
