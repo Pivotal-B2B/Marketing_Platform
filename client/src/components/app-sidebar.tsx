@@ -1,4 +1,25 @@
-import { LayoutDashboard, Building2, Users, ListFilter, Globe, Mail, Phone, CheckSquare, ShieldAlert, Upload, FileText, ShoppingCart, Settings, Settings2, LogOut } from "lucide-react";
+import { 
+  LayoutDashboard, 
+  Building2, 
+  Users, 
+  Megaphone,
+  CheckCircle,
+  BarChart,
+  Briefcase,
+  Settings,
+  LogOut,
+  ChevronDown,
+  ListFilter,
+  Globe,
+  Mail,
+  Phone,
+  Settings2,
+  ShieldAlert,
+  Upload,
+  UserCog,
+  Lock,
+  Zap
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -8,106 +29,122 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 
-// Navigation items based on user role
-const getNavItems = (userRole: string) => {
-  const allItems = [
-    {
-      title: "Dashboard",
-      url: "/",
-      icon: LayoutDashboard,
-      roles: ["admin", "campaign_manager", "data_ops", "qa_analyst", "agent"],
-    },
-    {
-      title: "Accounts",
-      url: "/accounts",
-      icon: Building2,
-      roles: ["admin", "campaign_manager", "data_ops", "agent"],
-    },
-    {
-      title: "Contacts",
-      url: "/contacts",
-      icon: Users,
-      roles: ["admin", "campaign_manager", "data_ops", "agent"],
-    },
-    {
-      title: "Segments & Lists",
-      url: "/segments",
-      icon: ListFilter,
-      roles: ["admin", "campaign_manager", "data_ops"],
-    },
-    {
-      title: "Domain Sets",
-      url: "/domain-sets",
-      icon: Globe,
-      roles: ["admin", "data_ops"],
-    },
-    {
-      title: "Email Campaigns",
-      url: "/campaigns/email",
-      icon: Mail,
-      roles: ["admin", "campaign_manager"],
-    },
-    {
-      title: "Telemarketing",
-      url: "/campaigns/telemarketing",
-      icon: Phone,
-      roles: ["admin", "campaign_manager", "agent"],
-    },
-    {
-      title: "Campaign Config",
-      url: "/campaigns/config",
-      icon: Settings2,
-      roles: ["admin", "campaign_manager"],
-    },
-    {
-      title: "Leads & QA",
-      url: "/leads",
-      icon: CheckSquare,
-      roles: ["admin", "campaign_manager", "qa_analyst"],
-    },
-    {
-      title: "Suppressions",
-      url: "/suppressions",
-      icon: ShieldAlert,
-      roles: ["admin", "data_ops"],
-    },
-    {
-      title: "Bulk Imports",
-      url: "/imports",
-      icon: Upload,
-      roles: ["admin", "data_ops"],
-    },
-    {
-      title: "Reports",
-      url: "/reports",
-      icon: FileText,
-      roles: ["admin", "campaign_manager", "qa_analyst"],
-    },
-    {
-      title: "Client Orders",
-      url: "/orders",
-      icon: ShoppingCart,
-      roles: ["admin", "client_user"],
-    },
-    {
-      title: "Settings",
-      url: "/settings",
-      icon: Settings,
-      roles: ["admin"],
-    },
-  ];
+interface NavItem {
+  title: string;
+  url?: string;
+  icon: any;
+  roles: string[];
+  items?: SubNavItem[];
+}
 
-  return allItems.filter(item => item.roles.includes(userRole));
+interface SubNavItem {
+  title: string;
+  url: string;
+  roles: string[];
+}
+
+// Navigation structure per Phase 22 spec
+const getNavStructure = (): NavItem[] => [
+  {
+    title: "Dashboard",
+    url: "/",
+    icon: LayoutDashboard,
+    roles: ["admin", "campaign_manager", "data_ops", "qa_analyst", "agent", "client_user"],
+  },
+  {
+    title: "Accounts",
+    icon: Building2,
+    roles: ["admin", "campaign_manager", "data_ops"],
+    items: [
+      { title: "All Accounts", url: "/accounts", roles: ["admin", "campaign_manager", "data_ops"] },
+      { title: "Segments & Lists", url: "/segments", roles: ["admin", "campaign_manager", "data_ops"] },
+      { title: "Domain Sets", url: "/domain-sets", roles: ["admin", "data_ops"] },
+    ],
+  },
+  {
+    title: "Contacts",
+    icon: Users,
+    roles: ["admin", "campaign_manager", "data_ops"],
+    items: [
+      { title: "All Contacts", url: "/contacts", roles: ["admin", "campaign_manager", "data_ops"] },
+      { title: "Segments & Lists", url: "/segments", roles: ["admin", "campaign_manager", "data_ops"] },
+      { title: "Bulk Import", url: "/imports", roles: ["admin", "data_ops"] },
+    ],
+  },
+  {
+    title: "Campaigns",
+    icon: Megaphone,
+    roles: ["admin", "campaign_manager", "agent"],
+    items: [
+      { title: "All Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
+      { title: "Email Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
+      { title: "Phone Campaigns", url: "/campaigns/telemarketing", roles: ["admin", "campaign_manager", "agent"] },
+      { title: "Campaign Configuration", url: "/campaigns/config", roles: ["admin", "campaign_manager"] },
+    ],
+  },
+  {
+    title: "QA & Leads Delivery",
+    url: "/leads",
+    icon: CheckCircle,
+    roles: ["admin", "campaign_manager", "qa_analyst"],
+  },
+  {
+    title: "Reports",
+    url: "/reports",
+    icon: BarChart,
+    roles: ["admin", "campaign_manager", "qa_analyst", "client_user"],
+  },
+  {
+    title: "Projects Management",
+    url: "/orders",
+    icon: Briefcase,
+    roles: ["admin", "campaign_manager", "client_user"],
+  },
+  {
+    title: "Organization Settings",
+    icon: Settings,
+    roles: ["admin"],
+    items: [
+      { title: "User & Role Management", url: "/settings", roles: ["admin"] },
+      { title: "Suppression Management", url: "/suppressions", roles: ["admin"] },
+      { title: "Compliance Center", url: "/settings", roles: ["admin"] },
+      { title: "Integrations & APIs", url: "/settings", roles: ["admin"] },
+    ],
+  },
+];
+
+// Filter navigation items based on user role
+const filterNavByRole = (navItems: NavItem[], userRole: string): NavItem[] => {
+  return navItems
+    .filter(item => item.roles.includes(userRole))
+    .map(item => ({
+      ...item,
+      items: item.items?.filter(subItem => subItem.roles.includes(userRole)),
+    }));
 };
 
 export function AppSidebar({ userRole = "admin" }: { userRole?: string }) {
   const [location] = useLocation();
-  const navItems = getNavItems(userRole);
+  const navItems = filterNavByRole(getNavStructure(), userRole);
+
+  const isActive = (url?: string, items?: SubNavItem[]) => {
+    if (url) return location === url;
+    if (items) return items.some(item => location === item.url);
+    return false;
+  };
 
   return (
     <Sidebar>
@@ -118,20 +155,64 @@ export function AppSidebar({ userRole = "admin" }: { userRole?: string }) {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location === item.url}
-                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+              {navItems.map((item) => {
+                // Top-level item without dropdown
+                if (!item.items || item.items.length === 0) {
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={isActive(item.url)}
+                        data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <a href={item.url}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                }
+
+                // Collapsible item with nested dropdown
+                return (
+                  <Collapsible
+                    key={item.title}
+                    defaultOpen={isActive(undefined, item.items)}
+                    className="group/collapsible"
                   >
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          isActive={isActive(undefined, item.items)}
+                          data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                        >
+                          <item.icon />
+                          <span>{item.title}</span>
+                          <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub>
+                          {item.items.map((subItem) => (
+                            <SidebarMenuSubItem key={subItem.title}>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={location === subItem.url}
+                                data-testid={`nav-sub-${subItem.title.toLowerCase().replace(/\s+/g, '-')}`}
+                              >
+                                <a href={subItem.url}>
+                                  <span>{subItem.title}</span>
+                                </a>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
