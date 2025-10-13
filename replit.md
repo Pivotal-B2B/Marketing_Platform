@@ -80,14 +80,16 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 
 **Phase 8 Deliverables (Completed & Architect-Approved):**
 - ✅ **Dual-Industry Schema:** Added 11 industry fields to accounts: industryStandardized (primary), industrySecondary[] (array), industryRaw, plus AI metadata fields
-- ✅ **AI Enrichment Fields:** industryAiSuggested, industryAiCandidates (JSONB with confidence scores), industryAiTopk[], industryAiConfidence, industryAiSource, industryAiSuggestedAt
+- ✅ **AI Enrichment Fields:** industryAiSuggested, industryAiCandidates (JSONB with confidence scores), industryAiTopk[], industryAiConfidence (numeric 5,4), industryAiSource, industryAiSuggestedAt, industryAiReviewedAt
 - ✅ **Review Workflow:** industryAiReviewedBy, industryAiReviewedAt, industryAiStatus enum (pending/accepted/rejected/partial)
-- ✅ **Storage Methods:** updateAccountIndustry() for manual updates, reviewAccountIndustryAI() for processing AI reviews with accept/reject/partial logic, getAccountsNeedingReview() with confidence threshold filtering (≥0.5)
+- ✅ **Storage Methods:** updateAccountIndustry() for manual updates, reviewAccountIndustryAI() for processing AI reviews with accept/reject/partial logic, auto-clears industryAiCandidates after review, getAccountsNeedingReview() with confidence threshold filtering (≥0.5)
 - ✅ **API Routes:** PATCH /api/accounts/:id/industry (manual industry updates), POST /api/accounts/:id/industry/ai-review (AI review submission), GET /api/accounts/ai-review/pending (pending review queue)
 - ✅ **Role-Based Access:** All industry APIs restricted to admin, data_ops, campaign_manager roles
 - ✅ **Account Detail UI:** Updated Overview tab with Primary Industry + Secondary Industries badges, added AI Enrichment tab with "New" badge for pending suggestions
-- ✅ **AI Review Interface:** Multi-select review UI with confidence scores, mutually exclusive actions (Set as Primary/Add to Secondary/Reject), optimistic state reset on success
+- ✅ **AI Review Interface:** Multi-select review UI with confidence scores, mutually exclusive actions (Set as Primary/Add to Secondary/Reject), state clears after successful submission showing empty state
 - ✅ **Data Validation:** Zod schemas for updateAccountIndustrySchema and reviewAccountIndustryAISchema with proper field validation
+- ✅ **Bug Fixes:** Fixed industryAiConfidence type (text → numeric), added missing industryAiReviewedAt field, fixed reviewAccountIndustryAI to clear suggestions after review
+- ✅ **E2E Testing:** Comprehensive Playwright test covering account creation, AI suggestions display, multi-select review, state clearing, and industry display - all verified passing
 
 **Future Phase 8+ Enhancements:**
 - Add industry filter operators to advanced filtering (industry_any_in, industry_primary, industry_contains)
