@@ -1015,6 +1015,56 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== COMPANY SIZE REFERENCE ====================
+  
+  // Get all standardized company size ranges (sorted by employee count)
+  app.get("/api/company-sizes", async (req, res) => {
+    try {
+      const sizes = await storage.getCompanySizes();
+      res.json(sizes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch company sizes" });
+    }
+  });
+  
+  // Get company size by code (A-I)
+  app.get("/api/company-sizes/:code", async (req, res) => {
+    try {
+      const size = await storage.getCompanySizeByCode(req.params.code);
+      if (!size) {
+        return res.status(404).json({ message: "Company size not found" });
+      }
+      res.json(size);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch company size" });
+    }
+  });
+
+  // ==================== REVENUE RANGE REFERENCE ====================
+  
+  // Get all standardized revenue ranges (sorted by revenue)
+  app.get("/api/revenue-ranges", async (req, res) => {
+    try {
+      const ranges = await storage.getRevenueRanges();
+      res.json(ranges);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch revenue ranges" });
+    }
+  });
+  
+  // Get revenue range by label
+  app.get("/api/revenue-ranges/:label", async (req, res) => {
+    try {
+      const range = await storage.getRevenueRangeByLabel(decodeURIComponent(req.params.label));
+      if (!range) {
+        return res.status(404).json({ message: "Revenue range not found" });
+      }
+      res.json(range);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch revenue range" });
+    }
+  });
+
   // ==================== SELECTION CONTEXTS (Bulk Operations) ====================
   
   app.get("/api/selection-contexts/:id", requireAuth, async (req, res) => {
