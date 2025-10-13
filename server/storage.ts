@@ -9,6 +9,8 @@ import {
   campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
   selectionContexts, filterFieldRegistry, fieldChangeLog, industryReference,
   companySizeReference, revenueRangeReference,
+  campaignAudienceSnapshots, senderProfiles, emailTemplates, emailSends, emailEvents,
+  callScripts, callAttempts, callEvents, qualificationResponses,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -31,6 +33,15 @@ import {
   type IndustryReference,
   type CompanySizeReference,
   type RevenueRangeReference,
+  type CampaignAudienceSnapshot, type InsertCampaignAudienceSnapshot,
+  type SenderProfile, type InsertSenderProfile,
+  type EmailTemplate, type InsertEmailTemplate,
+  type EmailSend, type InsertEmailSend,
+  type EmailEvent, type InsertEmailEvent,
+  type CallScript, type InsertCallScript,
+  type CallAttempt, type InsertCallAttempt,
+  type CallEvent, type InsertCallEvent,
+  type QualificationResponse, type InsertQualificationResponse,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -61,6 +72,56 @@ export interface IStorage {
   createCampaign(campaign: InsertCampaign): Promise<Campaign>;
   updateCampaign(id: string, campaign: Partial<InsertCampaign>): Promise<Campaign | undefined>;
   deleteCampaign(id: string): Promise<void>;
+  
+  // Campaign Audience Snapshots
+  createCampaignAudienceSnapshot(snapshot: InsertCampaignAudienceSnapshot): Promise<CampaignAudienceSnapshot>;
+  getCampaignAudienceSnapshots(campaignId: string): Promise<CampaignAudienceSnapshot[]>;
+  
+  // Sender Profiles
+  getSenderProfiles(): Promise<SenderProfile[]>;
+  getSenderProfile(id: string): Promise<SenderProfile | undefined>;
+  createSenderProfile(profile: InsertSenderProfile): Promise<SenderProfile>;
+  updateSenderProfile(id: string, profile: Partial<InsertSenderProfile>): Promise<SenderProfile | undefined>;
+  deleteSenderProfile(id: string): Promise<void>;
+  
+  // Email Templates
+  getEmailTemplates(): Promise<EmailTemplate[]>;
+  getEmailTemplate(id: string): Promise<EmailTemplate | undefined>;
+  createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate>;
+  updateEmailTemplate(id: string, template: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined>;
+  approveEmailTemplate(id: string, approvedById: string): Promise<EmailTemplate | undefined>;
+  deleteEmailTemplate(id: string): Promise<void>;
+  
+  // Email Sends
+  getEmailSends(campaignId?: string): Promise<EmailSend[]>;
+  getEmailSend(id: string): Promise<EmailSend | undefined>;
+  createEmailSend(send: InsertEmailSend): Promise<EmailSend>;
+  updateEmailSend(id: string, send: Partial<InsertEmailSend>): Promise<EmailSend | undefined>;
+  
+  // Email Events
+  createEmailEvent(event: InsertEmailEvent): Promise<EmailEvent>;
+  getEmailEvents(sendId: string): Promise<EmailEvent[]>;
+  
+  // Call Scripts
+  getCallScripts(campaignId?: string): Promise<CallScript[]>;
+  getCallScript(id: string): Promise<CallScript | undefined>;
+  createCallScript(script: InsertCallScript): Promise<CallScript>;
+  updateCallScript(id: string, script: Partial<InsertCallScript>): Promise<CallScript | undefined>;
+  deleteCallScript(id: string): Promise<void>;
+  
+  // Call Attempts
+  getCallAttempts(campaignId?: string, agentId?: string): Promise<CallAttempt[]>;
+  getCallAttempt(id: string): Promise<CallAttempt | undefined>;
+  createCallAttempt(attempt: InsertCallAttempt): Promise<CallAttempt>;
+  updateCallAttempt(id: string, attempt: Partial<InsertCallAttempt>): Promise<CallAttempt | undefined>;
+  
+  // Call Events
+  createCallEvent(event: InsertCallEvent): Promise<CallEvent>;
+  getCallEvents(attemptId: string): Promise<CallEvent[]>;
+  
+  // Qualification Responses
+  createQualificationResponse(response: InsertQualificationResponse): Promise<QualificationResponse>;
+  getQualificationResponses(attemptId?: string, leadId?: string): Promise<QualificationResponse[]>;
   
   // Segments
   getSegments(filters?: any): Promise<Segment[]>;
@@ -703,6 +764,213 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCampaign(id: string): Promise<void> {
     await db.delete(campaigns).where(eq(campaigns.id, id));
+  }
+
+  // Campaign Audience Snapshots
+  async createCampaignAudienceSnapshot(insertSnapshot: InsertCampaignAudienceSnapshot): Promise<CampaignAudienceSnapshot> {
+    const [snapshot] = await db.insert(campaignAudienceSnapshots).values(insertSnapshot).returning();
+    return snapshot;
+  }
+
+  async getCampaignAudienceSnapshots(campaignId: string): Promise<CampaignAudienceSnapshot[]> {
+    return await db.select().from(campaignAudienceSnapshots).where(eq(campaignAudienceSnapshots.campaignId, campaignId));
+  }
+
+  // Sender Profiles
+  async getSenderProfiles(): Promise<SenderProfile[]> {
+    return await db.select().from(senderProfiles).where(eq(senderProfiles.isActive, true));
+  }
+
+  async getSenderProfile(id: string): Promise<SenderProfile | undefined> {
+    const [profile] = await db.select().from(senderProfiles).where(eq(senderProfiles.id, id));
+    return profile || undefined;
+  }
+
+  async createSenderProfile(insertProfile: InsertSenderProfile): Promise<SenderProfile> {
+    const [profile] = await db.insert(senderProfiles).values(insertProfile).returning();
+    return profile;
+  }
+
+  async updateSenderProfile(id: string, updateData: Partial<InsertSenderProfile>): Promise<SenderProfile | undefined> {
+    const [profile] = await db
+      .update(senderProfiles)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(senderProfiles.id, id))
+      .returning();
+    return profile || undefined;
+  }
+
+  async deleteSenderProfile(id: string): Promise<void> {
+    await db.delete(senderProfiles).where(eq(senderProfiles.id, id));
+  }
+
+  // Email Templates
+  async getEmailTemplates(): Promise<EmailTemplate[]> {
+    return await db.select().from(emailTemplates).orderBy(desc(emailTemplates.createdAt));
+  }
+
+  async getEmailTemplate(id: string): Promise<EmailTemplate | undefined> {
+    const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createEmailTemplate(insertTemplate: InsertEmailTemplate): Promise<EmailTemplate> {
+    const [template] = await db.insert(emailTemplates).values(insertTemplate).returning();
+    return template;
+  }
+
+  async updateEmailTemplate(id: string, updateData: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined> {
+    const [template] = await db
+      .update(emailTemplates)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(emailTemplates.id, id))
+      .returning();
+    return template || undefined;
+  }
+
+  async approveEmailTemplate(id: string, approvedById: string): Promise<EmailTemplate | undefined> {
+    const [template] = await db
+      .update(emailTemplates)
+      .set({
+        isApproved: true,
+        approvedById,
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(emailTemplates.id, id))
+      .returning();
+    return template || undefined;
+  }
+
+  async deleteEmailTemplate(id: string): Promise<void> {
+    await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
+  }
+
+  // Email Sends
+  async getEmailSends(campaignId?: string): Promise<EmailSend[]> {
+    if (campaignId) {
+      return await db.select().from(emailSends).where(eq(emailSends.campaignId, campaignId));
+    }
+    return await db.select().from(emailSends).orderBy(desc(emailSends.createdAt));
+  }
+
+  async getEmailSend(id: string): Promise<EmailSend | undefined> {
+    const [send] = await db.select().from(emailSends).where(eq(emailSends.id, id));
+    return send || undefined;
+  }
+
+  async createEmailSend(insertSend: InsertEmailSend): Promise<EmailSend> {
+    const [send] = await db.insert(emailSends).values(insertSend).returning();
+    return send;
+  }
+
+  async updateEmailSend(id: string, updateData: Partial<InsertEmailSend>): Promise<EmailSend | undefined> {
+    const [send] = await db
+      .update(emailSends)
+      .set(updateData)
+      .where(eq(emailSends.id, id))
+      .returning();
+    return send || undefined;
+  }
+
+  // Email Events
+  async createEmailEvent(insertEvent: InsertEmailEvent): Promise<EmailEvent> {
+    const [event] = await db.insert(emailEvents).values(insertEvent).returning();
+    return event;
+  }
+
+  async getEmailEvents(sendId: string): Promise<EmailEvent[]> {
+    return await db.select().from(emailEvents).where(eq(emailEvents.sendId, sendId)).orderBy(desc(emailEvents.createdAt));
+  }
+
+  // Call Scripts
+  async getCallScripts(campaignId?: string): Promise<CallScript[]> {
+    if (campaignId) {
+      return await db.select().from(callScripts).where(eq(callScripts.campaignId, campaignId));
+    }
+    return await db.select().from(callScripts).orderBy(desc(callScripts.createdAt));
+  }
+
+  async getCallScript(id: string): Promise<CallScript | undefined> {
+    const [script] = await db.select().from(callScripts).where(eq(callScripts.id, id));
+    return script || undefined;
+  }
+
+  async createCallScript(insertScript: InsertCallScript): Promise<CallScript> {
+    const [script] = await db.insert(callScripts).values(insertScript).returning();
+    return script;
+  }
+
+  async updateCallScript(id: string, updateData: Partial<InsertCallScript>): Promise<CallScript | undefined> {
+    const [script] = await db
+      .update(callScripts)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(callScripts.id, id))
+      .returning();
+    return script || undefined;
+  }
+
+  async deleteCallScript(id: string): Promise<void> {
+    await db.delete(callScripts).where(eq(callScripts.id, id));
+  }
+
+  // Call Attempts
+  async getCallAttempts(campaignId?: string, agentId?: string): Promise<CallAttempt[]> {
+    let query = db.select().from(callAttempts);
+    
+    if (campaignId && agentId) {
+      query = query.where(and(eq(callAttempts.campaignId, campaignId), eq(callAttempts.agentId, agentId)));
+    } else if (campaignId) {
+      query = query.where(eq(callAttempts.campaignId, campaignId));
+    } else if (agentId) {
+      query = query.where(eq(callAttempts.agentId, agentId));
+    }
+    
+    return await query.orderBy(desc(callAttempts.createdAt));
+  }
+
+  async getCallAttempt(id: string): Promise<CallAttempt | undefined> {
+    const [attempt] = await db.select().from(callAttempts).where(eq(callAttempts.id, id));
+    return attempt || undefined;
+  }
+
+  async createCallAttempt(insertAttempt: InsertCallAttempt): Promise<CallAttempt> {
+    const [attempt] = await db.insert(callAttempts).values(insertAttempt).returning();
+    return attempt;
+  }
+
+  async updateCallAttempt(id: string, updateData: Partial<InsertCallAttempt>): Promise<CallAttempt | undefined> {
+    const [attempt] = await db
+      .update(callAttempts)
+      .set(updateData)
+      .where(eq(callAttempts.id, id))
+      .returning();
+    return attempt || undefined;
+  }
+
+  // Call Events
+  async createCallEvent(insertEvent: InsertCallEvent): Promise<CallEvent> {
+    const [event] = await db.insert(callEvents).values(insertEvent).returning();
+    return event;
+  }
+
+  async getCallEvents(attemptId: string): Promise<CallEvent[]> {
+    return await db.select().from(callEvents).where(eq(callEvents.attemptId, attemptId)).orderBy(desc(callEvents.createdAt));
+  }
+
+  // Qualification Responses
+  async createQualificationResponse(insertResponse: InsertQualificationResponse): Promise<QualificationResponse> {
+    const [response] = await db.insert(qualificationResponses).values(insertResponse).returning();
+    return response;
+  }
+
+  async getQualificationResponses(attemptId?: string, leadId?: string): Promise<QualificationResponse[]> {
+    if (attemptId) {
+      return await db.select().from(qualificationResponses).where(eq(qualificationResponses.attemptId, attemptId));
+    } else if (leadId) {
+      return await db.select().from(qualificationResponses).where(eq(qualificationResponses.leadId, leadId));
+    }
+    return await db.select().from(qualificationResponses).orderBy(desc(qualificationResponses.createdAt));
   }
 
   // Segments
