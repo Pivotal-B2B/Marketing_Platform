@@ -58,10 +58,8 @@ export default function DomainSets() {
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; description?: string; csvContent: string }) => {
-      return await apiRequest('/api/domain-sets', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      const response = await apiRequest('POST', '/api/domain-sets', data);
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/domain-sets'] });
@@ -85,10 +83,8 @@ export default function DomainSets() {
 
   const convertMutation = useMutation({
     mutationFn: async ({ id, listName }: { id: string; listName: string }) => {
-      return await apiRequest(`/api/domain-sets/${id}/convert-to-list`, {
-        method: 'POST',
-        body: JSON.stringify({ listName }),
-      });
+      const response = await apiRequest('POST', `/api/domain-sets/${id}/convert-to-list`, { listName });
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
@@ -110,9 +106,7 @@ export default function DomainSets() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/domain-sets/${id}`, {
-        method: 'DELETE',
-      });
+      await apiRequest('DELETE', `/api/domain-sets/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/domain-sets'] });

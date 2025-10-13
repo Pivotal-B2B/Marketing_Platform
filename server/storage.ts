@@ -1778,6 +1778,7 @@ export class DatabaseStorage implements IStorage {
     
     let matchedAccounts = 0;
     let matchedContacts = 0;
+    let unknownDomains = 0;
     
     // Process each domain item
     for (const item of items) {
@@ -1846,12 +1847,12 @@ export class DatabaseStorage implements IStorage {
             matchType: 'none',
             matchConfidence: '0.00',
           });
+          unknownDomains++;
         }
       }
     }
     
     // Update domain set stats
-    const unknownDomains = items.filter(i => i.matchType === 'none' || !i.matchType).length;
     await this.updateDomainSet(domainSetId, {
       matchedAccounts,
       matchedContacts,
