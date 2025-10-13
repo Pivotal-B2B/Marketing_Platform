@@ -28,7 +28,10 @@ import {
   insertCallAttemptSchema,
   insertContentAssetSchema,
   insertSocialPostSchema,
-  insertAIContentGenerationSchema
+  insertAIContentGenerationSchema,
+  insertEventSchema,
+  insertResourceSchema,
+  insertNewsSchema
 } from "@shared/schema";
 
 export function registerRoutes(app: Express) {
@@ -1809,6 +1812,201 @@ export function registerRoutes(app: Express) {
       res.status(201).json(generation);
     } catch (error) {
       res.status(500).json({ message: "Failed to generate content" });
+    }
+  });
+
+  // ==================== EVENTS ====================
+  
+  app.get("/api/events", requireAuth, async (req, res) => {
+    try {
+      const events = await storage.getEvents();
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch events" });
+    }
+  });
+
+  app.post("/api/events", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const validated = insertEventSchema.parse(req.body);
+      const event = await storage.createEvent({ ...validated, createdBy: userId });
+      res.status(201).json(event);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
+  app.get("/api/events/:id", requireAuth, async (req, res) => {
+    try {
+      const event = await storage.getEvent(req.params.id);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch event" });
+    }
+  });
+
+  app.put("/api/events/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertEventSchema.partial().parse(req.body);
+      const event = await storage.updateEvent(req.params.id, validated);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update event" });
+    }
+  });
+
+  app.delete("/api/events/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const deleted = await storage.deleteEvent(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
+
+  // ==================== RESOURCES ====================
+  
+  app.get("/api/resources", requireAuth, async (req, res) => {
+    try {
+      const resources = await storage.getResources();
+      res.json(resources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resources" });
+    }
+  });
+
+  app.post("/api/resources", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const validated = insertResourceSchema.parse(req.body);
+      const resource = await storage.createResource({ ...validated, createdBy: userId });
+      res.status(201).json(resource);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create resource" });
+    }
+  });
+
+  app.get("/api/resources/:id", requireAuth, async (req, res) => {
+    try {
+      const resource = await storage.getResource(req.params.id);
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      res.json(resource);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch resource" });
+    }
+  });
+
+  app.put("/api/resources/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertResourceSchema.partial().parse(req.body);
+      const resource = await storage.updateResource(req.params.id, validated);
+      if (!resource) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      res.json(resource);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update resource" });
+    }
+  });
+
+  app.delete("/api/resources/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const deleted = await storage.deleteResource(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Resource not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete resource" });
+    }
+  });
+
+  // ==================== NEWS ====================
+  
+  app.get("/api/news", requireAuth, async (req, res) => {
+    try {
+      const news = await storage.getNews();
+      res.json(news);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch news" });
+    }
+  });
+
+  app.post("/api/news", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const validated = insertNewsSchema.parse(req.body);
+      const newsItem = await storage.createNews({ ...validated, createdBy: userId });
+      res.status(201).json(newsItem);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create news" });
+    }
+  });
+
+  app.get("/api/news/:id", requireAuth, async (req, res) => {
+    try {
+      const newsItem = await storage.getNewsItem(req.params.id);
+      if (!newsItem) {
+        return res.status(404).json({ message: "News not found" });
+      }
+      res.json(newsItem);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch news" });
+    }
+  });
+
+  app.put("/api/news/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertNewsSchema.partial().parse(req.body);
+      const newsItem = await storage.updateNews(req.params.id, validated);
+      if (!newsItem) {
+        return res.status(404).json({ message: "News not found" });
+      }
+      res.json(newsItem);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update news" });
+    }
+  });
+
+  app.delete("/api/news/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const deleted = await storage.deleteNews(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "News not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete news" });
     }
   });
 }
