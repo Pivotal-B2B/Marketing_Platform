@@ -101,6 +101,42 @@ export const filterFieldCategoryEnum = pgEnum('filter_field_category', [
   'client_portal_fields'
 ]);
 
+export const contentAssetTypeEnum = pgEnum('content_asset_type', [
+  'email_template',
+  'landing_page',
+  'social_post',
+  'ad_creative',
+  'pdf_document',
+  'video',
+  'call_script',
+  'sales_sequence',
+  'blog_post'
+]);
+
+export const contentApprovalStatusEnum = pgEnum('content_approval_status', [
+  'draft',
+  'in_review',
+  'approved',
+  'rejected',
+  'published'
+]);
+
+export const socialPlatformEnum = pgEnum('social_platform', [
+  'linkedin',
+  'twitter',
+  'facebook',
+  'instagram',
+  'youtube'
+]);
+
+export const contentToneEnum = pgEnum('content_tone', [
+  'formal',
+  'conversational',
+  'insightful',
+  'persuasive',
+  'technical'
+]);
+
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1240,3 +1276,155 @@ export type InsertCompanySizeReference = z.infer<typeof insertCompanySizeReferen
 
 export type RevenueRangeReference = typeof revenueRangeReference.$inferSelect;
 export type InsertRevenueRangeReference = z.infer<typeof insertRevenueRangeReferenceSchema>;
+
+// ============================================================================
+// CONTENT STUDIO & SOCIAL MEDIA MANAGEMENT
+// ============================================================================
+
+// Content Assets table
+export const contentAssets = pgTable("content_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assetType: contentAssetTypeEnum("asset_type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  content: text("content"), // HTML/text content
+  contentHtml: text("content_html"), // Rendered HTML for emails/landing pages
+  thumbnailUrl: text("thumbnail_url"),
+  fileUrl: text("file_url"), // For PDFs, videos, images
+  tags: text("tags").array().default(sql`ARRAY[]::text[]`),
+  metadata: jsonb("metadata"), // Custom metadata, AI-extracted keywords
+  approvalStatus: contentApprovalStatusEnum("approval_status").notNull().default('draft'),
+  tone: contentToneEnum("tone"),
+  targetAudience: text("target_audience"),
+  ctaGoal: text("cta_goal"),
+  linkedCampaigns: text("linked_campaigns").array().default(sql`ARRAY[]::text[]`),
+  usageHistory: jsonb("usage_history").default(sql`'[]'::jsonb`), // Track where asset was used
+  version: integer("version").notNull().default(1),
+  currentVersionId: varchar("current_version_id"),
+  ownerId: varchar("owner_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  assetTypeIdx: index("content_assets_asset_type_idx").on(table.assetType),
+  approvalStatusIdx: index("content_assets_approval_status_idx").on(table.approvalStatus),
+  ownerIdx: index("content_assets_owner_idx").on(table.ownerId),
+}));
+
+// Content Versions table
+export const contentVersions = pgTable("content_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id").notNull().references(() => contentAssets.id, { onDelete: 'cascade' }),
+  versionNumber: integer("version_number").notNull(),
+  content: text("content").notNull(),
+  contentHtml: text("content_html"),
+  metadata: jsonb("metadata"),
+  changedBy: varchar("changed_by").notNull().references(() => users.id),
+  changeDescription: text("change_description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  assetIdIdx: index("content_versions_asset_id_idx").on(table.assetId),
+  versionIdx: index("content_versions_version_number_idx").on(table.assetId, table.versionNumber),
+}));
+
+// Content Approvals table
+export const contentApprovals = pgTable("content_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id").notNull().references(() => contentAssets.id, { onDelete: 'cascade' }),
+  reviewerId: varchar("reviewer_id").notNull().references(() => users.id),
+  status: contentApprovalStatusEnum("status").notNull(),
+  comments: text("comments"),
+  reviewedAt: timestamp("reviewed_at").notNull().defaultNow(),
+}, (table) => ({
+  assetIdIdx: index("content_approvals_asset_id_idx").on(table.assetId),
+  reviewerIdx: index("content_approvals_reviewer_idx").on(table.reviewerId),
+}));
+
+// Social Posts table
+export const socialPosts = pgTable("social_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id").references(() => contentAssets.id, { onDelete: 'set null' }),
+  platform: socialPlatformEnum("platform").notNull(),
+  content: text("content").notNull(),
+  mediaUrls: text("media_urls").array().default(sql`ARRAY[]::text[]`),
+  scheduledAt: timestamp("scheduled_at"),
+  publishedAt: timestamp("published_at"),
+  status: contentApprovalStatusEnum("status").notNull().default('draft'),
+  utmParameters: jsonb("utm_parameters"), // UTM tracking
+  platformPostId: text("platform_post_id"), // ID from social platform
+  engagement: jsonb("engagement"), // likes, shares, comments, impressions
+  sentiment: text("sentiment"), // AI-analyzed: positive/neutral/negative
+  ownerId: varchar("owner_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  platformIdx: index("social_posts_platform_idx").on(table.platform),
+  statusIdx: index("social_posts_status_idx").on(table.status),
+  scheduledAtIdx: index("social_posts_scheduled_at_idx").on(table.scheduledAt),
+  ownerIdx: index("social_posts_owner_idx").on(table.ownerId),
+}));
+
+// AI Content Generations table (track AI-generated content)
+export const aiContentGenerations = pgTable("ai_content_generations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id").references(() => contentAssets.id, { onDelete: 'set null' }),
+  prompt: text("prompt").notNull(),
+  contentType: contentAssetTypeEnum("content_type").notNull(),
+  targetAudience: text("target_audience"),
+  tone: contentToneEnum("tone"),
+  ctaGoal: text("cta_goal"),
+  generatedContent: text("generated_content").notNull(),
+  model: text("model").notNull(), // GPT-4, Claude, etc.
+  tokensUsed: integer("tokens_used"),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  assetIdIdx: index("ai_content_generations_asset_id_idx").on(table.assetId),
+  userIdx: index("ai_content_generations_user_idx").on(table.userId),
+  createdAtIdx: index("ai_content_generations_created_at_idx").on(table.createdAt),
+}));
+
+// Insert schemas for Content Studio
+export const insertContentAssetSchema = createInsertSchema(contentAssets).omit({
+  id: true,
+  version: true,
+  currentVersionId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertContentVersionSchema = createInsertSchema(contentVersions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertContentApprovalSchema = createInsertSchema(contentApprovals).omit({
+  id: true,
+  reviewedAt: true,
+});
+
+export const insertSocialPostSchema = createInsertSchema(socialPosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAIContentGenerationSchema = createInsertSchema(aiContentGenerations).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Export types for Content Studio
+export type ContentAsset = typeof contentAssets.$inferSelect;
+export type InsertContentAsset = z.infer<typeof insertContentAssetSchema>;
+
+export type ContentVersion = typeof contentVersions.$inferSelect;
+export type InsertContentVersion = z.infer<typeof insertContentVersionSchema>;
+
+export type ContentApproval = typeof contentApprovals.$inferSelect;
+export type InsertContentApproval = z.infer<typeof insertContentApprovalSchema>;
+
+export type SocialPost = typeof socialPosts.$inferSelect;
+export type InsertSocialPost = z.infer<typeof insertSocialPostSchema>;
+
+export type AIContentGeneration = typeof aiContentGenerations.$inferSelect;
+export type InsertAIContentGeneration = z.infer<typeof insertAIContentGenerationSchema>;
