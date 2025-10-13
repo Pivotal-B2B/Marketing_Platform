@@ -460,6 +460,15 @@ export default function SegmentsPage() {
                     <CardDescription>
                       {segment.description || "No description"}
                     </CardDescription>
+                    {segment.definitionJson && (segment.definitionJson as any).conditions?.length > 0 && (
+                      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                        <ListFilter className="h-4 w-4" />
+                        <span>{(segment.definitionJson as any).conditions.length} filter condition(s)</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {(segment.definitionJson as any).logic || 'AND'}
+                        </Badge>
+                      </div>
+                    )}
                     {segment.tags && segment.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {segment.tags.map((tag, i) => (
