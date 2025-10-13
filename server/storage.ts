@@ -7,7 +7,7 @@ import {
   users, accounts, contacts, campaigns, segments, lists, domainSets,
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
   campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
-  selectionContexts, filterFieldRegistry, fieldChangeLog,
+  selectionContexts, filterFieldRegistry, fieldChangeLog, industryReference,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -27,6 +27,7 @@ import {
   type SavedFilter, type InsertSavedFilter,
   type SelectionContext, type InsertSelectionContext,
   type FilterField,
+  type IndustryReference,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -142,6 +143,11 @@ export interface IStorage {
   // Filter Fields Registry
   getFilterFields(category?: string): Promise<any[]>;
   getFilterFieldsByEntity(entity: string): Promise<any[]>;
+  
+  // Industry Reference (Standardized Taxonomy)
+  getIndustries(activeOnly?: boolean): Promise<IndustryReference[]>;
+  searchIndustries(query: string, limit?: number): Promise<IndustryReference[]>;
+  getIndustryById(id: string): Promise<IndustryReference | undefined>;
   
   // Dual-Industry Management (Phase 8)
   updateAccountIndustry(id: string, data: { primary?: string; secondary?: string[]; code?: string }): Promise<Account | undefined>;
@@ -1079,6 +1085,45 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(filterFieldRegistry.sortOrder);
+  }
+  
+  // Industry Reference (Standardized Taxonomy)
+  async getIndustries(activeOnly: boolean = true): Promise<IndustryReference[]> {
+    let query = db
+      .select()
+      .from(industryReference)
+      .orderBy(industryReference.name);
+    
+    if (activeOnly) {
+      query = query.where(eq(industryReference.isActive, true)) as any;
+    }
+    
+    return await query;
+  }
+  
+  async searchIndustries(query: string, limit: number = 50): Promise<IndustryReference[]> {
+    return await db
+      .select()
+      .from(industryReference)
+      .where(
+        and(
+          eq(industryReference.isActive, true),
+          or(
+            like(industryReference.name, `%${query}%`),
+            sql`${query} = ANY(${industryReference.synonyms})`
+          )
+        )
+      )
+      .orderBy(industryReference.name)
+      .limit(limit);
+  }
+  
+  async getIndustryById(id: string): Promise<IndustryReference | undefined> {
+    const [industry] = await db
+      .select()
+      .from(industryReference)
+      .where(eq(industryReference.id, id));
+    return industry || undefined;
   }
   
   // Dual-Industry Management (Phase 8)
