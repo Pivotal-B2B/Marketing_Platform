@@ -690,16 +690,25 @@ export const campaignAudienceSnapshots = pgTable("campaign_audience_snapshots", 
   campaignIdx: index("campaign_audience_snapshots_campaign_idx").on(table.campaignId),
 }));
 
-// Sender Profiles
+// Sender Profiles (Enhanced for Phase 26)
 export const senderProfiles = pgTable("sender_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // e.g., "Pivotal — Marketing"
   brandId: varchar("brand_id"),
   fromName: text("from_name").notNull(),
   fromEmail: text("from_email").notNull(),
+  replyTo: text("reply_to"),
+  replyToEmail: text("reply_to_email"), // backward compatibility
   dkimDomain: text("dkim_domain"),
   trackingDomain: text("tracking_domain"),
-  replyToEmail: text("reply_to_email"),
+  trackingDomainId: integer("tracking_domain_id"), // FK to tracking_domains
+  espAdapter: text("esp_adapter").default('sendgrid'), // 'ses', 'sendgrid', 'mailgun'
+  ipPoolId: integer("ip_pool_id"), // FK to ip_pools; null = shared
+  defaultThrottleTps: integer("default_throttle_tps").default(10),
+  dailyCap: integer("daily_cap"),
+  signatureHtml: text("signature_html"),
   isActive: boolean("is_active").default(true),
+  status: text("status").default('active'), // 'active' or 'suspended'  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -1621,3 +1630,190 @@ export type InsertResource = z.infer<typeof insertResourceSchema>;
 
 export type News = typeof news.$inferSelect;
 export type InsertNews = z.infer<typeof insertNewsSchema>;
+
+// ============================================================================
+// EMAIL INFRASTRUCTURE (Phase 26)
+// ============================================================================
+
+// Enums for Email Infrastructure
+export const authStatusEnum = pgEnum('auth_status', ['pending', 'verified', 'failed']);
+export const warmupStatusEnum = pgEnum('warmup_status', ['not_started', 'in_progress', 'completed', 'paused']);
+export const stoModeEnum = pgEnum('sto_mode', ['off', 'global_model', 'per_contact']);
+export const sendPolicyScopeEnum = pgEnum('send_policy_scope', ['tenant', 'campaign']);
+
+// Domain Authentication
+export const domainAuth = pgTable("domain_auth", {
+  id: serial("id").primaryKey(),
+  domain: text("domain").notNull().unique(),
+  spfStatus: authStatusEnum("spf_status").default('pending').notNull(),
+  dkimStatus: authStatusEnum("dkim_status").default('pending').notNull(),
+  dmarcStatus: authStatusEnum("dmarc_status").default('pending').notNull(),
+  trackingDomainStatus: authStatusEnum("tracking_domain_status").default('pending').notNull(),
+  bimiStatus: authStatusEnum("bimi_status").default('pending'),
+  lastCheckedAt: timestamp("last_checked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// DKIM Keys
+export const dkimKeys = pgTable("dkim_keys", {
+  id: serial("id").primaryKey(),
+  domainAuthId: integer("domain_auth_id").notNull().references(() => domainAuth.id, { onDelete: 'cascade' }),
+  selector: text("selector").notNull(),
+  publicKey: text("public_key").notNull(),
+  rotationDueAt: timestamp("rotation_due_at"),
+  status: authStatusEnum("status").default('pending').notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Tracking Domains
+export const trackingDomains = pgTable("tracking_domains", {
+  id: serial("id").primaryKey(),
+  cname: text("cname").notNull().unique(), // e.g., click.brand.com
+  target: text("target").notNull(), // provider target
+  tlsStatus: authStatusEnum("tls_status").default('pending').notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// IP Pools
+export const ipPools = pgTable("ip_pools", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  provider: text("provider").notNull(), // 'ses', 'sendgrid', 'mailgun'
+  ipAddresses: text("ip_addresses").array().notNull(), // array of IPs
+  warmupStatus: warmupStatusEnum("warmup_status").default('not_started').notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Warmup Plans
+export const warmupPlans = pgTable("warmup_plans", {
+  id: serial("id").primaryKey(),
+  ipPoolId: integer("ip_pool_id").notNull().references(() => ipPools.id, { onDelete: 'cascade' }),
+  day: integer("day").notNull(), // day of warmup (1-28)
+  dailyCap: integer("daily_cap").notNull(),
+  domainSplitJson: jsonb("domain_split_json"), // per-domain distribution
+  status: warmupStatusEnum("status").default('not_started').notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Send Policies (STO, Batching, Throttling)
+export const sendPolicies = pgTable("send_policies", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  scope: sendPolicyScopeEnum("scope").default('tenant').notNull(),
+  
+  // STO Settings
+  stoMode: stoModeEnum("sto_mode").default('off').notNull(),
+  stoWindowHours: integer("sto_window_hours").default(24),
+  
+  // Batching Settings
+  batchSize: integer("batch_size").default(5000),
+  batchGapMinutes: integer("batch_gap_minutes").default(15),
+  seedTestBatch: boolean("seed_test_batch").default(false),
+  
+  // Throttling Settings
+  globalTps: integer("global_tps").default(10),
+  perDomainCaps: jsonb("per_domain_caps"), // { "gmail.com": 500, "outlook.com": 300 }
+  frequencyCap: integer("frequency_cap"), // max emails per contact per week
+  
+  status: text("status").default('active').notNull(), // 'active' or 'suspended'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Domain Reputation Snapshots
+export const domainReputationSnapshots = pgTable("domain_reputation_snapshots", {
+  id: serial("id").primaryKey(),
+  domain: text("domain").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  metricsJson: jsonb("metrics_json").notNull(), // delivery%, bounces, complaints, etc.
+  healthScore: integer("health_score"), // 0-100
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Per-Domain Stats (aggregated by day)
+export const perDomainStats = pgTable("per_domain_stats", {
+  id: serial("id").primaryKey(),
+  sendingDomain: text("sending_domain").notNull(),
+  recipientProvider: text("recipient_provider").notNull(), // gmail.com, outlook.com, etc.
+  day: text("day").notNull(), // YYYY-MM-DD
+  delivered: integer("delivered").default(0),
+  bouncesHard: integer("bounces_hard").default(0),
+  bouncesSoft: integer("bounces_soft").default(0),
+  complaints: integer("complaints").default(0),
+  opens: integer("opens").default(0),
+  clicks: integer("clicks").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Insert Schemas
+export const insertDomainAuthSchema = createInsertSchema(domainAuth).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDkimKeySchema = createInsertSchema(dkimKeys).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTrackingDomainSchema = createInsertSchema(trackingDomains).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertIpPoolSchema = createInsertSchema(ipPools).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWarmupPlanSchema = createInsertSchema(warmupPlans).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSendPolicySchema = createInsertSchema(sendPolicies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDomainReputationSnapshotSchema = createInsertSchema(domainReputationSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPerDomainStatsSchema = createInsertSchema(perDomainStats).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Export Types
+export type DomainAuth = typeof domainAuth.$inferSelect;
+export type InsertDomainAuth = z.infer<typeof insertDomainAuthSchema>;
+
+export type DkimKey = typeof dkimKeys.$inferSelect;
+export type InsertDkimKey = z.infer<typeof insertDkimKeySchema>;
+
+export type TrackingDomain = typeof trackingDomains.$inferSelect;
+export type InsertTrackingDomain = z.infer<typeof insertTrackingDomainSchema>;
+
+export type IpPool = typeof ipPools.$inferSelect;
+export type InsertIpPool = z.infer<typeof insertIpPoolSchema>;
+
+export type WarmupPlan = typeof warmupPlans.$inferSelect;
+export type InsertWarmupPlan = z.infer<typeof insertWarmupPlanSchema>;
+
+export type SendPolicy = typeof sendPolicies.$inferSelect;
+export type InsertSendPolicy = z.infer<typeof insertSendPolicySchema>;
+
+export type DomainReputationSnapshot = typeof domainReputationSnapshots.$inferSelect;
+export type InsertDomainReputationSnapshot = z.infer<typeof insertDomainReputationSnapshotSchema>;
+
+export type PerDomainStats = typeof perDomainStats.$inferSelect;
+export type InsertPerDomainStats = z.infer<typeof insertPerDomainStatsSchema>;
