@@ -12,6 +12,7 @@ import {
   campaignAudienceSnapshots, senderProfiles, emailTemplates, emailSends, emailEvents,
   callScripts, callAttempts, callEvents, qualificationResponses,
   contentAssets, socialPosts, aiContentGenerations, contentAssetPushes,
+  events, resources, news,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -49,6 +50,9 @@ import {
   type SocialPost, type InsertSocialPost,
   type AIContentGeneration, type InsertAIContentGeneration,
   type ContentAssetPush, type InsertContentAssetPush,
+  type Event, type InsertEvent,
+  type Resource, type InsertResource,
+  type News, type InsertNews,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -2016,6 +2020,108 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(contentAssetPushes.createdAt))
       .limit(1);
     return result[0] || null;
+  }
+
+  // ==================== EVENTS ====================
+  
+  async getEvents(): Promise<Event[]> {
+    return await db.select().from(events).orderBy(desc(events.createdAt));
+  }
+
+  async getEvent(id: string): Promise<Event | null> {
+    const result = await db.select().from(events).where(eq(events.id, id));
+    return result[0] || null;
+  }
+
+  async getEventBySlug(slug: string): Promise<Event | null> {
+    const result = await db.select().from(events).where(eq(events.slug, slug));
+    return result[0] || null;
+  }
+
+  async createEvent(data: InsertEvent): Promise<Event> {
+    const result = await db.insert(events).values(data).returning();
+    return result[0];
+  }
+
+  async updateEvent(id: string, data: Partial<InsertEvent>): Promise<Event | null> {
+    const result = await db.update(events)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(events.id, id))
+      .returning();
+    return result[0] || null;
+  }
+
+  async deleteEvent(id: string): Promise<boolean> {
+    const result = await db.delete(events).where(eq(events.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // ==================== RESOURCES ====================
+  
+  async getResources(): Promise<Resource[]> {
+    return await db.select().from(resources).orderBy(desc(resources.createdAt));
+  }
+
+  async getResource(id: string): Promise<Resource | null> {
+    const result = await db.select().from(resources).where(eq(resources.id, id));
+    return result[0] || null;
+  }
+
+  async getResourceBySlug(slug: string): Promise<Resource | null> {
+    const result = await db.select().from(resources).where(eq(resources.slug, slug));
+    return result[0] || null;
+  }
+
+  async createResource(data: InsertResource): Promise<Resource> {
+    const result = await db.insert(resources).values(data).returning();
+    return result[0];
+  }
+
+  async updateResource(id: string, data: Partial<InsertResource>): Promise<Resource | null> {
+    const result = await db.update(resources)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(resources.id, id))
+      .returning();
+    return result[0] || null;
+  }
+
+  async deleteResource(id: string): Promise<boolean> {
+    const result = await db.delete(resources).where(eq(resources.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // ==================== NEWS ====================
+  
+  async getNews(): Promise<News[]> {
+    return await db.select().from(news).orderBy(desc(news.createdAt));
+  }
+
+  async getNewsItem(id: string): Promise<News | null> {
+    const result = await db.select().from(news).where(eq(news.id, id));
+    return result[0] || null;
+  }
+
+  async getNewsBySlug(slug: string): Promise<News | null> {
+    const result = await db.select().from(news).where(eq(news.slug, slug));
+    return result[0] || null;
+  }
+
+  async createNews(data: InsertNews): Promise<News> {
+    const result = await db.insert(news).values(data).returning();
+    return result[0];
+  }
+
+  async updateNews(id: string, data: Partial<InsertNews>): Promise<News | null> {
+    const result = await db.update(news)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(news.id, id))
+      .returning();
+    return result[0] || null;
+  }
+
+  async deleteNews(id: string): Promise<boolean> {
+    const result = await db.delete(news).where(eq(news.id, id)).returning();
+    return result.length > 0;
   }
 }
 
