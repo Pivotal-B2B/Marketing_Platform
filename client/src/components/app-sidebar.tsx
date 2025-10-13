@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, Users, ListFilter, Globe, Mail, Phone, CheckSquare, ShieldAlert, Upload, FileText, ShoppingCart, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Building2, Users, ListFilter, Globe, Mail, Phone, CheckSquare, ShieldAlert, Upload, FileText, ShoppingCart, Settings, Settings2, LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -57,6 +57,12 @@ const getNavItems = (userRole: string) => {
       url: "/campaigns/telemarketing",
       icon: Phone,
       roles: ["admin", "campaign_manager", "agent"],
+    },
+    {
+      title: "Campaign Config",
+      url: "/campaigns/config",
+      icon: Settings2,
+      roles: ["admin", "campaign_manager"],
     },
     {
       title: "Leads & QA",
