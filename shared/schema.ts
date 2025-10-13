@@ -79,6 +79,10 @@ export const entityTypeEnum = pgEnum('entity_type', ['account', 'contact']);
 
 export const selectionTypeEnum = pgEnum('selection_type', ['explicit', 'filtered']);
 
+export const visibilityScopeEnum = pgEnum('visibility_scope', ['private', 'team', 'global']);
+
+export const sourceTypeEnum = pgEnum('source_type', ['segment', 'manual_upload', 'selection', 'filter']);
+
 export const industryAIStatusEnum = pgEnum('industry_ai_status', [
   'pending',
   'accepted', 
@@ -343,22 +347,42 @@ export const segments = pgTable("segments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
+  entityType: entityTypeEnum("entity_type").notNull().default('contact'),
   definitionJson: jsonb("definition_json").notNull(),
   ownerId: varchar("owner_id").references(() => users.id),
+  lastRefreshedAt: timestamp("last_refreshed_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  recordCountCache: integer("record_count_cache").default(0),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  visibilityScope: visibilityScopeEnum("visibility_scope").notNull().default('private'),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  entityTypeIdx: index("segments_entity_type_idx").on(table.entityType),
+  isActiveIdx: index("segments_is_active_idx").on(table.isActive),
+  ownerIdIdx: index("segments_owner_id_idx").on(table.ownerId),
+}));
 
 // Lists table (static snapshots)
 export const lists = pgTable("lists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
-  contactIds: text("contact_ids").array(),
+  entityType: entityTypeEnum("entity_type").notNull().default('contact'),
+  sourceType: sourceTypeEnum("source_type").notNull().default('manual_upload'),
+  sourceRef: varchar("source_ref"), // Segment ID, import ID, or selection context ID
+  snapshotTs: timestamp("snapshot_ts").notNull().defaultNow(),
+  recordIds: text("record_ids").array().notNull().default(sql`'{}'::text[]`),
   ownerId: varchar("owner_id").references(() => users.id),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  visibilityScope: visibilityScopeEnum("visibility_scope").notNull().default('private'),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  entityTypeIdx: index("lists_entity_type_idx").on(table.entityType),
+  sourceTypeIdx: index("lists_source_type_idx").on(table.sourceType),
+  ownerIdIdx: index("lists_owner_id_idx").on(table.ownerId),
+}));
 
 // Domain Sets table
 export const domainSets = pgTable("domain_sets", {
