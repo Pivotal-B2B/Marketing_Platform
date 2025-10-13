@@ -1611,6 +1611,7 @@ export function registerRoutes(app: Express) {
         status: 'pending',
         attemptCount: 0,
         maxAttempts: 3,
+        pushedBy: req.user!.userId,
       });
 
       // Update push to in_progress
