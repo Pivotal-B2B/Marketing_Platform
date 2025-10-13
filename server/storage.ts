@@ -13,6 +13,7 @@ import {
   callScripts, callAttempts, callEvents, qualificationResponses,
   contentAssets, socialPosts, aiContentGenerations, contentAssetPushes,
   events, resources, news,
+  softphoneProfiles, callRecordingAccessLogs,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -46,6 +47,8 @@ import {
   type CallAttempt, type InsertCallAttempt,
   type CallEvent, type InsertCallEvent,
   type QualificationResponse, type InsertQualificationResponse,
+  type SoftphoneProfile, type InsertSoftphoneProfile,
+  type CallRecordingAccessLog, type InsertCallRecordingAccessLog,
   type ContentAsset, type InsertContentAsset,
   type SocialPost, type InsertSocialPost,
   type AIContentGeneration, type InsertAIContentGeneration,
@@ -138,6 +141,14 @@ export interface IStorage {
   // Call Events
   createCallEvent(event: InsertCallEvent): Promise<CallEvent>;
   getCallEvents(attemptId: string): Promise<CallEvent[]>;
+  
+  // Softphone Profiles (Phase 27)
+  getSoftphoneProfile(userId: string): Promise<SoftphoneProfile | undefined>;
+  upsertSoftphoneProfile(profile: InsertSoftphoneProfile): Promise<SoftphoneProfile>;
+  
+  // Call Recording Access Logs (Phase 27)
+  createCallRecordingAccessLog(log: InsertCallRecordingAccessLog): Promise<CallRecordingAccessLog>;
+  getCallRecordingAccessLogs(callAttemptId: string): Promise<CallRecordingAccessLog[]>;
   
   // Qualification Responses
   createQualificationResponse(response: InsertQualificationResponse): Promise<QualificationResponse>;
@@ -1038,6 +1049,44 @@ export class DatabaseStorage implements IStorage {
 
   async getCallEvents(attemptId: string): Promise<CallEvent[]> {
     return await db.select().from(callEvents).where(eq(callEvents.attemptId, attemptId)).orderBy(desc(callEvents.createdAt));
+  }
+
+  // Softphone Profiles (Phase 27)
+  async getSoftphoneProfile(userId: string): Promise<SoftphoneProfile | undefined> {
+    const [profile] = await db.select().from(softphoneProfiles).where(eq(softphoneProfiles.userId, userId));
+    return profile || undefined;
+  }
+
+  async upsertSoftphoneProfile(insertProfile: InsertSoftphoneProfile): Promise<SoftphoneProfile> {
+    const [profile] = await db
+      .insert(softphoneProfiles)
+      .values({ ...insertProfile, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: softphoneProfiles.userId,
+        set: {
+          micDeviceId: insertProfile.micDeviceId,
+          speakerDeviceId: insertProfile.speakerDeviceId,
+          lastTestAt: insertProfile.lastTestAt,
+          testResultsJson: insertProfile.testResultsJson,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return profile;
+  }
+
+  // Call Recording Access Logs (Phase 27)
+  async createCallRecordingAccessLog(insertLog: InsertCallRecordingAccessLog): Promise<CallRecordingAccessLog> {
+    const [log] = await db.insert(callRecordingAccessLogs).values(insertLog).returning();
+    return log;
+  }
+
+  async getCallRecordingAccessLogs(callAttemptId: string): Promise<CallRecordingAccessLog[]> {
+    return await db
+      .select()
+      .from(callRecordingAccessLogs)
+      .where(eq(callRecordingAccessLogs.callAttemptId, callAttemptId))
+      .orderBy(desc(callRecordingAccessLogs.createdAt));
   }
 
   // Qualification Responses
