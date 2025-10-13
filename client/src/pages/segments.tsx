@@ -65,7 +65,7 @@ export default function SegmentsPage() {
     defaultValues: {
       name: "",
       description: "",
-      contactIds: [],
+      recordIds: [],
     },
   });
 
@@ -310,14 +310,8 @@ export default function SegmentsPage() {
               icon={ListFilter}
               title="No segments found"
               description={searchQuery ? "Try adjusting your search query" : "Create your first dynamic segment to start targeting contacts"}
-              action={
-                !searchQuery ? (
-                  <Button onClick={() => setCreateSegmentDialogOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Segment
-                  </Button>
-                ) : undefined
-              }
+              actionLabel={!searchQuery ? "Create Segment" : undefined}
+              onAction={!searchQuery ? () => setCreateSegmentDialogOpen(true) : undefined}
             />
           )}
         </TabsContent>
@@ -427,7 +421,7 @@ export default function SegmentsPage() {
                     <TableRow key={list.id} className="hover-elevate" data-testid={`row-list-${list.id}`}>
                       <TableCell className="font-medium">{list.name}</TableCell>
                       <TableCell className="text-muted-foreground">{list.description || "-"}</TableCell>
-                      <TableCell>{list.contactIds?.length || 0}</TableCell>
+                      <TableCell>{list.recordIds?.length || 0}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Button variant="outline" size="sm" data-testid={`button-view-list-${list.id}`}>
@@ -454,14 +448,8 @@ export default function SegmentsPage() {
               icon={Users}
               title="No lists found"
               description={searchQuery ? "Try adjusting your search query" : "Create your first static list"}
-              action={
-                !searchQuery ? (
-                  <Button onClick={() => setCreateListDialogOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create List
-                  </Button>
-                ) : undefined
-              }
+              actionLabel={!searchQuery ? "Create List" : undefined}
+              onAction={!searchQuery ? () => setCreateListDialogOpen(true) : undefined}
             />
           )}
         </TabsContent>
@@ -531,12 +519,8 @@ export default function SegmentsPage() {
               icon={Upload}
               title="No domain sets found"
               description="Upload your first domain set to start matching accounts"
-              action={
-                <Button>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Domain Set
-                </Button>
-              }
+              actionLabel="Upload Domain Set"
+              onAction={() => {}}
             />
           )}
         </TabsContent>
