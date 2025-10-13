@@ -1,10 +1,18 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { z } from "zod";
 import { 
   Plus, 
   Search, 
@@ -23,14 +31,65 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type ContentAsset } from "@shared/schema";
 import { useLocation } from "wouter";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+
+const createAssetSchema = z.object({
+  assetType: z.enum(["email_template", "landing_page", "social_post", "pdf", "image", "video"]),
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  tags: z.string().optional(), // Will be split into array
+});
+
+type CreateAssetForm = z.infer<typeof createAssetSchema>;
 
 export default function ContentStudioPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const { data: assets, isLoading } = useQuery<ContentAsset[]>({
     queryKey: ['/api/content-assets'],
+  });
+
+  const form = useForm<CreateAssetForm>({
+    resolver: zodResolver(createAssetSchema),
+    defaultValues: {
+      assetType: "email_template",
+      title: "",
+      description: "",
+      tags: "",
+    },
+  });
+
+  const createAssetMutation = useMutation({
+    mutationFn: async (data: CreateAssetForm) => {
+      const tags = data.tags ? data.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+      return apiRequest('POST', '/api/content-assets', {
+        assetType: data.assetType,
+        title: data.title,
+        description: data.description || null,
+        tags,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/content-assets'] });
+      setCreateDialogOpen(false);
+      form.reset();
+      toast({
+        title: "Asset created",
+        description: "Your content asset has been created successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create content asset. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const filteredAssets = assets?.filter(asset => {
@@ -87,7 +146,7 @@ export default function ContentStudioPage() {
             <Sparkles className="w-4 h-4 mr-2" />
             AI Generator
           </Button>
-          <Button onClick={() => setLocation("/content-studio/create")} data-testid="button-create-asset">
+          <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-asset">
             <Plus className="w-4 h-4 mr-2" />
             Create Asset
           </Button>
@@ -197,13 +256,105 @@ export default function ContentStudioPage() {
                 icon={Sparkles}
                 title="No assets found"
                 description={searchQuery ? "Try adjusting your search" : "Create your first content asset to get started"}
-                onAction={() => setLocation("/content-studio/create")}
+                onAction={() => setCreateDialogOpen(true)}
                 actionLabel="Create Asset"
               />
             )}
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Create Asset Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create Content Asset</DialogTitle>
+            <DialogDescription>
+              Create a new content asset for your marketing campaigns
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit((data) => createAssetMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="assetType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Asset Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-asset-type">
+                          <SelectValue placeholder="Select asset type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="email_template">Email Template</SelectItem>
+                        <SelectItem value="landing_page">Landing Page</SelectItem>
+                        <SelectItem value="social_post">Social Post</SelectItem>
+                        <SelectItem value="pdf">PDF Document</SelectItem>
+                        <SelectItem value="image">Image</SelectItem>
+                        <SelectItem value="video">Video</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Enter asset title" data-testid="input-asset-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Enter asset description" rows={3} data-testid="input-asset-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tags</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Enter tags separated by commas" data-testid="input-asset-tags" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createAssetMutation.isPending} data-testid="button-submit-asset">
+                  {createAssetMutation.isPending ? "Creating..." : "Create Asset"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1388,6 +1388,7 @@ export const insertContentAssetSchema = createInsertSchema(contentAssets).omit({
   id: true,
   version: true,
   currentVersionId: true,
+  ownerId: true,
   createdAt: true,
   updatedAt: true,
 });
