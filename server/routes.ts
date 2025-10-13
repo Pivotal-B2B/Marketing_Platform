@@ -891,7 +891,8 @@ export function registerRoutes(app: Express) {
 
   // ==================== FILTER FIELDS REGISTRY ====================
   
-  app.get("/api/filters/fields", requireAuth, async (req, res) => {
+  // Filter field metadata is public (no auth required) - only exposes schema/configuration
+  app.get("/api/filters/fields", async (req, res) => {
     try {
       const category = req.query.category as string | undefined;
       const fields = await storage.getFilterFields(category);
@@ -915,7 +916,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/filters/fields/entity/:entity", requireAuth, async (req, res) => {
+  app.get("/api/filters/fields/entity/:entity", async (req, res) => {
     try {
       const fields = await storage.getFilterFieldsByEntity(req.params.entity);
       res.json(fields);

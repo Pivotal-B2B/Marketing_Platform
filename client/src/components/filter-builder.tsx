@@ -55,7 +55,7 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
 
   // Fetch dynamic filter fields from API
   const { data: filterFieldsData } = useQuery<FilterFieldsResponse>({
-    queryKey: ['/api/filters/fields', 'entity', entityType],
+    queryKey: [`/api/filters/fields/entity/${entityType}`],
   });
 
   // Auto-expand first category on load
