@@ -110,6 +110,47 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
         - POST /api/domain-sets/:id/expand (expand to contacts with filters)
         - POST /api/domain-sets/:id/convert-to-list (create list from matches)
         - DELETE /api/domain-sets/:id (archive/delete)
+- **Phase 22 - Menu & Navigation Architecture (Simplified & Scalable) (October 2025):**
+    - **Objectives:** Clean, intuitive, role-based navigation with reduced menu clutter via nested utilities and logical grouping
+    - **Navigation Structure:** Reduced from 14+ top-level items to 7 primary categories using collapsible nested dropdowns:
+        1. **Dashboard** - Unified KPI overview (campaigns, leads, QA, engagement)
+        2. **Accounts** - Master company database with nested:
+            - All Accounts (primary list view)
+            - Segments & Lists (account segmentation)
+            - Domain Sets (ABM tools)
+        3. **Contacts** - Contact database with nested:
+            - All Contacts (primary list view)
+            - Segments & Lists (contact segmentation)
+            - Bulk Import (CSV/XLSX upload)
+        4. **Campaigns** - Central campaign hub with nested:
+            - All Campaigns (overview)
+            - Email Campaigns
+            - Phone Campaigns
+            - Campaign Configuration
+        5. **QA & Leads Delivery** - Lead review, approval, and delivery tracking
+        6. **Reports** - Analytics and performance dashboards
+        7. **Projects Management** - Client-side campaign order management
+        8. **Organization Settings** - Platform configurations with nested:
+            - User & Role Management
+            - Suppression Management
+            - Compliance Center
+            - Integrations & APIs
+    - **Technical Implementation:**
+        - shadcn Sidebar with Collapsible component for dropdown groups
+        - ChevronDown icon with 180° rotation animation on expand/collapse
+        - Active state highlighting for both parent and nested items
+        - Role-based visibility filtering (Admin, Campaign Manager, Data Ops, QA Analyst, Agent, Client User)
+        - data-testid attributes for automated testing (`nav-{item-name}`, `nav-sub-{item-name}`)
+    - **UX Benefits:**
+        - Decluttered navigation reduces cognitive load
+        - Contextual utilities (Segments, Lists, Imports) live where users need them
+        - Better cognitive flow aligns with ABM logic (Accounts → Domain Sets → Campaigns)
+        - Role adaptability ensures users see only relevant tools
+        - Future-proof structure supports expansion (Content Hub, AI Modules, Integrations)
+    - **Design Behavior:**
+        - Collapsible sidebar with hover-to-expand and tooltip hints
+        - Breadcrumbs on all views for quick back navigation
+        - Dynamic quick actions per module (contextual "+ New" buttons)
 
 ## External Dependencies
 
