@@ -67,11 +67,24 @@ export class ResourcesCentreSync {
 
   private async fetchFromResourcesCentre<T>(endpoint: string): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    
+    // Debug logging
+    console.log('Fetching from Resources Centre:', {
+      url,
+      apiKeyLength: this.apiKey?.length || 0,
+      apiKeyPrefix: this.apiKey?.substring(0, 10) || 'none',
+    });
+    
     const response = await fetch(url, {
       headers: {
         'X-API-Key': this.apiKey,
         'Accept': 'application/json',
       },
+    });
+
+    console.log('Resources Centre response:', {
+      status: response.status,
+      statusText: response.statusText,
     });
 
     if (!response.ok) {
