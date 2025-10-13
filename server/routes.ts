@@ -34,7 +34,10 @@ import {
   insertAIContentGenerationSchema,
   insertEventSchema,
   insertResourceSchema,
-  insertNewsSchema
+  insertNewsSchema,
+  insertSpeakerSchema,
+  insertOrganizerSchema,
+  insertSponsorSchema
 } from "@shared/schema";
 
 export function registerRoutes(app: Express) {
@@ -2024,7 +2027,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/speakers", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+  app.post("/api/speakers", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const validated = insertSpeakerSchema.parse(req.body);
       const speaker = await storage.createSpeaker(validated);
@@ -2037,6 +2040,31 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.put("/api/speakers/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const validated = insertSpeakerSchema.partial().parse(req.body);
+      const speaker = await storage.updateSpeaker(parseInt(req.params.id), validated);
+      if (!speaker) {
+        return res.status(404).json({ message: "Speaker not found" });
+      }
+      res.json(speaker);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update speaker" });
+    }
+  });
+
+  app.delete("/api/speakers/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      await storage.deleteSpeaker(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete speaker" });
+    }
+  });
+
   app.get("/api/organizers", requireAuth, async (req, res) => {
     try {
       const organizers = await storage.getOrganizers();
@@ -2046,7 +2074,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/organizers", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+  app.post("/api/organizers", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const validated = insertOrganizerSchema.parse(req.body);
       const organizer = await storage.createOrganizer(validated);
@@ -2059,6 +2087,31 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.put("/api/organizers/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const validated = insertOrganizerSchema.partial().parse(req.body);
+      const organizer = await storage.updateOrganizer(parseInt(req.params.id), validated);
+      if (!organizer) {
+        return res.status(404).json({ message: "Organizer not found" });
+      }
+      res.json(organizer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update organizer" });
+    }
+  });
+
+  app.delete("/api/organizers/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      await storage.deleteOrganizer(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete organizer" });
+    }
+  });
+
   app.get("/api/sponsors", requireAuth, async (req, res) => {
     try {
       const sponsors = await storage.getSponsors();
@@ -2068,7 +2121,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/sponsors", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+  app.post("/api/sponsors", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const validated = insertSponsorSchema.parse(req.body);
       const sponsor = await storage.createSponsor(validated);
@@ -2078,6 +2131,31 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create sponsor" });
+    }
+  });
+
+  app.put("/api/sponsors/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const validated = insertSponsorSchema.partial().parse(req.body);
+      const sponsor = await storage.updateSponsor(parseInt(req.params.id), validated);
+      if (!sponsor) {
+        return res.status(404).json({ message: "Sponsor not found" });
+      }
+      res.json(sponsor);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update sponsor" });
+    }
+  });
+
+  app.delete("/api/sponsors/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      await storage.deleteSponsor(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete sponsor" });
     }
   });
 
