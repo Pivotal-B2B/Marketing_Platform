@@ -4,7 +4,7 @@ import { db } from "./db";
 import { buildFilterQuery, buildSuppressionFilter } from "./filter-builder";
 import type { FilterGroup } from "@shared/filter-types";
 import {
-  users, accounts, contacts, campaigns, segments, lists, domainSets,
+  users, accounts, contacts, campaigns, segments, lists, domainSets, domainSetItems, domainSetContactLinks,
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
   campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
   selectionContexts, filterFieldRegistry, fieldChangeLog, industryReference,
@@ -18,6 +18,8 @@ import {
   type Segment, type InsertSegment,
   type List, type InsertList,
   type DomainSet, type InsertDomainSet,
+  type DomainSetItem, type InsertDomainSetItem,
+  type DomainSetContactLink, type InsertDomainSetContactLink,
   type Lead, type InsertLead,
   type EmailMessage, type InsertEmailMessage,
   type Call, type InsertCall,
@@ -1676,6 +1678,229 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(sql`${accounts.industryAiConfidence}::float DESC`)
       .limit(limit);
+  }
+  
+  // Domain Sets (Phase 21)
+  async getDomainSets(userId?: string): Promise<DomainSet[]> {
+    let query = db.select().from(domainSets);
+    
+    if (userId) {
+      query = query.where(eq(domainSets.ownerId, userId)) as any;
+    }
+    
+    return await query.orderBy(desc(domainSets.createdAt));
+  }
+  
+  async getDomainSet(id: string): Promise<DomainSet | undefined> {
+    const [domainSet] = await db.select().from(domainSets).where(eq(domainSets.id, id));
+    return domainSet || undefined;
+  }
+  
+  async createDomainSet(insertDomainSet: InsertDomainSet): Promise<DomainSet> {
+    const [domainSet] = await db.insert(domainSets).values(insertDomainSet).returning();
+    return domainSet;
+  }
+  
+  async updateDomainSet(id: string, updateData: Partial<InsertDomainSet>): Promise<DomainSet | undefined> {
+    const [domainSet] = await db
+      .update(domainSets)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(domainSets.id, id))
+      .returning();
+    return domainSet || undefined;
+  }
+  
+  async deleteDomainSet(id: string): Promise<void> {
+    await db.delete(domainSets).where(eq(domainSets.id, id));
+  }
+  
+  // Domain Set Items
+  async getDomainSetItems(domainSetId: string): Promise<DomainSetItem[]> {
+    return await db
+      .select()
+      .from(domainSetItems)
+      .where(eq(domainSetItems.domainSetId, domainSetId))
+      .orderBy(domainSetItems.createdAt);
+  }
+  
+  async createDomainSetItem(item: InsertDomainSetItem): Promise<DomainSetItem> {
+    const [created] = await db.insert(domainSetItems).values(item).returning();
+    return created;
+  }
+  
+  async createDomainSetItemsBulk(items: InsertDomainSetItem[]): Promise<DomainSetItem[]> {
+    if (items.length === 0) return [];
+    return await db.insert(domainSetItems).values(items).returning();
+  }
+  
+  async updateDomainSetItem(id: string, updateData: Partial<InsertDomainSetItem>): Promise<DomainSetItem | undefined> {
+    const [item] = await db
+      .update(domainSetItems)
+      .set(updateData)
+      .where(eq(domainSetItems.id, id))
+      .returning();
+    return item || undefined;
+  }
+  
+  // Domain Set Contact Links
+  async getDomainSetContactLinks(domainSetId: string): Promise<DomainSetContactLink[]> {
+    return await db
+      .select()
+      .from(domainSetContactLinks)
+      .where(eq(domainSetContactLinks.domainSetId, domainSetId))
+      .orderBy(domainSetContactLinks.createdAt);
+  }
+  
+  async createDomainSetContactLink(link: InsertDomainSetContactLink): Promise<DomainSetContactLink> {
+    const [created] = await db.insert(domainSetContactLinks).values(link).returning();
+    return created;
+  }
+  
+  async createDomainSetContactLinksBulk(links: InsertDomainSetContactLink[]): Promise<DomainSetContactLink[]> {
+    if (links.length === 0) return [];
+    return await db.insert(domainSetContactLinks).values(links).returning();
+  }
+  
+  // Domain Set Operations
+  async processDomainSetMatching(domainSetId: string): Promise<void> {
+    // Import domain utils
+    const { normalizeDomain, getMatchTypeAndConfidence, extractCompanyNameFromDomain } = await import('@shared/domain-utils');
+    
+    // Get the domain set
+    const domainSet = await this.getDomainSet(domainSetId);
+    if (!domainSet) throw new Error('Domain set not found');
+    
+    // Get all items for this set
+    const items = await this.getDomainSetItems(domainSetId);
+    
+    // Get all accounts for matching
+    const allAccounts = await db.select().from(accounts);
+    
+    let matchedAccounts = 0;
+    let matchedContacts = 0;
+    
+    // Process each domain item
+    for (const item of items) {
+      const normalizedDomain = normalizeDomain(item.domain);
+      
+      // Try to find exact match first
+      const exactMatch = allAccounts.find(acc => 
+        acc.domain && normalizeDomain(acc.domain) === normalizedDomain
+      );
+      
+      if (exactMatch) {
+        // Exact match found
+        await this.updateDomainSetItem(item.id, {
+          normalizedDomain,
+          accountId: exactMatch.id,
+          matchType: 'exact',
+          matchConfidence: '1.00',
+        });
+        matchedAccounts++;
+        
+        // Count contacts for this account
+        const accountContacts = await this.getContactsByAccountId(exactMatch.id);
+        await this.updateDomainSetItem(item.id, {
+          matchedContactsCount: accountContacts.length,
+        });
+        matchedContacts += accountContacts.length;
+      } else {
+        // Try fuzzy matching
+        let bestMatch: { account: typeof allAccounts[0]; confidence: number } | null = null;
+        
+        for (const account of allAccounts) {
+          if (!account.domain) continue;
+          
+          const matchResult = getMatchTypeAndConfidence(
+            item.domain,
+            account.domain,
+            account.name
+          );
+          
+          if (matchResult.matchType === 'fuzzy' && 
+              (!bestMatch || matchResult.confidence > bestMatch.confidence)) {
+            bestMatch = { account, confidence: matchResult.confidence };
+          }
+        }
+        
+        if (bestMatch) {
+          // Fuzzy match found
+          await this.updateDomainSetItem(item.id, {
+            normalizedDomain,
+            accountId: bestMatch.account.id,
+            matchType: 'fuzzy',
+            matchConfidence: bestMatch.confidence.toFixed(2),
+          });
+          matchedAccounts++;
+          
+          // Count contacts
+          const accountContacts = await this.getContactsByAccountId(bestMatch.account.id);
+          await this.updateDomainSetItem(item.id, {
+            matchedContactsCount: accountContacts.length,
+          });
+          matchedContacts += accountContacts.length;
+        } else {
+          // No match found
+          await this.updateDomainSetItem(item.id, {
+            normalizedDomain,
+            matchType: 'none',
+            matchConfidence: '0.00',
+          });
+        }
+      }
+    }
+    
+    // Update domain set stats
+    const unknownDomains = items.filter(i => i.matchType === 'none' || !i.matchType).length;
+    await this.updateDomainSet(domainSetId, {
+      matchedAccounts,
+      matchedContacts,
+      unknownDomains,
+      status: 'completed',
+    });
+  }
+  
+  async expandDomainSetToContacts(domainSetId: string, filters?: any): Promise<Contact[]> {
+    // Get all items with matched accounts
+    const items = await this.getDomainSetItems(domainSetId);
+    const accountIds = items
+      .filter(item => item.accountId)
+      .map(item => item.accountId as string);
+    
+    if (accountIds.length === 0) return [];
+    
+    // Get all contacts for these accounts
+    let contacts: Contact[] = [];
+    for (const accountId of accountIds) {
+      const accountContacts = await this.getContactsByAccountId(accountId);
+      contacts.push(...accountContacts);
+    }
+    
+    // Apply additional filters if provided (title, seniority, etc.)
+    // This is a simplified version - full implementation would use FilterGroup
+    
+    return contacts;
+  }
+  
+  async convertDomainSetToList(domainSetId: string, listName: string, userId: string): Promise<List> {
+    // Get all contacts from the domain set
+    const contacts = await this.expandDomainSetToContacts(domainSetId);
+    const contactIds = contacts.map(c => c.id);
+    
+    // Create a new list
+    const list = await this.createList({
+      name: listName,
+      description: `Generated from domain set`,
+      entityType: 'contact',
+      sourceType: 'manual_upload',
+      sourceRef: domainSetId,
+      recordIds: contactIds,
+      ownerId: userId,
+      tags: ['domain-set'],
+      visibilityScope: 'private',
+    });
+    
+    return list;
   }
 }
 
