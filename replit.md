@@ -36,6 +36,11 @@ The system utilizes a modern web stack: **React 18 + Vite, TypeScript, TailwindC
 - **Domain Sets Upgrade:** Advanced domain normalization, validation, and matching engine (exact and fuzzy) with confidence scoring. Supports bulk upload, expansion to contacts, and conversion to lists for ABM.
 - **Menu & Navigation Architecture:** Simplified role-based navigation with 7 primary categories and collapsible nested dropdowns for improved UX and scalability.
 - **Campaign Builder UI & Workflow:** A 5-step wizard for creating email and telemarketing campaigns, including audience selection, content setup (rich HTML editor, call script builder), scheduling/pacing, compliance review, and launch. Features dynamic placeholders, conditional content, and role-based access.
+- **Content Studio & Social Media Management:** Centralized creative workspace featuring:
+    - **Asset Library:** Unified repository for managing email templates, landing pages, social posts, PDFs, images, and videos with version control and approval workflows.
+    - **AI Content Generator:** Multi-format AI-powered content creation supporting blog posts, social posts, email copy, ad copy with persona-based tone customization and CTA integration.
+    - **Social Media Publisher:** Multi-platform publishing (LinkedIn, Twitter/X, Facebook, Instagram, YouTube) with platform-specific scheduling, multi-account posting, preview capabilities, and approval workflows.
+    - **Asset Management:** Support for multiple content types (email_template, landing_page, social_post, pdf, image, video) with tags, versioning, and reusability across campaigns.
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)
