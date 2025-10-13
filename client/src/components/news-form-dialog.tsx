@@ -18,6 +18,7 @@ const newsFormSchema = z.object({
   community: z.enum(["hr", "finance", "marketing", "it", "cx_ux", "data_ai", "ops"]),
   overviewHtml: z.string().optional(),
   bodyHtml: z.string().optional(),
+  authors: z.string().optional(), // Comma-separated authors
   publishedIso: z.string().optional(),
   thumbnailUrl: z.string().url().optional().or(z.literal("")),
   status: z.enum(["draft", "published", "archived"]).default("draft"),
@@ -43,6 +44,7 @@ export function NewsFormDialog({ open, onOpenChange, news }: NewsFormDialogProps
       community: news?.community || "marketing",
       overviewHtml: news?.overviewHtml || "",
       bodyHtml: news?.bodyHtml || "",
+      authors: news?.authors?.join(", ") || "",
       publishedIso: news?.publishedIso || "",
       thumbnailUrl: news?.thumbnailUrl || "",
       status: news?.status || "draft",
@@ -51,7 +53,10 @@ export function NewsFormDialog({ open, onOpenChange, news }: NewsFormDialogProps
 
   const createMutation = useMutation({
     mutationFn: async (data: NewsFormData) => {
-      return await apiRequest("/api/news", "POST", data);
+      const authors = data.authors 
+        ? data.authors.split(",").map(a => a.trim()).filter(Boolean)
+        : [];
+      return await apiRequest("/api/news", "POST", { ...data, authors });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/news"] });
@@ -73,7 +78,10 @@ export function NewsFormDialog({ open, onOpenChange, news }: NewsFormDialogProps
 
   const updateMutation = useMutation({
     mutationFn: async (data: NewsFormData) => {
-      return await apiRequest(`/api/news/${news?.id}`, "PUT", data);
+      const authors = data.authors 
+        ? data.authors.split(",").map(a => a.trim()).filter(Boolean)
+        : [];
+      return await apiRequest(`/api/news/${news?.id}`, "PUT", { ...data, authors });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/news"] });
@@ -189,6 +197,20 @@ export function NewsFormDialog({ open, onOpenChange, news }: NewsFormDialogProps
                   <FormLabel>Body (Optional)</FormLabel>
                   <FormControl>
                     <Textarea {...field} placeholder="News body content..." rows={6} data-testid="textarea-body" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="authors"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Authors (Optional)</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="John Doe, Jane Smith" data-testid="input-authors" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

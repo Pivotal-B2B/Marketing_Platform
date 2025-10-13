@@ -128,11 +128,18 @@ export default function NewsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2 text-sm">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span data-testid={`text-community-${newsItem.id}`}>
-                    {newsItem.community}
-                  </span>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span data-testid={`text-community-${newsItem.id}`}>
+                      {newsItem.community}
+                    </span>
+                  </div>
+                  {newsItem.authors && newsItem.authors.length > 0 && (
+                    <div className="text-muted-foreground" data-testid={`text-authors-${newsItem.id}`}>
+                      By: {newsItem.authors.join(", ")}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
