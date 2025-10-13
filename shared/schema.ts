@@ -384,16 +384,59 @@ export const lists = pgTable("lists", {
   ownerIdIdx: index("lists_owner_id_idx").on(table.ownerId),
 }));
 
-// Domain Sets table
+// Domain Sets table (Phase 21 - Upgraded for ABM & Campaign Audience Mapping)
 export const domainSets = pgTable("domain_sets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
-  domains: text("domains").array().notNull(),
-  statsJson: jsonb("stats_json"),
+  description: text("description"),
+  uploadFileUri: text("upload_file_uri"),
+  totalUploaded: integer("total_uploaded").default(0),
+  matchedAccounts: integer("matched_accounts").default(0),
+  matchedContacts: integer("matched_contacts").default(0),
+  duplicatesRemoved: integer("duplicates_removed").default(0),
+  unknownDomains: integer("unknown_domains").default(0),
+  status: text("status").notNull().default('processing'), // processing | completed | error
   ownerId: varchar("owner_id").references(() => users.id),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  ownerIdIdx: index("domain_sets_owner_id_idx").on(table.ownerId),
+  statusIdx: index("domain_sets_status_idx").on(table.status),
+}));
+
+// Domain Set Items table (individual domains with matching results)
+export const domainSetItems = pgTable("domain_set_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  domainSetId: varchar("domain_set_id").references(() => domainSets.id, { onDelete: 'cascade' }).notNull(),
+  domain: text("domain").notNull(),
+  normalizedDomain: text("normalized_domain").notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'set null' }),
+  matchType: text("match_type"), // exact | fuzzy | none
+  matchConfidence: numeric("match_confidence", { precision: 3, scale: 2 }), // 0.00 to 1.00
+  matchedContactsCount: integer("matched_contacts_count").default(0),
+  autoCreatedAccount: boolean("auto_created_account").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  domainSetIdIdx: index("domain_set_items_domain_set_id_idx").on(table.domainSetId),
+  accountIdIdx: index("domain_set_items_account_id_idx").on(table.accountId),
+  normalizedDomainIdx: index("domain_set_items_normalized_domain_idx").on(table.normalizedDomain),
+}));
+
+// Domain Set Contact Links table (links domains to contacts)
+export const domainSetContactLinks = pgTable("domain_set_contact_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  domainSetId: varchar("domain_set_id").references(() => domainSets.id, { onDelete: 'cascade' }).notNull(),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'cascade' }),
+  matchedVia: text("matched_via").notNull(), // domain | email | manual
+  includedInList: boolean("included_in_list").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  domainSetIdIdx: index("domain_set_contact_links_domain_set_id_idx").on(table.domainSetId),
+  contactIdIdx: index("domain_set_contact_links_contact_id_idx").on(table.contactId),
+}));
 
 // Campaigns table
 export const campaigns = pgTable("campaigns", {
@@ -874,6 +917,16 @@ export const insertDomainSetSchema = createInsertSchema(domainSets).omit({
   updatedAt: true,
 });
 
+export const insertDomainSetItemSchema = createInsertSchema(domainSetItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDomainSetContactLinkSchema = createInsertSchema(domainSetContactLinks).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertCampaignSchema = createInsertSchema(campaigns).omit({
   id: true,
   createdAt: true,
@@ -1085,6 +1138,12 @@ export type InsertList = z.infer<typeof insertListSchema>;
 
 export type DomainSet = typeof domainSets.$inferSelect;
 export type InsertDomainSet = z.infer<typeof insertDomainSetSchema>;
+
+export type DomainSetItem = typeof domainSetItems.$inferSelect;
+export type InsertDomainSetItem = z.infer<typeof insertDomainSetItemSchema>;
+
+export type DomainSetContactLink = typeof domainSetContactLinks.$inferSelect;
+export type InsertDomainSetContactLink = z.infer<typeof insertDomainSetContactLinkSchema>;
 
 export type Campaign = typeof campaigns.$inferSelect;
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
