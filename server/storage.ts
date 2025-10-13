@@ -228,6 +228,29 @@ export interface IStorage {
   updateAccountIndustry(id: string, data: { primary?: string; secondary?: string[]; code?: string }): Promise<Account | undefined>;
   reviewAccountIndustryAI(id: string, userId: string, review: { accept_primary?: string; add_secondary?: string[]; reject?: string[] }): Promise<Account | undefined>;
   getAccountsNeedingReview(limit?: number): Promise<Account[]>;
+  
+  // Domain Sets (Phase 21)
+  getDomainSets(userId?: string): Promise<DomainSet[]>;
+  getDomainSet(id: string): Promise<DomainSet | undefined>;
+  createDomainSet(domainSet: InsertDomainSet): Promise<DomainSet>;
+  updateDomainSet(id: string, domainSet: Partial<InsertDomainSet>): Promise<DomainSet | undefined>;
+  deleteDomainSet(id: string): Promise<void>;
+  
+  // Domain Set Items
+  getDomainSetItems(domainSetId: string): Promise<DomainSetItem[]>;
+  createDomainSetItem(item: InsertDomainSetItem): Promise<DomainSetItem>;
+  createDomainSetItemsBulk(items: InsertDomainSetItem[]): Promise<DomainSetItem[]>;
+  updateDomainSetItem(id: string, item: Partial<InsertDomainSetItem>): Promise<DomainSetItem | undefined>;
+  
+  // Domain Set Contact Links
+  getDomainSetContactLinks(domainSetId: string): Promise<DomainSetContactLink[]>;
+  createDomainSetContactLink(link: InsertDomainSetContactLink): Promise<DomainSetContactLink>;
+  createDomainSetContactLinksBulk(links: InsertDomainSetContactLink[]): Promise<DomainSetContactLink[]>;
+  
+  // Domain Set Operations
+  processDomainSetMatching(domainSetId: string): Promise<void>;
+  expandDomainSetToContacts(domainSetId: string, filters?: any): Promise<Contact[]>;
+  convertDomainSetToList(domainSetId: string, listName: string, userId: string): Promise<List>;
 }
 
 export class DatabaseStorage implements IStorage {
