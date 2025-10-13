@@ -21,7 +21,8 @@ import {
   Zap,
   Sparkles,
   Share2,
-  FileText
+  FileText,
+  Cloud
 } from "lucide-react";
 import {
   Sidebar,
@@ -113,6 +114,12 @@ const getNavStructure = (): NavItem[] => [
       { title: "AI Content Generator", url: "/content-studio/ai-generator", roles: ["admin", "campaign_manager"] },
       { title: "Social Media Publisher", url: "/content-studio/social-publisher", roles: ["admin", "campaign_manager"] },
     ],
+  },
+  {
+    title: "Resources Centre",
+    url: "/resources-centre",
+    icon: Cloud,
+    roles: ["admin", "campaign_manager", "data_ops"],
   },
   {
     title: "Email Infrastructure",

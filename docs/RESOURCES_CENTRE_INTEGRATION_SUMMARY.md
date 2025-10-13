@@ -6,6 +6,7 @@
 - ✅ `speakers` table with externalId tracking
 - ✅ `organizers` table with externalId tracking  
 - ✅ `sponsors` table with externalId tracking
+- ✅ `events`, `resources`, `news` tables for content distribution
 - All tables have proper indexes and timestamps
 
 ### 2. API Endpoints (All Protected with RBAC)
@@ -14,6 +15,7 @@
 - ✅ `PUT /api/speakers/:id` - Update speaker (admin/data_ops)
 - ✅ `DELETE /api/speakers/:id` - Delete speaker (admin/data_ops)
 - ✅ Same CRUD for organizers and sponsors
+- ✅ Same CRUD for events, resources, and news
 - ✅ `POST /api/sync/resources-centre` - Trigger sync (admin/data_ops)
 
 ### 3. Event Form Enhancements
@@ -30,9 +32,18 @@
 - ✅ Detailed sync results reporting
 - ✅ Proper error handling and logging
 
-### 5. Documentation
+### 5. Resources Centre Management Page
+- ✅ Comprehensive admin UI at `/resources-centre`
+- ✅ One-click sync with detailed results display
+- ✅ Overview of all content types (Events, Resources, News)
+- ✅ Quick create buttons for each content type
+- ✅ Integration status monitoring
+- ✅ Added to main navigation for admin/campaign_manager/data_ops roles
+
+### 6. Documentation
 - ✅ `docs/resources-centre-api-spec.md` - API specification for Resources Centre
 - ✅ `docs/resources-centre-sync-guide.md` - Complete usage guide
+- ✅ `docs/RESOURCES_CENTRE_INTEGRATION_SUMMARY.md` - Integration overview
 - ✅ Updated `replit.md` with integration details
 
 ## ✅ Configuration Complete

@@ -85,6 +85,7 @@ export class ResourcesCentreSync {
   }
 
   async syncSpeakers(): Promise<{ created: number; updated: number; errors: number }> {
+    this.validateConfig();
     const result = { created: 0, updated: 0, errors: 0 };
 
     try {
@@ -134,6 +135,7 @@ export class ResourcesCentreSync {
   }
 
   async syncOrganizers(): Promise<{ created: number; updated: number; errors: number }> {
+    this.validateConfig();
     const result = { created: 0, updated: 0, errors: 0 };
 
     try {
@@ -178,6 +180,7 @@ export class ResourcesCentreSync {
   }
 
   async syncSponsors(): Promise<{ created: number; updated: number; errors: number }> {
+    this.validateConfig();
     const result = { created: 0, updated: 0, errors: 0 };
 
     try {
@@ -222,8 +225,6 @@ export class ResourcesCentreSync {
   }
 
   async syncAll(): Promise<SyncResult> {
-    this.validateConfig();
-
     const errors: string[] = [];
     const result: SyncResult = { success: true };
 
