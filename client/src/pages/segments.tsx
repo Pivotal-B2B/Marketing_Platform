@@ -184,9 +184,18 @@ export default function SegmentsPage() {
 
   const exportListMutation = useMutation({
     mutationFn: async ({ listId, format }: { listId: string; format: 'csv' | 'json' }) => {
+      const token = localStorage.getItem('auth_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`/api/lists/${listId}/export`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ format }),
         credentials: 'include',
       });

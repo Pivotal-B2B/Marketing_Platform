@@ -815,12 +815,22 @@ export class DatabaseStorage implements IStorage {
       throw new Error('List not found');
     }
 
+    // If no record IDs, return empty data
+    if (!list.recordIds || list.recordIds.length === 0) {
+      const timestamp = new Date().toISOString().split('T')[0];
+      const sanitizedName = list.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      return {
+        data: format === 'csv' ? '' : '[]',
+        filename: `${sanitizedName}_${timestamp}.${format}`
+      };
+    }
+
     // Get all records based on entity type
     const table = list.entityType === 'contact' ? contacts : accounts;
     const records = await db
       .select()
       .from(table)
-      .where(sql`${table.id} = ANY(${list.recordIds})`);
+      .where(inArray(table.id, list.recordIds));
 
     const timestamp = new Date().toISOString().split('T')[0];
     const sanitizedName = list.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
