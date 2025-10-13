@@ -9,6 +9,7 @@ import {
   integer,
   pgEnum,
   index,
+  uniqueIndex,
   serial,
   boolean,
   real
@@ -107,6 +108,7 @@ export const users = pgTable("users", {
 export const accounts = pgTable("accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  nameNormalized: text("name_normalized"),
   industry: text("industry"),
   annualRevenue: text("annual_revenue"),
   employeesSizeRange: text("employees_size_range"),
@@ -119,7 +121,9 @@ export const accounts = pgTable("accounts", {
   yearFounded: integer("year_founded"),
   sicCode: text("sic_code"),
   naicsCode: text("naics_code"),
-  domain: text("domain").unique(),
+  domain: text("domain"),
+  domainNormalized: text("domain_normalized"),
+  previousNames: text("previous_names").array(),
   linkedinUrl: text("linkedin_url"),
   linkedinSpecialties: text("linkedin_specialties").array(),
   mainPhone: text("main_phone"),
@@ -131,10 +135,16 @@ export const accounts = pgTable("accounts", {
   tags: text("tags").array(),
   ownerId: varchar("owner_id").references(() => users.id),
   customFields: jsonb("custom_fields"),
+  sourceSystem: text("source_system"),
+  sourceRecordId: text("source_record_id"),
+  sourceUpdatedAt: timestamp("source_updated_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   domainIdx: index("accounts_domain_idx").on(table.domain),
+  domainNormalizedUniqueIdx: uniqueIndex("accounts_domain_normalized_unique_idx").on(table.domainNormalized).where(sql`deleted_at IS NULL`),
+  nameCityCountryUniqueIdx: uniqueIndex("accounts_name_city_country_unique_idx").on(table.nameNormalized, table.hqCity, table.hqCountry).where(sql`deleted_at IS NULL AND domain_normalized IS NULL`),
   ownerIdx: index("accounts_owner_idx").on(table.ownerId),
   nameIdx: index("accounts_name_idx").on(table.name),
   specialtiesGinIdx: index("accounts_specialties_gin_idx").using('gin', table.linkedinSpecialties),
@@ -151,6 +161,7 @@ export const contacts = pgTable("contacts", {
   lastName: text("last_name"),
   jobTitle: text("job_title"),
   email: text("email").notNull(),
+  emailNormalized: text("email_normalized"),
   emailVerificationStatus: emailVerificationStatusEnum("email_verification_status").default('unknown'),
   directPhone: text("direct_phone"),
   directPhoneE164: text("direct_phone_e164"),
@@ -169,14 +180,81 @@ export const contacts = pgTable("contacts", {
   customFields: jsonb("custom_fields"),
   emailStatus: text("email_status").default('unknown'),
   phoneStatus: text("phone_status").default('unknown'),
+  sourceSystem: text("source_system"),
+  sourceRecordId: text("source_record_id"),
+  sourceUpdatedAt: timestamp("source_updated_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   emailIdx: index("contacts_email_idx").on(table.email),
+  emailNormalizedUniqueIdx: uniqueIndex("contacts_email_normalized_unique_idx").on(table.emailNormalized).where(sql`deleted_at IS NULL`),
   accountIdx: index("contacts_account_idx").on(table.accountId),
   phoneIdx: index("contacts_phone_idx").on(table.directPhoneE164),
   ownerIdx: index("contacts_owner_idx").on(table.ownerId),
   tagsGinIdx: index("contacts_tags_gin_idx").using('gin', table.tags),
+}));
+
+// Contact Emails - Secondary email addresses for contacts
+export const contactEmails = pgTable("contact_emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").notNull().references(() => contacts.id, { onDelete: 'cascade' }),
+  email: text("email").notNull(),
+  emailNormalized: text("email_normalized").notNull(),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  contactIdx: index("contact_emails_contact_idx").on(table.contactId),
+  emailNormalizedUniqueIdx: uniqueIndex("contact_emails_email_normalized_unique_idx").on(table.emailNormalized).where(sql`deleted_at IS NULL`),
+}));
+
+// Account Domains - Alternate/additional domains for accounts
+export const accountDomains = pgTable("account_domains", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  domain: text("domain").notNull(),
+  domainNormalized: text("domain_normalized").notNull(),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  accountIdx: index("account_domains_account_idx").on(table.accountId),
+  domainNormalizedUniqueIdx: uniqueIndex("account_domains_domain_normalized_unique_idx").on(table.domainNormalized).where(sql`deleted_at IS NULL`),
+}));
+
+// Field Change Log - Audit trail for field-level survivorship
+export const fieldChangeLog = pgTable("field_change_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // 'contact', 'account'
+  entityId: varchar("entity_id").notNull(),
+  fieldKey: text("field_key").notNull(),
+  oldValue: jsonb("old_value"),
+  newValue: jsonb("new_value"),
+  sourceSystem: text("source_system"),
+  actorId: varchar("actor_id").references(() => users.id),
+  survivorshipPolicy: text("survivorship_policy"), // e.g., 'prefer_new', 'max_recency', 'union'
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  entityIdx: index("field_change_log_entity_idx").on(table.entityType, table.entityId),
+  createdAtIdx: index("field_change_log_created_at_idx").on(table.createdAt),
+}));
+
+// Dedupe Review Queue - Human review for fuzzy matches
+export const dedupeReviewQueue = pgTable("dedupe_review_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(), // 'contact', 'account'
+  candidateAId: varchar("candidate_a_id").notNull(),
+  candidateBId: varchar("candidate_b_id").notNull(),
+  matchScore: real("match_score").notNull(), // 0.0 to 1.0 confidence
+  matchReason: text("match_reason"), // e.g., 'similar_name_same_account', 'trigram_domain'
+  status: text("status").notNull().default('pending'), // 'pending', 'approved_merge', 'rejected', 'auto_merged'
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  statusIdx: index("dedupe_review_queue_status_idx").on(table.status),
+  entityTypeIdx: index("dedupe_review_queue_entity_type_idx").on(table.entityType),
 }));
 
 // Segments table (dynamic filters)
@@ -651,6 +729,26 @@ export const insertFilterFieldSchema = createInsertSchema(filterFieldRegistry).o
   updatedAt: true,
 });
 
+export const insertContactEmailSchema = createInsertSchema(contactEmails).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAccountDomainSchema = createInsertSchema(accountDomains).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertFieldChangeLogSchema = createInsertSchema(fieldChangeLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDedupeReviewQueueSchema = createInsertSchema(dedupeReviewQueue).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Inferred Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -717,3 +815,15 @@ export type InsertSelectionContext = z.infer<typeof insertSelectionContextSchema
 
 export type FilterField = typeof filterFieldRegistry.$inferSelect;
 export type InsertFilterField = z.infer<typeof insertFilterFieldSchema>;
+
+export type ContactEmail = typeof contactEmails.$inferSelect;
+export type InsertContactEmail = z.infer<typeof insertContactEmailSchema>;
+
+export type AccountDomain = typeof accountDomains.$inferSelect;
+export type InsertAccountDomain = z.infer<typeof insertAccountDomainSchema>;
+
+export type FieldChangeLog = typeof fieldChangeLog.$inferSelect;
+export type InsertFieldChangeLog = z.infer<typeof insertFieldChangeLogSchema>;
+
+export type DedupeReviewQueue = typeof dedupeReviewQueue.$inferSelect;
+export type InsertDedupeReviewQueue = z.infer<typeof insertDedupeReviewQueueSchema>;

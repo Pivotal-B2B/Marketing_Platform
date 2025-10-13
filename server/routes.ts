@@ -305,6 +305,72 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Upsert endpoints for deduplication
+  app.post("/api/contacts:upsert", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const { email, sourceSystem, sourceRecordId, sourceUpdatedAt, ...contactData } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required for upsert" });
+      }
+      
+      // Check email suppression
+      if (await storage.isEmailSuppressed(email)) {
+        return res.status(400).json({ message: "Email is on suppression list" });
+      }
+      
+      const result = await storage.upsertContact(
+        { email, ...contactData },
+        {
+          sourceSystem,
+          sourceRecordId,
+          sourceUpdatedAt: sourceUpdatedAt ? new Date(sourceUpdatedAt) : undefined,
+          actorId: req.user!.id
+        }
+      );
+      
+      res.status(result.action === 'created' ? 201 : 200).json({
+        ...result.contact,
+        _action: result.action
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to upsert contact" });
+    }
+  });
+
+  app.post("/api/accounts:upsert", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const { name, sourceSystem, sourceRecordId, sourceUpdatedAt, ...accountData } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ message: "Name is required for upsert" });
+      }
+      
+      const result = await storage.upsertAccount(
+        { name, ...accountData },
+        {
+          sourceSystem,
+          sourceRecordId,
+          sourceUpdatedAt: sourceUpdatedAt ? new Date(sourceUpdatedAt) : undefined,
+          actorId: req.user!.id
+        }
+      );
+      
+      res.status(result.action === 'created' ? 201 : 200).json({
+        ...result.account,
+        _action: result.action
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to upsert account" });
+    }
+  });
+
   // ==================== SEGMENTS ====================
   
   app.get("/api/segments", requireAuth, async (req, res) => {

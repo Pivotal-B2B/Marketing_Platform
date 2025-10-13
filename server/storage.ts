@@ -244,6 +244,408 @@ export class DatabaseStorage implements IStorage {
     await db.delete(contacts).where(eq(contacts.id, id));
   }
 
+  async upsertContact(data: Partial<InsertContact> & { email: string }, options?: {
+    sourceSystem?: string,
+    sourceRecordId?: string,
+    sourceUpdatedAt?: Date,
+    actorId?: string
+  }): Promise<{ contact: Contact, action: 'created' | 'updated' }> {
+    const { normalizeEmail, normalizePhoneE164 } = await import('./normalization.js');
+    
+    // Normalize business keys
+    const emailNormalized = normalizeEmail(data.email);
+    
+    // Deterministic lookup: find by normalized email
+    const [existing] = await db
+      .select()
+      .from(contacts)
+      .where(
+        and(
+          eq(contacts.emailNormalized, emailNormalized),
+          isNull(contacts.deletedAt)
+        )
+      )
+      .limit(1);
+    
+    if (existing) {
+      // UPDATE: Apply field-level survivorship with audit logging
+      const updates: Partial<InsertContact> = {
+        emailNormalized,
+        sourceSystem: options?.sourceSystem,
+        sourceRecordId: options?.sourceRecordId,
+        sourceUpdatedAt: options?.sourceUpdatedAt,
+        updatedAt: new Date()
+      };
+      
+      const changeLogs: any[] = [];
+      
+      // Survivorship: prefer new if not null, otherwise keep existing
+      const fieldsToUpdate = [
+        'fullName', 'firstName', 'lastName', 'jobTitle', 'email',
+        'directPhone', 'phoneExtension', 'seniorityLevel', 'department',
+        'address', 'linkedinUrl', 'consentBasis', 'consentSource', 'accountId'
+      ];
+      
+      for (const field of fieldsToUpdate) {
+        if (data[field as keyof typeof data] !== undefined && data[field as keyof typeof data] !== null) {
+          const newValue = data[field as keyof typeof data];
+          const oldValue = (existing as any)[field];
+          
+          if (newValue !== oldValue) {
+            (updates as any)[field] = newValue;
+            
+            // Log field change
+            changeLogs.push({
+              entityType: 'contact',
+              entityId: existing.id,
+              fieldKey: field,
+              oldValue: oldValue,
+              newValue: newValue,
+              sourceSystem: options?.sourceSystem || null,
+              actorId: options?.actorId || null,
+              survivorshipPolicy: 'prefer_new_if_not_null'
+            });
+          }
+        }
+      }
+      
+      // Union for array fields (tags, intentTopics)
+      if (data.tags && data.tags.length > 0) {
+        const existingTags = existing.tags || [];
+        const newTags = Array.from(new Set([...existingTags, ...data.tags]));
+        if (JSON.stringify(existingTags.sort()) !== JSON.stringify(newTags.sort())) {
+          updates.tags = newTags;
+          changeLogs.push({
+            entityType: 'contact',
+            entityId: existing.id,
+            fieldKey: 'tags',
+            oldValue: existingTags,
+            newValue: newTags,
+            sourceSystem: options?.sourceSystem || null,
+            actorId: options?.actorId || null,
+            survivorshipPolicy: 'union'
+          });
+        }
+      }
+      
+      if (data.intentTopics && data.intentTopics.length > 0) {
+        const existingTopics = existing.intentTopics || [];
+        const newTopics = Array.from(new Set([...existingTopics, ...data.intentTopics]));
+        if (JSON.stringify(existingTopics.sort()) !== JSON.stringify(newTopics.sort())) {
+          updates.intentTopics = newTopics;
+          changeLogs.push({
+            entityType: 'contact',
+            entityId: existing.id,
+            fieldKey: 'intentTopics',
+            oldValue: existingTopics,
+            newValue: newTopics,
+            sourceSystem: options?.sourceSystem || null,
+            actorId: options?.actorId || null,
+            survivorshipPolicy: 'union'
+          });
+        }
+      }
+      
+      // Custom fields: merge
+      if (data.customFields) {
+        const mergedCustomFields = { ...existing.customFields as any, ...data.customFields as any };
+        updates.customFields = mergedCustomFields;
+        changeLogs.push({
+          entityType: 'contact',
+          entityId: existing.id,
+          fieldKey: 'customFields',
+          oldValue: existing.customFields,
+          newValue: mergedCustomFields,
+          sourceSystem: options?.sourceSystem || null,
+          actorId: options?.actorId || null,
+          survivorshipPolicy: 'merge'
+        });
+      }
+      
+      // Normalize phone if provided
+      if (data.directPhone) {
+        const e164 = normalizePhoneE164(data.directPhone);
+        if (e164 && e164 !== existing.directPhoneE164) {
+          updates.directPhoneE164 = e164;
+          changeLogs.push({
+            entityType: 'contact',
+            entityId: existing.id,
+            fieldKey: 'directPhoneE164',
+            oldValue: existing.directPhoneE164,
+            newValue: e164,
+            sourceSystem: options?.sourceSystem || null,
+            actorId: options?.actorId || null,
+            survivorshipPolicy: 'prefer_new_normalized'
+          });
+        }
+      }
+      
+      // Write change logs if there are any changes
+      if (changeLogs.length > 0) {
+        await db.insert(fieldChangeLog).values(changeLogs);
+      }
+      
+      const [updated] = await db
+        .update(contacts)
+        .set(updates)
+        .where(eq(contacts.id, existing.id))
+        .returning();
+      
+      return { contact: updated, action: 'updated' };
+    } else {
+      // CREATE: New contact
+      const insertData: InsertContact = {
+        ...data,
+        emailNormalized,
+        sourceSystem: options?.sourceSystem,
+        sourceRecordId: options?.sourceRecordId,
+        sourceUpdatedAt: options?.sourceUpdatedAt
+      } as InsertContact;
+      
+      // Normalize phone if provided
+      if (data.directPhone) {
+        const e164 = normalizePhoneE164(data.directPhone);
+        if (e164) {
+          insertData.directPhoneE164 = e164;
+        }
+      }
+      
+      const [created] = await db.insert(contacts).values(insertData).returning();
+      return { contact: created, action: 'created' };
+    }
+  }
+
+  async upsertAccount(data: Partial<InsertAccount> & { name: string }, options?: {
+    sourceSystem?: string,
+    sourceRecordId?: string,
+    sourceUpdatedAt?: Date,
+    actorId?: string
+  }): Promise<{ account: Account, action: 'created' | 'updated' }> {
+    const { normalizeDomain, normalizeName, normalizePhoneE164 } = await import('./normalization.js');
+    
+    // Normalize business keys
+    const nameNormalized = normalizeName(data.name);
+    const domainNormalized = data.domain ? normalizeDomain(data.domain) : null;
+    
+    // Deterministic lookup: prefer domain, fallback to name+geo
+    let existing: Account | undefined;
+    
+    if (domainNormalized) {
+      [existing] = await db
+        .select()
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.domainNormalized, domainNormalized),
+            isNull(accounts.deletedAt)
+          )
+        )
+        .limit(1);
+    }
+    
+    // Fallback: match by name + city + country if no domain match
+    if (!existing && data.hqCity && data.hqCountry) {
+      [existing] = await db
+        .select()
+        .from(accounts)
+        .where(
+          and(
+            eq(accounts.nameNormalized, nameNormalized),
+            eq(accounts.hqCity, data.hqCity),
+            eq(accounts.hqCountry, data.hqCountry),
+            isNull(accounts.domainNormalized),
+            isNull(accounts.deletedAt)
+          )
+        )
+        .limit(1);
+    }
+    
+    if (existing) {
+      // UPDATE: Apply field-level survivorship with audit logging
+      const updates: Partial<InsertAccount> = {
+        nameNormalized,
+        domainNormalized: domainNormalized || existing.domainNormalized,
+        sourceSystem: options?.sourceSystem,
+        sourceRecordId: options?.sourceRecordId,
+        sourceUpdatedAt: options?.sourceUpdatedAt,
+        updatedAt: new Date()
+      };
+      
+      const changeLogs: any[] = [];
+      
+      // Survivorship: prefer new if not null
+      const fieldsToUpdate = [
+        'name', 'domain', 'industry', 'annualRevenue', 'employeesSizeRange',
+        'staffCount', 'description', 'hqAddress', 'hqCity', 'hqState', 'hqCountry',
+        'yearFounded', 'sicCode', 'naicsCode', 'linkedinUrl', 'mainPhone',
+        'mainPhoneExtension', 'ownerId'
+      ];
+      
+      for (const field of fieldsToUpdate) {
+        if (data[field as keyof typeof data] !== undefined && data[field as keyof typeof data] !== null) {
+          const newValue = data[field as keyof typeof data];
+          const oldValue = (existing as any)[field];
+          
+          if (newValue !== oldValue) {
+            (updates as any)[field] = newValue;
+            
+            changeLogs.push({
+              entityType: 'account',
+              entityId: existing.id,
+              fieldKey: field,
+              oldValue: oldValue,
+              newValue: newValue,
+              sourceSystem: options?.sourceSystem || null,
+              actorId: options?.actorId || null,
+              survivorshipPolicy: 'prefer_new_if_not_null'
+            });
+          }
+        }
+      }
+      
+      // Union for array fields
+      if (data.tags && data.tags.length > 0) {
+        const existingTags = existing.tags || [];
+        const newTags = Array.from(new Set([...existingTags, ...data.tags]));
+        if (JSON.stringify(existingTags.sort()) !== JSON.stringify(newTags.sort())) {
+          updates.tags = newTags;
+          changeLogs.push({
+            entityType: 'account',
+            entityId: existing.id,
+            fieldKey: 'tags',
+            oldValue: existingTags,
+            newValue: newTags,
+            sourceSystem: options?.sourceSystem || null,
+            actorId: options?.actorId || null,
+            survivorshipPolicy: 'union'
+          });
+        }
+      }
+      
+      if (data.intentTopics && data.intentTopics.length > 0) {
+        const existingTopics = existing.intentTopics || [];
+        const newTopics = Array.from(new Set([...existingTopics, ...data.intentTopics]));
+        if (JSON.stringify(existingTopics.sort()) !== JSON.stringify(newTopics.sort())) {
+          updates.intentTopics = newTopics;
+          changeLogs.push({
+            entityType: 'account',
+            entityId: existing.id,
+            fieldKey: 'intentTopics',
+            oldValue: existingTopics,
+            newValue: newTopics,
+            sourceSystem: options?.sourceSystem || null,
+            actorId: options?.actorId || null,
+            survivorshipPolicy: 'union'
+          });
+        }
+      }
+      
+      if (data.techStack && data.techStack.length > 0) {
+        const existingTech = existing.techStack || [];
+        const newTech = Array.from(new Set([...existingTech, ...data.techStack]));
+        if (JSON.stringify(existingTech.sort()) !== JSON.stringify(newTech.sort())) {
+          updates.techStack = newTech;
+          changeLogs.push({
+            entityType: 'account',
+            entityId: existing.id,
+            fieldKey: 'techStack',
+            oldValue: existingTech,
+            newValue: newTech,
+            sourceSystem: options?.sourceSystem || null,
+            actorId: options?.actorId || null,
+            survivorshipPolicy: 'union'
+          });
+        }
+      }
+      
+      if (data.linkedinSpecialties && data.linkedinSpecialties.length > 0) {
+        const existingSpec = existing.linkedinSpecialties || [];
+        const newSpec = Array.from(new Set([...existingSpec, ...data.linkedinSpecialties]));
+        if (JSON.stringify(existingSpec.sort()) !== JSON.stringify(newSpec.sort())) {
+          updates.linkedinSpecialties = newSpec;
+          changeLogs.push({
+            entityType: 'account',
+            entityId: existing.id,
+            fieldKey: 'linkedinSpecialties',
+            oldValue: existingSpec,
+            newValue: newSpec,
+            sourceSystem: options?.sourceSystem || null,
+            actorId: options?.actorId || null,
+            survivorshipPolicy: 'union'
+          });
+        }
+      }
+      
+      // Custom fields: merge
+      if (data.customFields) {
+        const mergedCustomFields = { ...existing.customFields as any, ...data.customFields as any };
+        updates.customFields = mergedCustomFields;
+        changeLogs.push({
+          entityType: 'account',
+          entityId: existing.id,
+          fieldKey: 'customFields',
+          oldValue: existing.customFields,
+          newValue: mergedCustomFields,
+          sourceSystem: options?.sourceSystem || null,
+          actorId: options?.actorId || null,
+          survivorshipPolicy: 'merge'
+        });
+      }
+      
+      // Normalize phone if provided
+      if (data.mainPhone) {
+        const e164 = normalizePhoneE164(data.mainPhone);
+        if (e164 && e164 !== existing.mainPhoneE164) {
+          updates.mainPhoneE164 = e164;
+          changeLogs.push({
+            entityType: 'account',
+            entityId: existing.id,
+            fieldKey: 'mainPhoneE164',
+            oldValue: existing.mainPhoneE164,
+            newValue: e164,
+            sourceSystem: options?.sourceSystem || null,
+            actorId: options?.actorId || null,
+            survivorshipPolicy: 'prefer_new_normalized'
+          });
+        }
+      }
+      
+      // Write change logs if there are any changes
+      if (changeLogs.length > 0) {
+        await db.insert(fieldChangeLog).values(changeLogs);
+      }
+      
+      const [updated] = await db
+        .update(accounts)
+        .set(updates)
+        .where(eq(accounts.id, existing.id))
+        .returning();
+      
+      return { account: updated, action: 'updated' };
+    } else {
+      // CREATE: New account
+      const insertData: InsertAccount = {
+        ...data,
+        nameNormalized,
+        domainNormalized: domainNormalized || undefined,
+        sourceSystem: options?.sourceSystem,
+        sourceRecordId: options?.sourceRecordId,
+        sourceUpdatedAt: options?.sourceUpdatedAt
+      } as InsertAccount;
+      
+      // Normalize phone if provided
+      if (data.mainPhone) {
+        const e164 = normalizePhoneE164(data.mainPhone);
+        if (e164) {
+          insertData.mainPhoneE164 = e164;
+        }
+      }
+      
+      const [created] = await db.insert(accounts).values(insertData).returning();
+      return { account: created, action: 'created' };
+    }
+  }
+
   // Campaigns
   async getCampaigns(filters?: any): Promise<Campaign[]> {
     return await db.select().from(campaigns).orderBy(desc(campaigns.createdAt));

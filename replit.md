@@ -12,6 +12,7 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - ✅ **Phase 4:** Advanced Filtering - Multi-criteria filter system with Sheet UI pattern, AND/OR logic, and saved filters backend
 - 🔄 **Phase 5 (In Progress):** Bulk Operations - Selection infrastructure with checkboxes, server-side selection contexts, bulk actions toolbar
 - 🔄 **Phase 6 (In Progress):** Dynamic Filter Field Registry - Scalable, category-based filtering with auto-propagation
+- 🔄 **Phase 7 (In Progress):** Data Quality & Deduplication - Upsert workflows, field-level survivorship, audit trail
 
 **Phase 4 Deliverables (Completed):**
 - Advanced filter infrastructure: Shared filter types (text/number/array/boolean), SQL query builder with Drizzle ORM integration
@@ -48,6 +49,22 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 - 🔄 Real-time count preview on filter changes (pending)
 - 🔄 Cross-entity join support in filter-builder.ts (Contacts ↔ Accounts ↔ Campaigns ↔ QA) (pending)
 - 🔄 Time-based operators (within_last_days, between_dates, not_updated_since) (pending)
+
+**Phase 7 Deliverables (In Progress):**
+- ✅ Schema enhancements: Added normalization fields (email_normalized, domain_normalized, name_normalized) to contacts/accounts
+- ✅ Added source tracking fields (source_system, source_record_id, source_updated_at) for provenance
+- ✅ Added soft delete support (deleted_at) with partial indexes for uniqueness constraints
+- ✅ Created contact_emails table for secondary email addresses with unique constraints
+- ✅ Created account_domains table for alternate domains with unique constraints
+- ✅ Created field_change_log table for audit trail of all field-level changes
+- ✅ Created dedupe_review_queue table for human review of fuzzy matches
+- ✅ Built normalization utilities: normalizeEmail() with Gmail dot/alias handling, normalizeDomain(), normalizeName() with legal suffix removal, normalizePhoneE164()
+- ✅ Implemented storage.upsertContact() with deterministic email lookup, field-level survivorship (prefer_new, union for arrays), and change tracking
+- ✅ Implemented storage.upsertAccount() with domain-first lookup, name+geo fallback, field-level survivorship
+- ✅ Added API endpoints: POST /contacts:upsert and POST /accounts:upsert with suppression checks and source metadata
+- 🔄 Real-time duplicate detection UI (pending)
+- 🔄 Bulk import dry-run mode (pending)
+- 🔄 Merge/consolidation workflow (pending)
 
 ## User Preferences
 
