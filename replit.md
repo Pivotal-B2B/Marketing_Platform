@@ -75,6 +75,14 @@ The system utilizes a modern web stack: **React 18 + Vite, TypeScript, TailwindC
     - **News:** News articles with community targeting, overview/body HTML, comma-separated authors field (transforms to text array), published date, and SEO metadata.
     - **Content Distribution:** Generalized push service supports all content types with type-specific payload transformation for Resources Centre API integration.
     - **Management UI:** Dedicated pages for Events (/events), Resources (/resources), and News (/news) with list views, CRUD operations, status management (draft/published), and delete functionality.
+- **Phase 26: Email Infrastructure Settings (MVP):** Enterprise-grade email deliverability management system:
+    - **Database Schema:** Comprehensive email infrastructure tables including domainAuth (SPF/DKIM/DMARC records), trackingDomains (click/open tracking), ipPools (IP management and warmup), warmupPlans (progressive volume increase), sendPolicies (STO rules and throttling), domainReputationSnapshots (health monitoring), and perDomainStats (performance metrics).
+    - **Enhanced Sender Profiles:** Core senderProfiles table enhanced with Phase 26 fields including isDefault (default profile flag), espProvider (SendGrid/SES/Mailgun), domainAuthId (FK to domain authentication), isVerified (email verification status), reputationScore (0-100 sender reputation), warmupStatus (not_started/in_progress/completed/paused), and createdBy (user tracking).
+    - **Storage Layer:** Complete IStorage interface with CRUD methods for all email infrastructure entities (sender profiles, domain auth, tracking domains, IP pools, send policies) implemented in DatabaseStorage class.
+    - **API Layer:** RESTful API endpoints for Sender Profiles management (GET /api/sender-profiles, POST, PUT, DELETE) with role-based access control (admin/campaign_manager) and Zod validation.
+    - **Sender Profiles UI:** Full CRUD management interface at /email-infrastructure/sender-profiles featuring card-based list view with profile details, status badges (default, warmup status), verification status icons, reputation scores, ESP provider display, and dialog-based create/edit forms with comprehensive field validation.
+    - **Navigation:** New "Email Infrastructure" section in admin-only sidebar with "Sender Profiles" submenu item.
+    - **Future Enhancements:** UI expansion to include domain authentication management, IP pool warmup controls, send policy configuration, domain health dashboards, and advanced relationship management (linking profiles to domain auth, IP pools, tracking domains).
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)
