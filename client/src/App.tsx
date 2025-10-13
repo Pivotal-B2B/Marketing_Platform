@@ -20,7 +20,9 @@ import SegmentsPage from "@/pages/segments";
 import DomainSetsPage from "@/pages/domain-sets";
 import CampaignsPage from "@/pages/campaigns";
 import EmailCampaignsPage from "@/pages/email-campaigns";
+import EmailCampaignCreatePage from "@/pages/email-campaign-create";
 import TelemarketingPage from "@/pages/telemarketing";
+import TelemarketingCreatePage from "@/pages/telemarketing-create";
 import CampaignConfigPage from "@/pages/campaign-config";
 import LeadsPage from "@/pages/leads";
 import SuppressionsPage from "@/pages/suppressions";
@@ -54,7 +56,9 @@ function AuthenticatedApp() {
               <Route path="/segments" component={SegmentsPage} />
               <Route path="/domain-sets" component={DomainSetsPage} />
               <Route path="/campaigns" component={CampaignsPage} />
+              <Route path="/campaigns/email/create" component={EmailCampaignCreatePage} />
               <Route path="/campaigns/email" component={EmailCampaignsPage} />
+              <Route path="/campaigns/telemarketing/create" component={TelemarketingCreatePage} />
               <Route path="/campaigns/telemarketing" component={TelemarketingPage} />
               <Route path="/campaigns/config" component={CampaignConfigPage} />
               <Route path="/leads" component={LeadsPage} />
