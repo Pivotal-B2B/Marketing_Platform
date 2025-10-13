@@ -53,6 +53,15 @@ import {
   type Event, type InsertEvent,
   type Resource, type InsertResource,
   type News, type InsertNews,
+  domainAuth, trackingDomains, ipPools, warmupPlans, sendPolicies,
+  domainReputationSnapshots, perDomainStats,
+  type DomainAuth, type InsertDomainAuth,
+  type TrackingDomain, type InsertTrackingDomain,
+  type IpPool, type InsertIpPool,
+  type WarmupPlan, type InsertWarmupPlan,
+  type SendPolicy, type InsertSendPolicy,
+  type DomainReputationSnapshot, type InsertDomainReputationSnapshot,
+  type PerDomainStats, type InsertPerDomainStats,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -262,6 +271,43 @@ export interface IStorage {
   processDomainSetMatching(domainSetId: string): Promise<void>;
   expandDomainSetToContacts(domainSetId: string, filters?: any): Promise<Contact[]>;
   convertDomainSetToList(domainSetId: string, listName: string, userId: string): Promise<List>;
+  
+  // Email Infrastructure (Phase 26)
+  // Sender Profiles
+  getSenderProfiles(): Promise<SenderProfile[]>;
+  getSenderProfile(id: string): Promise<SenderProfile | undefined>;
+  createSenderProfile(profile: InsertSenderProfile): Promise<SenderProfile>;
+  updateSenderProfile(id: string, profile: Partial<InsertSenderProfile>): Promise<SenderProfile | undefined>;
+  deleteSenderProfile(id: string): Promise<void>;
+  
+  // Domain Authentication
+  getDomainAuths(): Promise<DomainAuth[]>;
+  getDomainAuth(id: number): Promise<DomainAuth | undefined>;
+  getDomainAuthByDomain(domain: string): Promise<DomainAuth | undefined>;
+  createDomainAuth(domainAuth: InsertDomainAuth): Promise<DomainAuth>;
+  updateDomainAuth(id: number, domainAuth: Partial<InsertDomainAuth>): Promise<DomainAuth | undefined>;
+  verifyDomainAuth(id: number): Promise<DomainAuth | undefined>;
+  
+  // Tracking Domains
+  getTrackingDomains(): Promise<TrackingDomain[]>;
+  getTrackingDomain(id: number): Promise<TrackingDomain | undefined>;
+  createTrackingDomain(trackingDomain: InsertTrackingDomain): Promise<TrackingDomain>;
+  updateTrackingDomain(id: number, trackingDomain: Partial<InsertTrackingDomain>): Promise<TrackingDomain | undefined>;
+  deleteTrackingDomain(id: number): Promise<void>;
+  
+  // IP Pools
+  getIpPools(): Promise<IpPool[]>;
+  getIpPool(id: number): Promise<IpPool | undefined>;
+  createIpPool(ipPool: InsertIpPool): Promise<IpPool>;
+  updateIpPool(id: number, ipPool: Partial<InsertIpPool>): Promise<IpPool | undefined>;
+  deleteIpPool(id: number): Promise<void>;
+  
+  // Send Policies
+  getSendPolicies(): Promise<SendPolicy[]>;
+  getSendPolicy(id: number): Promise<SendPolicy | undefined>;
+  createSendPolicy(sendPolicy: InsertSendPolicy): Promise<SendPolicy>;
+  updateSendPolicy(id: number, sendPolicy: Partial<InsertSendPolicy>): Promise<SendPolicy | undefined>;
+  deleteSendPolicy(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2124,6 +2170,157 @@ export class DatabaseStorage implements IStorage {
   async deleteNews(id: string): Promise<boolean> {
     const result = await db.delete(news).where(eq(news.id, id)).returning();
     return result.length > 0;
+  }
+  
+  // ==================== EMAIL INFRASTRUCTURE (Phase 26) ====================
+  
+  // Sender Profiles
+  async getSenderProfiles(): Promise<SenderProfile[]> {
+    return await db.select().from(senderProfiles).orderBy(desc(senderProfiles.createdAt));
+  }
+
+  async getSenderProfile(id: string): Promise<SenderProfile | undefined> {
+    const [profile] = await db.select().from(senderProfiles).where(eq(senderProfiles.id, id));
+    return profile || undefined;
+  }
+
+  async createSenderProfile(profile: InsertSenderProfile): Promise<SenderProfile> {
+    const [result] = await db.insert(senderProfiles).values(profile).returning();
+    return result;
+  }
+
+  async updateSenderProfile(id: string, profile: Partial<InsertSenderProfile>): Promise<SenderProfile | undefined> {
+    const [result] = await db.update(senderProfiles)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(senderProfiles.id, id))
+      .returning();
+    return result || undefined;
+  }
+
+  async deleteSenderProfile(id: string): Promise<void> {
+    await db.delete(senderProfiles).where(eq(senderProfiles.id, id));
+  }
+  
+  // Domain Authentication
+  async getDomainAuths(): Promise<DomainAuth[]> {
+    return await db.select().from(domainAuth).orderBy(desc(domainAuth.createdAt));
+  }
+
+  async getDomainAuth(id: number): Promise<DomainAuth | undefined> {
+    const [result] = await db.select().from(domainAuth).where(eq(domainAuth.id, id));
+    return result || undefined;
+  }
+
+  async getDomainAuthByDomain(domain: string): Promise<DomainAuth | undefined> {
+    const [result] = await db.select().from(domainAuth).where(eq(domainAuth.domain, domain));
+    return result || undefined;
+  }
+
+  async createDomainAuth(data: InsertDomainAuth): Promise<DomainAuth> {
+    const [result] = await db.insert(domainAuth).values(data).returning();
+    return result;
+  }
+
+  async updateDomainAuth(id: number, data: Partial<InsertDomainAuth>): Promise<DomainAuth | undefined> {
+    const [result] = await db.update(domainAuth)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(domainAuth.id, id))
+      .returning();
+    return result || undefined;
+  }
+
+  async verifyDomainAuth(id: number): Promise<DomainAuth | undefined> {
+    // Placeholder for DNS verification logic
+    // In production, this would call DNS verification APIs
+    const [result] = await db.update(domainAuth)
+      .set({ 
+        lastCheckedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(domainAuth.id, id))
+      .returning();
+    return result || undefined;
+  }
+  
+  // Tracking Domains
+  async getTrackingDomains(): Promise<TrackingDomain[]> {
+    return await db.select().from(trackingDomains).orderBy(desc(trackingDomains.createdAt));
+  }
+
+  async getTrackingDomain(id: number): Promise<TrackingDomain | undefined> {
+    const [result] = await db.select().from(trackingDomains).where(eq(trackingDomains.id, id));
+    return result || undefined;
+  }
+
+  async createTrackingDomain(data: InsertTrackingDomain): Promise<TrackingDomain> {
+    const [result] = await db.insert(trackingDomains).values(data).returning();
+    return result;
+  }
+
+  async updateTrackingDomain(id: number, data: Partial<InsertTrackingDomain>): Promise<TrackingDomain | undefined> {
+    const [result] = await db.update(trackingDomains)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(trackingDomains.id, id))
+      .returning();
+    return result || undefined;
+  }
+
+  async deleteTrackingDomain(id: number): Promise<void> {
+    await db.delete(trackingDomains).where(eq(trackingDomains.id, id));
+  }
+  
+  // IP Pools
+  async getIpPools(): Promise<IpPool[]> {
+    return await db.select().from(ipPools).orderBy(desc(ipPools.createdAt));
+  }
+
+  async getIpPool(id: number): Promise<IpPool | undefined> {
+    const [result] = await db.select().from(ipPools).where(eq(ipPools.id, id));
+    return result || undefined;
+  }
+
+  async createIpPool(data: InsertIpPool): Promise<IpPool> {
+    const [result] = await db.insert(ipPools).values(data).returning();
+    return result;
+  }
+
+  async updateIpPool(id: number, data: Partial<InsertIpPool>): Promise<IpPool | undefined> {
+    const [result] = await db.update(ipPools)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(ipPools.id, id))
+      .returning();
+    return result || undefined;
+  }
+
+  async deleteIpPool(id: number): Promise<void> {
+    await db.delete(ipPools).where(eq(ipPools.id, id));
+  }
+  
+  // Send Policies
+  async getSendPolicies(): Promise<SendPolicy[]> {
+    return await db.select().from(sendPolicies).orderBy(desc(sendPolicies.createdAt));
+  }
+
+  async getSendPolicy(id: number): Promise<SendPolicy | undefined> {
+    const [result] = await db.select().from(sendPolicies).where(eq(sendPolicies.id, id));
+    return result || undefined;
+  }
+
+  async createSendPolicy(data: InsertSendPolicy): Promise<SendPolicy> {
+    const [result] = await db.insert(sendPolicies).values(data).returning();
+    return result;
+  }
+
+  async updateSendPolicy(id: number, data: Partial<InsertSendPolicy>): Promise<SendPolicy | undefined> {
+    const [result] = await db.update(sendPolicies)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(sendPolicies.id, id))
+      .returning();
+    return result || undefined;
+  }
+
+  async deleteSendPolicy(id: number): Promise<void> {
+    await db.delete(sendPolicies).where(eq(sendPolicies.id, id));
   }
 }
 
