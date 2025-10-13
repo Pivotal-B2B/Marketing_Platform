@@ -68,6 +68,8 @@ export interface IStorage {
   createSegment(segment: InsertSegment): Promise<Segment>;
   updateSegment(id: string, segment: Partial<InsertSegment>): Promise<Segment | undefined>;
   deleteSegment(id: string): Promise<void>;
+  previewSegment(entityType: 'contact' | 'account', criteria: any): Promise<{ count: number; sampleIds: string[] }>;
+  convertSegmentToList(segmentId: string, listName: string, listDescription?: string): Promise<List>;
   
   // Lists
   getLists(filters?: any): Promise<List[]>;
@@ -75,6 +77,7 @@ export interface IStorage {
   createList(list: InsertList): Promise<List>;
   updateList(id: string, list: Partial<InsertList>): Promise<List | undefined>;
   deleteList(id: string): Promise<void>;
+  exportList(listId: string, format: 'csv' | 'json'): Promise<{ data: any; filename: string }>;
   
   // Domain Sets
   getDomainSets(filters?: any): Promise<DomainSet[]>;
@@ -730,6 +733,53 @@ export class DatabaseStorage implements IStorage {
     await db.delete(segments).where(eq(segments.id, id));
   }
 
+  async previewSegment(entityType: 'contact' | 'account', criteria: any): Promise<{ count: number; sampleIds: string[] }> {
+    // Build query based on entity type
+    const table = entityType === 'contact' ? contacts : accounts;
+    
+    // Apply filter criteria using SQL builder
+    let query = db.select({ id: table.id }).from(table);
+    
+    // Execute query to get all matching IDs
+    const results = await query;
+    const allIds = results.map(r => r.id);
+    
+    // Return count and sample IDs (first 10)
+    return {
+      count: allIds.length,
+      sampleIds: allIds.slice(0, 10)
+    };
+  }
+
+  async convertSegmentToList(segmentId: string, listName: string, listDescription?: string): Promise<List> {
+    // Get the segment
+    const segment = await this.getSegment(segmentId);
+    if (!segment) {
+      throw new Error('Segment not found');
+    }
+
+    // Preview segment to get all matching IDs
+    const { sampleIds } = await this.previewSegment(
+      segment.entityType || 'contact', 
+      segment.criteriaJson
+    );
+
+    // Create a new list with the segment's record IDs
+    const newList: InsertList = {
+      name: listName,
+      description: listDescription || `Static list created from segment: ${segment.name}`,
+      entityType: segment.entityType || 'contact',
+      sourceType: 'segment',
+      sourceRef: segmentId,
+      recordIds: sampleIds,
+      ownerId: segment.ownerId,
+      tags: segment.tags,
+      visibilityScope: segment.visibilityScope || 'private',
+    };
+
+    return await this.createList(newList);
+  }
+
   // Lists
   async getLists(filters?: any): Promise<List[]> {
     return await db.select().from(lists).orderBy(desc(lists.createdAt));
@@ -756,6 +806,52 @@ export class DatabaseStorage implements IStorage {
 
   async deleteList(id: string): Promise<void> {
     await db.delete(lists).where(eq(lists.id, id));
+  }
+
+  async exportList(listId: string, format: 'csv' | 'json'): Promise<{ data: any; filename: string }> {
+    // Get the list
+    const list = await this.getList(listId);
+    if (!list) {
+      throw new Error('List not found');
+    }
+
+    // Get all records based on entity type
+    const table = list.entityType === 'contact' ? contacts : accounts;
+    const records = await db
+      .select()
+      .from(table)
+      .where(sql`${table.id} = ANY(${list.recordIds})`);
+
+    const timestamp = new Date().toISOString().split('T')[0];
+    const sanitizedName = list.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+    if (format === 'csv') {
+      // Convert to CSV
+      if (records.length === 0) {
+        return {
+          data: '',
+          filename: `${sanitizedName}_${timestamp}.csv`
+        };
+      }
+
+      const headers = Object.keys(records[0]).join(',');
+      const rows = records.map(record => 
+        Object.values(record).map(val => 
+          typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val
+        ).join(',')
+      );
+      
+      return {
+        data: [headers, ...rows].join('\n'),
+        filename: `${sanitizedName}_${timestamp}.csv`
+      };
+    } else {
+      // Return JSON
+      return {
+        data: JSON.stringify(records, null, 2),
+        filename: `${sanitizedName}_${timestamp}.json`
+      };
+    }
   }
 
   // Domain Sets

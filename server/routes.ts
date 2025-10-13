@@ -474,6 +474,34 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  app.post("/api/segments/preview", requireAuth, async (req, res) => {
+    try {
+      const { entityType, criteria } = req.body;
+      if (!entityType || !criteria) {
+        return res.status(400).json({ message: "Missing entityType or criteria" });
+      }
+      const result = await storage.previewSegment(entityType, criteria);
+      res.json(result);
+    } catch (error) {
+      console.error('Segment preview error:', error);
+      res.status(500).json({ message: "Failed to preview segment" });
+    }
+  });
+
+  app.post("/api/segments/:id/convert-to-list", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
+    try {
+      const { name, description } = req.body;
+      if (!name) {
+        return res.status(400).json({ message: "List name is required" });
+      }
+      const list = await storage.convertSegmentToList(req.params.id, name, description);
+      res.status(201).json(list);
+    } catch (error) {
+      console.error('Convert segment to list error:', error);
+      res.status(500).json({ message: "Failed to convert segment to list", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // ==================== LISTS ====================
   
   app.get("/api/lists", requireAuth, async (req, res) => {
@@ -504,6 +532,26 @@ export function registerRoutes(app: Express) {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete list" });
+    }
+  });
+
+  app.post("/api/lists/:id/export", requireAuth, async (req, res) => {
+    try {
+      const { format = 'csv' } = req.body;
+      if (!['csv', 'json'].includes(format)) {
+        return res.status(400).json({ message: "Invalid format. Use 'csv' or 'json'" });
+      }
+      
+      const result = await storage.exportList(req.params.id, format);
+      
+      // Set appropriate content type and headers
+      const contentType = format === 'csv' ? 'text/csv' : 'application/json';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.send(result.data);
+    } catch (error) {
+      console.error('Export list error:', error);
+      res.status(500).json({ message: "Failed to export list", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
