@@ -1831,6 +1831,24 @@ export const contentEvents = pgTable("content_events", {
   tsIdx: index("content_events_ts_idx").on(t.ts)
 }));
 
+// Campaign Content Links (for linking campaigns to Events/Resources from Resources Centre)
+export const campaignContentLinks = pgTable("campaign_content_links", {
+  id: serial("id").primaryKey(),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: "cascade" }).notNull(),
+  contentType: varchar("content_type", { length: 50 }).notNull(), // event | resource
+  contentId: varchar("content_id", { length: 255 }).notNull(), // External ID from Resources Centre
+  contentSlug: varchar("content_slug", { length: 255 }).notNull(),
+  contentTitle: text("content_title").notNull(),
+  contentUrl: text("content_url").notNull(), // Base URL without tracking params
+  formId: varchar("form_id", { length: 255 }), // If content has gated form
+  metadata: jsonb("metadata"), // Additional content metadata
+  createdBy: varchar("created_by", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (t) => ({
+  campaignContentIdx: uniqueIndex("campaign_content_unique_idx").on(t.campaignId, t.contentType, t.contentId),
+  contentIdIdx: index("campaign_content_links_content_id_idx").on(t.contentId)
+}));
+
 // Insert Schemas
 export const insertDomainAuthSchema = createInsertSchema(domainAuth).omit({
   id: true,
@@ -1881,6 +1899,11 @@ export const insertContentEventSchema = createInsertSchema(contentEvents).omit({
   createdAt: true,
 });
 
+export const insertCampaignContentLinkSchema = createInsertSchema(campaignContentLinks).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Export Types
 export type DomainAuth = typeof domainAuth.$inferSelect;
 export type InsertDomainAuth = z.infer<typeof insertDomainAuthSchema>;
@@ -1908,3 +1931,6 @@ export type InsertPerDomainStats = z.infer<typeof insertPerDomainStatsSchema>;
 
 export type ContentEvent = typeof contentEvents.$inferSelect;
 export type InsertContentEvent = z.infer<typeof insertContentEventSchema>;
+
+export type CampaignContentLink = typeof campaignContentLinks.$inferSelect;
+export type InsertCampaignContentLink = z.infer<typeof insertCampaignContentLinkSchema>;

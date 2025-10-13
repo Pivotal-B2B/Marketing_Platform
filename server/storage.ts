@@ -14,6 +14,7 @@ import {
   contentAssets, socialPosts, aiContentGenerations, contentAssetPushes,
   events, resources, news,
   softphoneProfiles, callRecordingAccessLogs,
+  campaignContentLinks,
   type User, type InsertUser,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -49,6 +50,7 @@ import {
   type QualificationResponse, type InsertQualificationResponse,
   type SoftphoneProfile, type InsertSoftphoneProfile,
   type CallRecordingAccessLog, type InsertCallRecordingAccessLog,
+  type CampaignContentLink, type InsertCampaignContentLink,
   type ContentAsset, type InsertContentAsset,
   type SocialPost, type InsertSocialPost,
   type AIContentGeneration, type InsertAIContentGeneration,
@@ -149,6 +151,12 @@ export interface IStorage {
   // Call Recording Access Logs (Phase 27)
   createCallRecordingAccessLog(log: InsertCallRecordingAccessLog): Promise<CallRecordingAccessLog>;
   getCallRecordingAccessLogs(callAttemptId: string): Promise<CallRecordingAccessLog[]>;
+  
+  // Campaign Content Links (Resources Centre Integration)
+  getCampaignContentLinks(campaignId: string): Promise<CampaignContentLink[]>;
+  getCampaignContentLink(id: number): Promise<CampaignContentLink | undefined>;
+  createCampaignContentLink(link: InsertCampaignContentLink): Promise<CampaignContentLink>;
+  deleteCampaignContentLink(id: number): Promise<void>;
   
   // Qualification Responses
   createQualificationResponse(response: InsertQualificationResponse): Promise<QualificationResponse>;
@@ -1087,6 +1095,29 @@ export class DatabaseStorage implements IStorage {
       .from(callRecordingAccessLogs)
       .where(eq(callRecordingAccessLogs.callAttemptId, callAttemptId))
       .orderBy(desc(callRecordingAccessLogs.createdAt));
+  }
+
+  // Campaign Content Links (Resources Centre Integration)
+  async getCampaignContentLinks(campaignId: string): Promise<CampaignContentLink[]> {
+    return await db
+      .select()
+      .from(campaignContentLinks)
+      .where(eq(campaignContentLinks.campaignId, campaignId))
+      .orderBy(desc(campaignContentLinks.createdAt));
+  }
+
+  async getCampaignContentLink(id: number): Promise<CampaignContentLink | undefined> {
+    const [link] = await db.select().from(campaignContentLinks).where(eq(campaignContentLinks.id, id));
+    return link || undefined;
+  }
+
+  async createCampaignContentLink(insertLink: InsertCampaignContentLink): Promise<CampaignContentLink> {
+    const [link] = await db.insert(campaignContentLinks).values(insertLink).returning();
+    return link;
+  }
+
+  async deleteCampaignContentLink(id: number): Promise<void> {
+    await db.delete(campaignContentLinks).where(eq(campaignContentLinks.id, id));
   }
 
   // Qualification Responses

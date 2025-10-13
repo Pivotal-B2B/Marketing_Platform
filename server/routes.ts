@@ -2168,4 +2168,186 @@ export function registerRoutes(app: Express) {
 
   // ==================== WEBHOOKS (Resources Centre Reverse Webhook) ====================
   app.use("/api/webhooks", webhooksRouter);
+
+  // ==================== CAMPAIGN CONTENT LINKS (Resources Centre Integration) ====================
+  
+  // Get linked content for a campaign
+  app.get("/api/campaigns/:campaignId/content-links", requireAuth, async (req, res) => {
+    try {
+      const { campaignId } = req.params;
+      
+      // Verify campaign exists
+      const campaign = await storage.getCampaign(campaignId);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+      
+      const links = await storage.getCampaignContentLinks(campaignId);
+      res.json(links);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch content links" });
+    }
+  });
+  
+  // Link content to campaign
+  app.post("/api/campaigns/:campaignId/content-links", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { campaignId } = req.params;
+      const userId = (req.user as any).id;
+      
+      // Verify campaign exists
+      const campaign = await storage.getCampaign(campaignId);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+      
+      const validated = z.object({
+        contentType: z.enum(['event', 'resource']),
+        contentId: z.string(),
+        contentSlug: z.string(),
+        contentTitle: z.string(),
+        contentUrl: z.string().url(),
+        formId: z.string().optional(),
+        metadata: z.any().optional()
+      }).parse(req.body);
+      
+      const link = await storage.createCampaignContentLink({
+        campaignId,
+        contentType: validated.contentType,
+        contentId: validated.contentId,
+        contentSlug: validated.contentSlug,
+        contentTitle: validated.contentTitle,
+        contentUrl: validated.contentUrl,
+        formId: validated.formId || null,
+        metadata: validated.metadata || null,
+        createdBy: userId
+      });
+      
+      res.status(201).json(link);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create content link" });
+    }
+  });
+  
+  // Delete content link
+  app.delete("/api/campaigns/:campaignId/content-links/:linkId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { linkId } = req.params;
+      
+      await storage.deleteCampaignContentLink(Number(linkId));
+      res.json({ message: "Content link deleted" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete content link" });
+    }
+  });
+  
+  // Generate tracking URL for a single contact
+  app.post("/api/campaigns/:campaignId/content-links/:linkId/tracking-url", requireAuth, async (req, res) => {
+    try {
+      const { campaignId, linkId } = req.params;
+      
+      // Get campaign
+      const campaign = await storage.getCampaign(campaignId);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+      
+      // Get content link
+      const link = await storage.getCampaignContentLink(Number(linkId));
+      if (!link) {
+        return res.status(404).json({ message: "Content link not found" });
+      }
+      
+      const validated = z.object({
+        contactId: z.string().optional(),
+        email: z.string().optional(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        company: z.string().optional(),
+        utmSource: z.string().optional(),
+        utmMedium: z.string().optional(),
+        utmCampaign: z.string().optional()
+      }).parse(req.body);
+      
+      // Import the URL generator
+      const { generateTrackingUrl } = await import("./lib/urlGenerator");
+      
+      const trackingUrl = generateTrackingUrl(link.contentUrl, {
+        ...validated,
+        campaignId,
+        campaignName: campaign.name
+      });
+      
+      res.json({ trackingUrl });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to generate tracking URL" });
+    }
+  });
+  
+  // Generate bulk tracking URLs for multiple contacts
+  app.post("/api/campaigns/:campaignId/content-links/:linkId/bulk-tracking-urls", requireAuth, async (req, res) => {
+    try {
+      const { campaignId, linkId } = req.params;
+      
+      // Get campaign
+      const campaign = await storage.getCampaign(campaignId);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+      
+      // Get content link
+      const link = await storage.getCampaignContentLink(Number(linkId));
+      if (!link) {
+        return res.status(404).json({ message: "Content link not found" });
+      }
+      
+      const validated = z.object({
+        contactIds: z.array(z.string()),
+        utmSource: z.string().optional(),
+        utmMedium: z.string().optional(),
+        utmCampaign: z.string().optional()
+      }).parse(req.body);
+      
+      // Get contacts
+      const contacts = await Promise.all(
+        validated.contactIds.map(id => storage.getContact(id))
+      );
+      
+      const validContacts = contacts.filter(c => c !== undefined) as any[];
+      
+      // Import the URL generator
+      const { generateBulkTrackingUrls } = await import("./lib/urlGenerator");
+      
+      const trackingUrls = generateBulkTrackingUrls(
+        link.contentUrl,
+        validContacts.map(c => ({
+          id: c.id,
+          email: c.email,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          company: c.company
+        })),
+        {
+          campaignId,
+          campaignName: campaign.name,
+          utmSource: validated.utmSource,
+          utmMedium: validated.utmMedium,
+          utmCampaign: validated.utmCampaign
+        }
+      );
+      
+      res.json({ trackingUrls });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to generate bulk tracking URLs" });
+    }
+  });
 }
