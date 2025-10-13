@@ -89,7 +89,7 @@ const getNavStructure = (): NavItem[] => [
     icon: Megaphone,
     roles: ["admin", "campaign_manager", "agent"],
     items: [
-      { title: "All Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
+      { title: "All Campaigns", url: "/campaigns", roles: ["admin", "campaign_manager"] },
       { title: "Email Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
       { title: "Phone Campaigns", url: "/campaigns/telemarketing", roles: ["admin", "campaign_manager", "agent"] },
       { title: "Campaign Configuration", url: "/campaigns/config", roles: ["admin", "campaign_manager"] },
