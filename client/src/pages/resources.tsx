@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -6,9 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, FileText, Download, Lock, Trash2, Edit, Users } from "lucide-react";
 import type { Resource } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { ResourceFormDialog } from "@/components/resource-form-dialog";
 
 export default function Resources() {
   const { toast } = useToast();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editResource, setEditResource] = useState<Resource | undefined>(undefined);
 
   const { data: resources = [], isLoading } = useQuery<Resource[]>({
     queryKey: ["/api/resources"],
@@ -53,7 +57,7 @@ export default function Resources() {
           <FileText className="h-6 w-6" />
           <h1 className="text-2xl font-bold">Resources</h1>
         </div>
-        <Button data-testid="button-create-resource">
+        <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-resource">
           <Plus className="h-4 w-4 mr-2" />
           Create Resource
         </Button>
@@ -68,7 +72,7 @@ export default function Resources() {
               <p className="text-muted-foreground mb-4">
                 Create your first resource to get started
               </p>
-              <Button data-testid="button-create-first-resource">
+              <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-resource">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Resource
               </Button>
@@ -110,6 +114,7 @@ export default function Resources() {
                     <Button 
                       size="icon" 
                       variant="ghost"
+                      onClick={() => setEditResource(resource)}
                       data-testid={`button-edit-${resource.id}`}
                     >
                       <Edit className="h-4 w-4" />
@@ -158,6 +163,17 @@ export default function Resources() {
           ))}
         </div>
       )}
+
+      <ResourceFormDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
+      
+      <ResourceFormDialog
+        open={!!editResource}
+        onOpenChange={(open) => !open && setEditResource(undefined)}
+        resource={editResource}
+      />
     </div>
   );
 }

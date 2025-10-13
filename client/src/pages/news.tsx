@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -7,9 +8,12 @@ import { Plus, Newspaper, Trash2, Edit, Users } from "lucide-react";
 import { format } from "date-fns";
 import type { News } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { NewsFormDialog } from "@/components/news-form-dialog";
 
 export default function NewsPage() {
   const { toast } = useToast();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editNews, setEditNews] = useState<News | undefined>(undefined);
 
   const { data: news = [], isLoading } = useQuery<News[]>({
     queryKey: ["/api/news"],
@@ -54,7 +58,7 @@ export default function NewsPage() {
           <Newspaper className="h-6 w-6" />
           <h1 className="text-2xl font-bold">News</h1>
         </div>
-        <Button data-testid="button-create-news">
+        <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-news">
           <Plus className="h-4 w-4 mr-2" />
           Create News
         </Button>
@@ -69,7 +73,7 @@ export default function NewsPage() {
               <p className="text-muted-foreground mb-4">
                 Create your first news article to get started
               </p>
-              <Button data-testid="button-create-first-news">
+              <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-news">
                 <Plus className="h-4 w-4 mr-2" />
                 Create News
               </Button>
@@ -107,6 +111,7 @@ export default function NewsPage() {
                     <Button 
                       size="icon" 
                       variant="ghost"
+                      onClick={() => setEditNews(newsItem)}
                       data-testid={`button-edit-${newsItem.id}`}
                     >
                       <Edit className="h-4 w-4" />
@@ -134,6 +139,17 @@ export default function NewsPage() {
           ))}
         </div>
       )}
+
+      <NewsFormDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
+      
+      <NewsFormDialog
+        open={!!editNews}
+        onOpenChange={(open) => !open && setEditNews(undefined)}
+        news={editNews}
+      />
     </div>
   );
 }
