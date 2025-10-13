@@ -558,6 +558,137 @@ export const orderCampaignLinks = pgTable("order_campaign_links", {
   campaignIdx: index("order_campaign_links_campaign_idx").on(table.campaignId),
 }));
 
+// Campaign Audience Snapshots
+export const campaignAudienceSnapshots = pgTable("campaign_audience_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  audienceDefinition: jsonb("audience_definition").notNull(),
+  contactIds: text("contact_ids").array(),
+  accountIds: text("account_ids").array(),
+  contactCount: integer("contact_count").default(0),
+  accountCount: integer("account_count").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignIdx: index("campaign_audience_snapshots_campaign_idx").on(table.campaignId),
+}));
+
+// Sender Profiles
+export const senderProfiles = pgTable("sender_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  brandId: varchar("brand_id"),
+  fromName: text("from_name").notNull(),
+  fromEmail: text("from_email").notNull(),
+  dkimDomain: text("dkim_domain"),
+  trackingDomain: text("tracking_domain"),
+  replyToEmail: text("reply_to_email"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Email Templates
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  htmlContent: text("html_content").notNull(),
+  placeholders: text("placeholders").array(),
+  version: integer("version").default(1),
+  isApproved: boolean("is_approved").default(false),
+  approvedById: varchar("approved_by_id").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Email Sends
+export const emailSends = pgTable("email_sends", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  templateId: varchar("template_id").references(() => emailTemplates.id),
+  senderProfileId: varchar("sender_profile_id").references(() => senderProfiles.id),
+  providerMessageId: text("provider_message_id"),
+  provider: text("provider"),
+  status: text("status").notNull().default('pending'),
+  sendAt: timestamp("send_at"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignIdx: index("email_sends_campaign_idx").on(table.campaignId),
+  contactIdx: index("email_sends_contact_idx").on(table.contactId),
+  statusIdx: index("email_sends_status_idx").on(table.status),
+}));
+
+// Email Events
+export const emailEvents = pgTable("email_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sendId: varchar("send_id").references(() => emailSends.id, { onDelete: 'cascade' }).notNull(),
+  type: text("type").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  sendIdx: index("email_events_send_idx").on(table.sendId),
+  typeIdx: index("email_events_type_idx").on(table.type),
+}));
+
+// Call Scripts
+export const callScripts = pgTable("call_scripts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  content: text("content").notNull(),
+  version: integer("version").default(1),
+  changelog: text("changelog"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Call Attempts
+export const callAttempts = pgTable("call_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  agentId: varchar("agent_id").references(() => users.id).notNull(),
+  telnyxCallId: text("telnyx_call_id"),
+  recordingUrl: text("recording_url"),
+  disposition: callDispositionEnum("disposition"),
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at"),
+  duration: integer("duration"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignIdx: index("call_attempts_campaign_idx").on(table.campaignId),
+  contactIdx: index("call_attempts_contact_idx").on(table.contactId),
+  agentIdx: index("call_attempts_agent_idx").on(table.agentId),
+}));
+
+// Call Events
+export const callEvents = pgTable("call_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  attemptId: varchar("attempt_id").references(() => callAttempts.id, { onDelete: 'cascade' }).notNull(),
+  type: text("type").notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  attemptIdx: index("call_events_attempt_idx").on(table.attemptId),
+  typeIdx: index("call_events_type_idx").on(table.type),
+}));
+
+// Qualification Responses
+export const qualificationResponses = pgTable("qualification_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  attemptId: varchar("attempt_id").references(() => callAttempts.id, { onDelete: 'cascade' }),
+  leadId: varchar("lead_id").references(() => leads.id, { onDelete: 'cascade' }),
+  schemaVersion: text("schema_version"),
+  answersJson: jsonb("answers_json").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  attemptIdx: index("qualification_responses_attempt_idx").on(table.attemptId),
+  leadIdx: index("qualification_responses_lead_idx").on(table.leadId),
+}));
+
 // Bulk Imports
 export const bulkImports = pgTable("bulk_imports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -750,6 +881,56 @@ export const insertCampaignSchema = createInsertSchema(campaigns).omit({
   launchedAt: true,
 });
 
+export const insertCampaignAudienceSnapshotSchema = createInsertSchema(campaignAudienceSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSenderProfileSchema = createInsertSchema(senderProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  approvedAt: true,
+});
+
+export const insertEmailSendSchema = createInsertSchema(emailSends).omit({
+  id: true,
+  createdAt: true,
+  sentAt: true,
+});
+
+export const insertEmailEventSchema = createInsertSchema(emailEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCallScriptSchema = createInsertSchema(callScripts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCallAttemptSchema = createInsertSchema(callAttempts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCallEventSchema = createInsertSchema(callEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertQualificationResponseSchema = createInsertSchema(qualificationResponses).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertEmailMessageSchema = createInsertSchema(emailMessages).omit({
   id: true,
   createdAt: true,
@@ -907,6 +1088,33 @@ export type InsertDomainSet = z.infer<typeof insertDomainSetSchema>;
 
 export type Campaign = typeof campaigns.$inferSelect;
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
+
+export type CampaignAudienceSnapshot = typeof campaignAudienceSnapshots.$inferSelect;
+export type InsertCampaignAudienceSnapshot = z.infer<typeof insertCampaignAudienceSnapshotSchema>;
+
+export type SenderProfile = typeof senderProfiles.$inferSelect;
+export type InsertSenderProfile = z.infer<typeof insertSenderProfileSchema>;
+
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+
+export type EmailSend = typeof emailSends.$inferSelect;
+export type InsertEmailSend = z.infer<typeof insertEmailSendSchema>;
+
+export type EmailEvent = typeof emailEvents.$inferSelect;
+export type InsertEmailEvent = z.infer<typeof insertEmailEventSchema>;
+
+export type CallScript = typeof callScripts.$inferSelect;
+export type InsertCallScript = z.infer<typeof insertCallScriptSchema>;
+
+export type CallAttempt = typeof callAttempts.$inferSelect;
+export type InsertCallAttempt = z.infer<typeof insertCallAttemptSchema>;
+
+export type CallEvent = typeof callEvents.$inferSelect;
+export type InsertCallEvent = z.infer<typeof insertCallEventSchema>;
+
+export type QualificationResponse = typeof qualificationResponses.$inferSelect;
+export type InsertQualificationResponse = z.infer<typeof insertQualificationResponseSchema>;
 
 export type EmailMessage = typeof emailMessages.$inferSelect;
 export type InsertEmailMessage = z.infer<typeof insertEmailMessageSchema>;
