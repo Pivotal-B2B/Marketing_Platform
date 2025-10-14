@@ -24,6 +24,7 @@ import {
 } from "@/lib/csv-utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { CSVFieldMapper } from "@/components/csv-field-mapper";
 
 interface CSVImportDialogProps {
   open: boolean;
@@ -31,7 +32,13 @@ interface CSVImportDialogProps {
   onImportComplete: () => void;
 }
 
-type ImportStage = "upload" | "validate" | "preview" | "importing" | "complete";
+interface FieldMapping {
+  csvColumn: string;
+  targetField: string | null;
+  targetEntity: "contact" | "account" | null;
+}
+
+type ImportStage = "upload" | "mapping" | "validate" | "preview" | "importing" | "complete";
 
 export function CSVImportDialog({
   open,
@@ -42,6 +49,7 @@ export function CSVImportDialog({
   const [file, setFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
+  const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState({ success: 0, failed: 0 });
@@ -59,11 +67,40 @@ export function CSVImportDialog({
         if (parsed.length > 0) {
           setHeaders(parsed[0]);
           setCsvData(parsed.slice(1));
-          setStage("validate");
-          validateData(parsed);
+          setStage("mapping");
         }
       };
       reader.readAsText(selectedFile);
+    }
+  };
+
+  const handleMappingComplete = (mappings: FieldMapping[]) => {
+    setFieldMappings(mappings);
+    // Apply mappings and validate
+    setStage("validate");
+    validateDataWithMapping(mappings);
+  };
+
+  const validateDataWithMapping = (mappings: FieldMapping[]) => {
+    // Create a mapped headers array based on the field mappings
+    const mappedHeaders = mappings.map(m => {
+      if (!m.targetField || !m.targetEntity) return "";
+      return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
+    });
+    
+    const validationErrors: ValidationError[] = [];
+
+    csvData.forEach((row, index) => {
+      // Map the row data to match the expected format
+      const mappedRow = mappings.map((mapping, idx) => row[idx] || "");
+      const rowErrors = validateContactWithAccountRow(mappedRow, mappedHeaders, index + 2);
+      validationErrors.push(...rowErrors);
+    });
+
+    setErrors(validationErrors);
+
+    if (validationErrors.length === 0) {
+      setStage("preview");
     }
   };
 
@@ -91,10 +128,19 @@ export function CSVImportDialog({
     let successCount = 0;
     let failedCount = 0;
 
+    // Create mapped headers based on field mappings
+    const mappedHeaders = fieldMappings.map(m => {
+      if (!m.targetField || !m.targetEntity) return "";
+      return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
+    });
+
     for (let i = 0; i < csvData.length; i++) {
       try {
-        const contactData = csvRowToContactFromUnified(csvData[i], headers);
-        const accountData = csvRowToAccountFromUnified(csvData[i], headers);
+        // Map the row data according to the field mappings
+        const mappedRow = fieldMappings.map((mapping, idx) => csvData[i][idx] || "");
+        
+        const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
+        const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
 
         await apiRequest(
           "POST",
@@ -160,6 +206,7 @@ export function CSVImportDialog({
     setFile(null);
     setCsvData([]);
     setHeaders([]);
+    setFieldMappings([]);
     setErrors([]);
     setImportProgress(0);
     setImportResults({ success: 0, failed: 0 });
@@ -222,6 +269,16 @@ export function CSVImportDialog({
                 </AlertDescription>
               </Alert>
             </div>
+          )}
+
+          {/* Mapping Stage */}
+          {stage === "mapping" && (
+            <CSVFieldMapper
+              csvHeaders={headers}
+              sampleData={csvData}
+              onMappingComplete={handleMappingComplete}
+              onCancel={handleClose}
+            />
           )}
 
           {/* Validation Stage */}
