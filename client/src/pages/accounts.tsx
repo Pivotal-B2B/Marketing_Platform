@@ -5,11 +5,13 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Filter, Download, Building2, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Download, Upload, Building2, Pencil, Trash2 } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
 import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar";
 import { useSelection } from "@/hooks/use-selection";
 import type { FilterGroup } from "@shared/filter-types";
+import { CSVImportDialog } from "@/components/csv-import-dialog";
+import { exportAccountsToCSV, downloadCSV, generateAccountsTemplate } from "@/lib/csv-utils";
 import {
   Table,
   TableBody,
@@ -40,6 +42,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 export default function AccountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
   const [, setLocation] = useLocation();
@@ -72,7 +75,7 @@ export default function AccountsPage() {
     defaultValues: {
       name: "",
       domain: "",
-      industry: "",
+      industryStandardized: "",
       employeesSizeRange: "",
       annualRevenue: "",
     },
@@ -124,7 +127,7 @@ export default function AccountsPage() {
     searchQuery === "" ||
     account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     account.domain?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    account.industry?.toLowerCase().includes(searchQuery.toLowerCase())
+    account.industryStandardized?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
   const {
@@ -147,13 +150,37 @@ export default function AccountsPage() {
             Manage your B2B account database
           </p>
         </div>
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-account">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Account
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              const csv = exportAccountsToCSV(filteredAccounts);
+              downloadCSV(csv, `accounts_export_${new Date().toISOString().split('T')[0]}.csv`);
+              toast({
+                title: "Export Complete",
+                description: `Exported ${filteredAccounts.length} accounts to CSV`,
+              });
+            }}
+            data-testid="button-export-accounts"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setImportDialogOpen(true)}
+            data-testid="button-import-accounts"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-account">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Account
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Create Account</DialogTitle>
@@ -191,7 +218,7 @@ export default function AccountsPage() {
                 />
                 <FormField
                   control={createForm.control}
-                  name="industry"
+                  name="industryStandardized"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Industry</FormLabel>
@@ -239,6 +266,7 @@ export default function AccountsPage() {
             </Form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
@@ -258,10 +286,6 @@ export default function AccountsPage() {
           onApplyFilter={setFilterGroup}
           initialFilter={filterGroup}
         />
-        <Button variant="outline" data-testid="button-export">
-          <Download className="mr-2 h-4 w-4" />
-          Export
-        </Button>
       </div>
 
       <BulkActionsToolbar
@@ -352,8 +376,8 @@ export default function AccountsPage() {
                   </TableCell>
                   <TableCell className="font-mono text-sm">{account.domain || "-"}</TableCell>
                   <TableCell>
-                    {account.industry ? (
-                      <Badge variant="outline">{account.industry}</Badge>
+                    {account.industryStandardized ? (
+                      <Badge variant="outline">{account.industryStandardized}</Badge>
                     ) : "-"}
                   </TableCell>
                   <TableCell>{account.employeesSizeRange || "-"}</TableCell>
@@ -395,16 +419,20 @@ export default function AccountsPage() {
           icon={Building2}
           title="No accounts found"
           description={searchQuery ? "Try adjusting your search query" : "Get started by creating your first account"}
-          action={
-            !searchQuery ? (
-              <Button onClick={() => setCreateDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Account
-              </Button>
-            ) : undefined
-          }
+          actionLabel={!searchQuery ? "Create Account" : undefined}
+          onAction={!searchQuery ? () => setCreateDialogOpen(true) : undefined}
         />
       )}
+
+      {/* CSV Import Dialog */}
+      <CSVImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        entityType="account"
+        onImportComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+        }}
+      />
     </div>
   );
 }

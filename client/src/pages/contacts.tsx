@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon, Link as LinkIcon, Building2 } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
 import type { FilterGroup } from "@shared/filter-types";
+import { CSVImportDialog } from "@/components/csv-import-dialog";
+import { exportContactsToCSV, downloadCSV, generateContactsTemplate } from "@/lib/csv-utils";
 import {
   Table,
   TableBody,
@@ -54,6 +56,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 export default function ContactsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -225,7 +228,26 @@ export default function ContactsPage() {
             <LinkIcon className="mr-2 h-4 w-4" />
             {autoLinkMutation.isPending ? "Linking..." : "Auto-Link"}
           </Button>
-          <Button variant="outline" data-testid="button-import-contacts">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              const csv = exportContactsToCSV(filteredContacts);
+              downloadCSV(csv, `contacts_export_${new Date().toISOString().split('T')[0]}.csv`);
+              toast({
+                title: "Export Complete",
+                description: `Exported ${filteredContacts.length} contacts to CSV`,
+              });
+            }}
+            data-testid="button-export-contacts"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setImportDialogOpen(true)}
+            data-testid="button-import-contacts"
+          >
             <Upload className="mr-2 h-4 w-4" />
             Import
           </Button>
@@ -556,6 +578,16 @@ export default function ContactsPage() {
           onAction={!searchQuery ? () => setCreateDialogOpen(true) : undefined}
         />
       )}
+
+      {/* CSV Import Dialog */}
+      <CSVImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        entityType="contact"
+        onImportComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+        }}
+      />
     </div>
   );
 }
