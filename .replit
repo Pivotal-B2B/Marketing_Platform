@@ -38,9 +38,5 @@ waitForPort = 5000
 integrations = ["javascript_database:1.0.0"]
 
 [[ports]]
-localPort = 5000
+localPort = 42997
 externalPort = 80
-
-[[ports]]
-localPort = 34587
-externalPort = 3000

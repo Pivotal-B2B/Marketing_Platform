@@ -24,7 +24,12 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
 - **Audience Management:** Advanced multi-criteria filtering, dynamic segments, static lists, and domain set uploaders.
 - **Data Quality & Deduplication:** Deterministic upsert with field-level survivorship, normalization, source tracking, and soft deletes.
-- **Unified CSV Import/Export System:** RFC4180-compliant CSV parsing with unified Contact+Account import from a single CSV file. Features include account_* prefix for account fields, automatic account matching/creation by normalized domain (trim/lowercase), intelligent contact-account linking, suppression list validation, and custom fields support for both entities.
+- **Unified CSV Import/Export System with Field Mapping:** RFC4180-compliant CSV parsing with unified Contact+Account import from a single CSV file. Features include:
+  - **Smart Field Mapping**: Interactive UI for mapping CSV columns to Contact/Account fields with auto-detection based on column name similarity
+  - **Large File Optimization**: Batch processing (50 records/batch) with real-time progress tracking and per-record error reporting
+  - **Flexible Import**: Supports any CSV format via custom field mapping, account_* prefix for account fields
+  - **Intelligent Matching**: Automatic account matching/creation by normalized domain (trim/lowercase)
+  - **Data Quality**: Suppression list validation, custom fields support for both entities
 - **Bulk Operations:** Multi-page record selection with bulk actions (Export, Add to List, Update, Delete).
 - **Campaign Management:**
     - **Email:** HTML editor, personalization, tracking, pre-send guards, mandatory unsubscribe.
