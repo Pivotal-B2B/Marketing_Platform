@@ -256,6 +256,84 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Batch import: Process multiple contacts with accounts in one request (for large file optimization)
+  app.post("/api/contacts/batch-import", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const { records } = req.body; // Array of { contact, account } objects
+      
+      if (!Array.isArray(records)) {
+        return res.status(400).json({ message: "Records must be an array" });
+      }
+
+      const results = {
+        success: 0,
+        failed: 0,
+        errors: [] as Array<{ index: number; error: string }>,
+      };
+
+      for (let i = 0; i < records.length; i++) {
+        try {
+          const { contact: contactData, account: accountData } = records[i];
+
+          // Validate contact data
+          const validatedContact = insertContactSchema.parse(contactData);
+          
+          // Check email suppression
+          if (await storage.isEmailSuppressed(validatedContact.email)) {
+            results.failed++;
+            results.errors.push({ index: i, error: "Email is on suppression list" });
+            continue;
+          }
+          
+          // Check phone suppression if provided
+          if (validatedContact.directPhoneE164 && await storage.isPhoneSuppressed(validatedContact.directPhoneE164)) {
+            results.failed++;
+            results.errors.push({ index: i, error: "Phone is on DNC list" });
+            continue;
+          }
+
+          let account;
+          
+          // Normalize domain (trim and lowercase) to prevent duplicates from casing
+          if (accountData.domain) {
+            accountData.domain = accountData.domain.trim().toLowerCase();
+          }
+          
+          // Try to find existing account by domain first
+          if (accountData.domain) {
+            account = await storage.getAccountByDomain(accountData.domain);
+          }
+          
+          // If not found and we have account data, create new account
+          if (!account && (accountData.name || accountData.domain)) {
+            const validatedAccount = insertAccountSchema.parse(accountData);
+            account = await storage.createAccount(validatedAccount);
+          }
+          
+          // Link contact to account if found/created
+          if (account) {
+            validatedContact.accountId = account.id;
+          }
+          
+          // Create contact
+          await storage.createContact(validatedContact);
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({ 
+            index: i, 
+            error: error instanceof Error ? error.message : "Unknown error" 
+          });
+        }
+      }
+
+      res.status(200).json(results);
+    } catch (error) {
+      console.error("Batch import error:", error);
+      res.status(500).json({ message: "Failed to process batch import" });
+    }
+  });
+
   // Unified import: Contact + Account in one request
   app.post("/api/contacts/import-with-account", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {

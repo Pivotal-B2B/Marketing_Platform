@@ -134,27 +134,52 @@ export function CSVImportDialog({
       return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
     });
 
-    for (let i = 0; i < csvData.length; i++) {
-      try {
-        // Map the row data according to the field mappings
-        const mappedRow = fieldMappings.map((mapping, idx) => csvData[i][idx] || "");
-        
-        const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
-        const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
+    // Process in batches for better performance with large files
+    const BATCH_SIZE = 50; // Process 50 records at a time
+    const totalBatches = Math.ceil(csvData.length / BATCH_SIZE);
+    
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const start = batchIndex * BATCH_SIZE;
+      const end = Math.min(start + BATCH_SIZE, csvData.length);
+      const batchRows = csvData.slice(start, end);
 
-        await apiRequest(
+      try {
+        // Prepare batch records
+        const records = batchRows.map((row) => {
+          const mappedRow = fieldMappings.map((mapping, idx) => row[idx] || "");
+          const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
+          const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
+          return { contact: contactData, account: accountData };
+        });
+
+        // Send batch to server
+        const result = await apiRequest(
           "POST",
-          "/api/contacts/import-with-account",
-          { contact: contactData, account: accountData }
-        );
+          "/api/contacts/batch-import",
+          { records }
+        ) as unknown as {
+          success: number;
+          failed: number;
+          errors: Array<{ index: number; error: string }>;
+        };
         
-        successCount++;
+        successCount += result.success;
+        failedCount += result.failed;
+
+        // Log any batch errors
+        if (result.errors.length > 0) {
+          result.errors.forEach((err: { index: number; error: string }) => {
+            console.error(`Row ${start + err.index + 2}: ${err.error}`);
+          });
+        }
       } catch (error) {
-        failedCount++;
-        console.error(`Failed to import row ${i + 2}:`, error);
+        // If batch fails entirely, count all as failed
+        failedCount += batchRows.length;
+        console.error(`Failed to import batch ${batchIndex + 1}:`, error);
       }
 
-      setImportProgress(Math.round(((i + 1) / csvData.length) * 100));
+      // Update progress after each batch
+      setImportProgress(Math.round(((end) / csvData.length) * 100));
     }
 
     setImportResults({ success: successCount, failed: failedCount });

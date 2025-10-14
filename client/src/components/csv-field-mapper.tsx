@@ -232,7 +232,7 @@ export function CSVFieldMapper({
                     </SelectContent>
                   </Select>
 
-                  {mapping.targetEntity && mapping.targetEntity !== "skip" && (
+                  {mapping.targetEntity && (mapping.targetEntity === "contact" || mapping.targetEntity === "account") && (
                     <Select
                       value={mapping.targetField || ""}
                       onValueChange={(value) => updateMapping(mapping.csvColumn, value, mapping.targetEntity)}
