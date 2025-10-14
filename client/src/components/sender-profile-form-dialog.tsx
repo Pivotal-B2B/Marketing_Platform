@@ -181,14 +181,13 @@ export function SenderProfileFormDialog({ open, onOpenChange, profile }: SenderP
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>ESP Provider (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger data-testid="select-esp-provider">
                         <SelectValue placeholder="Select an ESP provider" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
                       <SelectItem value="sendgrid">SendGrid</SelectItem>
                       <SelectItem value="ses">Amazon SES</SelectItem>
                       <SelectItem value="mailgun">Mailgun</SelectItem>
@@ -205,14 +204,13 @@ export function SenderProfileFormDialog({ open, onOpenChange, profile }: SenderP
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Warmup Status (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger data-testid="select-warmup-status">
                         <SelectValue placeholder="Select warmup status" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
                       <SelectItem value="not_started">Not Started</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
