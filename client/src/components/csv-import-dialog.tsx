@@ -15,14 +15,12 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   parseCSV,
-  validateContactRow,
-  validateAccountRow,
-  csvRowToContact,
-  csvRowToAccount,
+  validateContactWithAccountRow,
+  csvRowToContactFromUnified,
+  csvRowToAccountFromUnified,
   type ValidationError,
   downloadCSV,
-  generateContactsTemplate,
-  generateAccountsTemplate,
+  generateContactsWithAccountTemplate,
 } from "@/lib/csv-utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -30,7 +28,6 @@ import { useToast } from "@/hooks/use-toast";
 interface CSVImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  entityType: "contact" | "account";
   onImportComplete: () => void;
 }
 
@@ -39,7 +36,6 @@ type ImportStage = "upload" | "validate" | "preview" | "importing" | "complete";
 export function CSVImportDialog({
   open,
   onOpenChange,
-  entityType,
   onImportComplete,
 }: CSVImportDialogProps) {
   const [stage, setStage] = useState<ImportStage>("upload");
@@ -77,10 +73,7 @@ export function CSVImportDialog({
     const validationErrors: ValidationError[] = [];
 
     dataRows.forEach((row, index) => {
-      const rowErrors =
-        entityType === "contact"
-          ? validateContactRow(row, headerRow, index + 2) // +2 for header and 1-based
-          : validateAccountRow(row, headerRow, index + 2);
+      const rowErrors = validateContactWithAccountRow(row, headerRow, index + 2); // +2 for header and 1-based
       validationErrors.push(...rowErrors);
     });
 
@@ -100,15 +93,13 @@ export function CSVImportDialog({
 
     for (let i = 0; i < csvData.length; i++) {
       try {
-        const rowData =
-          entityType === "contact"
-            ? csvRowToContact(csvData[i], headers)
-            : csvRowToAccount(csvData[i], headers);
+        const contactData = csvRowToContactFromUnified(csvData[i], headers);
+        const accountData = csvRowToAccountFromUnified(csvData[i], headers);
 
         await apiRequest(
           "POST",
-          entityType === "contact" ? "/api/contacts" : "/api/accounts",
-          rowData
+          "/api/contacts/import-with-account",
+          { contact: contactData, account: accountData }
         );
         
         successCount++;
@@ -125,26 +116,23 @@ export function CSVImportDialog({
 
     toast({
       title: "Import Complete",
-      description: `Successfully imported ${successCount} ${entityType}s. ${failedCount} failed.`,
+      description: `Successfully imported ${successCount} contacts with accounts. ${failedCount} failed.`,
     });
 
     onImportComplete();
   };
 
   const downloadTemplate = () => {
-    const template =
-      entityType === "contact"
-        ? generateContactsTemplate()
-        : generateAccountsTemplate();
+    const template = generateContactsWithAccountTemplate();
     
     downloadCSV(
       template,
-      `${entityType}s_template_${new Date().toISOString().split("T")[0]}.csv`
+      `contacts_with_accounts_template_${new Date().toISOString().split("T")[0]}.csv`
     );
 
     toast({
       title: "Template Downloaded",
-      description: `${entityType} CSV template has been downloaded`,
+      description: "Contacts with Accounts CSV template has been downloaded",
     });
   };
 
@@ -163,7 +151,7 @@ export function CSVImportDialog({
 
     downloadCSV(
       errorReport,
-      `${entityType}_import_errors_${new Date().toISOString().split("T")[0]}.csv`
+      `contact_import_errors_${new Date().toISOString().split("T")[0]}.csv`
     );
   };
 
@@ -183,11 +171,11 @@ export function CSVImportDialog({
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>
-            Import {entityType === "contact" ? "Contacts" : "Accounts"} from CSV
+            Import Contacts with Accounts from CSV
           </DialogTitle>
           <DialogDescription>
-            Upload a CSV file to bulk import{" "}
-            {entityType === "contact" ? "contacts" : "accounts"}
+            Upload a CSV file to bulk import contacts along with their account information.
+            The system will automatically find or create accounts based on domain.
           </DialogDescription>
         </DialogHeader>
 

@@ -5,12 +5,11 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Filter, Download, Upload, Building2, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Download, Building2, Pencil, Trash2 } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
 import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar";
 import { useSelection } from "@/hooks/use-selection";
 import type { FilterGroup } from "@shared/filter-types";
-import { CSVImportDialog } from "@/components/csv-import-dialog";
 import { exportAccountsToCSV, downloadCSV, generateAccountsTemplate } from "@/lib/csv-utils";
 import {
   Table,
@@ -42,7 +41,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 export default function AccountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
   const [, setLocation] = useLocation();
@@ -166,14 +164,7 @@ export default function AccountsPage() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setImportDialogOpen(true)}
-            data-testid="button-import-accounts"
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
+          {/* CSV Import is now handled via the unified Contact+Account import on the Contacts page */}
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-create-account">
@@ -424,15 +415,7 @@ export default function AccountsPage() {
         />
       )}
 
-      {/* CSV Import Dialog */}
-      <CSVImportDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
-        entityType="account"
-        onImportComplete={() => {
-          queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
-        }}
-      />
+      {/* Note: CSV import for accounts is now handled via the unified Contact+Account import on the Contacts page */}
     </div>
   );
 }

@@ -256,6 +256,66 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Unified import: Contact + Account in one request
+  app.post("/api/contacts/import-with-account", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const { contact: contactData, account: accountData } = req.body;
+
+      // Validate contact data
+      const validatedContact = insertContactSchema.parse(contactData);
+      
+      // Check email suppression
+      if (await storage.isEmailSuppressed(validatedContact.email)) {
+        return res.status(400).json({ message: "Email is on suppression list" });
+      }
+      
+      // Check phone suppression if provided
+      if (validatedContact.directPhoneE164 && await storage.isPhoneSuppressed(validatedContact.directPhoneE164)) {
+        return res.status(400).json({ message: "Phone is on DNC list" });
+      }
+
+      let account;
+      let accountCreated = false;
+      
+      // Normalize domain (trim and lowercase) to prevent duplicates from casing
+      if (accountData.domain) {
+        accountData.domain = accountData.domain.trim().toLowerCase();
+      }
+      
+      // Try to find existing account by domain first
+      if (accountData.domain) {
+        account = await storage.getAccountByDomain(accountData.domain);
+      }
+      
+      // If not found and we have account data, create new account
+      if (!account && (accountData.name || accountData.domain)) {
+        const validatedAccount = insertAccountSchema.parse(accountData);
+        account = await storage.createAccount(validatedAccount);
+        accountCreated = true;
+      }
+      
+      // Link contact to account if found/created
+      if (account) {
+        validatedContact.accountId = account.id;
+      }
+      
+      // Create contact
+      const contact = await storage.createContact(validatedContact);
+      
+      res.status(201).json({
+        contact,
+        account,
+        accountCreated,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      console.error("Unified import error:", error);
+      res.status(500).json({ message: "Failed to import contact with account" });
+    }
+  });
+
   app.post("/api/contacts", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const validated = insertContactSchema.parse(req.body);

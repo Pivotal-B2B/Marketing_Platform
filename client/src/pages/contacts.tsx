@@ -583,9 +583,9 @@ export default function ContactsPage() {
       <CSVImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
-        entityType="contact"
         onImportComplete={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
         }}
       />
     </div>

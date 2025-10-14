@@ -85,6 +85,7 @@ export interface IStorage {
   // Accounts
   getAccounts(filters?: FilterGroup): Promise<Account[]>;
   getAccount(id: string): Promise<Account | undefined>;
+  getAccountByDomain(domain: string): Promise<Account | undefined>;
   createAccount(account: InsertAccount): Promise<Account>;
   updateAccount(id: string, account: Partial<InsertAccount>): Promise<Account | undefined>;
   deleteAccount(id: string): Promise<void>;
@@ -401,6 +402,11 @@ export class DatabaseStorage implements IStorage {
 
   async getAccount(id: string): Promise<Account | undefined> {
     const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
+    return account || undefined;
+  }
+
+  async getAccountByDomain(domain: string): Promise<Account | undefined> {
+    const [account] = await db.select().from(accounts).where(eq(accounts.domain, domain));
     return account || undefined;
   }
 
