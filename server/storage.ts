@@ -71,6 +71,8 @@ import {
   type SendPolicy, type InsertSendPolicy,
   type DomainReputationSnapshot, type InsertDomainReputationSnapshot,
   type PerDomainStats, type InsertPerDomainStats,
+  customFieldDefinitions,
+  type CustomFieldDefinition, type InsertCustomFieldDefinition,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -94,6 +96,13 @@ export interface IStorage {
   createContact(contact: InsertContact): Promise<Contact>;
   updateContact(id: string, contact: Partial<InsertContact>): Promise<Contact | undefined>;
   deleteContact(id: string): Promise<void>;
+  
+  // Custom Field Definitions
+  getCustomFieldDefinitions(entityType?: 'account' | 'contact'): Promise<CustomFieldDefinition[]>;
+  getCustomFieldDefinition(id: string): Promise<CustomFieldDefinition | undefined>;
+  createCustomFieldDefinition(definition: InsertCustomFieldDefinition): Promise<CustomFieldDefinition>;
+  updateCustomFieldDefinition(id: string, definition: Partial<InsertCustomFieldDefinition>): Promise<CustomFieldDefinition | undefined>;
+  deleteCustomFieldDefinition(id: string): Promise<void>;
   
   // Campaigns
   getCampaigns(filters?: any): Promise<Campaign[]>;
@@ -452,6 +461,58 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContact(id: string): Promise<void> {
     await db.delete(contacts).where(eq(contacts.id, id));
+  }
+
+  // Custom Field Definitions
+  async getCustomFieldDefinitions(entityType?: 'account' | 'contact'): Promise<CustomFieldDefinition[]> {
+    if (entityType) {
+      const definitions = await db
+        .select()
+        .from(customFieldDefinitions)
+        .where(and(
+          eq(customFieldDefinitions.active, true),
+          eq(customFieldDefinitions.entityType, entityType)
+        ))
+        .orderBy(customFieldDefinitions.displayOrder);
+      return definitions;
+    } else {
+      const definitions = await db
+        .select()
+        .from(customFieldDefinitions)
+        .where(eq(customFieldDefinitions.active, true))
+        .orderBy(customFieldDefinitions.displayOrder);
+      return definitions;
+    }
+  }
+
+  async getCustomFieldDefinition(id: string): Promise<CustomFieldDefinition | undefined> {
+    const [definition] = await db.select().from(customFieldDefinitions).where(eq(customFieldDefinitions.id, id));
+    return definition || undefined;
+  }
+
+  async createCustomFieldDefinition(insertData: InsertCustomFieldDefinition): Promise<CustomFieldDefinition> {
+    const [definition] = await db
+      .insert(customFieldDefinitions)
+      .values(insertData)
+      .returning();
+    return definition;
+  }
+
+  async updateCustomFieldDefinition(id: string, updateData: Partial<InsertCustomFieldDefinition>): Promise<CustomFieldDefinition | undefined> {
+    const [definition] = await db
+      .update(customFieldDefinitions)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(customFieldDefinitions.id, id))
+      .returning();
+    return definition || undefined;
+  }
+
+  async deleteCustomFieldDefinition(id: string): Promise<void> {
+    // Soft delete by setting active to false
+    await db
+      .update(customFieldDefinitions)
+      .set({ active: false, updatedAt: new Date() })
+      .where(eq(customFieldDefinitions.id, id));
   }
 
   async upsertContact(data: Partial<InsertContact> & { email: string }, options?: {

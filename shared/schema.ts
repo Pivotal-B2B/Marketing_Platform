@@ -77,6 +77,17 @@ export const callDispositionEnum = pgEnum('call_disposition', [
 
 export const entityTypeEnum = pgEnum('entity_type', ['account', 'contact']);
 
+export const customFieldTypeEnum = pgEnum('custom_field_type', [
+  'text',
+  'number',
+  'date',
+  'boolean',
+  'select',
+  'multi_select',
+  'url',
+  'email'
+]);
+
 export const selectionTypeEnum = pgEnum('selection_type', ['explicit', 'filtered']);
 
 export const visibilityScopeEnum = pgEnum('visibility_scope', ['private', 'team', 'global']);
@@ -190,6 +201,27 @@ export const users = pgTable("users", {
 }, (table) => ({
   emailIdx: index("users_email_idx").on(table.email),
   usernameIdx: index("users_username_idx").on(table.username),
+}));
+
+// Custom Field Definitions table
+export const customFieldDefinitions = pgTable("custom_field_definitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: entityTypeEnum("entity_type").notNull(), // 'account' or 'contact'
+  fieldKey: text("field_key").notNull(), // Unique key used in customFields JSONB
+  displayLabel: text("display_label").notNull(), // Human-readable label
+  fieldType: customFieldTypeEnum("field_type").notNull(), // text, number, date, etc.
+  options: jsonb("options"), // For select/multi_select types: array of options
+  required: boolean("required").notNull().default(false),
+  defaultValue: text("default_value"),
+  helpText: text("help_text"), // Tooltip/help text for users
+  displayOrder: integer("display_order").notNull().default(0), // Order in forms
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+}, (table) => ({
+  entityKeyIdx: uniqueIndex("custom_field_definitions_entity_key_idx").on(table.entityType, table.fieldKey),
+  entityTypeIdx: index("custom_field_definitions_entity_type_idx").on(table.entityType),
 }));
 
 // Accounts table
@@ -998,6 +1030,17 @@ export const insertUserSchema = createInsertSchema(users).omit({
   updatedAt: true,
 });
 
+export const insertCustomFieldDefinitionSchema = createInsertSchema(customFieldDefinitions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateCustomFieldDefinitionSchema = insertCustomFieldDefinitionSchema.partial().extend({
+  // Prevent changing entity type after creation
+  entityType: z.never().optional(),
+});
+
 export const insertAccountSchema = createInsertSchema(accounts).omit({
   id: true,
   createdAt: true,
@@ -1261,6 +1304,9 @@ export const insertRevenueRangeReferenceSchema = createInsertSchema(revenueRange
 // Inferred Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type CustomFieldDefinition = typeof customFieldDefinitions.$inferSelect;
+export type InsertCustomFieldDefinition = z.infer<typeof insertCustomFieldDefinitionSchema>;
 
 export type Account = typeof accounts.$inferSelect;
 export type InsertAccount = z.infer<typeof insertAccountSchema>;

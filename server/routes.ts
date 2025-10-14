@@ -6,7 +6,9 @@ import webhooksRouter from "./routes/webhooks";
 import { z } from "zod";
 import { 
   insertAccountSchema, 
-  insertContactSchema, 
+  insertContactSchema,
+  insertCustomFieldDefinitionSchema,
+  updateCustomFieldDefinitionSchema,
   insertCampaignSchema,
   insertLeadSchema,
   insertSuppressionEmailSchema,
@@ -296,6 +298,68 @@ export function registerRoutes(app: Express) {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete contact" });
+    }
+  });
+
+  // ==================== CUSTOM FIELD DEFINITIONS ====================
+  
+  app.get("/api/custom-field-definitions", requireAuth, async (req, res) => {
+    try {
+      const entityType = req.query.entityType as 'account' | 'contact' | undefined;
+      const definitions = await storage.getCustomFieldDefinitions(entityType);
+      res.json(definitions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch custom field definitions" });
+    }
+  });
+
+  app.get("/api/custom-field-definitions/:id", requireAuth, async (req, res) => {
+    try {
+      const definition = await storage.getCustomFieldDefinition(req.params.id);
+      if (!definition) {
+        return res.status(404).json({ message: "Custom field definition not found" });
+      }
+      res.json(definition);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch custom field definition" });
+    }
+  });
+
+  app.post("/api/custom-field-definitions", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const validated = insertCustomFieldDefinitionSchema.parse(req.body);
+      const definition = await storage.createCustomFieldDefinition(validated);
+      res.status(201).json(definition);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create custom field definition" });
+    }
+  });
+
+  app.patch("/api/custom-field-definitions/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const validated = updateCustomFieldDefinitionSchema.parse(req.body);
+      const definition = await storage.updateCustomFieldDefinition(req.params.id, validated);
+      if (!definition) {
+        return res.status(404).json({ message: "Custom field definition not found" });
+      }
+      res.json(definition);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update custom field definition" });
+    }
+  });
+
+  app.delete("/api/custom-field-definitions/:id", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      await storage.deleteCustomFieldDefinition(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete custom field definition" });
     }
   });
 
