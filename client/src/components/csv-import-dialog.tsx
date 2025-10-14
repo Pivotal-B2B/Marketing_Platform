@@ -24,7 +24,6 @@ import {
 } from "@/lib/csv-utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CSVFieldMapper } from "@/components/csv-field-mapper";
 
 interface CSVImportDialogProps {
   open: boolean;
@@ -38,7 +37,7 @@ interface FieldMapping {
   targetEntity: "contact" | "account" | null;
 }
 
-type ImportStage = "upload" | "mapping" | "validate" | "preview" | "importing" | "complete";
+type ImportStage = "upload" | "validate" | "preview" | "importing" | "complete";
 
 export function CSVImportDialog({
   open,
@@ -67,7 +66,8 @@ export function CSVImportDialog({
         if (parsed.length > 0) {
           setHeaders(parsed[0]);
           setCsvData(parsed.slice(1));
-          setStage("mapping");
+          setStage("validate");
+          validateData(parsed);
         }
       };
       reader.readAsText(selectedFile);
@@ -298,15 +298,6 @@ export function CSVImportDialog({
             </div>
           )}
 
-          {/* Mapping Stage */}
-          {stage === "mapping" && (
-            <CSVFieldMapper
-              csvHeaders={headers}
-              sampleData={csvData}
-              onMappingComplete={handleMappingComplete}
-              onCancel={handleClose}
-            />
-          )}
 
           {/* Validation Stage */}
           {stage === "validate" && errors.length > 0 && (
