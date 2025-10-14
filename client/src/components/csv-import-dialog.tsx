@@ -153,11 +153,13 @@ export function CSVImportDialog({
         });
 
         // Send batch to server
-        const result = await apiRequest(
+        const response = await apiRequest(
           "POST",
           "/api/contacts/batch-import",
           { records }
-        ) as unknown as {
+        );
+        
+        const result = await response.json() as {
           success: number;
           failed: number;
           errors: Array<{ index: number; error: string }>;
