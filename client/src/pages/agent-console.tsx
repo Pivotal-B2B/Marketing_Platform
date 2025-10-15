@@ -190,6 +190,12 @@ export default function AgentConsolePage() {
   useEffect(() => {
     if (validPhoneOptions.length > 0) {
       setSelectedPhoneType(validPhoneOptions[0].type);
+      setShowManualDial(false);
+      setManualPhoneNumber('');
+    } else {
+      // No valid numbers, show manual dial option
+      setSelectedPhoneType('manual');
+      setShowManualDial(true);
     }
   }, [validPhoneOptions]);
 
@@ -318,8 +324,8 @@ export default function AgentConsolePage() {
     
     // If manual dial, append to notes for record keeping
     if (selectedPhoneType === 'manual') {
-      const manualDialNote = `\n[Manual Dial: ${phoneNumber}]`;
-      setNotes(prev => prev + manualDialNote);
+      const manualDialNote = `[Manual Dial: ${phoneNumber}]`;
+      setNotes(prev => prev ? `${prev}\n${manualDialNote}` : manualDialNote);
     }
     
     makeCall(e164Phone, sipConfig?.callerIdNumber);
@@ -584,11 +590,6 @@ export default function AgentConsolePage() {
                           <SelectItem value="manual" data-testid="option-manual-dial">
                             📞 Manual Dial (External Number)
                           </SelectItem>
-                          {validPhoneOptions.length === 0 && (
-                            <SelectItem value="manual" data-testid="option-manual-dial-only">
-                              📞 Manual Dial (No saved numbers)
-                            </SelectItem>
-                          )}
                         </SelectContent>
                       </Select>
                       
