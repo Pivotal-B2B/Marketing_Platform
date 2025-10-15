@@ -49,7 +49,7 @@ export default function TelemarketingCreatePage() {
     try {
       // Transform audience data to match schema
       const audienceRefs: any = {};
-      
+
       if (data.audience?.source === 'segment' && data.audience.selectedSegments?.length > 0) {
         audienceRefs.segments = data.audience.selectedSegments;
       }
@@ -62,7 +62,7 @@ export default function TelemarketingCreatePage() {
       if (data.audience?.source === 'filters' && data.audience.filterGroup) {
         audienceRefs.filterGroup = data.audience.filterGroup;
       }
-      
+
       // Add exclusions if present
       if (data.audience?.excludedSegments?.length > 0) {
         audienceRefs.excludedSegments = data.audience.excludedSegments;
@@ -92,7 +92,7 @@ export default function TelemarketingCreatePage() {
         callScript: data.content?.script,
         qualificationQuestions: data.content?.qualificationFields,
         scheduleJson,
-        assignedTeams: data.scheduling?.assignedAgents,
+        assignedTeams: data.scheduling?.assignedAgents || [], // Merged from changes snippet
         throttlingConfig,
         accountCapEnabled: data.accountCap?.enabled || false,
         accountCapValue: data.accountCap?.enabled ? data.accountCap.leadsPerAccount : null,

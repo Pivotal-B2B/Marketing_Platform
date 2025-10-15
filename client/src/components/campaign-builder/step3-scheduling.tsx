@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ChevronRight, Calendar, Clock, Zap } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 interface Step3Props {
   data: any;
@@ -20,6 +21,22 @@ export function Step3Scheduling({ data, onNext, campaignType }: Step3Props) {
   const [scheduleTime, setScheduleTime] = useState(data.scheduling?.time || "");
   const [timezone, setTimezone] = useState(data.scheduling?.timezone || "UTC");
   const [throttle, setThrottle] = useState(data.scheduling?.throttle || "");
+  const [assignedAgents, setAssignedAgents] = useState<string[]>(data.scheduling?.assignedAgents || []);
+
+  // Fetch available agents for telemarketing campaigns
+  const { data: agents = [] } = useQuery({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const response = await fetch("/api/users", {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error("Failed to fetch agents");
+      const users = await response.json();
+      // Filter to only show agents
+      return users.filter((user: any) => user.role === 'agent');
+    },
+    enabled: campaignType === "telemarketing",
+  });
 
   const handleNext = () => {
     onNext({
@@ -29,6 +46,7 @@ export function Step3Scheduling({ data, onNext, campaignType }: Step3Props) {
         time: scheduleTime,
         timezone,
         throttle,
+        assignedAgents: campaignType === "telemarketing" ? assignedAgents : undefined,
       },
     });
   };
@@ -177,17 +195,36 @@ export function Step3Scheduling({ data, onNext, campaignType }: Step3Props) {
               </div>
 
               <div className="space-y-2">
-                <Label>Agent Assignment</Label>
-                <Select defaultValue="auto">
+                <Label>Assign Agents</Label>
+                <Select 
+                  value={assignedAgents[0] || ""} 
+                  onValueChange={(value) => {
+                    if (value === "all") {
+                      setAssignedAgents(agents.map((a: any) => a.id));
+                    } else {
+                      setAssignedAgents([value]);
+                    }
+                  }}
+                >
                   <SelectTrigger data-testid="select-agent-assignment">
-                    <SelectValue />
+                    <SelectValue placeholder="Select agent..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">Auto-assign by availability</SelectItem>
-                    <SelectItem value="team">Assign to specific team</SelectItem>
-                    <SelectItem value="individual">Assign to specific agents</SelectItem>
+                    <SelectItem value="all">All Available Agents ({agents.length})</SelectItem>
+                    {agents.map((agent: any) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.firstName} {agent.lastName} ({agent.username})
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {assignedAgents.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {assignedAgents.length === agents.length 
+                      ? `All ${agents.length} agents assigned` 
+                      : `${assignedAgents.length} agent(s) assigned`}
+                  </p>
+                )}
               </div>
             </>
           )}

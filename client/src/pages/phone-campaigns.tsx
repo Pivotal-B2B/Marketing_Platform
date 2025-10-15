@@ -20,13 +20,16 @@ export default function PhoneCampaignsPage() {
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
     queryKey: ["/api/campaigns", { type: "telemarketing" }],
     queryFn: async () => {
-      const token = localStorage.getItem('authToken');
       const response = await fetch("/api/campaigns?type=telemarketing", {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-        },
+        credentials: 'include',
       });
-      if (!response.ok) throw new Error("Failed to fetch campaigns");
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/login';
+          throw new Error("Authentication required");
+        }
+        throw new Error("Failed to fetch campaigns");
+      }
       return response.json();
     },
   });
