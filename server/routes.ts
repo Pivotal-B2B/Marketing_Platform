@@ -1643,6 +1643,83 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Populate queue from campaign audience (segments/lists)
+  app.post("/api/campaigns/:id/queue/populate", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const campaign = await storage.getCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      // Get audience refs from campaign
+      const audienceRefs = campaign.audienceRefs as any;
+      if (!audienceRefs) {
+        return res.status(400).json({ message: "Campaign has no audience defined" });
+      }
+
+      let contacts: any[] = [];
+
+      // Resolve contacts from segments
+      if (audienceRefs.segments && Array.isArray(audienceRefs.segments)) {
+        for (const segmentId of audienceRefs.segments) {
+          const segment = await storage.getSegment(segmentId);
+          if (segment && segment.definitionJson) {
+            const segmentContacts = await storage.getContacts(segment.definitionJson as any);
+            contacts.push(...segmentContacts);
+          }
+        }
+      }
+
+      // Resolve contacts from lists
+      if (audienceRefs.lists && Array.isArray(audienceRefs.lists)) {
+        for (const listId of audienceRefs.lists) {
+          const list = await storage.getList(listId);
+          if (list && list.recordIds) {
+            const listContacts = await storage.getContactsByIds(list.recordIds);
+            contacts.push(...listContacts);
+          }
+        }
+      }
+
+      // Remove duplicates
+      const uniqueContacts = Array.from(
+        new Map(contacts.map(c => [c.id, c])).values()
+      );
+
+      if (uniqueContacts.length === 0) {
+        return res.status(400).json({ message: "No contacts found in campaign audience" });
+      }
+
+      // Enqueue all contacts
+      const enqueued = [];
+      for (const contact of uniqueContacts) {
+        try {
+          const queueItem = await storage.enqueueContact(
+            req.params.id,
+            contact.id,
+            contact.accountId,
+            0 // default priority
+          );
+          enqueued.push(queueItem);
+        } catch (error) {
+          // Skip contacts that can't be enqueued (e.g., already in queue)
+          console.warn(`Failed to enqueue contact ${contact.id}:`, error);
+        }
+      }
+
+      res.json({
+        message: `Successfully enqueued ${enqueued.length} contacts`,
+        enqueuedCount: enqueued.length,
+        totalContacts: uniqueContacts.length
+      });
+    } catch (error) {
+      console.error('Queue population error:', error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to populate queue" 
+      });
+    }
+  });
+
   app.patch("/api/campaigns/queue/:queueId/status", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { status, removedReason, isPositiveDisposition } = req.body;

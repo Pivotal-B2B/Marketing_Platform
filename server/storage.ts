@@ -106,6 +106,7 @@ export interface IStorage {
   // Contacts
   getContacts(filters?: FilterGroup): Promise<Contact[]>;
   getContact(id: string): Promise<Contact | undefined>;
+  getContactsByIds(ids: string[]): Promise<Contact[]>;
   getContactsByAccountId(accountId: string): Promise<Contact[]>;
   createContact(contact: InsertContact): Promise<Contact>;
   updateContact(id: string, contact: Partial<InsertContact>): Promise<Contact | undefined>;
@@ -567,6 +568,13 @@ export class DatabaseStorage implements IStorage {
 
   async getContactsByAccountId(accountId: string): Promise<Contact[]> {
     return await db.select().from(contacts).where(eq(contacts.accountId, accountId));
+  }
+
+  async getContactsByIds(ids: string[]): Promise<Contact[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    return await db.select().from(contacts).where(inArray(contacts.id, ids));
   }
 
   async createContact(insertContact: InsertContact): Promise<Contact> {
