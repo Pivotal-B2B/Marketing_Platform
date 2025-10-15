@@ -67,6 +67,34 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
     - **Agent Console Integration:** Real-time call controls (dial, hangup, mute), live call status indicators, audio playback through dedicated HTML5 audio element, and seamless disposition workflow after call completion
     - **Security:** SIP credentials stored securely in database with RBAC enforcement; agents retrieve default trunk config via authenticated API endpoint
 
+## Production Database Setup
+The system automatically initializes the production database with a default admin user when deployed with an empty database.
+
+**Automatic Database Initialization:**
+- **Smart Detection:** Checks if users exist on server startup
+- **Auto-Create Admin:** If database is empty, creates default admin user automatically
+- **No Duplicates:** Skips initialization if users already exist
+- **Implementation:** `server/db-init.ts` runs during server startup (`server/index.ts`)
+
+**Default Admin Credentials (Production):**
+- **Username:** admin
+- **Email:** admin@crm.local  
+- **Password:** Admin123!
+- **Role:** admin (with full permissions)
+
+**Customizing Admin Credentials:**
+To customize the default admin user, set these environment variables in Replit Secrets:
+- `ADMIN_USERNAME` - Custom admin username (default: "admin")
+- `ADMIN_EMAIL` - Custom admin email (default: "admin@crm.local")
+- `ADMIN_PASSWORD` - Custom admin password (default: "Admin123!")
+- `ADMIN_FIRST_NAME` - Custom first name (default: "Admin")
+- `ADMIN_LAST_NAME` - Custom last name (default: "User")
+
+**Security Note:**
+- Change the default password immediately after first login in production
+- Use Settings → User Management to create additional admin users
+- Development and production databases are completely separate (no data sharing)
+
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)
 - **Frontend Framework:** React 18
