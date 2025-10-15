@@ -713,7 +713,7 @@ export function registerRoutes(app: Express) {
       const [field] = await db.insert(customFieldDefinitions)
         .values({
           ...data,
-          createdBy: req.user?.id,
+          createdBy: req.user?.userId,
         })
         .returning();
 
@@ -1586,7 +1586,7 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "agentIds array is required" });
       }
 
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       
       // Release agents from their current campaigns first
       for (const agentId of agentIds) {
@@ -2002,7 +2002,7 @@ export function registerRoutes(app: Express) {
       const validated = insertSipTrunkConfigSchema.parse(req.body);
       const config = await storage.createSipTrunkConfig({
         ...validated,
-        createdById: req.user?.id,
+        createdById: req.user?.userId,
       });
       res.status(201).json(config);
     } catch (error) {
@@ -3678,7 +3678,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/campaigns/:campaignId/content-links", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { campaignId } = req.params;
-      const userId = (req.user as any).id;
+      const userId = (req.user as any).userId;
 
       // Verify campaign exists
       const campaign = await storage.getCampaign(campaignId);
