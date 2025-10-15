@@ -51,11 +51,14 @@ export function useTelnyxWebRTC({
         domain: sipDomain,
         hasPassword: !!sipPassword,
       });
+      console.log('SDK version: 2.22.18-beta.2');
       
       const telnyxClient = new TelnyxRTC({
         login: loginString,
         password: sipPassword,
         ringbackFile: undefined, // Use default ringback
+        // Note: Telnyx SDK handles websocket (wss://sip.telnyx.com:7443) and
+        // ICE servers (STUN: stun.telnyx.com:3478) automatically
       });
 
       // Event listeners
