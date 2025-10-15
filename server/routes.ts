@@ -2596,7 +2596,15 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/leads", requireAuth, async (req, res) => {
     try {
-      const leads = await storage.getLeads();
+      let filters = undefined;
+      if (req.query.filters) {
+        try {
+          filters = JSON.parse(req.query.filters as string);
+        } catch (e) {
+          return res.status(400).json({ message: "Invalid filters format" });
+        }
+      }
+      const leads = await storage.getLeads(filters);
       res.json(leads);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch leads" });

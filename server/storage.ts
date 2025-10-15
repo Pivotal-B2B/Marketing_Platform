@@ -2560,9 +2560,9 @@ export class DatabaseStorage implements IStorage {
 
 
   // Leads
-  async getLeads(filters?: any): Promise<LeadWithAccount[]> {
+  async getLeads(filters?: FilterGroup): Promise<LeadWithAccount[]> {
     // Join with contacts and accounts to get full details including company name
-    const results = await db
+    let query = db
       .select({
         id: leads.id,
         contactId: leads.contactId,
@@ -2587,9 +2587,17 @@ export class DatabaseStorage implements IStorage {
       })
       .from(leads)
       .leftJoin(contacts, eq(leads.contactId, contacts.id))
-      .leftJoin(accounts, eq(contacts.accountId, accounts.id))
-      .orderBy(desc(leads.createdAt));
+      .leftJoin(accounts, eq(contacts.accountId, accounts.id));
+
+    // Apply filters if provided
+    if (filters) {
+      const filterCondition = buildFilterQuery(filters, leads);
+      if (filterCondition) {
+        query = query.where(filterCondition) as any;
+      }
+    }
     
+    const results = await query.orderBy(desc(leads.createdAt));
     return results;
   }
 

@@ -1,8 +1,8 @@
 import { SQL, and, or, eq, like, gt, lt, gte, lte, ilike, sql, isNull, isNotNull, inArray } from "drizzle-orm";
 import { FilterGroup, FilterCondition } from "@shared/filter-types";
-import { accounts, contacts } from "@shared/schema";
+import { accounts, contacts, leads } from "@shared/schema";
 
-type TableType = typeof accounts | typeof contacts;
+type TableType = typeof accounts | typeof contacts | typeof leads;
 
 // Map filter field names to actual database column names
 const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
@@ -13,11 +13,14 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
   },
   contacts: {
     // Contacts don't have direct industry field - would need to join with accounts
+  },
+  leads: {
+    // Leads table uses standard field names
   }
 };
 
 function getColumnName(field: string, table: TableType): string {
-  const tableName = table === accounts ? 'accounts' : 'contacts';
+  const tableName = table === accounts ? 'accounts' : table === contacts ? 'contacts' : 'leads';
   return FIELD_MAPPINGS[tableName]?.[field] || field;
 }
 
