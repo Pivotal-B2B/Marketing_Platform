@@ -69,7 +69,7 @@ function AuthenticatedApp() {
               <Route path="/segments/:id" component={SegmentDetailPage} />
               <Route path="/segments" component={SegmentsPage} />
               <Route path="/domain-sets" component={DomainSetsPage} />
-              <Route path="/domain-sets/:id/accounts" component={AccountsListDetail} />
+              <Route path="/domain-sets/:id" component={AccountsListDetail} />
               <Route path="/campaigns" component={CampaignsPage} />
               <Route path="/campaigns/email/create" component={EmailCampaignCreatePage} />
               <Route path="/campaigns/email" component={EmailCampaignsPage} />

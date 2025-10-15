@@ -81,19 +81,17 @@ export default function AccountsListDetail() {
   };
 
   const handleCardClick = (accountId: string, matchType: string | undefined) => {
-    if (viewFilter === 'accounts') {
-      setLocation(`/accounts/${accountId}`);
-    } else if (viewFilter === 'contacts') {
-      // Assuming contacts have a similar detail page, adjust path if needed
+    if (viewFilter === 'contacts') {
+      // If viewing contacts, go to contact detail
       setLocation(`/contacts/${accountId}`);
     } else {
-      // Default behavior if no filter is active
+      // Otherwise go to account detail
       setLocation(`/accounts/${accountId}`);
     }
   };
 
   const handleNumberClick = (filterType: 'accounts' | 'contacts') => {
-    setLocation(`?view=${filterType}`);
+    setLocation(`/domain-sets/${id}?view=${filterType}`);
   };
 
   if (listLoading) {

@@ -301,7 +301,7 @@ export default function AccountsListTAL() {
       ) : (
         <div className="grid gap-6">
           {accountsLists.map((accountsList) => (
-            <Card key={accountsList.id} data-testid={`card-domain-set-${accountsList.id}`} className="cursor-pointer card-hover border-0 shadow-smooth-lg" onClick={() => window.location.href = `/domain-sets/${accountsList.id}/accounts`}>
+            <Card key={accountsList.id} data-testid={`card-domain-set-${accountsList.id}`} className="cursor-pointer card-hover border-0 shadow-smooth-lg" onClick={() => setLocation(`/domain-sets/${accountsList.id}`)}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
