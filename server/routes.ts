@@ -43,7 +43,7 @@ import {
   insertOrganizerSchema,
   insertSponsorSchema
 } from "@shared/schema";
-import { normalizePhoneE164 } from "@shared/utils"; // Import normalization utility
+import { normalizePhoneE164 } from "./normalization"; // Import normalization utility
 
 export function registerRoutes(app: Express) {
   // ==================== AUTH ====================
