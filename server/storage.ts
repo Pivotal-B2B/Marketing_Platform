@@ -1691,7 +1691,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAgentQueue(agentId: string, campaignId?: string, status?: string): Promise<any[]> {
-    let query = db
+    // Build the where conditions
+    const conditions = [eq(campaignQueue.agentId, agentId)];
+    
+    if (campaignId) {
+      conditions.push(eq(campaignQueue.campaignId, campaignId));
+    }
+    
+    if (status) {
+      conditions.push(eq(campaignQueue.status, status as any));
+    }
+
+    const results = await db
       .select({
         id: campaignQueue.id,
         campaignId: campaignQueue.campaignId,
@@ -1711,17 +1722,9 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(contacts, eq(campaignQueue.contactId, contacts.id))
       .leftJoin(accounts, eq(campaignQueue.accountId, accounts.id))
       .leftJoin(campaigns, eq(campaignQueue.campaignId, campaigns.id))
-      .where(eq(campaignQueue.agentId, agentId));
-
-    if (campaignId) {
-      query = query.where(eq(campaignQueue.campaignId, campaignId)) as any;
-    }
-
-    if (status) {
-      query = query.where(eq(campaignQueue.status, status as any)) as any;
-    }
-
-    const results = await query.orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
+      .where(and(...conditions))
+      .orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
+    
     return results;
   }
 

@@ -1675,7 +1675,7 @@ export function registerRoutes(app: Express) {
       // Now assign agents to the new campaign
       await storage.assignAgentsToCampaign(req.params.id, agentIds, userId);
       
-      // Automatically assign any existing queue items to the newly assigned agents
+      // Automatically assign existing unassigned queue items to the newly assigned agents
       const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
       
       res.status(201).json({ 
@@ -1967,14 +1967,16 @@ export function registerRoutes(app: Express) {
       const userRoles = req.user?.roles || [req.user?.role];
       const isAdmin = userRoles.includes('admin');
 
-      // Verify queue item ownership before allowing disposition (unless admin)
-      if (req.body.queueItemId && !isAdmin) {
+      // STRICT: Verify queue item ownership before allowing disposition (unless admin)
+      if (req.body.queueItemId) {
         const queueItem = await storage.getQueueItemById(req.body.queueItemId);
         if (!queueItem) {
           return res.status(404).json({ message: "Queue item not found" });
         }
-        if (queueItem.agentId !== agentId) {
-          return res.status(403).json({ message: "You can only create dispositions for your own queue items" });
+        
+        // STRICT: Only allow disposition if the queue item is assigned to this agent (or admin)
+        if (!isAdmin && queueItem.agentId !== agentId) {
+          return res.status(403).json({ message: "You can only create dispositions for queue items assigned to you" });
         }
       }
 
@@ -1994,20 +1996,25 @@ export function registerRoutes(app: Express) {
   });
 
   // Get calls for a specific queue item
-  app.get("/api/calls/queue/:queueItemId", requireAuth, requireRole('agent'), async (req, res) => {
+  app.get("/api/calls/queue/:queueItemId", requireAuth, async (req, res) => {
     try {
       const agentId = req.user?.userId;
       if (!agentId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Verify queue item ownership
+      // Check if user is admin
+      const userRoles = req.user?.roles || [req.user?.role];
+      const isAdmin = userRoles.includes('admin');
+
+      // STRICT: Verify queue item ownership (unless admin)
       const queueItem = await storage.getQueueItemById(req.params.queueItemId);
       if (!queueItem) {
         return res.status(404).json({ message: "Queue item not found" });
       }
-      if (queueItem.agentId !== agentId) {
-        return res.status(403).json({ message: "You can only view calls for your own queue items" });
+      
+      if (!isAdmin && queueItem.agentId !== agentId) {
+        return res.status(403).json({ message: "You can only view calls for queue items assigned to you" });
       }
 
       const calls = await storage.getCallsByQueueItem(req.params.queueItemId);
