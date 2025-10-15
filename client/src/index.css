@@ -80,8 +80,18 @@
 
   --input: 220 13% 82%;
   --ring: 220 90% 56%;
+  /* Semantic Colors - Extended Palette */
+  --success: 174 62% 42%;
+  --success-foreground: 174 62% 98%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 38 92% 98%;
+  --info: 199 89% 48%;
+  --info-foreground: 199 89% 98%;
+  --teal-accent: 174 62% 42%;
+  --teal-accent-foreground: 174 62% 98%;
+  
   --chart-1: 220 90% 56%;
-  --chart-2: 142 76% 36%;
+  --chart-2: 174 62% 42%;
   --chart-3: 38 92% 50%;
   --chart-4: 199 89% 48%;
   --chart-5: 280 87% 65%;
@@ -206,8 +216,18 @@
 
   --input: 220 13% 35%;
   --ring: 220 90% 56%;
+  /* Semantic Colors - Extended Palette for Dark Mode */
+  --success: 174 62% 52%;
+  --success-foreground: 174 62% 98%;
+  --warning: 38 92% 60%;
+  --warning-foreground: 38 92% 98%;
+  --info: 199 89% 58%;
+  --info-foreground: 199 89% 98%;
+  --teal-accent: 174 62% 52%;
+  --teal-accent-foreground: 174 62% 98%;
+  
   --chart-1: 220 90% 70%;
-  --chart-2: 142 76% 55%;
+  --chart-2: 174 62% 55%;
   --chart-3: 38 92% 65%;
   --chart-4: 199 89% 65%;
   --chart-5: 280 87% 75%;
@@ -399,6 +419,100 @@
   /* Badge glow effect */
   .badge-glow {
     box-shadow: 0 0 12px -2px currentColor;
+  }
+
+  /* Fade-in animation */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Count-up animation */
+  @keyframes countUp {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .animate-count-up {
+    animation: countUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Pulse glow animation */
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 8px -2px currentColor; }
+    50% { box-shadow: 0 0 16px 0px currentColor; }
+  }
+
+  .animate-pulse-glow {
+    animation: pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Slide-in from bottom */
+  @keyframes slideInBottom {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-slide-in-bottom {
+    animation: slideInBottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Icon hover glow */
+  .icon-hover {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .icon-hover:hover {
+    color: hsl(var(--primary));
+    filter: drop-shadow(0 0 6px hsl(var(--primary) / 0.3));
+  }
+
+  /* Premium gradient borders */
+  .gradient-border {
+    position: relative;
+    background: hsl(var(--card));
+  }
+
+  .gradient-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.5), hsl(var(--teal-accent) / 0.5));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Status indicator dots */
+  .status-dot {
+    @apply w-2 h-2 rounded-full inline-block;
+  }
+
+  .status-dot-success {
+    @apply bg-success;
+    box-shadow: 0 0 8px hsl(var(--success) / 0.6);
+  }
+
+  .status-dot-warning {
+    @apply bg-warning;
+    box-shadow: 0 0 8px hsl(var(--warning) / 0.6);
+  }
+
+  .status-dot-error {
+    @apply bg-destructive;
+    box-shadow: 0 0 8px hsl(var(--destructive) / 0.6);
+  }
+
+  .status-dot-info {
+    @apply bg-info;
+    box-shadow: 0 0 8px hsl(var(--info) / 0.6);
   }
 
   /* .no-default-hover-elevate/no-default-active-elevate is an escape hatch so consumers of
