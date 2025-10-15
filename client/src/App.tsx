@@ -60,9 +60,13 @@ function AuthenticatedApp() {
   const userRoles = (user as any)?.roles || [user?.role || 'agent'];
   
   // Debug log to help troubleshoot role issues
+  console.log('=== AUTH DEBUG ===');
   console.log('Current user:', user);
   console.log('Current user roles:', userRoles);
   console.log('User roles type:', typeof userRoles, Array.isArray(userRoles));
+  console.log('User role from legacy:', user?.role);
+  console.log('User roles from new system:', (user as any)?.roles);
+  console.log('==================');
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
