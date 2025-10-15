@@ -43,13 +43,17 @@ export default function ImportsPage() {
     mutationFn: async (file: File) => {
       if (!user?.id) throw new Error("User not authenticated");
       
-      // In production, this would upload to S3 and process in chunks
-      // For MVP, we'll create the import record
+      // Read the CSV file to count rows
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      const totalRows = Math.max(0, lines.length - 1); // Subtract header row
+      
+      // Create the import record
       const importData = {
         fileName: file.name,
         fileUrl: null, // Would be S3 URL in production
-        status: 'processing',
-        totalRows: null,
+        status: 'processing' as const,
+        totalRows,
         uploadedById: user.id,
       };
 

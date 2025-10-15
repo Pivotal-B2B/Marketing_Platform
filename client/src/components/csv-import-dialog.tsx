@@ -16,8 +16,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   parseCSV,
   validateContactWithAccountRow,
+  validateContactRow,
   csvRowToContactFromUnified,
   csvRowToAccountFromUnified,
+  csvRowToContact,
   type ValidationError,
   downloadCSV,
   generateContactsWithAccountTemplate,
@@ -107,6 +109,8 @@ export function CSVImportDialog({
 
     if (validationErrors.length === 0) {
       setStage("preview");
+    } else {
+      setStage("validate");
     }
   };
 
@@ -157,88 +161,98 @@ export function CSVImportDialog({
     let successCount = 0;
     let failedCount = 0;
 
-    // Check if we have field mappings (unified format) or not (contacts-only)
-    const isUnifiedFormat = fieldMappings.length > 0;
+    try {
+      // Check if we have field mappings (unified format) or not (contacts-only)
+      const isUnifiedFormat = fieldMappings.length > 0;
 
-    // Process in batches for better performance with large files
-    const BATCH_SIZE = 50;
-    const totalBatches = Math.ceil(csvData.length / BATCH_SIZE);
-    
-    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-      const start = batchIndex * BATCH_SIZE;
-      const end = Math.min(start + BATCH_SIZE, csvData.length);
-      const batchRows = csvData.slice(start, end);
+      // Process in batches for better performance with large files
+      const BATCH_SIZE = 50;
+      const totalBatches = Math.ceil(csvData.length / BATCH_SIZE);
+      
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const start = batchIndex * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, csvData.length);
+        const batchRows = csvData.slice(start, end);
 
-      try {
-        if (isUnifiedFormat) {
-          // Unified format with account data
-          const mappedHeaders = fieldMappings.map(m => {
-            if (!m.targetField || !m.targetEntity) return "";
-            return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
-          });
-
-          const records = batchRows.map((row) => {
-            const mappedRow = fieldMappings.map((mapping, idx) => row[idx] || "");
-            const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
-            const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
-            return { contact: contactData, account: accountData };
-          });
-
-          const response = await apiRequest(
-            "POST",
-            "/api/contacts/batch-import",
-            { records }
-          );
-          
-          const result = await response.json() as {
-            success: number;
-            failed: number;
-            errors: Array<{ index: number; error: string }>;
-          };
-          
-          successCount += result.success;
-          failedCount += result.failed;
-
-          if (result.errors.length > 0) {
-            result.errors.forEach((err: { index: number; error: string }) => {
-              console.error(`Row ${start + err.index + 2}: ${err.error}`);
+        try {
+          if (isUnifiedFormat) {
+            // Unified format with account data
+            const mappedHeaders = fieldMappings.map(m => {
+              if (!m.targetField || !m.targetEntity) return "";
+              return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
             });
-          }
-        } else {
-          // Contacts-only format
-          const contacts = batchRows.map((row) => csvRowToContact(row, headers));
 
-          for (const contactData of contacts) {
-            try {
-              await apiRequest("POST", "/api/contacts", contactData);
-              successCount++;
-            } catch (error) {
-              failedCount++;
-              console.error("Failed to import contact:", error);
+            const records = batchRows.map((row) => {
+              const mappedRow = fieldMappings.map((mapping, idx) => row[idx] || "");
+              const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
+              const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
+              return { contact: contactData, account: accountData };
+            });
+
+            const response = await apiRequest(
+              "POST",
+              "/api/contacts/batch-import",
+              { records }
+            );
+            
+            const result = await response.json() as {
+              success: number;
+              failed: number;
+              errors: Array<{ index: number; error: string }>;
+            };
+            
+            successCount += result.success;
+            failedCount += result.failed;
+
+            if (result.errors.length > 0) {
+              result.errors.forEach((err: { index: number; error: string }) => {
+                console.error(`Row ${start + err.index + 2}: ${err.error}`);
+              });
+            }
+          } else {
+            // Contacts-only format
+            const contacts = batchRows.map((row) => csvRowToContact(row, headers));
+
+            for (const contactData of contacts) {
+              try {
+                await apiRequest("POST", "/api/contacts", contactData);
+                successCount++;
+              } catch (error) {
+                failedCount++;
+                console.error("Failed to import contact:", error);
+              }
             }
           }
+        } catch (error) {
+          failedCount += batchRows.length;
+          console.error(`Failed to import batch ${batchIndex + 1}:`, error);
         }
-      } catch (error) {
-        failedCount += batchRows.length;
-        console.error(`Failed to import batch ${batchIndex + 1}:`, error);
+
+        setImportProgress(Math.round(((end) / csvData.length) * 100));
       }
 
-      setImportProgress(Math.round(((end) / csvData.length) * 100));
+      setImportResults({ success: successCount, failed: failedCount });
+      setStage("complete");
+
+      const message = isUnifiedFormat 
+        ? `Successfully imported ${successCount} contacts with accounts. ${failedCount} failed.`
+        : `Successfully imported ${successCount} contacts. ${failedCount} failed.`;
+
+      toast({
+        title: "Import Complete",
+        description: message,
+      });
+
+      onImportComplete();
+    } catch (error) {
+      console.error("Import failed:", error);
+      setStage("upload");
+      toast({
+        title: "Import Failed",
+        description: error instanceof Error ? error.message : "An error occurred during import",
+        variant: "destructive",
+      });
     }
-
-    setImportResults({ success: successCount, failed: failedCount });
-    setStage("complete");
-
-    const message = isUnifiedFormat 
-      ? `Successfully imported ${successCount} contacts with accounts. ${failedCount} failed.`
-      : `Successfully imported ${successCount} contacts. ${failedCount} failed.`;
-
-    toast({
-      title: "Import Complete",
-      description: message,
-    });
-
-    onImportComplete();
   };
 
   const downloadTemplate = () => {
