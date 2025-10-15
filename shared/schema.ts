@@ -724,6 +724,9 @@ export const campaigns = pgTable("campaigns", {
   retryRules: jsonb("retry_rules"),  // { voicemail: {}, no_answer: {}, backoff: "", business_hours: {}, respect_local_tz: bool }
   timezone: text("timezone"),  // Campaign timezone (e.g., 'America/New_York')
   
+  // Business Hours Configuration for Auto-Dialer
+  businessHoursConfig: jsonb("business_hours_config"), // { enabled: bool, timezone: string, operatingDays: string[], startTime: string, endTime: string, respectContactTimezone: bool, excludedDates: string[] }
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   launchedAt: timestamp("launched_at"),
