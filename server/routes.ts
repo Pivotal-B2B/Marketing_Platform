@@ -67,7 +67,7 @@ export function registerRoutes(app: Express) {
       }
 
       // Admin only for listing all users
-      if (req.user?.role !== 'admin') {
+      if (!req.user?.roles || !req.user.roles.includes('admin')) {
         return res.status(403).json({ message: "Forbidden" });
       }
 
