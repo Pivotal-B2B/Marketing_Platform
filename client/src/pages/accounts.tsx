@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Filter, Download, Building2, Pencil, Trash2 } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
 import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar";
+import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
+import { AddToListDialog } from "@/components/add-to-list-dialog";
 import { useSelection } from "@/hooks/use-selection";
 import type { FilterGroup } from "@shared/filter-types";
 import { exportAccountsToCSV, downloadCSV, generateAccountsTemplate } from "@/lib/csv-utils";
@@ -42,6 +44,8 @@ export default function AccountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [bulkUpdateDialogOpen, setBulkUpdateDialogOpen] = useState(false);
+  const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -175,6 +179,83 @@ export default function AccountsPage() {
       bulkDeleteMutation.mutate(Array.from(selectedIds));
     }
   };
+
+  const bulkUpdateMutation = useMutation({
+    mutationFn: async ({ field, value }: { field: string; value: string }) => {
+      await Promise.all(
+        Array.from(selectedIds).map(id =>
+          apiRequest('PATCH', `/api/accounts/${id}`, { [field]: value })
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+      clearSelection();
+      toast({
+        title: "Success",
+        description: `Updated ${selectedCount} accounts`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const addToListMutation = useMutation({
+    mutationFn: async (segmentId: string) => {
+      await apiRequest('POST', `/api/segments/${segmentId}/accounts`, {
+        accountIds: Array.from(selectedIds),
+      });
+    },
+    onSuccess: () => {
+      clearSelection();
+      toast({
+        title: "Success",
+        description: `Added ${selectedCount} accounts to list`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const createListMutation = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description: string }) => {
+      const segment = await apiRequest('POST', '/api/segments', {
+        name,
+        description,
+        type: 'account',
+        criteria: {},
+      });
+      const segmentData = await segment.json();
+      await apiRequest('POST', `/api/segments/${segmentData.id}/accounts`, {
+        accountIds: Array.from(selectedIds),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/segments'] });
+      clearSelection();
+      toast({
+        title: "Success",
+        description: `Created list and added ${selectedCount} accounts`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -322,8 +403,8 @@ export default function AccountsPage() {
         onClearSelection={clearSelection}
         onBulkExport={handleBulkExport}
         onBulkDelete={handleBulkDelete}
-        onBulkUpdate={() => toast({ title: "Bulk update coming soon" })}
-        onBulkAddToList={() => toast({ title: "Bulk add to list coming soon" })}
+        onBulkUpdate={() => setBulkUpdateDialogOpen(true)}
+        onBulkAddToList={() => setAddToListDialogOpen(true)}
       />
 
       {isLoading ? (
@@ -453,6 +534,25 @@ export default function AccountsPage() {
       )}
 
       {/* Note: CSV import for accounts is now handled via the unified Contact+Account import on the Contacts page */}
+
+      {/* Bulk Update Dialog */}
+      <BulkUpdateDialog
+        open={bulkUpdateDialogOpen}
+        onOpenChange={setBulkUpdateDialogOpen}
+        entityType="account"
+        selectedCount={selectedCount}
+        onUpdate={(field, value) => bulkUpdateMutation.mutate({ field, value })}
+      />
+
+      {/* Add to List Dialog */}
+      <AddToListDialog
+        open={addToListDialogOpen}
+        onOpenChange={setAddToListDialogOpen}
+        entityType="account"
+        selectedCount={selectedCount}
+        onAddToList={(listId) => addToListMutation.mutate(listId)}
+        onCreateList={(name, description) => createListMutation.mutate({ name, description })}
+      />
     </div>
   );
 }

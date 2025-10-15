@@ -24,6 +24,8 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useSelection } from "@/hooks/use-selection";
 import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar";
+import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
+import { AddToListDialog } from "@/components/add-to-list-dialog";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +59,8 @@ export default function ContactsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [bulkUpdateDialogOpen, setBulkUpdateDialogOpen] = useState(false);
+  const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -245,6 +249,83 @@ export default function ContactsPage() {
       bulkDeleteMutation.mutate(Array.from(selectedIds));
     }
   };
+
+  const bulkUpdateMutation = useMutation({
+    mutationFn: async ({ field, value }: { field: string; value: string }) => {
+      await Promise.all(
+        Array.from(selectedIds).map(id =>
+          apiRequest('PATCH', `/api/contacts/${id}`, { [field]: value })
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      clearSelection();
+      toast({
+        title: "Success",
+        description: `Updated ${selectedCount} contacts`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const addToListMutation = useMutation({
+    mutationFn: async (segmentId: string) => {
+      await apiRequest('POST', `/api/segments/${segmentId}/contacts`, {
+        contactIds: Array.from(selectedIds),
+      });
+    },
+    onSuccess: () => {
+      clearSelection();
+      toast({
+        title: "Success",
+        description: `Added ${selectedCount} contacts to list`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const createListMutation = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description: string }) => {
+      const segment = await apiRequest('POST', '/api/segments', {
+        name,
+        description,
+        type: 'contact',
+        criteria: {},
+      });
+      const segmentData = await segment.json();
+      await apiRequest('POST', `/api/segments/${segmentData.id}/contacts`, {
+        contactIds: Array.from(selectedIds),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/segments'] });
+      clearSelection();
+      toast({
+        title: "Success",
+        description: `Created list and added ${selectedCount} contacts`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -460,8 +541,8 @@ export default function ContactsPage() {
         onClearSelection={clearSelection}
         onBulkExport={handleBulkExport}
         onBulkDelete={handleBulkDelete}
-        onBulkUpdate={() => toast({ title: "Bulk update coming soon" })}
-        onBulkAddToList={() => toast({ title: "Bulk add to list coming soon" })}
+        onBulkUpdate={() => setBulkUpdateDialogOpen(true)}
+        onBulkAddToList={() => setAddToListDialogOpen(true)}
       />
 
       {contactsLoading ? (
@@ -624,6 +705,25 @@ export default function ContactsPage() {
           queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
           queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
         }}
+      />
+
+      {/* Bulk Update Dialog */}
+      <BulkUpdateDialog
+        open={bulkUpdateDialogOpen}
+        onOpenChange={setBulkUpdateDialogOpen}
+        entityType="contact"
+        selectedCount={selectedCount}
+        onUpdate={(field, value) => bulkUpdateMutation.mutate({ field, value })}
+      />
+
+      {/* Add to List Dialog */}
+      <AddToListDialog
+        open={addToListDialogOpen}
+        onOpenChange={setAddToListDialogOpen}
+        entityType="contact"
+        selectedCount={selectedCount}
+        onAddToList={(listId) => addToListMutation.mutate(listId)}
+        onCreateList={(name, description) => createListMutation.mutate({ name, description })}
       />
     </div>
   );
