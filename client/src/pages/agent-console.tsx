@@ -89,6 +89,7 @@ export default function AgentConsolePage() {
     isConnected,
     isMuted,
     callDuration,
+    lastError,
     formatDuration,
     makeCall,
     hangup,
@@ -316,6 +317,40 @@ export default function AgentConsolePage() {
             </Button>
           </div>
         </div>
+
+        {/* Error Details Alert */}
+        {lastError && (
+          <div className="bg-destructive/10 border-l-4 border-destructive p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-1">
+                <h3 className="font-semibold text-sm text-destructive mb-1">WebRTC Connection Error</h3>
+                <div className="text-xs space-y-1 font-mono">
+                  <div className="flex gap-2">
+                    <span className="text-muted-foreground">Code:</span>
+                    <span className="text-destructive font-semibold" data-testid="text-error-code">{lastError.code || 'Unknown'}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-muted-foreground">Message:</span>
+                    <span data-testid="text-error-message">{lastError.message}</span>
+                  </div>
+                  {lastError.sessionId && (
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground">Session:</span>
+                      <span className="opacity-70" data-testid="text-error-session">{lastError.sessionId}</span>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <span className="text-muted-foreground">Time:</span>
+                    <span className="opacity-70">{lastError.timestamp ? new Date(lastError.timestamp).toLocaleTimeString() : 'Unknown'}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Check browser console for full error details. Ensure SIP credentials are correct and Telnyx account is active.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Layout */}

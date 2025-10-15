@@ -5,6 +5,14 @@ import { useToast } from '@/hooks/use-toast';
 
 export type CallState = 'idle' | 'connecting' | 'ringing' | 'active' | 'held' | 'hangup';
 
+interface TelnyxErrorDetail {
+  code?: number;
+  message?: string;
+  sessionId?: string;
+  rawError?: any;
+  timestamp?: string;
+}
+
 interface UseTelnyxWebRTCProps {
   sipUsername?: string;
   sipPassword?: string;
@@ -26,6 +34,7 @@ export function useTelnyxWebRTC({
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const [lastError, setLastError] = useState<TelnyxErrorDetail | null>(null);
   const { toast } = useToast();
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -60,12 +69,54 @@ export function useTelnyxWebRTC({
       });
 
       telnyxClient.on('telnyx.error', (error: any) => {
-        console.error('Telnyx error:', error);
+        // Capture detailed error information
+        const errorDetail: TelnyxErrorDetail = {
+          code: error?.error?.code || error?.code,
+          message: error?.error?.message || error?.message || 'Unknown error',
+          sessionId: error?.sessionId || '',
+          rawError: error,
+          timestamp: new Date().toISOString(),
+        };
+        
+        setLastError(errorDetail);
+        
+        // Enhanced console logging
+        console.error('=== TELNYX ERROR DETAILS ===');
+        console.error('Error Code:', errorDetail.code);
+        console.error('Error Message:', errorDetail.message);
+        console.error('Session ID:', errorDetail.sessionId);
+        console.error('Timestamp:', errorDetail.timestamp);
+        console.error('Full Error Object:', JSON.stringify(error, null, 2));
+        console.error('SDK Version:', TelnyxRTC.prototype.constructor.name);
+        console.error('===========================');
+        
+        // User-friendly error messages based on error code
+        let userMessage = errorDetail.message;
+        let troubleshootingTip = '';
+        
+        switch (errorDetail.code) {
+          case -32001:
+            userMessage = 'Authentication Failed';
+            troubleshootingTip = 'Invalid credentials. Please verify your SIP username and password are correct.';
+            break;
+          case -32002:
+            userMessage = 'Connection Timeout';
+            troubleshootingTip = 'Unable to reach Telnyx server. Check your internet connection.';
+            break;
+          case -32003:
+            userMessage = 'Account Issue';
+            troubleshootingTip = 'Your Telnyx account may need attention (balance, permissions, etc).';
+            break;
+          default:
+            troubleshootingTip = `Error code: ${errorDetail.code}`;
+        }
+        
         toast({
           variant: "destructive",
-          title: "Connection Error",
-          description: error.message || "Failed to connect to calling service",
+          title: userMessage,
+          description: troubleshootingTip,
         });
+        
         setIsConnected(false);
       });
 
@@ -298,6 +349,7 @@ export function useTelnyxWebRTC({
     isConnected,
     isMuted,
     callDuration,
+    lastError,
     formatDuration,
     makeCall,
     hangup,
