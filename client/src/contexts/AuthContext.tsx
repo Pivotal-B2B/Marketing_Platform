@@ -6,6 +6,7 @@ interface AuthContextType {
   token: string | null;
   login: (token: string, user: Omit<User, 'password'>) => void;
   logout: () => void;
+  getToken: () => string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -44,6 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('authUser');
   };
 
+  const getToken = () => {
+    return token || localStorage.getItem('authToken');
+  };
+
   return (
     <AuthContext.Provider 
       value={{ 
@@ -51,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token, 
         login, 
         logout, 
+        getToken,
         isAuthenticated: !!token && !!user,
         isLoading
       }}
