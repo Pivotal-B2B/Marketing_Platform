@@ -47,26 +47,62 @@ export default function EmailCampaignCreatePage() {
 
   const handleComplete = async (data: any) => {
     try {
-      if (data.action === "draft") {
-        // Save as draft
-        await apiRequest("POST", "/api/campaigns", {
-          ...data,
-          type: "email",
-          status: "draft",
-        });
+      // Transform audience data to match schema
+      const audienceRefs: any = {};
+      
+      if (data.audience?.source === 'segment' && data.audience.selectedSegments?.length > 0) {
+        audienceRefs.segments = data.audience.selectedSegments;
+      }
+      if (data.audience?.source === 'list' && data.audience.selectedLists?.length > 0) {
+        audienceRefs.lists = data.audience.selectedLists;
+      }
+      if (data.audience?.source === 'domain_set' && data.audience.selectedDomainSets?.length > 0) {
+        audienceRefs.domainSets = data.audience.selectedDomainSets;
+      }
+      if (data.audience?.source === 'filters' && data.audience.filterGroup) {
+        audienceRefs.filterGroup = data.audience.filterGroup;
+      }
+      
+      // Add exclusions if present
+      if (data.audience?.excludedSegments?.length > 0) {
+        audienceRefs.excludedSegments = data.audience.excludedSegments;
+      }
+      if (data.audience?.excludedLists?.length > 0) {
+        audienceRefs.excludedLists = data.audience.excludedLists;
+      }
 
+      // Build throttling config
+      const throttlingConfig = data.scheduling?.throttle ? {
+        limit: data.scheduling.throttle,
+      } : undefined;
+
+      // Build schedule config
+      const scheduleJson = data.scheduling?.type === 'scheduled' ? {
+        type: 'scheduled',
+        date: data.scheduling.date,
+        time: data.scheduling.time,
+        timezone: data.scheduling.timezone,
+      } : undefined;
+
+      const campaignPayload = {
+        name: data.name || `Email Campaign ${new Date().toISOString()}`,
+        type: "email",
+        status: data.action === "draft" ? "draft" : "active",
+        audienceRefs,
+        emailSubject: data.content?.subject,
+        emailHtmlContent: data.content?.htmlContent,
+        scheduleJson,
+        throttlingConfig,
+      };
+
+      await apiRequest("POST", "/api/campaigns", campaignPayload);
+
+      if (data.action === "draft") {
         toast({
           title: "Draft Saved",
           description: "Your email campaign has been saved as a draft.",
         });
       } else {
-        // Launch campaign
-        const response = await apiRequest("POST", "/api/campaigns", {
-          ...data,
-          type: "email",
-          status: "active",
-        });
-
         toast({
           title: "Campaign Launched!",
           description: "Your email campaign is now running.",
@@ -74,10 +110,11 @@ export default function EmailCampaignCreatePage() {
       }
 
       setLocation("/campaigns/email");
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Campaign creation error:", error);
       toast({
         title: "Error",
-        description: "Failed to create campaign. Please try again.",
+        description: error?.message || "Failed to create campaign. Please try again.",
         variant: "destructive",
       });
     }

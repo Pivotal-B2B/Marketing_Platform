@@ -117,7 +117,7 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
 
   const toggleDomainSet = (id: string) => {
     setSelectedDomainSets(prev => 
-      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, d]
+      prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
     );
   };
 
@@ -129,7 +129,7 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
 
   const toggleExcludedList = (id: string) => {
     setExcludedLists(prev => 
-      prev.includes(id) ? prev.filter(l => l !== id) : [...prev, l]
+      prev.includes(id) ? prev.filter(l => l !== id) : [...prev, id]
     );
   };
 

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   Rocket, 
   Save, 
@@ -23,14 +25,15 @@ interface Step5Props {
 
 export function Step5Summary({ data, onNext, campaignType }: Step5Props) {
   const [isLaunching, setIsLaunching] = useState(false);
+  const [campaignName, setCampaignName] = useState(data.name || "");
 
   const handleLaunch = () => {
     setIsLaunching(true);
-    onNext({ ...data, action: "launch" });
+    onNext({ ...data, name: campaignName, action: "launch" });
   };
 
   const handleSaveDraft = () => {
-    onNext({ ...data, action: "draft" });
+    onNext({ ...data, name: campaignName, action: "draft" });
   };
 
   const handleSendTest = () => {
@@ -55,6 +58,26 @@ export function Step5Summary({ data, onNext, campaignType }: Step5Props) {
             </Badge>
           </div>
         </CardHeader>
+      </Card>
+
+      {/* Campaign Name */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Campaign Name</CardTitle>
+          <CardDescription>Give your campaign a descriptive name</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="campaign-name">Name</Label>
+            <Input
+              id="campaign-name"
+              data-testid="input-campaign-name"
+              placeholder={campaignType === "email" ? "e.g., Q4 Product Launch Email" : "e.g., Q4 Outbound Dialer Campaign"}
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+            />
+          </div>
+        </CardContent>
       </Card>
 
       {/* Audience Summary */}

@@ -47,26 +47,53 @@ export default function TelemarketingCreatePage() {
 
   const handleComplete = async (data: any) => {
     try {
-      // Ensure required fields are present
+      // Transform audience data to match schema
+      const audienceRefs: any = {};
+      
+      if (data.audience?.source === 'segment' && data.audience.selectedSegments?.length > 0) {
+        audienceRefs.segments = data.audience.selectedSegments;
+      }
+      if (data.audience?.source === 'list' && data.audience.selectedLists?.length > 0) {
+        audienceRefs.lists = data.audience.selectedLists;
+      }
+      if (data.audience?.source === 'domain_set' && data.audience.selectedDomainSets?.length > 0) {
+        audienceRefs.domainSets = data.audience.selectedDomainSets;
+      }
+      if (data.audience?.source === 'filters' && data.audience.filterGroup) {
+        audienceRefs.filterGroup = data.audience.filterGroup;
+      }
+      
+      // Add exclusions if present
+      if (data.audience?.excludedSegments?.length > 0) {
+        audienceRefs.excludedSegments = data.audience.excludedSegments;
+      }
+      if (data.audience?.excludedLists?.length > 0) {
+        audienceRefs.excludedLists = data.audience.excludedLists;
+      }
+
+      // Build throttling config
+      const throttlingConfig = data.scheduling?.dialingPace ? {
+        pace: data.scheduling.dialingPace,
+      } : undefined;
+
+      // Build schedule config
+      const scheduleJson = data.scheduling?.type === 'scheduled' ? {
+        type: 'scheduled',
+        date: data.scheduling.date,
+        time: data.scheduling.time,
+        timezone: data.scheduling.timezone,
+      } : undefined;
+
       const campaignPayload = {
         name: data.name || `Dialer Campaign ${new Date().toISOString()}`,
-        type: "telemarketing",
+        type: "call",
         status: data.action === "draft" ? "draft" : "active",
-        // Audience data
-        sourceType: data.sourceType,
-        segmentId: data.segmentId,
-        listId: data.listId,
-        domainSetId: data.domainSetId,
-        filtersJson: data.filtersJson || data.filters,
-        // Call script data
-        callScript: data.callScript,
-        qualificationQuestions: data.qualificationQuestions,
-        // Scheduling data
-        scheduleConfig: data.scheduleConfig,
-        assignedAgents: data.assignedAgents,
-        dialingPace: data.dialingPace,
-        // Compliance data
-        complianceConfig: data.complianceConfig,
+        audienceRefs,
+        callScript: data.content?.script,
+        qualificationQuestions: data.content?.qualificationFields,
+        scheduleJson,
+        assignedTeams: data.scheduling?.assignedAgents,
+        throttlingConfig,
       };
 
       await apiRequest("POST", "/api/campaigns", campaignPayload);
