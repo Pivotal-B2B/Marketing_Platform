@@ -189,6 +189,73 @@ export const contentStatusEnum = pgEnum('content_status', [
   'archived'
 ]);
 
+// Disposition & Call Management Enums
+export const dispositionSystemActionEnum = pgEnum('disposition_system_action', [
+  'add_to_global_dnc',
+  'remove_from_campaign_queue',
+  'remove_from_all_queues_for_contact',
+  'retry_after_delay',
+  'retry_with_next_attempt_window',
+  'converted_qualified',
+  'no_action'
+]);
+
+export const callJobStatusEnum = pgEnum('call_job_status', [
+  'queued',
+  'scheduled',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'removed'
+]);
+
+export const callSessionStatusEnum = pgEnum('call_session_status', [
+  'connecting',
+  'ringing',
+  'connected',
+  'no_answer',
+  'busy',
+  'failed',
+  'voicemail_detected',
+  'cancelled',
+  'completed'
+]);
+
+export const activityEventTypeEnum = pgEnum('activity_event_type', [
+  'call_job_created',
+  'call_job_scheduled',
+  'call_job_removed',
+  'call_started',
+  'call_connected',
+  'call_ended',
+  'disposition_saved',
+  'added_to_global_dnc',
+  'campaign_opt_out_saved',
+  'data_marked_invalid',
+  'retry_scheduled',
+  'account_cap_reached',
+  'queue_rebuilt',
+  'contact_called',
+  'email_sent',
+  'email_opened',
+  'email_clicked',
+  'form_submitted',
+  'task_created',
+  'task_completed',
+  'note_added'
+]);
+
+export const activityEntityTypeEnum = pgEnum('activity_entity_type', [
+  'contact',
+  'account',
+  'campaign',
+  'call_job',
+  'call_session',
+  'lead',
+  'user',
+  'email_message'
+]);
+
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -341,6 +408,19 @@ export const contacts = pgTable("contacts", {
   sourceSystem: text("source_system"),
   sourceRecordId: text("source_record_id"),
   sourceUpdatedAt: timestamp("source_updated_at"),
+  
+  // Timezone & Business Hours fields
+  timezone: text("timezone"), // IANA timezone (e.g., 'America/New_York')
+  city: text("city"),
+  state: text("state"),
+  country: text("country"),
+  
+  // Data Quality fields
+  isInvalid: boolean("is_invalid").notNull().default(false),
+  invalidReason: text("invalid_reason"),
+  invalidatedAt: timestamp("invalidated_at"),
+  invalidatedBy: varchar("invalidated_by").references(() => users.id, { onDelete: 'set null' }),
+  
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -351,6 +431,7 @@ export const contacts = pgTable("contacts", {
   phoneIdx: index("contacts_phone_idx").on(table.directPhoneE164),
   ownerIdx: index("contacts_owner_idx").on(table.ownerId),
   tagsGinIdx: index("contacts_tags_gin_idx").using('gin', table.tags),
+  timezoneIdx: index("contacts_timezone_idx").on(table.timezone),
 }));
 
 // Contact Emails - Secondary email addresses for contacts
@@ -580,6 +661,11 @@ export const campaigns = pgTable("campaigns", {
   accountCapEnabled: boolean("account_cap_enabled").notNull().default(false),
   accountCapValue: integer("account_cap_value"),
   accountCapMode: accountCapModeEnum("account_cap_mode"),
+  
+  // Retry Logic & Business Hours
+  retryRules: jsonb("retry_rules"),  // { voicemail: {}, no_answer: {}, backoff: "", business_hours: {}, respect_local_tz: bool }
+  timezone: text("timezone"),  // Campaign timezone (e.g., 'America/New_York')
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   launchedAt: timestamp("launched_at"),
@@ -728,6 +814,140 @@ export const suppressionPhones = pgTable("suppression_phones", {
 }, (table) => ({
   phoneIdx: index("suppression_phones_idx").on(table.phoneE164),
 }));
+
+// ========== DISPOSITION MANAGEMENT & CALL ACTIVITY SYSTEM ==========
+
+// Dispositions - Client-defined labels mapped to system actions
+export const dispositions = pgTable("dispositions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  label: text("label").notNull().unique(), // Client-facing label (e.g., "Do Not Call", "Voicemail Left")
+  systemAction: dispositionSystemActionEnum("system_action").notNull(),
+  params: jsonb("params"), // { retry_delay_minutes: 60, etc. }
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'set null' }),
+}, (table) => ({
+  labelIdx: index("dispositions_label_idx").on(table.label),
+  systemActionIdx: index("dispositions_system_action_idx").on(table.systemAction),
+}));
+
+// Call Jobs - Queue items for calls with scheduling
+export const callJobs = pgTable("call_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  agentId: varchar("agent_id").references(() => users.id, { onDelete: 'set null' }),
+  status: callJobStatusEnum("status").notNull().default('queued'),
+  scheduledAt: timestamp("scheduled_at"),
+  priority: integer("priority").notNull().default(0),
+  attemptNo: integer("attempt_no").notNull().default(0),
+  lockedByAgentId: varchar("locked_by_agent_id").references(() => users.id, { onDelete: 'set null' }),
+  lockedAt: timestamp("locked_at"),
+  removedReason: text("removed_reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignStatusIdx: index("call_jobs_campaign_status_idx").on(table.campaignId, table.status),
+  contactIdx: index("call_jobs_contact_idx").on(table.contactId),
+  accountIdx: index("call_jobs_account_idx").on(table.accountId),
+  agentIdx: index("call_jobs_agent_idx").on(table.agentId),
+  scheduledAtIdx: index("call_jobs_scheduled_at_idx").on(table.scheduledAt),
+}));
+
+// Call Sessions - Individual call attempts with Telnyx integration
+export const callSessions = pgTable("call_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  callJobId: varchar("call_job_id").references(() => callJobs.id, { onDelete: 'cascade' }).notNull(),
+  telnyxCallId: text("telnyx_call_id"),
+  fromNumber: text("from_number"),
+  toNumberE164: text("to_number_e164").notNull(),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  endedAt: timestamp("ended_at"),
+  durationSec: integer("duration_sec"),
+  recordingUrl: text("recording_url"),
+  status: callSessionStatusEnum("status").notNull().default('connecting'),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  callJobIdx: index("call_sessions_call_job_idx").on(table.callJobId),
+  telnyxCallIdx: index("call_sessions_telnyx_call_idx").on(table.telnyxCallId),
+  statusIdx: index("call_sessions_status_idx").on(table.status),
+}));
+
+// Call Dispositions - Links call sessions to dispositions with notes
+export const callDispositions = pgTable("call_dispositions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  callSessionId: varchar("call_session_id").references(() => callSessions.id, { onDelete: 'cascade' }).notNull(),
+  dispositionId: varchar("disposition_id").references(() => dispositions.id, { onDelete: 'restrict' }).notNull(),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'set null' }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  callSessionIdx: index("call_dispositions_call_session_idx").on(table.callSessionId),
+  dispositionIdx: index("call_dispositions_disposition_idx").on(table.dispositionId),
+}));
+
+// Global DNC - Do Not Call list (platform-wide)
+export const globalDnc = pgTable("global_dnc", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }),
+  phoneE164: text("phone_e164"),
+  source: text("source").notNull(), // agent | api | import
+  reason: text("reason"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  contactIdx: index("global_dnc_contact_idx").on(table.contactId),
+  phoneIdx: index("global_dnc_phone_idx").on(table.phoneE164),
+  contactPhoneUniq: uniqueIndex("global_dnc_contact_phone_uniq").on(table.contactId, table.phoneE164),
+}));
+
+// Campaign Opt-Outs - Per-campaign contact suppression
+export const campaignOptOuts = pgTable("campaign_opt_outs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  reason: text("reason"),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignContactUniq: uniqueIndex("campaign_opt_outs_campaign_contact_uniq").on(table.campaignId, table.contactId),
+  campaignIdx: index("campaign_opt_outs_campaign_idx").on(table.campaignId),
+  contactIdx: index("campaign_opt_outs_contact_idx").on(table.contactId),
+}));
+
+// Activity Log - Event store for audit trail and timelines
+export const activityLog = pgTable("activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: activityEntityTypeEnum("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  eventType: activityEventTypeEnum("event_type").notNull(),
+  payload: jsonb("payload"), // Rich event data
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  entityIdx: index("activity_log_entity_idx").on(table.entityType, table.entityId),
+  eventTypeIdx: index("activity_log_event_type_idx").on(table.eventType),
+  createdAtIdx: index("activity_log_created_at_idx").on(table.createdAt),
+}));
+
+// Business Hours Config - Timezone-based calling hours
+export const businessHoursConfig = pgTable("business_hours_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timezone: text("timezone").notNull(), // IANA timezone
+  dayOfWeek: integer("day_of_week").notNull(), // 0-6 (Sunday-Saturday)
+  startTime: text("start_time").notNull(), // HH:MM format
+  endTime: text("end_time").notNull(), // HH:MM format
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  timezoneIdx: index("business_hours_config_timezone_idx").on(table.timezone),
+  timezoneDayUniq: uniqueIndex("business_hours_config_timezone_day_uniq").on(table.timezone, table.dayOfWeek),
+}));
+
+// ========== END DISPOSITION MANAGEMENT SYSTEM ==========
 
 // Campaign Orders (Client Portal)
 export const campaignOrders = pgTable("campaign_orders", {
