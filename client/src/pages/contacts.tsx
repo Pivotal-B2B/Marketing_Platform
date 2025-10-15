@@ -209,6 +209,43 @@ export default function ContactsPage() {
     isSomeSelected,
   } = useSelection(filteredContacts);
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map(id => apiRequest('DELETE', `/api/contacts/${id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      clearSelection();
+      toast({
+        title: "Success",
+        description: `Deleted ${selectedCount} contacts`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const handleBulkExport = () => {
+    const selectedContacts = filteredContacts.filter(c => selectedIds.has(c.id));
+    const csv = exportContactsToCSV(selectedContacts);
+    downloadCSV(csv, `contacts_bulk_export_${new Date().toISOString().split('T')[0]}.csv`);
+    toast({
+      title: "Export Complete",
+      description: `Exported ${selectedCount} contacts to CSV`,
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (confirm(`Are you sure you want to delete ${selectedCount} contacts? This action cannot be undone.`)) {
+      bulkDeleteMutation.mutate(Array.from(selectedIds));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -421,8 +458,8 @@ export default function ContactsPage() {
         selectedCount={selectedCount}
         totalCount={filteredContacts.length}
         onClearSelection={clearSelection}
-        onBulkExport={() => toast({ title: "Bulk export coming soon" })}
-        onBulkDelete={() => toast({ title: "Bulk delete coming soon" })}
+        onBulkExport={handleBulkExport}
+        onBulkDelete={handleBulkDelete}
         onBulkUpdate={() => toast({ title: "Bulk update coming soon" })}
         onBulkAddToList={() => toast({ title: "Bulk add to list coming soon" })}
       />

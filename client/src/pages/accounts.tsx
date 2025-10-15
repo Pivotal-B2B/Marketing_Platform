@@ -139,6 +139,43 @@ export default function AccountsPage() {
     isSomeSelected,
   } = useSelection(filteredAccounts);
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map(id => apiRequest('DELETE', `/api/accounts/${id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+      clearSelection();
+      toast({
+        title: "Success",
+        description: `Deleted ${selectedCount} accounts`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const handleBulkExport = () => {
+    const selectedAccounts = filteredAccounts.filter(a => selectedIds.has(a.id));
+    const csv = exportAccountsToCSV(selectedAccounts);
+    downloadCSV(csv, `accounts_bulk_export_${new Date().toISOString().split('T')[0]}.csv`);
+    toast({
+      title: "Export Complete",
+      description: `Exported ${selectedCount} accounts to CSV`,
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (confirm(`Are you sure you want to delete ${selectedCount} accounts? This action cannot be undone.`)) {
+      bulkDeleteMutation.mutate(Array.from(selectedIds));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -283,8 +320,8 @@ export default function AccountsPage() {
         selectedCount={selectedCount}
         totalCount={filteredAccounts.length}
         onClearSelection={clearSelection}
-        onBulkExport={() => toast({ title: "Bulk export coming soon" })}
-        onBulkDelete={() => toast({ title: "Bulk delete coming soon" })}
+        onBulkExport={handleBulkExport}
+        onBulkDelete={handleBulkDelete}
         onBulkUpdate={() => toast({ title: "Bulk update coming soon" })}
         onBulkAddToList={() => toast({ title: "Bulk add to list coming soon" })}
       />
