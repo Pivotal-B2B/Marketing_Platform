@@ -1675,12 +1675,14 @@ export function registerRoutes(app: Express) {
       // Now assign agents to the new campaign
       await storage.assignAgentsToCampaign(req.params.id, agentIds, userId);
       
-      // Automatically assign existing unassigned queue items to the newly assigned agents
+      // Automatically assign ALL existing unassigned queue items to the newly assigned agents
+      // This includes items that were created before agents were assigned
       const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
       
       res.status(201).json({ 
         message: "Agents assigned successfully",
-        queueItemsAssigned: assignResult.assigned
+        queueItemsAssigned: assignResult.assigned,
+        note: assignResult.assigned === 0 ? "No unassigned queue items found. Queue may need to be populated first." : undefined
       });
     } catch (error) {
       console.error('Agent assignment error:', error);
@@ -1917,18 +1919,37 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Assign queue items to agents
+  // Assign or re-assign queue items to agents
   app.post("/api/campaigns/:id/queue/assign", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
-      const { agentIds, mode = 'round_robin' } = req.body;
+      const { agentIds, mode = 'round_robin', reassignAll = false } = req.body;
 
       if (!agentIds || !Array.isArray(agentIds) || agentIds.length === 0) {
         return res.status(400).json({ message: "agentIds array is required" });
       }
 
+      // If reassignAll is true, first clear all agent assignments for this campaign
+      if (reassignAll) {
+        await db
+          .update(campaignQueue)
+          .set({ agentId: null, updatedAt: new Date() })
+          .where(
+            and(
+              eq(campaignQueue.campaignId, req.params.id),
+              eq(campaignQueue.status, 'queued')
+            )
+          );
+      }
+
       const result = await storage.assignQueueToAgents(req.params.id, agentIds, mode);
-      res.json(result);
+      res.json({ 
+        ...result,
+        message: reassignAll 
+          ? `Re-assigned all queue items to ${agentIds.length} agent(s)` 
+          : `Assigned unassigned queue items to ${agentIds.length} agent(s)`
+      });
     } catch (error) {
+      console.error('Queue assignment error:', error);
       res.status(500).json({ message: "Failed to assign queue to agents" });
     }
   });
