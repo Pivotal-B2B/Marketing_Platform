@@ -118,13 +118,6 @@ export interface IStorage {
   createCampaignAudienceSnapshot(snapshot: InsertCampaignAudienceSnapshot): Promise<CampaignAudienceSnapshot>;
   getCampaignAudienceSnapshots(campaignId: string): Promise<CampaignAudienceSnapshot[]>;
 
-  // Sender Profiles
-  getSenderProfiles(): Promise<SenderProfile[]>;
-  getSenderProfile(id: string): Promise<SenderProfile | undefined>;
-  createSenderProfile(profile: InsertSenderProfile): Promise<SenderProfile>;
-  updateSenderProfile(id: string, profile: Partial<InsertSenderProfile>): Promise<SenderProfile | undefined>;
-  deleteSenderProfile(id: string): Promise<void>;
-
   // Email Templates
   getEmailTemplates(): Promise<EmailTemplate[]>;
   getEmailTemplate(id: string): Promise<EmailTemplate | undefined>;
@@ -216,13 +209,6 @@ export interface IStorage {
   updateList(id: string, list: Partial<InsertList>): Promise<List | undefined>;
   deleteList(id: string): Promise<void>;
   exportList(listId: string, format: 'csv' | 'json'): Promise<{ data: any; filename: string }>;
-
-  // Domain Sets (will be renamed to Accounts List (TAL))
-  getDomainSets(filters?: any): Promise<DomainSet[]>;
-  getDomainSet(id: string): Promise<DomainSet | undefined>;
-  createDomainSet(domainSet: InsertDomainSet): Promise<DomainSet>;
-  updateDomainSet(id: string, domainSet: Partial<InsertDomainSet>): Promise<DomainSet | undefined>;
-  deleteDomainSet(id: string): Promise<void>;
 
   // Leads
   getLeads(filters?: any): Promise<Lead[]>;
@@ -330,12 +316,7 @@ export interface IStorage {
   convertDomainSetToList(domainSetId: string, listName: string, userId: string): Promise<List>;
 
   // Email Infrastructure (Phase 26)
-  // Sender Profiles
-  getSenderProfiles(): Promise<SenderProfile[]>;
-  getSenderProfile(id: string): Promise<SenderProfile | undefined>;
-  createSenderProfile(profile: InsertSenderProfile): Promise<SenderProfile>;
-  updateSenderProfile(id: string, profile: Partial<InsertSenderProfile>): Promise<SenderProfile | undefined>;
-  deleteSenderProfile(id: string): Promise<void>;
+  // Sender Profiles (declared above at lines 122-126)
 
   // Domain Authentication
   getDomainAuths(): Promise<DomainAuth[]>;
@@ -1587,33 +1568,6 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Domain Sets (will be renamed to Accounts List (TAL))
-  async getDomainSets(filters?: any): Promise<DomainSet[]> {
-    return await db.select().from(domainSets).orderBy(desc(domainSets.createdAt));
-  }
-
-  async getDomainSet(id: string): Promise<DomainSet | undefined> {
-    const [domainSet] = await db.select().from(domainSets).where(eq(domainSets.id, id));
-    return domainSet || undefined;
-  }
-
-  async createDomainSet(insertDomainSet: InsertDomainSet): Promise<DomainSet> {
-    const [domainSet] = await db.insert(domainSets).values(insertDomainSet).returning();
-    return domainSet;
-  }
-
-  async updateDomainSet(id: string, updateData: Partial<InsertDomainSet>): Promise<DomainSet | undefined> {
-    const [domainSet] = await db
-      .update(domainSets)
-      .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(domainSets.id, id))
-      .returning();
-    return domainSet || undefined;
-  }
-
-  async deleteDomainSet(id: string): Promise<void> {
-    await db.delete(domainSets).where(eq(domainSets.id, id));
-  }
 
   // Leads
   async getLeads(filters?: any): Promise<Lead[]> {
