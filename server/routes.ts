@@ -285,7 +285,7 @@ export function registerRoutes(app: Express) {
       }
 
       // Check if this is the first user (should get admin role)
-      const allUsers = await storage.getAllUsers();
+      const allUsers = await storage.getUsers();
       const isFirstUser = allUsers.length === 0;
 
       // Hash password
