@@ -96,7 +96,9 @@ export default function AgentConsolePage() {
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
   const [currentContactIndex, setCurrentContactIndex] = useState(0);
-  const [selectedPhoneType, setSelectedPhoneType] = useState<'direct' | 'mobile' | 'company'>('direct');
+  const [selectedPhoneType, setSelectedPhoneType] = useState<'direct' | 'company' | 'manual'>('direct');
+  const [manualPhoneNumber, setManualPhoneNumber] = useState<string>('');
+  const [showManualDial, setShowManualDial] = useState(false);
   
   // Disposition form state
   const [disposition, setDisposition] = useState<string>('');
@@ -154,13 +156,14 @@ export default function AgentConsolePage() {
     enabled: !!currentQueueItem?.contactId,
   });
 
-  // Compute valid phone options
+  // Compute valid phone options (Priority: Direct → Company)
+  // Mobile numbers kept in records for identification only, not for calling
   const validPhoneOptions = useMemo(() => {
     if (!contactDetails) return [];
     
-    const options: Array<{ type: 'direct' | 'mobile' | 'company'; number: string; label: string }> = [];
+    const options: Array<{ type: 'direct' | 'company' | 'manual'; number: string; label: string }> = [];
     
-    // Check direct phone
+    // Priority 1: Direct phone (primary calling method)
     if (contactDetails.directPhone && normalizePhoneToE164(contactDetails.directPhone)) {
       options.push({
         type: 'direct',
@@ -169,16 +172,7 @@ export default function AgentConsolePage() {
       });
     }
     
-    // Check mobile phone
-    if (contactDetails.mobilePhone && normalizePhoneToE164(contactDetails.mobilePhone)) {
-      options.push({
-        type: 'mobile',
-        number: contactDetails.mobilePhone,
-        label: `Mobile: ${contactDetails.mobilePhone}`
-      });
-    }
-    
-    // Check company phone
+    // Priority 2: Company phone (secondary option if needed)
     if (contactDetails.account?.mainPhone && normalizePhoneToE164(contactDetails.account.mainPhone)) {
       options.push({
         type: 'company',
@@ -186,6 +180,8 @@ export default function AgentConsolePage() {
         label: `Company: ${contactDetails.account.mainPhone}`
       });
     }
+    
+    // Note: Mobile numbers are kept in records for identification only
     
     return options;
   }, [contactDetails]);
@@ -277,12 +273,21 @@ export default function AgentConsolePage() {
     let phoneNumber: string | null = null;
     let phoneLabel = '';
 
-    if (selectedPhoneType === 'direct') {
+    if (selectedPhoneType === 'manual') {
+      phoneNumber = manualPhoneNumber.trim();
+      phoneLabel = 'Manual Number';
+      
+      if (!phoneNumber) {
+        toast({
+          title: "No phone number",
+          description: "Please enter a phone number to dial",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (selectedPhoneType === 'direct') {
       phoneNumber = contactDetails?.directPhone || null;
       phoneLabel = 'Direct Phone';
-    } else if (selectedPhoneType === 'mobile') {
-      phoneNumber = contactDetails?.mobilePhone || null;
-      phoneLabel = 'Mobile Phone';
     } else if (selectedPhoneType === 'company') {
       phoneNumber = contactDetails?.account?.mainPhone || null;
       phoneLabel = 'Company Phone';
@@ -310,6 +315,13 @@ export default function AgentConsolePage() {
     }
 
     console.log(`Calling ${phoneLabel}: ${phoneNumber} → ${e164Phone}`);
+    
+    // If manual dial, append to notes for record keeping
+    if (selectedPhoneType === 'manual') {
+      const manualDialNote = `\n[Manual Dial: ${phoneNumber}]`;
+      setNotes(prev => prev + manualDialNote);
+    }
+    
     makeCall(e164Phone, sipConfig?.callerIdNumber);
   };
 
@@ -548,7 +560,14 @@ export default function AgentConsolePage() {
                     {/* Phone Numbers with Selector */}
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Select Phone Number</Label>
-                      <Select value={selectedPhoneType} onValueChange={(value: 'direct' | 'mobile' | 'company') => setSelectedPhoneType(value)}>
+                      <Select value={selectedPhoneType} onValueChange={(value: 'direct' | 'company' | 'manual') => {
+                        setSelectedPhoneType(value);
+                        if (value === 'manual') {
+                          setShowManualDial(true);
+                        } else {
+                          setShowManualDial(false);
+                        }
+                      }}>
                         <SelectTrigger data-testid="select-phone-type">
                           <SelectValue />
                         </SelectTrigger>
@@ -562,11 +581,34 @@ export default function AgentConsolePage() {
                               {option.label}
                             </SelectItem>
                           ))}
+                          <SelectItem value="manual" data-testid="option-manual-dial">
+                            📞 Manual Dial (External Number)
+                          </SelectItem>
                           {validPhoneOptions.length === 0 && (
-                            <SelectItem value="none" disabled>No valid phone numbers available</SelectItem>
+                            <SelectItem value="manual" data-testid="option-manual-dial-only">
+                              📞 Manual Dial (No saved numbers)
+                            </SelectItem>
                           )}
                         </SelectContent>
                       </Select>
+                      
+                      {/* Manual Dial Input */}
+                      {showManualDial && (
+                        <div className="space-y-1 pt-1">
+                          <Label className="text-xs text-muted-foreground">Enter Phone Number</Label>
+                          <input
+                            type="tel"
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            placeholder="e.g., (555) 123-4567"
+                            value={manualPhoneNumber}
+                            onChange={(e) => setManualPhoneNumber(e.target.value)}
+                            data-testid="input-manual-phone"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Will be recorded in call notes
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Company/Account */}
