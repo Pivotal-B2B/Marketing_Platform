@@ -54,7 +54,7 @@ export default function AccountsPage() {
   const [selectAllPages, setSelectAllPages] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
+
   const ITEMS_PER_PAGE = 250;
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
@@ -239,9 +239,11 @@ export default function AccountsPage() {
 
   const addToListMutation = useMutation({
     mutationFn: async (listId: string) => {
-      await apiRequest('POST', `/api/lists/${listId}/accounts`, {
-        accountIds: Array.from(selectedIds),
+      const response = await apiRequest(`/api/lists/${listId}/accounts`, {
+        method: 'POST',
+        body: JSON.stringify({ accountIds: Array.from(selectedIds) }),
       });
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
@@ -611,7 +613,7 @@ export default function AccountsPage() {
                 >
                   Previous
                 </Button>
-                
+
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum;
@@ -624,7 +626,7 @@ export default function AccountsPage() {
                     } else {
                       pageNum = currentPage - 2 + i;
                     }
-                    
+
                     return (
                       <Button
                         key={pageNum}

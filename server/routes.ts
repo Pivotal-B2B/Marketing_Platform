@@ -1029,11 +1029,13 @@ export function registerRoutes(app: Express) {
       }
 
       // Merge with existing IDs and deduplicate
-      const updatedIds = Array.from(new Set([...list.recordIds, ...contactIds]));
+      const existingIds = list.recordIds || [];
+      const updatedIds = Array.from(new Set([...existingIds, ...contactIds]));
       const updated = await storage.updateList(req.params.id, { recordIds: updatedIds });
 
       res.json(updated);
     } catch (error) {
+      console.error('Add contacts to list error:', error);
       res.status(500).json({ message: "Failed to add contacts to list" });
     }
   });
@@ -1056,11 +1058,13 @@ export function registerRoutes(app: Express) {
       }
 
       // Merge with existing IDs and deduplicate
-      const updatedIds = Array.from(new Set([...list.recordIds, ...accountIds]));
+      const existingIds = list.recordIds || [];
+      const updatedIds = Array.from(new Set([...existingIds, ...accountIds]));
       const updated = await storage.updateList(req.params.id, { recordIds: updatedIds });
 
       res.json(updated);
     } catch (error) {
+      console.error('Add accounts to list error:', error);
       res.status(500).json({ message: "Failed to add accounts to list" });
     }
   });
