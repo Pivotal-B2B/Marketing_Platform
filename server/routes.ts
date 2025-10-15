@@ -1954,15 +1954,19 @@ export function registerRoutes(app: Express) {
   // ==================== CALL DISPOSITIONS ====================
 
   // Create call disposition (agent saves disposition after call)
-  app.post("/api/calls/disposition", requireAuth, requireRole('agent'), async (req, res) => {
+  app.post("/api/calls/disposition", requireAuth, async (req, res) => {
     try {
       const agentId = req.user?.userId;
       if (!agentId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Verify queue item ownership before allowing disposition
-      if (req.body.queueItemId) {
+      // Check if user is admin
+      const userRoles = req.user?.roles || [req.user?.role];
+      const isAdmin = userRoles.includes('admin');
+
+      // Verify queue item ownership before allowing disposition (unless admin)
+      if (req.body.queueItemId && !isAdmin) {
         const queueItem = await storage.getQueueItemById(req.body.queueItemId);
         if (!queueItem) {
           return res.status(404).json({ message: "Queue item not found" });
