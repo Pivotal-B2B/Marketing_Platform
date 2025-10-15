@@ -58,6 +58,9 @@ function AuthenticatedApp() {
 
   // Get user roles array (support both legacy single role and new multi-role system)
   const userRoles = (user as any)?.roles || [user?.role || 'agent'];
+  
+  // Debug log to help troubleshoot role issues
+  console.log('Current user roles:', userRoles);
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>

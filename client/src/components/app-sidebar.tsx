@@ -71,11 +71,12 @@ const getNavSections = (): NavSection[] => [
     label: "CRM",
     roles: ["admin", "campaign_manager", "data_ops", "qa_analyst", "agent", "client_user"],
     items: [
+      // Dashboard is visible to all authenticated users
       {
         title: "Dashboard",
         url: "/",
         icon: LayoutDashboard,
-        roles: ["admin", "campaign_manager", "data_ops", "qa_analyst", "agent", "client_user"],
+        roles: ["admin", "campaign_manager", "data_ops", "qa_analyst", "agent", "client_user", "content_creator"],
       },
       {
         title: "Accounts",
@@ -99,7 +100,7 @@ const getNavSections = (): NavSection[] => [
       },
     ],
   },
-  
+
   // Campaigns & Outreach Section
   {
     label: "Campaigns & Outreach",
@@ -352,7 +353,7 @@ export function AppSidebar({ userRoles = ["admin"] }: { userRoles?: string[] }) 
           </div>
         ))}
       </SidebarContent>
-      
+
       <SidebarFooter className="p-4 border-t">
         <Button 
           variant="ghost" 

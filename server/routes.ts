@@ -236,9 +236,14 @@ export function registerRoutes(app: Express) {
           await storage.assignUserRole(user.id, 'admin', user.id);
           userRoles = ['admin'];
         } else {
-          // Use legacy role as fallback
-          userRoles = [user.role];
+          // Use legacy role as fallback - ensure it's always in an array
+          userRoles = [user.role || 'agent'];
         }
+      }
+      
+      // Ensure userRoles is always an array
+      if (!Array.isArray(userRoles)) {
+        userRoles = [userRoles];
       }
       
       // Generate JWT token with roles
