@@ -1184,7 +1184,7 @@ export function registerRoutes(app: Express) {
 
       // Get all domain set items with matched accounts
       const matchedItems = await db
-        .select()
+        .selectDistinct({ accountId: domainSetItems.accountId })
         .from(domainSetItems)
         .where(
           and(
@@ -1197,12 +1197,10 @@ export function registerRoutes(app: Express) {
         return res.json([]);
       }
 
-      // Get unique account IDs, filtering out any null values
-      const accountIds = [...new Set(
-        matchedItems
-          .map(item => item.accountId)
-          .filter((id): id is string => id !== null && id !== undefined)
-      )];
+      // Extract account IDs (already filtered for non-null by query)
+      const accountIds = matchedItems
+        .map(item => item.accountId)
+        .filter((id): id is string => id !== null && id !== undefined);
 
       if (accountIds.length === 0) {
         return res.json([]);
@@ -1228,7 +1226,7 @@ export function registerRoutes(app: Express) {
 
       // Get all accounts that were matched by this domain set
       const matchedAccountIds = await db
-        .select()
+        .selectDistinct({ accountId: domainSetItems.accountId })
         .from(domainSetItems)
         .where(
           and(
@@ -1241,12 +1239,10 @@ export function registerRoutes(app: Express) {
         return res.json([]);
       }
 
-      // Get unique account IDs, filtering out any null/undefined values
-      const accountIds = [...new Set(
-        matchedAccountIds
-          .map(m => m.accountId)
-          .filter((id): id is string => id !== null && id !== undefined)
-      )];
+      // Extract account IDs (already filtered for non-null by query)
+      const accountIds = matchedAccountIds
+        .map(m => m.accountId)
+        .filter((id): id is string => id !== null && id !== undefined);
 
       if (accountIds.length === 0) {
         return res.json([]);
