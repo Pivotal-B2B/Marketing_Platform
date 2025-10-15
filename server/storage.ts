@@ -1350,21 +1350,6 @@ export class DatabaseStorage implements IStorage {
     } else {
       // For contacts, we already have the full records from the query
       return allRecords as Contact[];
-          deletedAt: contacts.deletedAt,
-          createdAt: contacts.createdAt,
-          updatedAt: contacts.updatedAt,
-          accountName: accounts.name,
-        })
-        .from(contacts)
-        .leftJoin(accounts, eq(contacts.accountId, accounts.id))
-        .where(inArray(contacts.id, sampleIds));
-      
-      // Map back to Contact type with account name embedded
-      return contactsWithAccounts.map(c => ({
-        ...c,
-        // Store account name in a way the frontend can access it
-        account: c.accountName ? { name: c.accountName } : undefined
-      })) as any;
     }
   }
 
