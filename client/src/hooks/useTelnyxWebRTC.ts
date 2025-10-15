@@ -107,7 +107,16 @@ export function useTelnyxWebRTC({
       });
 
       // Connect to Telnyx
-      telnyxClient.connect();
+      telnyxClient.connect().catch((error: any) => {
+        console.error('Telnyx connection failed:', error);
+        setIsConnected(false);
+        toast({
+          variant: "destructive",
+          title: "Connection Failed",
+          description: error.message || "Failed to connect to Telnyx server",
+        });
+      });
+      
       setClient(telnyxClient);
 
       return () => {
