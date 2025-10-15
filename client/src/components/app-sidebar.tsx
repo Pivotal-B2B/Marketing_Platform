@@ -131,6 +131,14 @@ const getNavStructure = (): NavItem[] => [
     ],
   },
   {
+    title: "Telephony Settings",
+    icon: Phone,
+    roles: ["admin"],
+    items: [
+      { title: "SIP Trunk Configuration", url: "/telephony/sip-trunks", roles: ["admin"] },
+    ],
+  },
+  {
     title: "QA & Leads Delivery",
     url: "/leads",
     icon: CheckCircle,

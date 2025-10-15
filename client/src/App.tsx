@@ -41,6 +41,7 @@ import EventsPage from "@/pages/events";
 import ResourcesPage from "@/pages/resources";
 import NewsPage from "@/pages/news";
 import SenderProfilesPage from "@/pages/sender-profiles";
+import SipTrunkSettingsPage from "@/pages/sip-trunk-settings";
 import AgentConsolePage from "./pages/agent-console";
 import ResourcesCentrePage from "@/pages/resources-centre";
 import CampaignQueuePage from "@/pages/campaign-queue";
@@ -91,6 +92,7 @@ function AuthenticatedApp() {
               <Route path="/resources-centre" component={ResourcesCentrePage} />
               <Route path="/agent-console" component={AgentConsolePage} />
               <Route path="/email-infrastructure/sender-profiles" component={SenderProfilesPage} />
+              <Route path="/telephony/sip-trunks" component={SipTrunkSettingsPage} />
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />
               <Route path="/reports" component={ReportsPage} />
