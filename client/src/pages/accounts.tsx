@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/shared/empty-state";
 import {
   Dialog,
@@ -38,7 +39,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAccountSchema, type InsertAccount, type Account } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CSVImportDialog } from "@/components/csv-import-dialog";
+import { CSVImportAccountsDialog } from "@/components/csv-import-accounts-dialog";
 
 export default function AccountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -540,23 +541,11 @@ export default function AccountsPage() {
         />
       )}
 
-      <CSVImportDialog
-        isOpen={importDialogOpen}
-        onClose={() => setImportDialogOpen(false)}
-        entityType="account"
-        onImportSuccess={() => {
+      <CSVImportAccountsDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImportComplete={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
-          toast({
-            title: "Import Successful",
-            description: "Accounts imported successfully.",
-          });
-        }}
-        onImportError={(error) => {
-          toast({
-            variant: "destructive",
-            title: "Import Failed",
-            description: error.message,
-          });
         }}
       />
 
