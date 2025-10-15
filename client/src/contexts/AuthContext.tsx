@@ -25,7 +25,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedUser = localStorage.getItem('authUser');
       
       if (storedToken && storedUser) {
-        // Validate the token by making a test API call
+        // First set the state immediately
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+        
+        // Then validate the token in the background
         try {
           const response = await fetch('/api/dashboard/stats', {
             headers: {
@@ -33,21 +37,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           });
           
-          if (response.ok) {
-            // Token is valid, load the auth state
-            setToken(storedToken);
-            setUser(JSON.parse(storedUser));
-          } else {
-            // Token is invalid (401/403), clear everything
-            console.log('[AUTH] Clearing invalid/expired token from localStorage');
+          if (!response.ok && (response.status === 401 || response.status === 403)) {
+            // Only clear if we get a definite auth failure
+            console.log('[AUTH] Token validation failed, clearing auth state');
+            setToken(null);
+            setUser(null);
             localStorage.removeItem('authToken');
             localStorage.removeItem('authUser');
           }
+          // If we get other errors (500, network issues, etc.), keep the token
         } catch (error) {
-          // Network error or other issue, clear auth state to be safe
-          console.error('[AUTH] Error validating token:', error);
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('authUser');
+          // On network errors, keep the user logged in
+          console.warn('[AUTH] Token validation error (keeping user logged in):', error);
         }
       }
       
