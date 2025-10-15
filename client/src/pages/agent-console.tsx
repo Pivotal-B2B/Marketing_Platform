@@ -40,8 +40,14 @@ type Contact = {
   fullName: string;
   email: string;
   directPhone: string | null;
+  mobilePhone: string | null;
   jobTitle: string | null;
   accountId: string | null;
+  account?: {
+    id: string;
+    name: string;
+    mainPhone: string | null;
+  } | null;
 };
 
 // Queue item type
@@ -72,6 +78,7 @@ export default function AgentConsolePage() {
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
   const [currentContactIndex, setCurrentContactIndex] = useState(0);
+  const [selectedPhoneType, setSelectedPhoneType] = useState<'direct' | 'mobile' | 'company'>('direct');
   
   // Disposition form state
   const [disposition, setDisposition] = useState<string>('');
@@ -196,15 +203,6 @@ export default function AgentConsolePage() {
   });
 
   const handleDial = () => {
-    if (!currentQueueItem?.contactPhone) {
-      toast({
-        title: "No phone number",
-        description: "This contact doesn't have a phone number",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!isConnected) {
       toast({
         title: "Not connected",
@@ -214,9 +212,33 @@ export default function AgentConsolePage() {
       return;
     }
 
+    // Get phone number based on selected type
+    let phoneNumber: string | null = null;
+    let phoneLabel = '';
+
+    if (selectedPhoneType === 'direct') {
+      phoneNumber = contactDetails?.directPhone || null;
+      phoneLabel = 'Direct Phone';
+    } else if (selectedPhoneType === 'mobile') {
+      phoneNumber = contactDetails?.mobilePhone || null;
+      phoneLabel = 'Mobile Phone';
+    } else if (selectedPhoneType === 'company') {
+      phoneNumber = contactDetails?.account?.mainPhone || null;
+      phoneLabel = 'Company Phone';
+    }
+
+    if (!phoneNumber) {
+      toast({
+        title: "No phone number",
+        description: `This contact doesn't have a ${phoneLabel.toLowerCase()}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Normalize phone number to E.164 format
     // Remove all non-digit characters
-    const digitsOnly = currentQueueItem.contactPhone.replace(/\D/g, '');
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
     
     // Add + and country code if needed
     let e164Phone = digitsOnly;
@@ -231,6 +253,7 @@ export default function AgentConsolePage() {
       e164Phone = `+${digitsOnly}`;
     }
 
+    console.log(`Calling ${phoneLabel}: ${phoneNumber} → ${e164Phone}`);
     makeCall(e164Phone, sipConfig?.callerIdNumber);
   };
 
@@ -466,15 +489,34 @@ export default function AgentConsolePage() {
                       </div>
                     </div>
 
-                    {/* Phone */}
-                    <div className="flex items-start gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-muted-foreground">Phone</p>
-                        <p className="font-medium font-mono text-sm tracking-wide" data-testid="text-contact-phone">
-                          {currentQueueItem.contactPhone || 'No phone'}
-                        </p>
-                      </div>
+                    {/* Phone Numbers with Selector */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Select Phone Number</Label>
+                      <Select value={selectedPhoneType} onValueChange={(value: 'direct' | 'mobile' | 'company') => setSelectedPhoneType(value)}>
+                        <SelectTrigger data-testid="select-phone-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contactDetails?.directPhone && (
+                            <SelectItem value="direct" data-testid="option-direct-phone">
+                              Direct: {contactDetails.directPhone}
+                            </SelectItem>
+                          )}
+                          {contactDetails?.mobilePhone && (
+                            <SelectItem value="mobile" data-testid="option-mobile-phone">
+                              Mobile: {contactDetails.mobilePhone}
+                            </SelectItem>
+                          )}
+                          {contactDetails?.account?.mainPhone && (
+                            <SelectItem value="company" data-testid="option-company-phone">
+                              Company: {contactDetails.account.mainPhone}
+                            </SelectItem>
+                          )}
+                          {!contactDetails?.directPhone && !contactDetails?.mobilePhone && !contactDetails?.account?.mainPhone && (
+                            <SelectItem value="direct" disabled>No phone numbers available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {/* Company/Account */}
