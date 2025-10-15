@@ -1336,7 +1336,14 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/campaigns", requireAuth, async (req, res) => {
     try {
-      const campaigns = await storage.getCampaigns();
+      const typeFilter = req.query.type as string | undefined;
+      let campaigns = await storage.getCampaigns();
+      
+      // Filter by type if specified
+      if (typeFilter) {
+        campaigns = campaigns.filter(c => c.type === typeFilter);
+      }
+      
       res.json(campaigns);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch campaigns" });

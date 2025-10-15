@@ -11,10 +11,18 @@ export default function CampaignsPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [, setLocation] = useLocation();
 
-  // Placeholder: In real implementation, these would fetch from API
   const { data: campaigns = [], isLoading } = useQuery({
     queryKey: ["/api/campaigns"],
-    enabled: false, // Disabled until API is implemented
+    queryFn: async () => {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch("/api/campaigns", {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
+      if (!response.ok) throw new Error("Failed to fetch campaigns");
+      return response.json();
+    },
   });
 
   // Mock data for demonstration

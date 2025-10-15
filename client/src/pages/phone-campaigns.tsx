@@ -20,7 +20,12 @@ export default function PhoneCampaignsPage() {
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
     queryKey: ["/api/campaigns", { type: "telemarketing" }],
     queryFn: async () => {
-      const response = await fetch("/api/campaigns?type=telemarketing");
+      const token = localStorage.getItem('authToken');
+      const response = await fetch("/api/campaigns?type=telemarketing", {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+      });
       if (!response.ok) throw new Error("Failed to fetch campaigns");
       return response.json();
     },
