@@ -30,7 +30,7 @@ export function TopBar({ userName = "Admin User" }: { userName?: string }) {
     <header className="flex items-center justify-between gap-4 border-b bg-background px-4 py-3">
       <div className="flex items-center gap-4 flex-1">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
-        
+
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -44,15 +44,15 @@ export function TopBar({ userName = "Admin User" }: { userName?: string }) {
 
       <div className="flex items-center gap-2">
         <ThemeToggle />
-        
+
         <Button variant="ghost" size="icon" data-testid="button-help">
           <HelpCircle className="h-5 w-5" />
         </Button>
 
         <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
           <Bell className="h-5 w-5" />
-          <Badge 
-            variant="destructive" 
+          <Badge
+            variant="destructive"
             className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
           >
             3

@@ -23,11 +23,14 @@ export default function Dashboard() {
   });
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Overview of your B2B campaigns and performance metrics
-        </p>
+      <div className="bg-gradient-primary rounded-2xl p-8 text-white shadow-smooth-lg relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+        <div className="relative z-10">
+          <h1 className="text-3xl font-bold">Welcome Back!</h1>
+          <p className="mt-2 text-white/90">
+            Overview of your B2B campaigns and performance metrics
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -75,35 +78,41 @@ export default function Dashboard() {
 
       {/* Charts will be added later with real campaign metrics */}
       
-      <Card>
+      <Card className="border-0 shadow-smooth-lg">
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle className="text-xl">Quick Actions</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="hover-elevate cursor-pointer">
+            <Card className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-blue-500/10 to-blue-600/5">
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <Building2 className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <h3 className="font-semibold">Create Account</h3>
+                  <div className="h-16 w-16 mx-auto mb-3 bg-blue-500/20 rounded-2xl flex items-center justify-center">
+                    <Building2 className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="font-semibold text-lg">Create Account</h3>
                   <p className="text-sm text-muted-foreground mt-1">Add a new company</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="hover-elevate cursor-pointer">
+            <Card className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-purple-500/10 to-purple-600/5">
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <Mail className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <h3 className="font-semibold">New Campaign</h3>
+                  <div className="h-16 w-16 mx-auto mb-3 bg-purple-500/20 rounded-2xl flex items-center justify-center">
+                    <Mail className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <h3 className="font-semibold text-lg">New Campaign</h3>
                   <p className="text-sm text-muted-foreground mt-1">Launch email or calls</p>
                 </div>
               </CardContent>
             </Card>
-            <Card className="hover-elevate cursor-pointer">
+            <Card className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-green-500/10 to-green-600/5">
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <CheckCircle className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <h3 className="font-semibold">Review Leads</h3>
+                  <div className="h-16 w-16 mx-auto mb-3 bg-green-500/20 rounded-2xl flex items-center justify-center">
+                    <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  </div>
+                  <h3 className="font-semibold text-lg">Review Leads</h3>
                   <p className="text-sm text-muted-foreground mt-1">Approve or reject</p>
                 </div>
               </CardContent>

@@ -21,23 +21,21 @@ export function SectionCard({
 }: SectionCardProps) {
   return (
     <Card className={className}>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3 flex-1 min-w-0">
-            {Icon && (
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Icon className="w-4 h-4 text-primary" />
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-lg">{title}</CardTitle>
-              {description && (
-                <CardDescription className="mt-1">{description}</CardDescription>
-              )}
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Icon className="h-5 w-5 text-primary" />
             </div>
+          )}
+          <div>
+            <CardTitle className="text-lg">{title}</CardTitle>
+            {description && (
+              <p className="text-sm text-muted-foreground mt-1">{description}</p>
+            )}
           </div>
-          {action && <div className="flex-shrink-0">{action}</div>}
         </div>
+        {action && <div className="flex-shrink-0">{action}</div>}
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>

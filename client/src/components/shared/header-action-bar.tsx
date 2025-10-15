@@ -97,18 +97,21 @@ export function HeaderActionBar({
   };
 
   return (
-    <div className="sticky top-0 z-10 bg-background border-b">
+    <div className="sticky top-0 z-10 border-b bg-gradient-surface shadow-smooth backdrop-blur-sm">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between gap-6">
           {/* Left: Avatar + Title + Badges */}
           <div className="flex items-center gap-4 flex-1 min-w-0">
-            <Avatar className="w-12 h-12">
-              {avatarUrl && <AvatarImage src={avatarUrl} alt={title} />}
-              <AvatarFallback className="text-lg font-semibold">
-                {avatarFallback}
-              </AvatarFallback>
-            </Avatar>
-            
+            <div className="relative">
+              <Avatar className="h-16 w-16 border-2 border-primary/30 shadow-lg">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt={title} />}
+                <AvatarFallback className="bg-gradient-primary text-white font-bold text-xl">
+                  {avatarFallback}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-1 -right-1 h-5 w-5 bg-green-500 rounded-full border-2 border-background"></div>
+            </div>
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-semibold truncate">{title}</h1>
