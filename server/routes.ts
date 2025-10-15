@@ -804,6 +804,21 @@ export function registerRoutes(app: Express) {
     try {
       const validated = insertSegmentSchema.parse(req.body);
       const segment = await storage.createSegment(validated);
+      
+      // Calculate and update record count
+      if (segment.definitionJson) {
+        const preview = await storage.previewSegment(
+          segment.entityType || 'contact',
+          segment.definitionJson
+        );
+        await storage.updateSegment(segment.id, { 
+          recordCountCache: preview.count,
+          lastRefreshedAt: new Date()
+        });
+        segment.recordCountCache = preview.count;
+        segment.lastRefreshedAt = new Date();
+      }
+      
       res.status(201).json(segment);
     } catch (error) {
       if (error instanceof z.ZodError) {

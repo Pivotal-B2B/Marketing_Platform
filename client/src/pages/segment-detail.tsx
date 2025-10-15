@@ -147,7 +147,9 @@ export default function SegmentDetailPage() {
                       </TableCell>
                       <TableCell className="font-mono text-sm">{contact.email}</TableCell>
                       <TableCell>{contact.jobTitle || "-"}</TableCell>
-                      <TableCell>{contact.accountId || "-"}</TableCell>
+                      <TableCell>
+                        {(contact as any).account?.name || contact.accountId || "-"}
+                      </TableCell>
                     </TableRow>
                   );
                 } else {

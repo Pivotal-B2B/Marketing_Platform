@@ -1332,6 +1332,10 @@ export class DatabaseStorage implements IStorage {
       segment.definitionJson
     );
 
+    if (sampleIds.length === 0) {
+      return [];
+    }
+
     if (segment.entityType === 'account') {
       const accountsList = await db
         .select()
@@ -1339,11 +1343,53 @@ export class DatabaseStorage implements IStorage {
         .where(inArray(accounts.id, sampleIds));
       return accountsList;
     } else {
-      const contactsList = await db
-        .select()
+      // For contacts, join with accounts to get account names
+      const contactsWithAccounts = await db
+        .select({
+          id: contacts.id,
+          accountId: contacts.accountId,
+          fullName: contacts.fullName,
+          firstName: contacts.firstName,
+          lastName: contacts.lastName,
+          jobTitle: contacts.jobTitle,
+          email: contacts.email,
+          emailNormalized: contacts.emailNormalized,
+          emailVerificationStatus: contacts.emailVerificationStatus,
+          directPhone: contacts.directPhone,
+          directPhoneE164: contacts.directPhoneE164,
+          phoneExtension: contacts.phoneExtension,
+          phoneVerifiedAt: contacts.phoneVerifiedAt,
+          seniorityLevel: contacts.seniorityLevel,
+          department: contacts.department,
+          address: contacts.address,
+          linkedinUrl: contacts.linkedinUrl,
+          intentTopics: contacts.intentTopics,
+          tags: contacts.tags,
+          consentBasis: contacts.consentBasis,
+          consentSource: contacts.consentSource,
+          consentTimestamp: contacts.consentTimestamp,
+          ownerId: contacts.ownerId,
+          customFields: contacts.customFields,
+          emailStatus: contacts.emailStatus,
+          phoneStatus: contacts.phoneStatus,
+          sourceSystem: contacts.sourceSystem,
+          sourceRecordId: contacts.sourceRecordId,
+          sourceUpdatedAt: contacts.sourceUpdatedAt,
+          deletedAt: contacts.deletedAt,
+          createdAt: contacts.createdAt,
+          updatedAt: contacts.updatedAt,
+          accountName: accounts.name,
+        })
         .from(contacts)
+        .leftJoin(accounts, eq(contacts.accountId, accounts.id))
         .where(inArray(contacts.id, sampleIds));
-      return contactsList;
+      
+      // Map back to Contact type with account name embedded
+      return contactsWithAccounts.map(c => ({
+        ...c,
+        // Store account name in a way the frontend can access it
+        account: c.accountName ? { name: c.accountName } : undefined
+      })) as any;
     }
   }
 
@@ -1451,11 +1497,53 @@ export class DatabaseStorage implements IStorage {
         .where(inArray(accounts.id, list.recordIds));
       return accountsList;
     } else {
-      const contactsList = await db
-        .select()
+      // For contacts, join with accounts to get account names
+      const contactsWithAccounts = await db
+        .select({
+          id: contacts.id,
+          accountId: contacts.accountId,
+          fullName: contacts.fullName,
+          firstName: contacts.firstName,
+          lastName: contacts.lastName,
+          jobTitle: contacts.jobTitle,
+          email: contacts.email,
+          emailNormalized: contacts.emailNormalized,
+          emailVerificationStatus: contacts.emailVerificationStatus,
+          directPhone: contacts.directPhone,
+          directPhoneE164: contacts.directPhoneE164,
+          phoneExtension: contacts.phoneExtension,
+          phoneVerifiedAt: contacts.phoneVerifiedAt,
+          seniorityLevel: contacts.seniorityLevel,
+          department: contacts.department,
+          address: contacts.address,
+          linkedinUrl: contacts.linkedinUrl,
+          intentTopics: contacts.intentTopics,
+          tags: contacts.tags,
+          consentBasis: contacts.consentBasis,
+          consentSource: contacts.consentSource,
+          consentTimestamp: contacts.consentTimestamp,
+          ownerId: contacts.ownerId,
+          customFields: contacts.customFields,
+          emailStatus: contacts.emailStatus,
+          phoneStatus: contacts.phoneStatus,
+          sourceSystem: contacts.sourceSystem,
+          sourceRecordId: contacts.sourceRecordId,
+          sourceUpdatedAt: contacts.sourceUpdatedAt,
+          deletedAt: contacts.deletedAt,
+          createdAt: contacts.createdAt,
+          updatedAt: contacts.updatedAt,
+          accountName: accounts.name,
+        })
         .from(contacts)
+        .leftJoin(accounts, eq(contacts.accountId, accounts.id))
         .where(inArray(contacts.id, list.recordIds));
-      return contactsList;
+      
+      // Map back to Contact type with account name embedded
+      return contactsWithAccounts.map(c => ({
+        ...c,
+        // Store account name in a way the frontend can access it
+        account: c.accountName ? { name: c.accountName } : undefined
+      })) as any;
     }
   }
 
