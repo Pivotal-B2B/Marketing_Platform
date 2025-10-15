@@ -11,7 +11,6 @@ import { TopBar } from "@/components/layout/top-bar";
 import { ProtectedRoute } from "@/components/protected-route";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
-import RegisterPage from "@/pages/register";
 import Dashboard from "@/pages/dashboard";
 import AccountsPage from "@/pages/accounts";
 import AccountDetailPage from "@/pages/account-detail";
@@ -129,7 +128,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={LoginPage} />
-      <Route path="/register" component={RegisterPage} />
       <Route>
         <ProtectedRoute>
           <AuthenticatedApp />
