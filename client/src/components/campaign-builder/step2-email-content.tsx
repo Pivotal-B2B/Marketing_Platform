@@ -168,7 +168,7 @@ export function Step2EmailContent({ data, onNext }: Step2EmailProps) {
                     value={htmlContent}
                     onChange={(e) => setHtmlContent(e.target.value)}
                     placeholder="<html>...</html>"
-                    className="font-mono text-sm min-h-[400px]"
+                    className="font-mono text-sm min-h-[400px] email-content font-sans"
                     data-testid="textarea-html-content"
                   />
                   <Button variant="outline" size="sm" data-testid="button-preview-html">
