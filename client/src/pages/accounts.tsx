@@ -77,7 +77,7 @@ export default function AccountsPage() {
   const { data: accounts, isLoading } = useQuery<Account[]>({
     queryKey: ['/api/accounts', filterGroup],
     queryFn: async () => {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('authToken');
       const headers: HeadersInit = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
