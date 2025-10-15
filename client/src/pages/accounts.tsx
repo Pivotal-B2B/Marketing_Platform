@@ -197,7 +197,7 @@ export default function AccountsPage() {
   });
 
   const handleBulkExport = () => {
-    const selectedAccounts = filteredAccounts.filter(a => selectedIds.has(a.id));
+    const selectedAccounts = filteredAccounts.filter(a => selectedIds.includes(a.id));
     const csv = exportAccountsToCSV(selectedAccounts);
     downloadCSV(csv, `accounts_bulk_export_${new Date().toISOString().split('T')[0]}.csv`);
     toast({
@@ -208,14 +208,14 @@ export default function AccountsPage() {
 
   const handleBulkDelete = () => {
     if (confirm(`Are you sure you want to delete ${selectedCount} accounts? This action cannot be undone.`)) {
-      bulkDeleteMutation.mutate(Array.from(selectedIds));
+      bulkDeleteMutation.mutate(selectedIds);
     }
   };
 
   const bulkUpdateMutation = useMutation({
     mutationFn: async ({ field, value }: { field: string; value: string }) => {
       await Promise.all(
-        Array.from(selectedIds).map(id =>
+        selectedIds.map(id =>
           apiRequest('PATCH', `/api/accounts/${id}`, { [field]: value })
         )
       );
@@ -239,9 +239,8 @@ export default function AccountsPage() {
 
   const addToListMutation = useMutation({
     mutationFn: async (listId: string) => {
-      const response = await apiRequest(`/api/lists/${listId}/accounts`, {
-        method: 'POST',
-        body: JSON.stringify({ accountIds: Array.from(selectedIds) }),
+      const response = await apiRequest('POST', `/api/lists/${listId}/accounts`, {
+        accountIds: selectedIds,
       });
       return response.json();
     },
@@ -269,7 +268,7 @@ export default function AccountsPage() {
         description,
         entityType: 'account',
         sourceType: 'selection',
-        recordIds: Array.from(selectedIds),
+        recordIds: selectedIds,
       });
       return list.json();
     },
