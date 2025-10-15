@@ -18,17 +18,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load auth state from localStorage on mount
+  // Load auth state from localStorage on mount and validate token
   useEffect(() => {
-    const storedToken = localStorage.getItem('authToken');
-    const storedUser = localStorage.getItem('authUser');
+    const validateAndLoadAuth = async () => {
+      const storedToken = localStorage.getItem('authToken');
+      const storedUser = localStorage.getItem('authUser');
+      
+      if (storedToken && storedUser) {
+        // Validate the token by making a test API call
+        try {
+          const response = await fetch('/api/dashboard/stats', {
+            headers: {
+              'Authorization': `Bearer ${storedToken}`
+            }
+          });
+          
+          if (response.ok) {
+            // Token is valid, load the auth state
+            setToken(storedToken);
+            setUser(JSON.parse(storedUser));
+          } else {
+            // Token is invalid (401/403), clear everything
+            console.log('[AUTH] Clearing invalid/expired token from localStorage');
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('authUser');
+          }
+        } catch (error) {
+          // Network error or other issue, clear auth state to be safe
+          console.error('[AUTH] Error validating token:', error);
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('authUser');
+        }
+      }
+      
+      setIsLoading(false);
+    };
     
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
-    
-    setIsLoading(false);
+    validateAndLoadAuth();
   }, []);
 
   const login = (newToken: string, newUser: Omit<User, 'password'>) => {
