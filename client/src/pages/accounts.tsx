@@ -4,8 +4,7 @@ import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Filter, Download, Building2, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Download, Upload, Building2, Trash2 } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
 import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar";
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
@@ -39,10 +38,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAccountSchema, type InsertAccount, type Account } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { CSVImportDialog } from "@/components/csv-import-dialog";
 
 export default function AccountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [bulkUpdateDialogOpen, setBulkUpdateDialogOpen] = useState(false);
   const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
@@ -58,7 +59,7 @@ export default function AccountsPage() {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      
+
       const params = new URLSearchParams();
       if (filterGroup) {
         params.set('filters', JSON.stringify(filterGroup));
@@ -281,7 +282,14 @@ export default function AccountsPage() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          {/* CSV Import is now handled via the unified Contact+Account import on the Contacts page */}
+          <Button 
+            variant="outline" 
+            onClick={() => setImportDialogOpen(true)}
+            data-testid="button-import-accounts"
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-create-account">
@@ -532,7 +540,25 @@ export default function AccountsPage() {
         />
       )}
 
-      {/* Note: CSV import for accounts is now handled via the unified Contact+Account import on the Contacts page */}
+      <CSVImportDialog
+        isOpen={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        entityType="account"
+        onImportSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+          toast({
+            title: "Import Successful",
+            description: "Accounts imported successfully.",
+          });
+        }}
+        onImportError={(error) => {
+          toast({
+            variant: "destructive",
+            title: "Import Failed",
+            description: error.message,
+          });
+        }}
+      />
 
       {/* Bulk Update Dialog */}
       <BulkUpdateDialog
