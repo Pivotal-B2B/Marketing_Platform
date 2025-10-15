@@ -1978,7 +1978,15 @@ export function registerRoutes(app: Express) {
       if (!config) {
         return res.status(404).json({ message: "No default SIP trunk configured" });
       }
-      res.json(config);
+      
+      // Override credentials with secure environment variables
+      const secureConfig = {
+        ...config,
+        sipUsername: process.env.TELNYX_SIP_USERNAME || config.sipUsername,
+        sipPassword: process.env.TELNYX_SIP_PASSWORD || config.sipPassword,
+      };
+      
+      res.json(secureConfig);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch default SIP trunk" });
     }
