@@ -57,8 +57,10 @@ export function useTelnyxWebRTC({
         login: loginString,
         password: sipPassword,
         ringbackFile: undefined, // Use default ringback
-        // Note: Telnyx SDK handles websocket (wss://sip.telnyx.com:7443) and
-        // ICE servers (STUN: stun.telnyx.com:3478) automatically
+        // Note: Telnyx SDK automatically handles:
+        // - WebSocket: wss://sip.telnyx.com:7443
+        // - STUN: stun.telnyx.com:3478
+        // - TURN: turn.telnyx.com:3478
       });
 
       // Event listeners
