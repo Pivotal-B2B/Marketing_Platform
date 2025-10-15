@@ -97,6 +97,7 @@ function AuthenticatedApp() {
               <Route path="/imports" component={ImportsPage} />
               <Route path="/reports" component={ReportsPage} />
               <Route path="/settings/users" component={SettingsPage} />
+              <Route path="/settings/users" component={lazy(() => import("@/pages/user-management"))} />
               <Route path="/settings/compliance" component={SettingsPage} />
               <Route path="/settings/integrations" component={SettingsPage} />
               <Route path="/settings" component={SettingsPage} />
