@@ -789,6 +789,60 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Add contacts to list
+  app.post("/api/lists/:id/contacts", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
+    try {
+      const { contactIds } = req.body;
+      if (!Array.isArray(contactIds)) {
+        return res.status(400).json({ message: "contactIds must be an array" });
+      }
+
+      const list = await storage.getList(req.params.id);
+      if (!list) {
+        return res.status(404).json({ message: "List not found" });
+      }
+
+      if (list.entityType !== 'contact') {
+        return res.status(400).json({ message: "This list is not for contacts" });
+      }
+
+      // Merge with existing IDs and deduplicate
+      const updatedIds = Array.from(new Set([...list.recordIds, ...contactIds]));
+      const updated = await storage.updateList(req.params.id, { recordIds: updatedIds });
+      
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to add contacts to list" });
+    }
+  });
+
+  // Add accounts to list
+  app.post("/api/lists/:id/accounts", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
+    try {
+      const { accountIds } = req.body;
+      if (!Array.isArray(accountIds)) {
+        return res.status(400).json({ message: "accountIds must be an array" });
+      }
+
+      const list = await storage.getList(req.params.id);
+      if (!list) {
+        return res.status(404).json({ message: "List not found" });
+      }
+
+      if (list.entityType !== 'account') {
+        return res.status(400).json({ message: "This list is not for accounts" });
+      }
+
+      // Merge with existing IDs and deduplicate
+      const updatedIds = Array.from(new Set([...list.recordIds, ...accountIds]));
+      const updated = await storage.updateList(req.params.id, { recordIds: updatedIds });
+      
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to add accounts to list" });
+    }
+  });
+
   app.post("/api/lists/:id/export", requireAuth, async (req, res) => {
     try {
       const { format = 'csv' } = req.body;

@@ -299,19 +299,17 @@ export default function ContactsPage() {
 
   const createListMutation = useMutation({
     mutationFn: async ({ name, description }: { name: string; description: string }) => {
-      const segment = await apiRequest('POST', '/api/segments', {
+      const list = await apiRequest('POST', '/api/lists', {
         name,
         description,
-        type: 'contact',
-        criteria: {},
+        entityType: 'contact',
+        sourceType: 'selection',
+        recordIds: Array.from(selectedIds),
       });
-      const segmentData = await segment.json();
-      await apiRequest('POST', `/api/segments/${segmentData.id}/contacts`, {
-        contactIds: Array.from(selectedIds),
-      });
+      return list.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/segments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
       clearSelection();
       toast({
         title: "Success",

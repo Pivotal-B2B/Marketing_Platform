@@ -31,11 +31,11 @@ export function AddToListDialog({
   const [newListName, setNewListName] = useState("");
   const [newListDescription, setNewListDescription] = useState("");
 
-  const { data: segments } = useQuery<Segment[]>({
-    queryKey: ['/api/segments'],
+  const { data: lists } = useQuery<any[]>({
+    queryKey: ['/api/lists'],
   });
 
-  const filteredSegments = segments?.filter(s => s.type === entityType) || [];
+  const filteredLists = lists?.filter(l => l.entityType === entityType) || [];
 
   const handleAdd = () => {
     if (selectedList) {
@@ -74,9 +74,9 @@ export function AddToListDialog({
                     <SelectValue placeholder="Choose a list" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredSegments.map((segment) => (
-                      <SelectItem key={segment.id} value={segment.id}>
-                        {segment.name}
+                    {filteredLists.map((list) => (
+                      <SelectItem key={list.id} value={list.id}>
+                        {list.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
