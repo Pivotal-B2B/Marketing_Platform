@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Plus, Upload, Trash2, List, RefreshCw, Search } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
 import type { FilterGroup } from "@shared/filter-types";
@@ -40,6 +41,7 @@ interface DomainSetItem {
 
 export default function AccountsListTAL() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedAccountsList, setSelectedAccountsList] = useState<DomainSet | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
@@ -361,21 +363,21 @@ export default function AccountsListTAL() {
                     className="text-center cursor-pointer hover-elevate rounded-lg p-2 transition-all"
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.location.href = `/domain-sets/${accountsList.id}?view=accounts`;
+                      setLocation(`/domain-sets/${accountsList.id}?view=accounts`);
                     }}
                   >
                     <p className="text-2xl font-bold text-green-600 hover:text-green-700">{accountsList.matchedAccounts}</p>
-                    <p className="text-sm text-muted-foreground">Matched Accounts</p>
+                    <p className="text-sm text-muted-foreground">Click to view</p>
                   </div>
                   <div 
                     className="text-center cursor-pointer hover-elevate rounded-lg p-2 transition-all"
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.location.href = `/domain-sets/${accountsList.id}?view=contacts`;
+                      setLocation(`/domain-sets/${accountsList.id}?view=contacts`);
                     }}
                   >
                     <p className="text-2xl font-bold text-blue-600 hover:text-blue-700">{accountsList.matchedContacts}</p>
-                    <p className="text-sm text-muted-foreground">Matched Contacts</p>
+                    <p className="text-sm text-muted-foreground">Click to view</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-orange-600">{accountsList.unknownDomains}</p>

@@ -15,7 +15,7 @@ interface StatCardProps {
 
 export function StatCard({ title, value, icon: Icon, trend, description }: StatCardProps) {
   return (
-    <Card data-testid={`stat-card-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+    <Card data-testid={`stat-card-${title.toLowerCase().replace(/\s+/g, '-')}`} className="hover-elevate transition-all">
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}

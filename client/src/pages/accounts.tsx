@@ -49,7 +49,19 @@ export default function AccountsPage() {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [bulkUpdateDialogOpen, setBulkUpdateDialogOpen] = useState(false);
   const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
-  const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
+  const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(() => {
+    // Check if there's a filter in sessionStorage
+    const savedFilter = sessionStorage.getItem('accountsFilter');
+    if (savedFilter) {
+      sessionStorage.removeItem('accountsFilter'); // Clear after reading
+      try {
+        return JSON.parse(savedFilter);
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [selectAllPages, setSelectAllPages] = useState(false);
   const [, setLocation] = useLocation();

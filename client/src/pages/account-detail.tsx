@@ -56,6 +56,8 @@ import type { Account, Contact } from "@shared/schema";
 import { HeaderActionBar } from "@/components/shared/header-action-bar";
 import { SectionCard } from "@/components/shared/section-card";
 import { ListSegmentMembership } from "@/components/list-segment-membership";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Import Card components
+import type { FilterGroup } from "@/types/filters"; // Assuming FilterGroup type is here
 
 export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -632,6 +634,50 @@ export default function AccountDetailPage() {
 
           {/* Right Column - Contextual Actions & Info (1/3) */}
           <div className="space-y-6">
+            {/* Account Summary */}
+            <SectionCard title="Account Summary" icon={TrendingUp}>
+              <div className="grid gap-4 md:grid-cols-2"> {/* Adjusted grid for better spacing */}
+                <Card 
+                  className="hover-elevate cursor-pointer transition-all"
+                  onClick={() => {
+                    // Navigate to contacts page with account filter
+                    const accountFilter: FilterGroup = {
+                      logic: 'AND',
+                      conditions: [{
+                        field: 'accountId',
+                        operator: '=',
+                        value: account.id
+                      }]
+                    };
+                    // Store filter in sessionStorage for contacts page to pick up
+                    sessionStorage.setItem('contactsFilter', JSON.stringify(accountFilter));
+                    setLocation('/contacts');
+                  }}
+                >
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-primary" data-testid="text-contacts-count">
+                      {contacts?.length || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Click to view contacts</p>
+                  </CardContent>
+                </Card>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Domain</span>
+                  <span className="text-sm font-mono">{account.domain || "-"}</span>
+                </div>
+                {account.employeesSizeRange && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Size Range</span>
+                    <span className="text-sm font-medium">{account.employeesSizeRange}</span>
+                  </div>
+                )}
+              </div>
+            </SectionCard>
+
             {/* Quick Actions */}
             <SectionCard title="Quick Actions" icon={Briefcase}>
               <div className="space-y-2">
@@ -699,26 +745,6 @@ export default function AccountDetailPage() {
                     Low
                   </Badge>
                 </div>
-              </div>
-            </SectionCard>
-
-            {/* Account Summary */}
-            <SectionCard title="Account Summary" icon={TrendingUp}>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Contacts</span>
-                  <span className="text-sm font-medium">{contacts.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Domain</span>
-                  <span className="text-sm font-mono">{account.domain || "-"}</span>
-                </div>
-                {account.employeesSizeRange && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Size Range</span>
-                    <span className="text-sm font-medium">{account.employeesSizeRange}</span>
-                  </div>
-                )}
               </div>
             </SectionCard>
           </div>

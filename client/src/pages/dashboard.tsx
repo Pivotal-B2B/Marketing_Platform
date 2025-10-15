@@ -38,27 +38,35 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <StatCard
-              title="Total Accounts"
-              value={stats?.totalAccounts.toLocaleString() || "0"}
-              icon={Building2}
-            />
-            <StatCard
-              title="Total Contacts"
-              value={stats?.totalContacts.toLocaleString() || "0"}
-              icon={Users}
-            />
-            <StatCard
-              title="Active Campaigns"
-              value={stats?.activeCampaigns.toString() || "0"}
-              icon={Mail}
-              description={`${stats?.activeCampaignsBreakdown.email || 0} email, ${stats?.activeCampaignsBreakdown.telemarketing || 0} telemarketing`}
-            />
-            <StatCard
-              title="Leads This Month"
-              value={stats?.leadsThisMonth.toLocaleString() || "0"}
-              icon={CheckCircle}
-            />
+            <div onClick={() => setLocation('/accounts')} className="cursor-pointer">
+              <StatCard
+                title="Total Accounts"
+                value={stats?.totalAccounts.toLocaleString() || "0"}
+                icon={Building2}
+              />
+            </div>
+            <div onClick={() => setLocation('/contacts')} className="cursor-pointer">
+              <StatCard
+                title="Total Contacts"
+                value={stats?.totalContacts.toLocaleString() || "0"}
+                icon={Users}
+              />
+            </div>
+            <div onClick={() => setLocation('/campaigns')} className="cursor-pointer">
+              <StatCard
+                title="Active Campaigns"
+                value={stats?.activeCampaigns.toString() || "0"}
+                icon={Mail}
+                description={`${stats?.activeCampaignsBreakdown.email || 0} email, ${stats?.activeCampaignsBreakdown.telemarketing || 0} telemarketing`}
+              />
+            </div>
+            <div onClick={() => setLocation('/leads')} className="cursor-pointer">
+              <StatCard
+                title="Leads This Month"
+                value={stats?.leadsThisMonth.toLocaleString() || "0"}
+                icon={CheckCircle}
+              />
+            </div>
           </>
         )}
       </div>
