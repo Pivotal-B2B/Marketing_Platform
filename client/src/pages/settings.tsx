@@ -1,18 +1,168 @@
+
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Settings, User, Bell, Shield, Mail, Phone } from "lucide-react";
+import { Settings, User, Bell, Shield, Mail, Phone, Database, Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import type { CustomFieldDefinition } from "@shared/schema";
 
 export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [customFieldDialogOpen, setCustomFieldDialogOpen] = useState(false);
+  const [editingField, setEditingField] = useState<CustomFieldDefinition | null>(null);
   const { toast } = useToast();
+
+  // Custom Fields State
+  const [fieldEntityType, setFieldEntityType] = useState<"contact" | "account">("contact");
+  const [fieldKey, setFieldKey] = useState("");
+  const [displayLabel, setDisplayLabel] = useState("");
+  const [fieldType, setFieldType] = useState<string>("text");
+  const [helpText, setHelpText] = useState("");
+  const [required, setRequired] = useState(false);
+  const [options, setOptions] = useState("");
+
+  const { data: customFields, isLoading: fieldsLoading } = useQuery<CustomFieldDefinition[]>({
+    queryKey: ['/api/custom-fields'],
+  });
+
+  const createFieldMutation = useMutation({
+    mutationFn: async (data: any) => {
+      await apiRequest('POST', '/api/custom-fields', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/custom-fields'] });
+      resetFieldForm();
+      setCustomFieldDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Custom field created successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const updateFieldMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      await apiRequest('PATCH', `/api/custom-fields/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/custom-fields'] });
+      resetFieldForm();
+      setCustomFieldDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Custom field updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const deleteFieldMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('DELETE', `/api/custom-fields/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/custom-fields'] });
+      toast({
+        title: "Success",
+        description: "Custom field deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const resetFieldForm = () => {
+    setFieldEntityType("contact");
+    setFieldKey("");
+    setDisplayLabel("");
+    setFieldType("text");
+    setHelpText("");
+    setRequired(false);
+    setOptions("");
+    setEditingField(null);
+  };
+
+  const handleEditField = (field: CustomFieldDefinition) => {
+    setEditingField(field);
+    setFieldEntityType(field.entityType);
+    setFieldKey(field.fieldKey);
+    setDisplayLabel(field.displayLabel);
+    setFieldType(field.fieldType);
+    setHelpText(field.helpText || "");
+    setRequired(field.required);
+    setOptions(field.options ? JSON.stringify(field.options) : "");
+    setCustomFieldDialogOpen(true);
+  };
+
+  const handleSaveField = () => {
+    const data: any = {
+      entityType: fieldEntityType,
+      fieldKey: fieldKey,
+      displayLabel: displayLabel,
+      fieldType: fieldType,
+      helpText: helpText || null,
+      required: required,
+      options: (fieldType === 'select' || fieldType === 'multi_select') && options ? JSON.parse(options) : null,
+    };
+
+    if (editingField) {
+      updateFieldMutation.mutate({ id: editingField.id, data });
+    } else {
+      createFieldMutation.mutate(data);
+    }
+  };
 
   const handlePasswordChange = async () => {
     if (newPassword !== confirmPassword) {
@@ -24,11 +174,6 @@ export default function SettingsPage() {
       return;
     }
 
-    // In a real application, you would make an API call here
-    // to the backend to update the password.
-    console.log("Updating password:", { currentPassword, newPassword });
-
-    // Simulating an API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     toast({
@@ -40,6 +185,9 @@ export default function SettingsPage() {
     setNewPassword("");
     setConfirmPassword("");
   };
+
+  const contactFields = customFields?.filter(f => f.entityType === 'contact') || [];
+  const accountFields = customFields?.filter(f => f.entityType === 'account') || [];
 
   return (
     <div className="space-y-6">
@@ -55,6 +203,10 @@ export default function SettingsPage() {
           <TabsTrigger value="profile" data-testid="tab-profile">
             <User className="mr-2 h-4 w-4" />
             Profile
+          </TabsTrigger>
+          <TabsTrigger value="custom-fields" data-testid="tab-custom-fields">
+            <Database className="mr-2 h-4 w-4" />
+            Custom Fields
           </TabsTrigger>
           <TabsTrigger value="notifications" data-testid="tab-notifications">
             <Bell className="mr-2 h-4 w-4" />
@@ -98,6 +250,320 @@ export default function SettingsPage() {
                 <Input id="role" value="Admin" disabled data-testid="input-role" />
               </div>
               <Button data-testid="button-save-profile">Save Changes</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="custom-fields" className="space-y-4 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Contact Custom Fields</CardTitle>
+                  <CardDescription>
+                    Define custom fields for contacts
+                  </CardDescription>
+                </div>
+                <Dialog open={customFieldDialogOpen && fieldEntityType === 'contact'} onOpenChange={(open) => {
+                  if (!open) resetFieldForm();
+                  setCustomFieldDialogOpen(open);
+                }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" onClick={() => setFieldEntityType('contact')}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Field
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-xl">
+                    <DialogHeader>
+                      <DialogTitle>{editingField ? 'Edit' : 'Create'} Contact Custom Field</DialogTitle>
+                      <DialogDescription>
+                        Define a custom field for contacts
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Field Key (internal)</Label>
+                        <Input
+                          value={fieldKey}
+                          onChange={(e) => setFieldKey(e.target.value)}
+                          placeholder="e.g., lead_score"
+                          disabled={!!editingField}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Display Label</Label>
+                        <Input
+                          value={displayLabel}
+                          onChange={(e) => setDisplayLabel(e.target.value)}
+                          placeholder="e.g., Lead Score"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Field Type</Label>
+                        <Select value={fieldType} onValueChange={setFieldType}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="text">Text</SelectItem>
+                            <SelectItem value="number">Number</SelectItem>
+                            <SelectItem value="date">Date</SelectItem>
+                            <SelectItem value="boolean">Boolean</SelectItem>
+                            <SelectItem value="select">Select (dropdown)</SelectItem>
+                            <SelectItem value="multi_select">Multi-Select</SelectItem>
+                            <SelectItem value="url">URL</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {(fieldType === 'select' || fieldType === 'multi_select') && (
+                        <div className="space-y-2">
+                          <Label>Options (JSON array)</Label>
+                          <Textarea
+                            value={options}
+                            onChange={(e) => setOptions(e.target.value)}
+                            placeholder='["Option 1", "Option 2", "Option 3"]'
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label>Help Text</Label>
+                        <Input
+                          value={helpText}
+                          onChange={(e) => setHelpText(e.target.value)}
+                          placeholder="Optional helper text"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch checked={required} onCheckedChange={setRequired} />
+                        <Label>Required Field</Label>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setCustomFieldDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveField}>
+                        {editingField ? 'Update' : 'Create'} Field
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Label</TableHead>
+                    <TableHead>Key</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Required</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contactFields.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        No custom fields defined
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    contactFields.map((field) => (
+                      <TableRow key={field.id}>
+                        <TableCell className="font-medium">{field.displayLabel}</TableCell>
+                        <TableCell className="font-mono text-sm">{field.fieldKey}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{field.fieldType}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {field.required ? <Badge>Required</Badge> : <span className="text-muted-foreground">Optional</span>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditField(field)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to delete this field?')) {
+                                  deleteFieldMutation.mutate(field.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Account Custom Fields</CardTitle>
+                  <CardDescription>
+                    Define custom fields for accounts
+                  </CardDescription>
+                </div>
+                <Dialog open={customFieldDialogOpen && fieldEntityType === 'account'} onOpenChange={(open) => {
+                  if (!open) resetFieldForm();
+                  setCustomFieldDialogOpen(open);
+                }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" onClick={() => setFieldEntityType('account')}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Field
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-xl">
+                    <DialogHeader>
+                      <DialogTitle>{editingField ? 'Edit' : 'Create'} Account Custom Field</DialogTitle>
+                      <DialogDescription>
+                        Define a custom field for accounts
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Field Key (internal)</Label>
+                        <Input
+                          value={fieldKey}
+                          onChange={(e) => setFieldKey(e.target.value)}
+                          placeholder="e.g., contract_type"
+                          disabled={!!editingField}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Display Label</Label>
+                        <Input
+                          value={displayLabel}
+                          onChange={(e) => setDisplayLabel(e.target.value)}
+                          placeholder="e.g., Contract Type"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Field Type</Label>
+                        <Select value={fieldType} onValueChange={setFieldType}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="text">Text</SelectItem>
+                            <SelectItem value="number">Number</SelectItem>
+                            <SelectItem value="date">Date</SelectItem>
+                            <SelectItem value="boolean">Boolean</SelectItem>
+                            <SelectItem value="select">Select (dropdown)</SelectItem>
+                            <SelectItem value="multi_select">Multi-Select</SelectItem>
+                            <SelectItem value="url">URL</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {(fieldType === 'select' || fieldType === 'multi_select') && (
+                        <div className="space-y-2">
+                          <Label>Options (JSON array)</Label>
+                          <Textarea
+                            value={options}
+                            onChange={(e) => setOptions(e.target.value)}
+                            placeholder='["Option 1", "Option 2", "Option 3"]'
+                          />
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label>Help Text</Label>
+                        <Input
+                          value={helpText}
+                          onChange={(e) => setHelpText(e.target.value)}
+                          placeholder="Optional helper text"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch checked={required} onCheckedChange={setRequired} />
+                        <Label>Required Field</Label>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setCustomFieldDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveField}>
+                        {editingField ? 'Update' : 'Create'} Field
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Label</TableHead>
+                    <TableHead>Key</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Required</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accountFields.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        No custom fields defined
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    accountFields.map((field) => (
+                      <TableRow key={field.id}>
+                        <TableCell className="font-medium">{field.displayLabel}</TableCell>
+                        <TableCell className="font-mono text-sm">{field.fieldKey}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{field.fieldType}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {field.required ? <Badge>Required</Badge> : <span className="text-muted-foreground">Optional</span>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditField(field)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to delete this field?')) {
+                                  deleteFieldMutation.mutate(field.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>

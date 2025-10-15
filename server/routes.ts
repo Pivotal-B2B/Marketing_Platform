@@ -1,9 +1,11 @@
 import type { Express } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { storage } from "./storage";
 import { comparePassword, generateToken, requireAuth, requireRole, hashPassword } from "./auth";
 import webhooksRouter from "./routes/webhooks";
 import { z } from "zod";
+import { db } from "./db";
+import { customFieldDefinitions } from "@shared/schema";
 import { 
   insertAccountSchema, 
   insertContactSchema,
@@ -44,9 +46,9 @@ import {
 
 export function registerRoutes(app: Express) {
   // ==================== AUTH ====================
-  
+
   // ==================== USERS (Admin Only) ====================
-  
+
   app.get("/api/users", requireAuth, requireRole('admin'), async (req, res) => {
     try {
       const users = await storage.getUsers();
@@ -61,18 +63,18 @@ export function registerRoutes(app: Express) {
   app.post("/api/users", requireAuth, requireRole('admin'), async (req, res) => {
     try {
       const validated = insertUserSchema.parse(req.body);
-      
+
       // Hash password before storing
       const hashedPassword = await hashPassword(validated.password);
-      
+
       const user = await storage.createUser({
         ...validated,
         password: hashedPassword
       });
-      
+
       // Return user without password
       const { password: _, ...userWithoutPassword } = user;
-      
+
       res.status(201).json(userWithoutPassword);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -81,17 +83,17 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to create user" });
     }
   });
-  
+
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
-      
+
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password required" });
       }
 
       const user = await storage.getUserByUsername(username);
-      
+
       if (!user) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
@@ -104,7 +106,7 @@ export function registerRoutes(app: Express) {
 
       // Generate JWT token
       const token = generateToken(user);
-      
+
       // Return token and user info without password
       const { password: _, ...userWithoutPassword } = user;
       res.json({ 
@@ -152,7 +154,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== ACCOUNTS ====================
-  
+
   app.get("/api/accounts", requireAuth, async (req, res) => {
     try {
       let filters = undefined;
@@ -223,7 +225,7 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to update account industry" });
     }
   });
-  
+
   app.post("/api/accounts/:id/industry/ai-review", requireAuth, requireRole('admin', 'data_ops', 'campaign_manager'), async (req, res) => {
     try {
       const userId = req.user!.id;
@@ -240,7 +242,7 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to review AI suggestions" });
     }
   });
-  
+
   app.get("/api/accounts/ai-review/pending", requireAuth, requireRole('admin', 'data_ops', 'campaign_manager'), async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
@@ -261,7 +263,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== CONTACTS ====================
-  
+
   app.get("/api/contacts", requireAuth, async (req, res) => {
     try {
       let filters = undefined;
@@ -295,7 +297,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/contacts/batch-import", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const { records } = req.body; // Array of { contact, account } objects
-      
+
       if (!Array.isArray(records)) {
         return res.status(400).json({ message: "Records must be an array" });
       }
@@ -312,14 +314,14 @@ export function registerRoutes(app: Express) {
 
           // Validate contact data
           const validatedContact = insertContactSchema.parse(contactData);
-          
+
           // Check email suppression
           if (await storage.isEmailSuppressed(validatedContact.email)) {
             results.failed++;
             results.errors.push({ index: i, error: "Email is on suppression list" });
             continue;
           }
-          
+
           // Check phone suppression if provided
           if (validatedContact.directPhoneE164 && await storage.isPhoneSuppressed(validatedContact.directPhoneE164)) {
             results.failed++;
@@ -328,28 +330,28 @@ export function registerRoutes(app: Express) {
           }
 
           let account;
-          
+
           // Normalize domain (trim and lowercase) to prevent duplicates from casing
           if (accountData.domain) {
             accountData.domain = accountData.domain.trim().toLowerCase();
           }
-          
+
           // Try to find existing account by domain first
           if (accountData.domain) {
             account = await storage.getAccountByDomain(accountData.domain);
           }
-          
+
           // If not found and we have account data, create new account
           if (!account && (accountData.name || accountData.domain)) {
             const validatedAccount = insertAccountSchema.parse(accountData);
             account = await storage.createAccount(validatedAccount);
           }
-          
+
           // Link contact to account if found/created
           if (account) {
             validatedContact.accountId = account.id;
           }
-          
+
           // Create contact
           await storage.createContact(validatedContact);
           results.success++;
@@ -376,12 +378,12 @@ export function registerRoutes(app: Express) {
 
       // Validate contact data
       const validatedContact = insertContactSchema.parse(contactData);
-      
+
       // Check email suppression
       if (await storage.isEmailSuppressed(validatedContact.email)) {
         return res.status(400).json({ message: "Email is on suppression list" });
       }
-      
+
       // Check phone suppression if provided
       if (validatedContact.directPhoneE164 && await storage.isPhoneSuppressed(validatedContact.directPhoneE164)) {
         return res.status(400).json({ message: "Phone is on DNC list" });
@@ -389,32 +391,32 @@ export function registerRoutes(app: Express) {
 
       let account;
       let accountCreated = false;
-      
+
       // Normalize domain (trim and lowercase) to prevent duplicates from casing
       if (accountData.domain) {
         accountData.domain = accountData.domain.trim().toLowerCase();
       }
-      
+
       // Try to find existing account by domain first
       if (accountData.domain) {
         account = await storage.getAccountByDomain(accountData.domain);
       }
-      
+
       // If not found and we have account data, create new account
       if (!account && (accountData.name || accountData.domain)) {
         const validatedAccount = insertAccountSchema.parse(accountData);
         account = await storage.createAccount(validatedAccount);
         accountCreated = true;
       }
-      
+
       // Link contact to account if found/created
       if (account) {
         validatedContact.accountId = account.id;
       }
-      
+
       // Create contact
       const contact = await storage.createContact(validatedContact);
-      
+
       res.status(201).json({
         contact,
         account,
@@ -432,17 +434,17 @@ export function registerRoutes(app: Express) {
   app.post("/api/contacts", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const validated = insertContactSchema.parse(req.body);
-      
+
       // Check email suppression
       if (await storage.isEmailSuppressed(validated.email)) {
         return res.status(400).json({ message: "Email is on suppression list" });
       }
-      
+
       // Check phone suppression if provided
       if (validated.directPhoneE164 && await storage.isPhoneSuppressed(validated.directPhoneE164)) {
         return res.status(400).json({ message: "Phone is on DNC list" });
       }
-      
+
       const contact = await storage.createContact(validated);
       res.status(201).json(contact);
     } catch (error) {
@@ -475,64 +477,98 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== CUSTOM FIELD DEFINITIONS ====================
-  
-  app.get("/api/custom-field-definitions", requireAuth, async (req, res) => {
+
+  // Get all custom field definitions
+  app.get('/api/custom-fields', async (req, res) => {
     try {
-      const entityType = req.query.entityType as 'account' | 'contact' | undefined;
-      const definitions = await storage.getCustomFieldDefinitions(entityType);
-      res.json(definitions);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch custom field definitions" });
+      const fields = await db.select()
+        .from(customFieldDefinitions)
+        .where(eq(customFieldDefinitions.active, true))
+        .orderBy(customFieldDefinitions.displayOrder);
+
+      res.json(fields);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.get("/api/custom-field-definitions/:id", requireAuth, async (req, res) => {
+  // Create custom field definition
+  app.post('/api/custom-fields', async (req, res) => {
     try {
-      const definition = await storage.getCustomFieldDefinition(req.params.id);
-      if (!definition) {
-        return res.status(404).json({ message: "Custom field definition not found" });
+      const data = insertCustomFieldDefinitionSchema.parse(req.body);
+
+      // Check if field key already exists for this entity type
+      const existing = await db.select()
+        .from(customFieldDefinitions)
+        .where(
+          and(
+            eq(customFieldDefinitions.entityType, data.entityType),
+            eq(customFieldDefinitions.fieldKey, data.fieldKey)
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'Field key already exists for this entity type' });
       }
-      res.json(definition);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch custom field definition" });
+
+      const [field] = await db.insert(customFieldDefinitions)
+        .values({
+          ...data,
+          createdBy: req.user?.id,
+        })
+        .returning();
+
+      res.json(field);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   });
 
-  app.post("/api/custom-field-definitions", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+  // Update custom field definition
+  app.patch('/api/custom-fields/:id', async (req, res) => {
     try {
-      const validated = insertCustomFieldDefinitionSchema.parse(req.body);
-      const definition = await storage.createCustomFieldDefinition(validated);
-      res.status(201).json(definition);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Validation error", errors: error.errors });
+      const { id } = req.params;
+      const data = updateCustomFieldDefinitionSchema.parse(req.body);
+
+      const [field] = await db.update(customFieldDefinitions)
+        .set({
+          ...data,
+          updatedAt: new Date(),
+        })
+        .where(eq(customFieldDefinitions.id, id))
+        .returning();
+
+      if (!field) {
+        return res.status(404).json({ error: 'Custom field not found' });
       }
-      res.status(500).json({ message: "Failed to create custom field definition" });
+
+      res.json(field);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   });
 
-  app.patch("/api/custom-field-definitions/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+  // Delete (deactivate) custom field definition
+  app.delete('/api/custom-fields/:id', async (req, res) => {
     try {
-      const validated = updateCustomFieldDefinitionSchema.parse(req.body);
-      const definition = await storage.updateCustomFieldDefinition(req.params.id, validated);
-      if (!definition) {
-        return res.status(404).json({ message: "Custom field definition not found" });
-      }
-      res.json(definition);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Validation error", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to update custom field definition" });
-    }
-  });
+      const { id } = req.params;
 
-  app.delete("/api/custom-field-definitions/:id", requireAuth, requireRole('admin'), async (req, res) => {
-    try {
-      await storage.deleteCustomFieldDefinition(req.params.id);
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete custom field definition" });
+      const [field] = await db.update(customFieldDefinitions)
+        .set({ 
+          active: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(customFieldDefinitions.id, id))
+        .returning();
+
+      if (!field) {
+        return res.status(404).json({ error: 'Custom field not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -551,7 +587,7 @@ export function registerRoutes(app: Express) {
       // Get all contacts without account_id
       const contacts = await storage.getContacts();
       const unlinkedContacts = contacts.filter(c => !c.accountId);
-      
+
       let linkedCount = 0;
       let failedCount = 0;
 
@@ -609,21 +645,21 @@ export function registerRoutes(app: Express) {
   app.post("/api/contacts:upsert", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const { email, title, sourceSystem, sourceRecordId, sourceUpdatedAt, ...contactData } = req.body;
-      
+
       if (!email) {
         return res.status(400).json({ message: "Email is required for upsert" });
       }
-      
+
       // Check email suppression
       if (await storage.isEmailSuppressed(email)) {
         return res.status(400).json({ message: "Email is on suppression list" });
       }
-      
+
       // Map 'title' to 'jobTitle' for database compatibility
       if (title !== undefined) {
         contactData.jobTitle = title;
       }
-      
+
       const result = await storage.upsertContact(
         { email, ...contactData },
         {
@@ -633,7 +669,7 @@ export function registerRoutes(app: Express) {
           actorId: req.user!.id
         }
       );
-      
+
       res.status(result.action === 'created' ? 201 : 200).json({
         entity: result.contact,
         action: result.action
@@ -650,16 +686,16 @@ export function registerRoutes(app: Express) {
   app.post("/api/accounts:upsert", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const { name, revenue, sourceSystem, sourceRecordId, sourceUpdatedAt, ...accountData } = req.body;
-      
+
       if (!name) {
         return res.status(400).json({ message: "Name is required for upsert" });
       }
-      
+
       // Map 'revenue' to 'annualRevenue' for database compatibility
       if (revenue !== undefined) {
         accountData.annualRevenue = revenue;
       }
-      
+
       const result = await storage.upsertAccount(
         { name, ...accountData },
         {
@@ -669,7 +705,7 @@ export function registerRoutes(app: Express) {
           actorId: req.user!.id
         }
       );
-      
+
       res.status(result.action === 'created' ? 201 : 200).json({
         entity: result.account,
         action: result.action
@@ -684,7 +720,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== SEGMENTS ====================
-  
+
   app.get("/api/segments", requireAuth, async (req, res) => {
     try {
       const segments = await storage.getSegments();
@@ -757,7 +793,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== LISTS ====================
-  
+
   app.get("/api/lists", requireAuth, async (req, res) => {
     try {
       const lists = await storage.getLists();
@@ -809,7 +845,7 @@ export function registerRoutes(app: Express) {
       // Merge with existing IDs and deduplicate
       const updatedIds = Array.from(new Set([...list.recordIds, ...contactIds]));
       const updated = await storage.updateList(req.params.id, { recordIds: updatedIds });
-      
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to add contacts to list" });
@@ -836,7 +872,7 @@ export function registerRoutes(app: Express) {
       // Merge with existing IDs and deduplicate
       const updatedIds = Array.from(new Set([...list.recordIds, ...accountIds]));
       const updated = await storage.updateList(req.params.id, { recordIds: updatedIds });
-      
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to add accounts to list" });
@@ -849,9 +885,9 @@ export function registerRoutes(app: Express) {
       if (!['csv', 'json'].includes(format)) {
         return res.status(400).json({ message: "Invalid format. Use 'csv' or 'json'" });
       }
-      
+
       const result = await storage.exportList(req.params.id, format);
-      
+
       // Set appropriate content type and headers
       const contentType = format === 'csv' ? 'text/csv' : 'application/json';
       res.setHeader('Content-Type', contentType);
@@ -864,7 +900,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== DOMAIN SETS (Phase 21) ====================
-  
+
   app.get("/api/domain-sets", requireAuth, async (req, res) => {
     try {
       const userId = (req as any).user?.id;
@@ -891,25 +927,25 @@ export function registerRoutes(app: Express) {
     try {
       const { parseDomainsFromCSV, deduplicateDomains, normalizeDomain, fixCommonDomainTypos } = await import('@shared/domain-utils');
       const userId = (req as any).user?.id;
-      
+
       const { name, description, csvContent, tags } = req.body;
-      
+
       if (!name || !csvContent) {
         return res.status(400).json({ message: "Name and CSV content are required" });
       }
-      
+
       // Parse domains from CSV
       const parsed = parseDomainsFromCSV(csvContent);
-      
+
       // Fix typos and normalize
       const fixedDomains = parsed.map(p => ({
         ...p,
         domain: fixCommonDomainTypos(p.domain)
       }));
-      
+
       // Deduplicate
       const { unique, duplicates } = deduplicateDomains(fixedDomains.map(p => p.domain));
-      
+
       // Create domain set
       const domainSet = await storage.createDomainSet({
         name,
@@ -920,19 +956,19 @@ export function registerRoutes(app: Express) {
         ownerId: userId,
         tags: tags || [],
       });
-      
+
       // Create domain items
       const items = unique.map(domain => ({
         domainSetId: domainSet.id,
         domain,
         normalizedDomain: normalizeDomain(domain),
       }));
-      
+
       await storage.createDomainSetItemsBulk(items);
-      
+
       // Trigger matching in background (in a real app, this would be a job queue)
       storage.processDomainSetMatching(domainSet.id).catch(console.error);
-      
+
       res.status(201).json(domainSet);
     } catch (error) {
       console.error('Create domain set error:', error);
@@ -975,11 +1011,11 @@ export function registerRoutes(app: Express) {
     try {
       const userId = (req as any).user?.id;
       const { listName } = req.body;
-      
+
       if (!listName) {
         return res.status(400).json({ message: "List name is required" });
       }
-      
+
       const list = await storage.convertDomainSetToList(req.params.id, listName, userId);
       res.status(201).json(list);
     } catch (error) {
@@ -998,7 +1034,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== CAMPAIGNS ====================
-  
+
   app.get("/api/campaigns", requireAuth, async (req, res) => {
     try {
       const campaigns = await storage.getCampaigns();
@@ -1053,12 +1089,12 @@ export function registerRoutes(app: Express) {
       }
 
       // TODO: Add pre-launch guards (audience validation, suppression checks, etc.)
-      
+
       const updated = await storage.updateCampaign(req.params.id, {
         status: 'active',
         launchedAt: new Date()
       });
-      
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: "Failed to launch campaign" });
@@ -1254,7 +1290,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== LEADS & QA ====================
-  
+
   app.get("/api/leads", requireAuth, async (req, res) => {
     try {
       const leads = await storage.getLeads();
@@ -1300,7 +1336,7 @@ export function registerRoutes(app: Express) {
       if (!lead) {
         return res.status(404).json({ message: "Lead not found" });
       }
-      
+
       res.json(lead);
     } catch (error) {
       res.status(500).json({ message: "Failed to approve lead" });
@@ -1318,7 +1354,7 @@ export function registerRoutes(app: Express) {
       if (!lead) {
         return res.status(404).json({ message: "Lead not found" });
       }
-      
+
       res.json(lead);
     } catch (error) {
       res.status(500).json({ message: "Failed to reject lead" });
@@ -1326,7 +1362,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== SUPPRESSIONS ====================
-  
+
   app.get("/api/suppressions/email", requireAuth, async (req, res) => {
     try {
       const suppressions = await storage.getEmailSuppressions();
@@ -1392,7 +1428,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== CAMPAIGN ORDERS (Client Portal) ====================
-  
+
   app.get("/api/orders", requireAuth, async (req, res) => {
     try {
       const orders = await storage.getCampaignOrders();
@@ -1445,11 +1481,11 @@ export function registerRoutes(app: Express) {
         status: 'submitted',
         submittedAt: new Date()
       });
-      
+
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
-      
+
       res.json(order);
     } catch (error) {
       res.status(500).json({ message: "Failed to submit order" });
@@ -1457,7 +1493,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== ORDER-CAMPAIGN LINKS (Bridge Model) ====================
-  
+
   app.get("/api/orders/:orderId/campaign-links", requireAuth, async (req, res) => {
     try {
       const links = await storage.getOrderCampaignLinks(req.params.orderId);
@@ -1473,7 +1509,7 @@ export function registerRoutes(app: Express) {
         ...req.body,
         orderId: req.params.orderId
       });
-      
+
       const link = await storage.createOrderCampaignLink(validated);
       res.status(201).json(link);
     } catch (error) {
@@ -1494,7 +1530,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== DASHBOARD STATS ====================
-  
+
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     try {
       const [
@@ -1512,11 +1548,11 @@ export function registerRoutes(app: Express) {
       const activeCampaigns = campaigns.filter(c => c.status === 'active' || c.status === 'launched');
       const emailCampaigns = activeCampaigns.filter(c => c.type === 'email').length;
       const callCampaigns = activeCampaigns.filter(c => c.type === 'telemarketing').length;
-      
+
       const thisMonth = new Date();
       thisMonth.setDate(1);
       thisMonth.setHours(0, 0, 0, 0);
-      
+
       const leadsThisMonth = leads.filter(l => 
         l.createdAt && new Date(l.createdAt) >= thisMonth
       ).length;
@@ -1537,7 +1573,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== SAVED FILTERS ====================
-  
+
   app.get("/api/saved-filters", requireAuth, async (req, res) => {
     try {
       const userId = req.user!.id;
@@ -1590,13 +1626,13 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== FILTER FIELDS REGISTRY ====================
-  
+
   // Filter field metadata is public (no auth required) - only exposes schema/configuration
   app.get("/api/filters/fields", async (req, res) => {
     try {
       const category = req.query.category as string | undefined;
       const fields = await storage.getFilterFields(category);
-      
+
       // Group by category for easier UI consumption
       const grouped = fields.reduce((acc: any, field) => {
         if (!acc[field.category]) {
@@ -1605,7 +1641,7 @@ export function registerRoutes(app: Express) {
         acc[field.category].push(field);
         return acc;
       }, {});
-      
+
       res.json({
         fields,
         grouped,
@@ -1620,7 +1656,7 @@ export function registerRoutes(app: Express) {
     try {
       // Return all filter fields regardless of entity for maximum flexibility
       const fields = await storage.getFilterFields();
-      
+
       // Group by category for easier UI consumption (same format as /api/filters/fields)
       const grouped = fields.reduce((acc: any, field) => {
         if (!acc[field.category]) {
@@ -1629,7 +1665,7 @@ export function registerRoutes(app: Express) {
         acc[field.category].push(field);
         return acc;
       }, {});
-      
+
       res.json({
         fields,
         grouped,
@@ -1641,7 +1677,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== INDUSTRY REFERENCE ====================
-  
+
   // Get all standardized industries
   app.get("/api/industries", async (req, res) => {
     try {
@@ -1651,17 +1687,17 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to fetch industries" });
     }
   });
-  
+
   // Search industries by name (with autocomplete)
   app.get("/api/industries/search", async (req, res) => {
     try {
       const query = req.query.q as string;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-      
+
       if (!query) {
         return res.status(400).json({ message: "Search query 'q' is required" });
       }
-      
+
       const industries = await storage.searchIndustries(query, limit);
       res.json(industries);
     } catch (error) {
@@ -1670,7 +1706,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== COMPANY SIZE REFERENCE ====================
-  
+
   // Get all standardized company size ranges (sorted by employee count)
   app.get("/api/company-sizes", async (req, res) => {
     try {
@@ -1680,7 +1716,7 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to fetch company sizes" });
     }
   });
-  
+
   // Get company size by code (A-I)
   app.get("/api/company-sizes/:code", async (req, res) => {
     try {
@@ -1695,7 +1731,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== REVENUE RANGE REFERENCE ====================
-  
+
   // Get all standardized revenue ranges (sorted by revenue)
   app.get("/api/revenue-ranges", async (req, res) => {
     try {
@@ -1705,7 +1741,7 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to fetch revenue ranges" });
     }
   });
-  
+
   // Get revenue range by label
   app.get("/api/revenue-ranges/:label", async (req, res) => {
     try {
@@ -1720,14 +1756,14 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== SELECTION CONTEXTS (Bulk Operations) ====================
-  
+
   app.get("/api/selection-contexts/:id", requireAuth, async (req, res) => {
     try {
       const userId = req.user!.id;
-      
+
       // Opportunistic cleanup of expired contexts
       await storage.deleteExpiredSelectionContexts().catch(() => {});
-      
+
       const context = await storage.getSelectionContext(req.params.id, userId);
       if (!context) {
         return res.status(404).json({ message: "Selection context not found or expired" });
@@ -1741,23 +1777,23 @@ export function registerRoutes(app: Express) {
   app.post("/api/selection-contexts", requireAuth, async (req, res) => {
     try {
       const userId = req.user!.id;
-      
+
       // Opportunistic cleanup of expired contexts
       await storage.deleteExpiredSelectionContexts().catch(() => {});
-      
+
       // Validate client payload (omit server-managed fields)
       const clientSchema = insertSelectionContextSchema.omit({ userId: true, expiresAt: true });
       const validated = clientSchema.parse(req.body);
-      
+
       // Set expiration to 15 minutes from now
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-      
+
       const context = await storage.createSelectionContext({
         ...validated,
         userId,
         expiresAt
       });
-      
+
       res.status(201).json(context);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1781,7 +1817,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== BULK IMPORTS ====================
-  
+
   app.get("/api/imports", requireAuth, async (req, res) => {
     try {
       const imports = await storage.getBulkImports();
@@ -1795,9 +1831,9 @@ export function registerRoutes(app: Express) {
     try {
       const validated = insertBulkImportSchema.parse(req.body);
       const bulkImport = await storage.createBulkImport(validated);
-      
+
       // TODO: Queue bulk import job for processing
-      
+
       res.status(201).json(bulkImport);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1820,7 +1856,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== CONTENT STUDIO ====================
-  
+
   app.get("/api/content-assets", requireAuth, async (req, res) => {
     try {
       const assets = await storage.getContentAssets();
@@ -1837,12 +1873,12 @@ export function registerRoutes(app: Express) {
       console.log("Request body:", JSON.stringify(req.body, null, 2));
       const validated = insertContentAssetSchema.parse(req.body);
       console.log("Validated data:", JSON.stringify(validated, null, 2));
-      
+
       // Clean up validated data - remove undefined values to let DB defaults work
       const cleanData = Object.fromEntries(
         Object.entries(validated).filter(([_, v]) => v !== undefined)
       );
-      
+
       const asset = await storage.createContentAsset({ ...cleanData, ownerId: userId });
       console.log("Asset created:", asset.id);
       res.status(201).json(asset);
@@ -1892,12 +1928,12 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== CONTENT PUSH TO RESOURCES CENTER ====================
-  
+
   app.post("/api/content-assets/:id/push", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { id } = req.params;
       const { targetUrl } = req.body;
-      
+
       // Get the asset
       const asset = await storage.getContentAsset(id);
       if (!asset) {
@@ -1970,7 +2006,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/content-pushes/:id/retry", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       // Get push record
       const pushRecord = await storage.getContentPush(id);
       if (!pushRecord) {
@@ -2047,7 +2083,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== SOCIAL MEDIA POSTS ====================
-  
+
   app.get("/api/social-posts", requireAuth, async (req, res) => {
     try {
       const posts = await storage.getSocialPosts();
@@ -2084,16 +2120,16 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== AI CONTENT GENERATION ====================
-  
+
   app.post("/api/ai-content", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const userId = req.user!.id;
       const { prompt, contentType, targetAudience, tone, ctaGoal } = req.body;
-      
+
       // TODO: Integrate with OpenAI/Anthropic API for real generation
       // For now, return mock generated content
       const mockContent = `Generated ${contentType} content for ${targetAudience}`;
-      
+
       const generation = await storage.createAIContentGeneration({
         prompt: prompt || "Generate content",
         contentType,
@@ -2105,7 +2141,7 @@ export function registerRoutes(app: Express) {
         tokensUsed: 500,
         userId,
       });
-      
+
       res.status(201).json(generation);
     } catch (error) {
       res.status(500).json({ message: "Failed to generate content" });
@@ -2113,7 +2149,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== EVENTS ====================
-  
+
   app.get("/api/events", requireAuth, async (req, res) => {
     try {
       const events = await storage.getEvents();
@@ -2178,7 +2214,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== RESOURCES ====================
-  
+
   app.get("/api/resources", requireAuth, async (req, res) => {
     try {
       const resources = await storage.getResources();
@@ -2243,7 +2279,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== NEWS ====================
-  
+
   app.get("/api/news", requireAuth, async (req, res) => {
     try {
       const news = await storage.getNews();
@@ -2308,7 +2344,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== SPEAKERS, ORGANIZERS, SPONSORS ====================
-  
+
   app.get("/api/speakers", requireAuth, async (req, res) => {
     try {
       const speakers = await storage.getSpeakers();
@@ -2451,12 +2487,12 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== RESOURCES CENTRE SYNC ====================
-  
+
   app.post("/api/sync/resources-centre", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const { resourcesCentreSync } = await import("./services/resourcesCentreSync");
       const result = await resourcesCentreSync.syncAll();
-      
+
       if (result.success) {
         res.json({
           message: "Sync completed successfully",
@@ -2491,7 +2527,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== EMAIL INFRASTRUCTURE (Phase 26) ====================
-  
+
   // Sender Profiles
   app.get("/api/sender-profiles", requireAuth, async (req, res) => {
     try {
@@ -2554,7 +2590,7 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== PHASE 27: TELEPHONY - SOFTPHONE & CALL RECORDING ====================
-  
+
   // Softphone Profile Routes
   app.get("/api/softphone/profile", requireAuth, async (req, res) => {
     try {
@@ -2589,7 +2625,7 @@ export function registerRoutes(app: Express) {
       const userId = req.user!.id;
       const { attemptId } = req.params;
       const { action } = req.body; // 'play' or 'download'
-      
+
       if (!action || !['play', 'download'].includes(action)) {
         return res.status(400).json({ message: "Invalid action. Must be 'play' or 'download'" });
       }
@@ -2629,7 +2665,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/calls/:attemptId/recording/access-logs", requireAuth, requireRole('admin', 'qa_specialist'), async (req, res) => {
     try {
       const { attemptId } = req.params;
-      
+
       // Verify call attempt exists
       const attempt = await storage.getCallAttempt(attemptId);
       if (!attempt) {
@@ -2647,37 +2683,37 @@ export function registerRoutes(app: Express) {
   app.use("/api/webhooks", webhooksRouter);
 
   // ==================== CAMPAIGN CONTENT LINKS (Resources Centre Integration) ====================
-  
+
   // Get linked content for a campaign
   app.get("/api/campaigns/:campaignId/content-links", requireAuth, async (req, res) => {
     try {
       const { campaignId } = req.params;
-      
+
       // Verify campaign exists
       const campaign = await storage.getCampaign(campaignId);
       if (!campaign) {
         return res.status(404).json({ message: "Campaign not found" });
       }
-      
+
       const links = await storage.getCampaignContentLinks(campaignId);
       res.json(links);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch content links" });
     }
   });
-  
+
   // Link content to campaign
   app.post("/api/campaigns/:campaignId/content-links", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { campaignId } = req.params;
       const userId = (req.user as any).id;
-      
+
       // Verify campaign exists
       const campaign = await storage.getCampaign(campaignId);
       if (!campaign) {
         return res.status(404).json({ message: "Campaign not found" });
       }
-      
+
       const validated = z.object({
         contentType: z.enum(['event', 'resource']),
         contentId: z.string(),
@@ -2687,7 +2723,7 @@ export function registerRoutes(app: Express) {
         formId: z.string().optional(),
         metadata: z.any().optional()
       }).parse(req.body);
-      
+
       const link = await storage.createCampaignContentLink({
         campaignId,
         contentType: validated.contentType,
@@ -2699,7 +2735,7 @@ export function registerRoutes(app: Express) {
         metadata: validated.metadata || null,
         createdBy: userId
       });
-      
+
       res.status(201).json(link);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2708,36 +2744,36 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to create content link" });
     }
   });
-  
+
   // Delete content link
   app.delete("/api/campaigns/:campaignId/content-links/:linkId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { linkId } = req.params;
-      
+
       await storage.deleteCampaignContentLink(Number(linkId));
       res.json({ message: "Content link deleted" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete content link" });
     }
   });
-  
+
   // Generate tracking URL for a single contact
   app.post("/api/campaigns/:campaignId/content-links/:linkId/tracking-url", requireAuth, async (req, res) => {
     try {
       const { campaignId, linkId } = req.params;
-      
+
       // Get campaign
       const campaign = await storage.getCampaign(campaignId);
       if (!campaign) {
         return res.status(404).json({ message: "Campaign not found" });
       }
-      
+
       // Get content link
       const link = await storage.getCampaignContentLink(Number(linkId));
       if (!link) {
         return res.status(404).json({ message: "Content link not found" });
       }
-      
+
       const validated = z.object({
         contactId: z.string().optional(),
         email: z.string().optional(),
@@ -2748,16 +2784,16 @@ export function registerRoutes(app: Express) {
         utmMedium: z.string().optional(),
         utmCampaign: z.string().optional()
       }).parse(req.body);
-      
+
       // Import the URL generator
       const { generateTrackingUrl } = await import("./lib/urlGenerator");
-      
+
       const trackingUrl = generateTrackingUrl(link.contentUrl, {
         ...validated,
         campaignId,
         campaignName: campaign.name
       });
-      
+
       res.json({ trackingUrl });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2766,41 +2802,41 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to generate tracking URL" });
     }
   });
-  
+
   // Generate bulk tracking URLs for multiple contacts
   app.post("/api/campaigns/:campaignId/content-links/:linkId/bulk-tracking-urls", requireAuth, async (req, res) => {
     try {
       const { campaignId, linkId } = req.params;
-      
+
       // Get campaign
       const campaign = await storage.getCampaign(campaignId);
       if (!campaign) {
         return res.status(404).json({ message: "Campaign not found" });
       }
-      
+
       // Get content link
       const link = await storage.getCampaignContentLink(Number(linkId));
       if (!link) {
         return res.status(404).json({ message: "Content link not found" });
       }
-      
+
       const validated = z.object({
         contactIds: z.array(z.string()),
         utmSource: z.string().optional(),
         utmMedium: z.string().optional(),
         utmCampaign: z.string().optional()
       }).parse(req.body);
-      
+
       // Get contacts
       const contacts = await Promise.all(
         validated.contactIds.map(id => storage.getContact(id))
       );
-      
+
       const validContacts = contacts.filter(c => c !== undefined) as any[];
-      
+
       // Import the URL generator
       const { generateBulkTrackingUrls } = await import("./lib/urlGenerator");
-      
+
       const trackingUrls = generateBulkTrackingUrls(
         link.contentUrl,
         validContacts.map(c => ({
@@ -2818,7 +2854,7 @@ export function registerRoutes(app: Express) {
           utmCampaign: validated.utmCampaign
         }
       );
-      
+
       res.json({ trackingUrls });
     } catch (error) {
       if (error instanceof z.ZodError) {
