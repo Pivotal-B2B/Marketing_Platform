@@ -10,7 +10,8 @@ export interface JWTPayload {
   userId: string;
   username: string;
   email: string;
-  role: string;
+  role: string; // Legacy - for backward compatibility
+  roles: string[]; // New multi-role support
 }
 
 // Extend Express Request to include user
@@ -22,12 +23,13 @@ declare global {
   }
 }
 
-export function generateToken(user: User): string {
+export function generateToken(user: User, roles: string[] = []): string {
   const payload: JWTPayload = {
     userId: user.id,
     username: user.username,
     email: user.email,
-    role: user.role,
+    role: user.role, // Legacy - primary role for backward compatibility
+    roles: roles.length > 0 ? roles : [user.role], // Use provided roles or fallback to legacy role
   };
   
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -68,14 +70,18 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Role-based access middleware
+// Role-based access middleware (supports multi-role users)
 export function requireRole(...allowedRoles: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: "Authentication required" });
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    // Check if user has any of the allowed roles
+    const userRoles = req.user.roles || [req.user.role]; // Support both new and legacy format
+    const hasPermission = userRoles.some(role => allowedRoles.includes(role));
+
+    if (!hasPermission) {
       return res.status(403).json({ message: "Insufficient permissions" });
     }
 
