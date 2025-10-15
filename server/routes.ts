@@ -170,6 +170,36 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Migrate existing users to multi-role system (one-time migration)
+  app.post("/api/users/migrate-roles", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      const allUsers = await storage.getUsers();
+      let migrated = 0;
+      let skipped = 0;
+
+      for (const user of allUsers) {
+        const existingRoles = await storage.getUserRoles(user.id);
+        
+        // Only migrate if user has no roles in the junction table
+        if (existingRoles.length === 0) {
+          await storage.assignUserRole(user.id, user.role, req.user!.userId);
+          migrated++;
+        } else {
+          skipped++;
+        }
+      }
+
+      res.json({
+        message: "Migration completed successfully",
+        migrated,
+        skipped,
+        total: allUsers.length
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ==================== AUTH ====================
 
   app.post("/api/auth/login", async (req, res) => {

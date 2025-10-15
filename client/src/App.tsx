@@ -37,6 +37,7 @@ import OrdersPage from "@/pages/orders";
 import ImportsPage from "@/pages/imports";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
+import UserManagementPage from "@/pages/user-management";
 import EventsPage from "@/pages/events";
 import ResourcesPage from "@/pages/resources";
 import NewsPage from "@/pages/news";
@@ -96,8 +97,7 @@ function AuthenticatedApp() {
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />
               <Route path="/reports" component={ReportsPage} />
-              <Route path="/settings/users" component={SettingsPage} />
-              <Route path="/settings/users" component={lazy(() => import("@/pages/user-management"))} />
+              <Route path="/settings/users" component={UserManagementPage} />
               <Route path="/settings/compliance" component={SettingsPage} />
               <Route path="/settings/integrations" component={SettingsPage} />
               <Route path="/settings" component={SettingsPage} />
