@@ -2,6 +2,13 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Handle 401 Unauthorized - automatically logout and redirect to login
+    if (res.status === 401) {
+      localStorage.removeItem('authToken');
+      window.location.href = '/login';
+      throw new Error('Session expired. Please login again.');
+    }
+    
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
@@ -49,6 +56,13 @@ export const getQueryFn: <T>(options: {
       headers: getAuthHeaders(),
       credentials: "include",
     });
+
+    // Handle 401 Unauthorized - automatically logout and redirect to login
+    if (res.status === 401) {
+      localStorage.removeItem('authToken');
+      window.location.href = '/login';
+      throw new Error('Session expired. Please login again.');
+    }
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
