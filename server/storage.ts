@@ -16,7 +16,8 @@ import {
   softphoneProfiles, callRecordingAccessLogs, sipTrunkConfigs,
   campaignContentLinks,
   speakers, organizers, sponsors,
-  type User, type InsertUser,
+  userRoles,
+  type User, type InsertUser, type UserRole, type InsertUserRole,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
   type Campaign, type InsertCampaign,
@@ -83,6 +84,12 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
+  
+  // User Roles (Multi-role support)
+  getUserRoles(userId: string): Promise<string[]>;
+  assignUserRole(userId: string, role: string, assignedBy?: string): Promise<void>;
+  removeUserRole(userId: string, role: string): Promise<void>;
+  updateUserRoles(userId: string, roles: string[], assignedBy?: string): Promise<void>;
 
   // Accounts
   getAccounts(filters?: FilterGroup): Promise<Account[]>;
@@ -410,6 +417,53 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user || undefined;
+  }
+
+  // User Roles (Multi-role support)
+  async getUserRoles(userId: string): Promise<string[]> {
+    const roles = await db
+      .select({ role: userRoles.role })
+      .from(userRoles)
+      .where(eq(userRoles.userId, userId));
+    return roles.map(r => r.role);
+  }
+
+  async assignUserRole(userId: string, role: string, assignedBy?: string): Promise<void> {
+    try {
+      await db.insert(userRoles).values({
+        userId,
+        role,
+        assignedBy,
+      });
+    } catch (error) {
+      // Ignore duplicate role assignment errors due to unique index
+      console.log(`Role ${role} already assigned to user ${userId}`);
+    }
+  }
+
+  async removeUserRole(userId: string, role: string): Promise<void> {
+    await db.delete(userRoles).where(
+      and(
+        eq(userRoles.userId, userId),
+        eq(userRoles.role, role)
+      )
+    );
+  }
+
+  async updateUserRoles(userId: string, roles: string[], assignedBy?: string): Promise<void> {
+    // Remove all existing roles
+    await db.delete(userRoles).where(eq(userRoles.userId, userId));
+    
+    // Insert new roles
+    if (roles.length > 0) {
+      await db.insert(userRoles).values(
+        roles.map(role => ({
+          userId,
+          role,
+          assignedBy,
+        }))
+      );
+    }
   }
 
   // Accounts
