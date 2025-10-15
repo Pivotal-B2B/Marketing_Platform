@@ -4,6 +4,14 @@
 Pivotal CRM is an enterprise-grade B2B customer relationship management platform designed to streamline B2B sales and marketing operations. It specializes in Account-Based Marketing (ABM), multi-channel campaign management (Email & Telemarketing), lead qualification, and includes a client portal. The platform emphasizes efficient customer engagement, robust compliance (DNC/Unsubscribe), comprehensive lead QA workflows, and features a "bridge model" for linking campaigns to orders.
 
 ## Recent Changes (October 15, 2025)
+- **Account Lead Cap Implementation:** Intelligent contact distribution system to prevent over-contacting accounts:
+  - **Database Schema:** Added `capEnabled`, `leadsPerAccount`, and `capMode` fields to campaigns table
+  - **Queue System:** Created `campaign_queue` table with status tracking (queued, in_progress, done, skipped, removed) and composite indexes for efficient lookups
+  - **Account Statistics:** Created `campaign_account_stats` table with atomic counters (queuedCount, connectedCount, positiveDispCount) for cap enforcement
+  - **Storage Layer:** Implemented race-free queue operations using PostgreSQL ON CONFLICT DO UPDATE for atomic counter maintenance and WHERE clause guards to prevent duplicate status transitions
+  - **API Endpoints:** 6 secured endpoints for queue management (enqueue, status updates, removal, stats, enforcement) with RBAC guards
+  - **UI Components:** Step 4 wizard now includes Account Lead Cap controls (toggle, 1-100 range input with validation, mode selection: queue_size/connected_calls/positive_disp)
+  - **Cap Modes:** Three enforcement modes - Queue Size (control exposure), Connected Calls (meaningful conversations), Positive Dispositions (quality-focused)
 - **Campaign Builder Bug Fixes:** Resolved critical issues preventing campaign creation:
   - Fixed campaign type enum: Changed from "telemarketing" to "call" to match database schema (campaigns.type enum: "email" | "call" | "combo")
   - Corrected audience data structure: Transformed flat audience selections into `audienceRefs` jsonb format containing segments, lists, domainSets, and filters
