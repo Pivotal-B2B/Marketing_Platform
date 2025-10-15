@@ -1400,6 +1400,99 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== CAMPAIGN QUEUE (ACCOUNT LEAD CAP) ====================
+
+  app.get("/api/campaigns/:id/queue", requireAuth, async (req, res) => {
+    try {
+      const { status } = req.query;
+      const queue = await storage.getCampaignQueue(
+        req.params.id,
+        status as string | undefined
+      );
+      res.json(queue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch campaign queue" });
+    }
+  });
+
+  app.post("/api/campaigns/:id/queue/enqueue", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { contactId, accountId, priority = 0 } = req.body;
+      
+      if (!contactId || !accountId) {
+        return res.status(400).json({ message: "contactId and accountId required" });
+      }
+
+      const queueItem = await storage.enqueueContact(
+        req.params.id,
+        contactId,
+        accountId,
+        priority
+      );
+      res.status(201).json(queueItem);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to enqueue contact" });
+    }
+  });
+
+  app.patch("/api/campaigns/queue/:queueId/status", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { status, removedReason, isPositiveDisposition } = req.body;
+      
+      if (!status) {
+        return res.status(400).json({ message: "status required" });
+      }
+
+      const updated = await storage.updateQueueStatus(
+        req.params.queueId,
+        status,
+        removedReason,
+        isPositiveDisposition
+      );
+
+      if (!updated) {
+        return res.status(404).json({ message: "Queue item not found or status already changed" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update queue status" });
+    }
+  });
+
+  app.delete("/api/campaigns/:id/queue/:contactId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { reason = "Manual removal" } = req.body;
+      
+      await storage.removeFromQueue(req.params.id, req.params.contactId, reason);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove from queue" });
+    }
+  });
+
+  app.get("/api/campaigns/:id/account-stats", requireAuth, async (req, res) => {
+    try {
+      const { accountId } = req.query;
+      const stats = await storage.getCampaignAccountStats(
+        req.params.id,
+        accountId as string | undefined
+      );
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch account stats" });
+    }
+  });
+
+  app.post("/api/campaigns/:id/enforce-cap", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const result = await storage.enforceAccountCap(req.params.id);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to enforce account cap" });
+    }
+  });
+
   // ==================== SENDER PROFILES ====================
 
   app.get("/api/sender-profiles", requireAuth, async (req, res) => {
