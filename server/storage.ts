@@ -1,5 +1,5 @@
 // Storage layer - referenced from blueprint:javascript_database
-import { eq, and, or, like, desc, sql, inArray, isNull } from "drizzle-orm";
+import { eq, sql, and, or, isNull, isNotNull, like, ilike, gte, lte, gt, lt, desc, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { buildFilterQuery, buildSuppressionFilter } from "./filter-builder";
 import type { FilterGroup } from "@shared/filter-types";

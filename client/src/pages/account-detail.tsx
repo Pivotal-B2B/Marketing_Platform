@@ -54,6 +54,7 @@ import {
 import type { Account, Contact } from "@shared/schema";
 import { HeaderActionBar } from "@/components/shared/header-action-bar";
 import { SectionCard } from "@/components/shared/section-card";
+import { ListSegmentMembership } from "@/components/list-segment-membership";
 
 export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -574,6 +575,15 @@ export default function AccountDetailPage() {
                 </div>
               </SectionCard>
             )}
+
+            {/* Lists & Segments */}
+            <SectionCard
+              title="Lists & Segments"
+              icon={List}
+              description="Membership in static lists and dynamic segments"
+            >
+              <ListSegmentMembership entityType="account" entityId={id || ''} />
+            </SectionCard>
 
             {/* Activity Timeline */}
             <SectionCard

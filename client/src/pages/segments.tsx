@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import type { FilterGroup } from "@shared/filter-types";
 
 export default function SegmentsPage() {
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [createSegmentDialogOpen, setCreateSegmentDialogOpen] = useState(false);
   const [createListDialogOpen, setCreateListDialogOpen] = useState(false);
@@ -448,7 +450,12 @@ export default function SegmentsPage() {
           ) : filteredSegments.length > 0 ? (
             <div className="grid gap-4">
               {filteredSegments.map((segment) => (
-                <Card key={segment.id} className="hover-elevate" data-testid={`card-segment-${segment.id}`}>
+                <Card 
+                  key={segment.id} 
+                  className="hover-elevate cursor-pointer" 
+                  data-testid={`card-segment-${segment.id}`}
+                  onClick={() => setLocation(`/segments/${segment.id}`)}
+                >
                   <CardHeader>
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <CardTitle>{segment.name}</CardTitle>
@@ -691,7 +698,12 @@ export default function SegmentsPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredLists.map((list) => (
-                    <TableRow key={list.id} className="hover-elevate" data-testid={`row-list-${list.id}`}>
+                    <TableRow 
+                      key={list.id} 
+                      className="hover-elevate cursor-pointer" 
+                      data-testid={`row-list-${list.id}`}
+                      onClick={() => setLocation(`/segments/lists/${list.id}`)}
+                    >
                       <TableCell className="font-medium">{list.name}</TableCell>
                       <TableCell>
                         <Badge variant="secondary">{list.entityType || 'contact'}</Badge>

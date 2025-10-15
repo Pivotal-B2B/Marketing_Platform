@@ -755,6 +755,17 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Added endpoint to get segment members
+  app.get("/api/segments/:id/members", requireAuth, async (req, res) => {
+    try {
+      const members = await storage.getSegmentMembers(req.params.id);
+      res.json(members);
+    } catch (error) {
+      console.error('Get segment members error:', error);
+      res.status(500).json({ message: "Failed to get segment members" });
+    }
+  });
+
   app.delete("/api/segments/:id", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
     try {
       await storage.deleteSegment(req.params.id);
@@ -803,6 +814,31 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Added endpoint to get a specific list by ID
+  app.get("/api/lists/:id", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getListById(req.params.id);
+      if (!list) {
+        return res.status(404).json({ message: "List not found" });
+      }
+      res.json(list);
+    } catch (error) {
+      console.error('Get list error:', error);
+      res.status(500).json({ message: "Failed to get list" });
+    }
+  });
+
+  // Added endpoint to get list members
+  app.get("/api/lists/:id/members", requireAuth, async (req, res) => {
+    try {
+      const members = await storage.getListMembers(req.params.id);
+      res.json(members);
+    } catch (error) {
+      console.error('Get list members error:', error);
+      res.status(500).json({ message: "Failed to get list members" });
+    }
+  });
+
   app.post("/api/lists", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
     try {
       const validated = insertListSchema.parse(req.body);
@@ -821,6 +857,7 @@ export function registerRoutes(app: Express) {
       await storage.deleteList(req.params.id);
       res.status(204).send();
     } catch (error) {
+      console.error('Delete list error:', error);
       res.status(500).json({ message: "Failed to delete list" });
     }
   });

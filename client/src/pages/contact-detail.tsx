@@ -1,6 +1,7 @@
 import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,6 +43,7 @@ import {
 import type { Contact, Account } from "@shared/schema";
 import { HeaderActionBar } from "@/components/shared/header-action-bar";
 import { SectionCard } from "@/components/shared/section-card";
+import { ListSegmentMembership } from "@/components/list-segment-membership";
 
 export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -382,6 +384,15 @@ export default function ContactDetailPage() {
                 </div>
               </SectionCard>
             )}
+
+            {/* Lists & Segments */}
+            <SectionCard
+              title="Lists & Segments"
+              icon={List}
+              description="Membership in static lists and dynamic segments"
+            >
+              <ListSegmentMembership entityType="contact" entityId={id || ''} />
+            </SectionCard>
 
             {/* Activity Timeline */}
             <SectionCard
