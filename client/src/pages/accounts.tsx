@@ -667,7 +667,7 @@ export default function AccountsPage() {
                     ) : "-"}
                   </TableCell>
                   <TableCell>{account.employeesSizeRange || "-"}</TableCell>
-                  <TableCell>{account.annualRevenue || "-"}</TableCell>
+                  <TableCell>{account.revenueRange || "-"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Button 

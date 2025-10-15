@@ -136,9 +136,9 @@ export function AccountCardPremium({ account, onCardClick, index = 0, isSelected
                 {account.hqCountry}
               </Badge>
             )}
-            {account.annualRevenue && (
+            {account.revenueRange && (
               <Badge variant="outline" className="rounded-full px-2.5 py-0.5">
-                {account.annualRevenue}
+                {account.revenueRange}
               </Badge>
             )}
           </div>
