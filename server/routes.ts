@@ -13,6 +13,7 @@ import {
   updateCustomFieldDefinitionSchema,
   insertCampaignSchema,
   insertLeadSchema,
+  insertCallSchema,
   insertSuppressionEmailSchema,
   insertSuppressionPhoneSchema,
   insertCampaignOrderSchema,

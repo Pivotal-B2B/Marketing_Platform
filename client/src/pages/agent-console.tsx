@@ -109,12 +109,11 @@ export default function AgentConsolePage() {
     },
   });
 
-  // Fetch agent queue data - only for selected campaign
+  // Fetch agent queue data - filter by selected campaign if one is chosen
   const { data: queueData = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery<QueueItem[]>({
     queryKey: selectedCampaignId 
       ? [`/api/agents/me/queue?campaignId=${selectedCampaignId}&status=queued`]
       : ['/api/agents/me/queue?status=queued'],
-    enabled: !!selectedCampaignId,
   });
 
   // Fetch contact details for current contact
