@@ -17,6 +17,7 @@ import {
   campaignContentLinks,
   speakers, organizers, sponsors,
   userRoles,
+  autoDialerQueues, agentStatus,
   type User, type InsertUser, type UserRole, type InsertUserRole,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -3727,17 +3728,60 @@ export class DatabaseStorage implements IStorage {
   // ==================== AUTO-DIALER QUEUE ====================
   async getAllAutoDialerQueues(activeOnly: boolean = false): Promise<any[]> {
     if (activeOnly) {
-      return await db.query.autoDialerQueues.findMany({
-        where: eq(autoDialerQueues.isActive, true),
-      });
+      return await db.select().from(autoDialerQueues).where(eq(autoDialerQueues.isActive, true));
     }
-    return await db.query.autoDialerQueues.findMany();
+    return await db.select().from(autoDialerQueues);
   }
 
   async getAutoDialerQueue(campaignId: string) {
-    return await db.query.autoDialerQueues.findFirst({
-      where: eq(autoDialerQueues.campaignId, campaignId),
-    });
+    const [queue] = await db.select().from(autoDialerQueues).where(eq(autoDialerQueues.campaignId, campaignId));
+    return queue || undefined;
+  }
+
+  async createAutoDialerQueue(data: any): Promise<any> {
+    const [queue] = await db.insert(autoDialerQueues).values(data).returning();
+    return queue;
+  }
+
+  async updateAutoDialerQueue(campaignId: string, data: any): Promise<any> {
+    const [queue] = await db.update(autoDialerQueues)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(autoDialerQueues.campaignId, campaignId))
+      .returning();
+    return queue || undefined;
+  }
+
+  // Agent Status Management
+  async getAvailableAgents(): Promise<any[]> {
+    return await db.select().from(agentStatus).where(eq(agentStatus.status, 'available'));
+  }
+
+  async updateAgentStatus(agentId: string, data: any): Promise<any> {
+    const [status] = await db.update(agentStatus)
+      .set({ ...data, lastStatusChangeAt: new Date(), updatedAt: new Date() })
+      .where(eq(agentStatus.agentId, agentId))
+      .returning();
+    return status || undefined;
+  }
+
+  async upsertAgentStatus(data: any): Promise<any> {
+    const [status] = await db.insert(agentStatus)
+      .values({ ...data, lastStatusChangeAt: new Date() })
+      .onConflictDoUpdate({
+        target: agentStatus.agentId,
+        set: {
+          status: data.status,
+          campaignId: data.campaignId,
+          currentCallId: data.currentCallId,
+          lastStatusChangeAt: new Date(),
+          lastCallEndedAt: data.lastCallEndedAt,
+          totalCallsToday: data.totalCallsToday,
+          totalTalkTimeToday: data.totalTalkTimeToday,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return status;
   }
 }
 
