@@ -4,7 +4,7 @@ import { db } from "./db";
 import { buildFilterQuery, buildSuppressionFilter } from "./filter-builder";
 import type { FilterGroup } from "@shared/filter-types";
 import {
-  users, accounts, contacts, campaigns, segments, lists, domainSets, domainSetItems, domainSetContactLinks,
+  users, accounts, contacts, campaigns, campaignAgentAssignments, segments, lists, domainSets, domainSetItems, domainSetContactLinks,
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
   campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
   selectionContexts, filterFieldRegistry, fieldChangeLog, industryReference,
@@ -21,6 +21,7 @@ import {
   type Account, type InsertAccount,
   type Contact, type InsertContact,
   type Campaign, type InsertCampaign,
+  type CampaignAgentAssignment, type InsertCampaignAgentAssignment,
   type Segment, type InsertSegment,
   type List, type InsertList,
   type DomainSet, type InsertDomainSet,
@@ -123,6 +124,13 @@ export interface IStorage {
   createCampaign(campaign: InsertCampaign): Promise<Campaign>;
   updateCampaign(id: string, campaign: Partial<InsertCampaign>): Promise<Campaign | undefined>;
   deleteCampaign(id: string): Promise<void>;
+
+  // Campaign Agent Assignments
+  listAgents(): Promise<Array<User & { currentAssignment?: { campaignId: string; campaignName: string } }>>;
+  getCampaignAgentAssignments(campaignId: string): Promise<CampaignAgentAssignment[]>;
+  listActiveAgentAssignments(): Promise<Array<CampaignAgentAssignment & { agentName: string; campaignName: string }>>;
+  assignAgentsToCampaign(campaignId: string, agentIds: string[], assignedBy: string): Promise<void>;
+  releaseAgentAssignment(campaignId: string, agentId: string): Promise<void>;
 
   // Campaign Audience Snapshots
   createCampaignAudienceSnapshot(snapshot: InsertCampaignAudienceSnapshot): Promise<CampaignAudienceSnapshot>;
@@ -1065,6 +1073,121 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCampaign(id: string): Promise<void> {
     await db.delete(campaigns).where(eq(campaigns.id, id));
+  }
+
+  // Campaign Agent Assignments
+  async listAgents(): Promise<Array<User & { currentAssignment?: { campaignId: string; campaignName: string } }>> {
+    // Get all users with agent role
+    const agentRoleUsers = await db
+      .select({ userId: userRoles.userId })
+      .from(userRoles)
+      .where(eq(userRoles.role, 'agent'));
+    
+    const agentIds = agentRoleUsers.map(r => r.userId);
+    
+    if (agentIds.length === 0) {
+      return [];
+    }
+    
+    // Get all agents with their current active assignments
+    const agents = await db
+      .select({
+        user: users,
+        assignment: campaignAgentAssignments,
+        campaign: campaigns,
+      })
+      .from(users)
+      .leftJoin(
+        campaignAgentAssignments, 
+        and(
+          eq(users.id, campaignAgentAssignments.agentId),
+          eq(campaignAgentAssignments.isActive, true)
+        )
+      )
+      .leftJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
+      .where(inArray(users.id, agentIds));
+    
+    return agents.map(row => ({
+      ...row.user,
+      currentAssignment: row.assignment && row.campaign ? {
+        campaignId: row.campaign.id,
+        campaignName: row.campaign.name,
+      } : undefined
+    }));
+  }
+
+  async getCampaignAgentAssignments(campaignId: string): Promise<CampaignAgentAssignment[]> {
+    return await db
+      .select()
+      .from(campaignAgentAssignments)
+      .where(
+        and(
+          eq(campaignAgentAssignments.campaignId, campaignId),
+          eq(campaignAgentAssignments.isActive, true)
+        )
+      );
+  }
+
+  async listActiveAgentAssignments(): Promise<Array<CampaignAgentAssignment & { agentName: string; campaignName: string }>> {
+    const assignments = await db
+      .select({
+        assignment: campaignAgentAssignments,
+        agent: users,
+        campaign: campaigns,
+      })
+      .from(campaignAgentAssignments)
+      .innerJoin(users, eq(campaignAgentAssignments.agentId, users.id))
+      .innerJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
+      .where(eq(campaignAgentAssignments.isActive, true));
+    
+    return assignments.map(row => ({
+      ...row.assignment,
+      agentName: `${row.agent.firstName || ''} ${row.agent.lastName || ''}`.trim() || row.agent.username,
+      campaignName: row.campaign.name,
+    }));
+  }
+
+  async assignAgentsToCampaign(campaignId: string, agentIds: string[], assignedBy: string): Promise<void> {
+    // Assign agents in a transaction to ensure atomicity
+    for (const agentId of agentIds) {
+      // Check if agent already has an active assignment
+      const [existingAssignment] = await db
+        .select()
+        .from(campaignAgentAssignments)
+        .where(
+          and(
+            eq(campaignAgentAssignments.agentId, agentId),
+            eq(campaignAgentAssignments.isActive, true)
+          )
+        );
+      
+      if (existingAssignment) {
+        throw new Error(`Agent ${agentId} is already assigned to campaign ${existingAssignment.campaignId}`);
+      }
+      
+      // Create new assignment
+      await db.insert(campaignAgentAssignments).values({
+        campaignId,
+        agentId,
+        assignedBy,
+        isActive: true,
+      });
+    }
+  }
+
+  async releaseAgentAssignment(campaignId: string, agentId: string): Promise<void> {
+    await db
+      .update(campaignAgentAssignments)
+      .set({ 
+        isActive: false,
+        releasedAt: new Date()
+      })
+      .where(
+        and(
+          eq(campaignAgentAssignments.campaignId, campaignId),
+          eq(campaignAgentAssignments.agentId, agentId)
+        )
+      );
   }
 
   // Campaign Audience Snapshots
