@@ -180,7 +180,7 @@ export function registerRoutes(app: Express) {
 
       for (const user of allUsers) {
         const existingRoles = await storage.getUserRoles(user.id);
-        
+
         // Only migrate if user has no roles in the junction table
         if (existingRoles.length === 0) {
           await storage.assignUserRole(user.id, user.role, req.user!.userId);
@@ -225,13 +225,13 @@ export function registerRoutes(app: Express) {
 
       // Fetch user roles (multi-role support)
       let userRoles = await storage.getUserRoles(user.id);
-      
+
       // Bootstrap check: If user has no roles and no admin users exist in the system,
       // automatically assign admin role to this user (first user setup)
       if (userRoles.length === 0) {
         const allUsersWithRoles = await storage.getAllUsersWithRoles();
         const hasAdmin = allUsersWithRoles.some(u => u.roles.includes('admin'));
-        
+
         if (!hasAdmin) {
           // This is the first user - give them admin role
           await storage.assignUserRole(user.id, 'admin', user.id);
@@ -241,12 +241,12 @@ export function registerRoutes(app: Express) {
           userRoles = [user.role || 'agent'];
         }
       }
-      
+
       // Ensure userRoles is always an array
       if (!Array.isArray(userRoles)) {
         userRoles = [userRoles];
       }
-      
+
       // Generate JWT token with roles
       const token = generateToken(user, userRoles);
 
@@ -1506,14 +1506,20 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/campaigns", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
-      const validated = insertCampaignSchema.parse(req.body);
-      const campaign = await storage.createCampaign(validated);
+      const { assignedAgents, ...campaignData } = req.body;
+      const campaign = await storage.createCampaign(campaignData);
+
+      // If agents are assigned, store them in campaign metadata or separate table
+      if (assignedAgents && Array.isArray(assignedAgents) && assignedAgents.length > 0) {
+        await storage.updateCampaign(campaign.id, {
+          metadata: { ...campaign.metadata, assignedAgents }
+        });
+      }
+
       res.status(201).json(campaign);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Validation failed", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create campaign" });
+      console.error('Campaign creation error:', error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to create campaign" });
     }
   });
 

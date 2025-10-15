@@ -311,29 +311,43 @@ export default function PhoneCampaignsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Total Calls</p>
-                    <p className="text-lg font-semibold">{campaign.totalCalls || 0}</p>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Total Calls</p>
+                      <p className="text-lg font-semibold">{campaign.totalCalls || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Connected</p>
+                      <p className="text-lg font-semibold">
+                        {campaign.connected || 0} ({campaign.totalCalls ? Math.round((campaign.connected / campaign.totalCalls) * 100) : 0}%)
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Qualified</p>
+                      <p className="text-lg font-semibold">
+                        {campaign.qualified || 0}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">DNC Requests</p>
+                      <p className="text-lg font-semibold text-red-500">
+                        {campaign.dncRequests || 0}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Connected</p>
-                    <p className="text-lg font-semibold">
-                      {campaign.connected || 0} ({campaign.totalCalls ? Math.round((campaign.connected / campaign.totalCalls) * 100) : 0}%)
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Qualified</p>
-                    <p className="text-lg font-semibold">
-                      {campaign.qualified || 0}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">DNC Requests</p>
-                    <p className="text-lg font-semibold text-red-500">
-                      {campaign.dncRequests || 0}
-                    </p>
-                  </div>
+                  {campaign.metadata?.assignedAgents && campaign.metadata.assignedAgents.length > 0 && (
+                    <div className="pt-3 border-t">
+                      <p className="text-xs text-muted-foreground mb-2">Assigned Agents</p>
+                      <div className="flex gap-1 flex-wrap">
+                        {campaign.metadata.assignedAgents.map((agentId: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            Agent {idx + 1}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

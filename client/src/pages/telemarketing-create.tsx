@@ -92,7 +92,7 @@ export default function TelemarketingCreatePage() {
         callScript: data.content?.script,
         qualificationQuestions: data.content?.qualificationFields,
         scheduleJson,
-        assignedTeams: data.scheduling?.assignedAgents || [], // Merged from changes snippet
+        assignedTeams: data.scheduling?.assignedAgents || [],
         throttlingConfig,
         accountCapEnabled: data.accountCap?.enabled || false,
         accountCapValue: data.accountCap?.enabled ? data.accountCap.leadsPerAccount : null,
