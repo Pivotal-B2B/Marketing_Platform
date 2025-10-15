@@ -4302,6 +4302,178 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== AI-POWERED QA SYSTEM ====================
+
+  // Trigger transcription for a lead
+  app.post("/api/leads/:id/transcribe", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+    try {
+      const { transcribeLeadCall } = await import('./services/assemblyai-transcription');
+      const success = await transcribeLeadCall(req.params.id);
+      
+      if (success) {
+        res.json({ message: "Transcription completed successfully" });
+      } else {
+        res.status(400).json({ message: "Transcription failed - check recording URL" });
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
+      res.status(500).json({ message: "Failed to transcribe call" });
+    }
+  });
+
+  // Analyze lead with AI
+  app.post("/api/leads/:id/analyze", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+    try {
+      const { analyzeLeadQualification } = await import('./services/ai-qa-analyzer');
+      const analysis = await analyzeLeadQualification(req.params.id);
+      
+      if (analysis) {
+        res.json(analysis);
+      } else {
+        res.status(400).json({ message: "Analysis failed - check transcript availability" });
+      }
+    } catch (error) {
+      console.error('AI analysis error:', error);
+      res.status(500).json({ message: "Failed to analyze lead" });
+    }
+  });
+
+  // Enrich account data with AI
+  app.post("/api/accounts/:id/enrich", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+    try {
+      const { enrichAccountData } = await import('./services/ai-account-enrichment');
+      const enrichmentResult = await enrichAccountData(req.params.id);
+      
+      if (enrichmentResult) {
+        res.json(enrichmentResult);
+      } else {
+        res.status(400).json({ message: "Enrichment failed" });
+      }
+    } catch (error) {
+      console.error('Account enrichment error:', error);
+      res.status(500).json({ message: "Failed to enrich account" });
+    }
+  });
+
+  // Verify account against client criteria
+  app.post("/api/accounts/:id/verify", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+    try {
+      const { verifyAccountAgainstCriteria } = await import('./services/ai-account-enrichment');
+      const { client_criteria } = req.body;
+      
+      const verification = await verifyAccountAgainstCriteria(req.params.id, client_criteria);
+      res.json(verification);
+    } catch (error) {
+      console.error('Account verification error:', error);
+      res.status(500).json({ message: "Failed to verify account" });
+    }
+  });
+
+  // Batch enrich accounts for a campaign
+  app.post("/api/campaigns/:id/enrich-accounts", requireAuth, requireRole(['admin', 'campaign_manager']), async (req, res) => {
+    try {
+      const { enrichCampaignAccounts } = await import('./services/ai-account-enrichment');
+      
+      // Start enrichment in background (don't wait)
+      enrichCampaignAccounts(req.params.id).catch(err => {
+        console.error('Background enrichment error:', err);
+      });
+      
+      res.json({ message: "Account enrichment started in background" });
+    } catch (error) {
+      console.error('Campaign enrichment error:', error);
+      res.status(500).json({ message: "Failed to start account enrichment" });
+    }
+  });
+
+  // Update campaign QA parameters
+  app.patch("/api/campaigns/:id/qa-parameters", requireAuth, requireRole(['admin', 'campaign_manager']), async (req, res) => {
+    try {
+      const { qaParameters, clientSubmissionConfig } = req.body;
+      
+      await storage.updateCampaign(req.params.id, {
+        qaParameters,
+        clientSubmissionConfig,
+      });
+      
+      res.json({ message: "QA parameters updated successfully" });
+    } catch (error) {
+      console.error('QA parameters update error:', error);
+      res.status(500).json({ message: "Failed to update QA parameters" });
+    }
+  });
+
+  // Submit lead to client
+  app.post("/api/leads/:id/submit-to-client", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+    try {
+      const { leads } = await import('@shared/schema');
+      
+      // Get lead and campaign
+      const [lead] = await db.select().from(leads).where(eq(leads.id, req.params.id)).limit(1);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      if (!lead.campaignId) {
+        return res.status(400).json({ message: "Lead has no associated campaign" });
+      }
+
+      const campaign = await storage.getCampaignById(lead.campaignId);
+      if (!campaign?.clientSubmissionConfig) {
+        return res.status(400).json({ message: "Campaign has no client submission configuration" });
+      }
+
+      const submissionConfig = campaign.clientSubmissionConfig as any;
+      
+      // Get contact and account data
+      const contact = lead.contactId ? await storage.getContactById(lead.contactId) : null;
+      const account = contact?.accountId ? await storage.getAccountById(contact.accountId) : null;
+
+      // Prepare submission data
+      const submissionData: any = {};
+      
+      if (submissionConfig.fieldMappings) {
+        for (const [clientField, crmField] of Object.entries(submissionConfig.fieldMappings)) {
+          if (crmField === 'contact.email') submissionData[clientField] = contact?.email;
+          else if (crmField === 'contact.fullName') submissionData[clientField] = contact?.fullName;
+          else if (crmField === 'contact.phone') submissionData[clientField] = contact?.directPhone;
+          else if (crmField === 'account.name') submissionData[clientField] = account?.name;
+          else if (crmField === 'account.domain') submissionData[clientField] = account?.domain;
+          // Add more mappings as needed
+        }
+      }
+
+      // Submit to client endpoint
+      const response = await fetch(submissionConfig.endpoint, {
+        method: submissionConfig.method || 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(submissionConfig.headers || {}),
+        },
+        body: JSON.stringify(submissionData),
+      });
+
+      const responseData = await response.json();
+
+      // Update lead with submission status
+      await db.update(leads)
+        .set({
+          submittedToClient: true,
+          submittedAt: new Date(),
+          submissionResponse: responseData,
+        })
+        .where(eq(leads.id, req.params.id));
+
+      res.json({
+        success: response.ok,
+        response: responseData,
+      });
+    } catch (error) {
+      console.error('Client submission error:', error);
+      res.status(500).json({ message: "Failed to submit lead to client" });
+    }
+  });
+
   // ==================== WEBHOOKS ====================
 
   app.use("/api/webhooks", webhooksRouter);

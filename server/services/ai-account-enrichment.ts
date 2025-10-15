@@ -102,7 +102,7 @@ If information is not available, use null for that field. Be conservative with c
 
     // Only update fields if they're more confident than existing data
     if (enrichmentData.industry && enrichmentData.confidence > 70) {
-      updateData.industry = enrichmentData.industry;
+      updateData.industryStandardized = enrichmentData.industry;
     }
     if (enrichmentData.employeeSize && enrichmentData.confidence > 70) {
       updateData.employeesSizeRange = enrichmentData.employeeSize;
@@ -111,7 +111,7 @@ If information is not available, use null for that field. Be conservative with c
       updateData.revenueRange = enrichmentData.revenueRange;
     }
     if (enrichmentData.technologies?.length > 0) {
-      updateData.technologies = enrichmentData.technologies;
+      updateData.techStack = enrichmentData.technologies;
     }
 
     await db.update(accounts)
@@ -168,10 +168,10 @@ export async function verifyAccountAgainstCriteria(
 
     // Verify industry
     if (clientCriteria.industries?.length) {
-      if (!account.industry) {
+      if (!account.industryStandardized) {
         missing_data.push('industry');
-      } else if (!clientCriteria.industries.includes(account.industry)) {
-        mismatches.push(`Industry mismatch: ${account.industry} not in [${clientCriteria.industries.join(', ')}]`);
+      } else if (!clientCriteria.industries.includes(account.industryStandardized)) {
+        mismatches.push(`Industry mismatch: ${account.industryStandardized} not in [${clientCriteria.industries.join(', ')}]`);
       }
     }
 
@@ -195,9 +195,9 @@ export async function verifyAccountAgainstCriteria(
 
     // Verify required technologies
     if (clientCriteria.required_technologies?.length) {
-      const accountTechs = account.technologies || [];
+      const accountTechs = account.techStack || [];
       const matchingTechs = clientCriteria.required_technologies.filter(tech =>
-        accountTechs.some(accountTech => 
+        accountTechs.some((accountTech: string) => 
           accountTech.toLowerCase().includes(tech.toLowerCase()) ||
           tech.toLowerCase().includes(accountTech.toLowerCase())
         )
@@ -209,9 +209,9 @@ export async function verifyAccountAgainstCriteria(
     }
 
     // Check excluded industries
-    if (clientCriteria.excluded_industries?.length && account.industry) {
-      if (clientCriteria.excluded_industries.includes(account.industry)) {
-        mismatches.push(`Industry excluded: ${account.industry}`);
+    if (clientCriteria.excluded_industries?.length && account.industryStandardized) {
+      if (clientCriteria.excluded_industries.includes(account.industryStandardized)) {
+        mismatches.push(`Industry excluded: ${account.industryStandardized}`);
       }
     }
 
@@ -255,29 +255,31 @@ export async function verifyAccountAgainstCriteria(
  */
 export async function enrichCampaignAccounts(campaignId: string): Promise<void> {
   try {
-    // Get all unique accounts for this campaign's contacts
-    const campaignContacts = await db.query.campaignQueue.findMany({
-      where: (queue, { eq }) => eq(queue.campaignId, campaignId),
-      with: {
-        contact: {
-          with: {
-            account: true,
-          },
-        },
-      },
-    });
+    // Get all unique account IDs from campaign queue via contacts
+    const { campaignQueue, contacts: contactsTable } = await import('@shared/schema');
+    const { eq } = await import('drizzle-orm');
+    
+    const queueItems = await db
+      .select({
+        contactId: campaignQueue.contactId,
+        accountId: contactsTable.accountId,
+      })
+      .from(campaignQueue)
+      .leftJoin(contactsTable, eq(campaignQueue.contactId, contactsTable.id))
+      .where(eq(campaignQueue.campaignId, campaignId));
 
     const uniqueAccountIds = new Set<string>();
-    campaignContacts.forEach(item => {
-      if (item.contact?.accountId) {
-        uniqueAccountIds.add(item.contact.accountId);
+    queueItems.forEach(item => {
+      if (item.accountId) {
+        uniqueAccountIds.add(item.accountId);
       }
     });
 
     console.log(`[AI-Enrichment] Enriching ${uniqueAccountIds.size} accounts for campaign ${campaignId}`);
 
     // Enrich each account (in production, use queue/background job)
-    for (const accountId of uniqueAccountIds) {
+    const accountIdsArray = Array.from(uniqueAccountIds);
+    for (const accountId of accountIdsArray) {
       await enrichAccountData(accountId);
       // Rate limit to avoid API throttling
       await new Promise(resolve => setTimeout(resolve, 1000));

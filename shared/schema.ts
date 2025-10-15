@@ -403,6 +403,11 @@ export const accounts = pgTable("accounts", {
   sourceRecordId: text("source_record_id"),
   sourceUpdatedAt: timestamp("source_updated_at"),
   deletedAt: timestamp("deleted_at"),
+
+  // AI-Powered Account Enrichment & Verification
+  aiEnrichmentData: jsonb("ai_enrichment_data"), // Full AI research results
+  aiEnrichmentDate: timestamp("ai_enrichment_date"), // Last enrichment timestamp
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
