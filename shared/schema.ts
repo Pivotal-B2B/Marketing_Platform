@@ -630,6 +630,7 @@ export const emailMessages = pgTable("email_messages", {
 // Calls table
 export const calls = pgTable("calls", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  queueItemId: varchar("queue_item_id").references(() => campaignQueue.id, { onDelete: 'cascade' }),
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }),
   contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }),
   agentId: varchar("agent_id").references(() => users.id),
@@ -644,6 +645,7 @@ export const calls = pgTable("calls", {
   campaignIdx: index("calls_campaign_idx").on(table.campaignId),
   contactIdx: index("calls_contact_idx").on(table.contactId),
   agentIdx: index("calls_agent_idx").on(table.agentId),
+  queueItemIdx: index("calls_queue_item_idx").on(table.queueItemId),
 }));
 
 // Leads table

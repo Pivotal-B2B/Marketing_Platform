@@ -1555,6 +1555,76 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== CALL DISPOSITIONS ====================
+
+  // Create call disposition (agent saves disposition after call)
+  app.post("/api/calls/disposition", requireAuth, requireRole('agent'), async (req, res) => {
+    try {
+      const agentId = req.user?.id;
+      if (!agentId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Verify queue item ownership before allowing disposition
+      if (req.body.queueItemId) {
+        const queueItem = await storage.getQueueItemById(req.body.queueItemId);
+        if (!queueItem) {
+          return res.status(404).json({ message: "Queue item not found" });
+        }
+        if (queueItem.agentId !== agentId) {
+          return res.status(403).json({ message: "You can only create dispositions for your own queue items" });
+        }
+      }
+
+      const validated = insertCallSchema.parse({
+        ...req.body,
+        agentId, // Ensure agentId matches the logged-in user
+      });
+
+      const call = await storage.createCallDisposition(validated);
+      res.status(201).json(call);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create call disposition" });
+    }
+  });
+
+  // Get calls for a specific queue item
+  app.get("/api/calls/queue/:queueItemId", requireAuth, requireRole('agent'), async (req, res) => {
+    try {
+      const agentId = req.user?.id;
+      if (!agentId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Verify queue item ownership
+      const queueItem = await storage.getQueueItemById(req.params.queueItemId);
+      if (!queueItem) {
+        return res.status(404).json({ message: "Queue item not found" });
+      }
+      if (queueItem.agentId !== agentId) {
+        return res.status(403).json({ message: "You can only view calls for your own queue items" });
+      }
+
+      const calls = await storage.getCallsByQueueItem(req.params.queueItemId);
+      res.json(calls);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch calls" });
+    }
+  });
+
+  // Get call history for a contact
+  app.get("/api/calls/contact/:contactId", requireAuth, async (req, res) => {
+    try {
+      const calls = await storage.getCallsByContact(req.params.contactId);
+      res.json(calls);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch call history" });
+    }
+  });
+
   // ==================== SENDER PROFILES ====================
 
   app.get("/api/sender-profiles", requireAuth, async (req, res) => {

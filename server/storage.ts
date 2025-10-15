@@ -132,6 +132,12 @@ export interface IStorage {
   getAgents(): Promise<User[]>;
   assignQueueToAgents(campaignId: string, agentIds: string[], mode?: 'round_robin' | 'weighted'): Promise<{ assigned: number }>;
   getAgentQueue(agentId: string, campaignId?: string, status?: string): Promise<any[]>;
+  getQueueItemById(id: string): Promise<any>;
+
+  // Call Dispositions
+  createCallDisposition(callData: InsertCall): Promise<any>;
+  getCallsByQueueItem(queueItemId: string): Promise<any[]>;
+  getCallsByContact(contactId: string): Promise<any[]>;
 
   // Email Templates
   getEmailTemplates(): Promise<EmailTemplate[]>;
@@ -1400,6 +1406,75 @@ export class DatabaseStorage implements IStorage {
 
     const results = await query.orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
     return results;
+  }
+
+  async getQueueItemById(id: string): Promise<any> {
+    const [queueItem] = await db
+      .select()
+      .from(campaignQueue)
+      .where(eq(campaignQueue.id, id))
+      .limit(1);
+    return queueItem || null;
+  }
+
+  // Call Dispositions
+  async createCallDisposition(callData: InsertCall): Promise<any> {
+    const [call] = await db.insert(calls).values(callData).returning();
+    
+    // If this is linked to a queue item and has a disposition, update queue status
+    if (call.queueItemId && call.disposition) {
+      await db
+        .update(campaignQueue)
+        .set({ 
+          status: 'done' as any,
+          updatedAt: new Date() 
+        })
+        .where(eq(campaignQueue.id, call.queueItemId));
+
+      // Update account stats for positive dispositions (qualified, callback_requested)
+      if (call.disposition === 'qualified' || call.disposition === 'callback_requested') {
+        const queueItem = await db
+          .select()
+          .from(campaignQueue)
+          .where(eq(campaignQueue.id, call.queueItemId))
+          .limit(1);
+        
+        if (queueItem.length > 0) {
+          await this.upsertCampaignAccountStats(
+            queueItem[0].campaignId,
+            queueItem[0].accountId,
+            { positiveDispCount: 1 }
+          );
+        }
+      }
+
+      // Update connected count
+      if (call.disposition === 'connected' || call.disposition === 'qualified' || call.disposition === 'callback_requested' || call.disposition === 'not_interested') {
+        const queueItem = await db
+          .select()
+          .from(campaignQueue)
+          .where(eq(campaignQueue.id, call.queueItemId))
+          .limit(1);
+        
+        if (queueItem.length > 0) {
+          await this.upsertCampaignAccountStats(
+            queueItem[0].campaignId,
+            queueItem[0].accountId,
+            { connectedCount: 1 }
+          );
+        }
+      }
+    }
+
+    return call;
+  }
+
+  async getCallsByQueueItem(queueItemId: string): Promise<any[]> {
+    return await db.select().from(calls).where(eq(calls.queueItemId, queueItemId));
+  }
+
+  async getCallsByContact(contactId: string): Promise<any[]> {
+    return await db.select().from(calls).where(eq(calls.contactId, contactId)).orderBy(desc(calls.createdAt));
   }
 
   // Email Templates

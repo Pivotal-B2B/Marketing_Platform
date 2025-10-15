@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { 
   Phone, 
   PhoneOff, 
@@ -18,28 +28,107 @@ import {
   Clock,
   User,
   Building2,
-  FileText
+  FileText,
+  RefreshCw
 } from "lucide-react";
-
-// Mock call queue data
-const mockQueue = [
-  { id: "1", contactName: "John Smith", accountName: "Acme Corp", phone: "+1-555-0101", priority: "high" },
-  { id: "2", contactName: "Jane Doe", accountName: "TechStart Inc", phone: "+1-555-0102", priority: "medium" },
-  { id: "3", contactName: "Bob Johnson", accountName: "Global Enterprises", phone: "+1-555-0103", priority: "low" },
-];
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 // Call status types
 type CallStatus = 'idle' | 'dialing' | 'ringing' | 'connected' | 'wrap-up';
 
+// Queue item type
+type QueueItem = {
+  id: string;
+  campaignId: string;
+  campaignName: string;
+  contactId: string;
+  contactName: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  accountId: string;
+  accountName: string | null;
+  priority: number;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+// Campaign type for selector
+type Campaign = {
+  id: string;
+  name: string;
+};
+
 export default function AgentConsolePage() {
+  const { toast } = useToast();
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [isMuted, setIsMuted] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(true);
-  const [selectedContact, setSelectedContact] = useState(mockQueue[0]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('all');
+  const [selectedContact, setSelectedContact] = useState<QueueItem | null>(null);
   const [callDuration, setCallDuration] = useState(0);
+  const [showDispositionModal, setShowDispositionModal] = useState(false);
+  
+  // Disposition form state
+  const [disposition, setDisposition] = useState<string>('');
+  const [notes, setNotes] = useState('');
+  const [qualificationData, setQualificationData] = useState<any>({});
   
   const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch agent queue data
+  const { data: queueData = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery<QueueItem[]>({
+    queryKey: selectedCampaignId === 'all' 
+      ? ['/api/agents/me/queue', { status: 'queued' }]
+      : ['/api/agents/me/queue', { campaignId: selectedCampaignId, status: 'queued' }],
+  });
+
+  // Extract unique campaigns from queue data
+  const campaigns: Campaign[] = Array.from(
+    new Map(queueData.map(item => [item.campaignId, { id: item.campaignId, name: item.campaignName }])).values()
+  );
+
+  // Auto-select first contact when queue loads
+  useEffect(() => {
+    if (queueData.length > 0 && !selectedContact) {
+      setSelectedContact(queueData[0]);
+    }
+  }, [queueData, selectedContact]);
+
+  // Mutation for saving disposition
+  const saveDispositionMutation = useMutation({
+    mutationFn: async (dispositionData: any) => {
+      return await apiRequest('/api/calls/disposition', {
+        method: 'POST',
+        body: JSON.stringify(dispositionData),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Disposition saved",
+        description: "Call disposition has been recorded successfully.",
+      });
+      
+      // Reset form
+      setDisposition('');
+      setNotes('');
+      setQualificationData({});
+      setShowDispositionModal(false);
+      setCallStatus('idle');
+      
+      // Refetch queue to get updated status
+      refetchQueue();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save disposition",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Clear all timeouts
   const clearAllTimeouts = () => {
@@ -89,9 +178,38 @@ export default function AgentConsolePage() {
   const handleHangup = () => {
     clearAllTimeouts();
     setCallStatus('wrap-up');
-    
-    const timeout = setTimeout(() => setCallStatus('idle'), 2000);
-    timeoutsRef.current = [timeout];
+    setShowDispositionModal(true);
+  };
+
+  const handleSaveDisposition = () => {
+    if (!disposition) {
+      toast({
+        title: "Disposition required",
+        description: "Please select a call disposition before proceeding.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedContact) {
+      toast({
+        title: "Error",
+        description: "No contact selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    saveDispositionMutation.mutate({
+      queueItemId: selectedContact.id,
+      campaignId: selectedContact.campaignId,
+      contactId: selectedContact.contactId,
+      disposition,
+      duration: callDuration,
+      notes,
+      qualificationData: Object.keys(qualificationData).length > 0 ? qualificationData : null,
+      callbackRequested: disposition === 'callback_requested',
+    });
   };
 
   const isCallActive = ['dialing', 'ringing', 'connected'].includes(callStatus);
@@ -117,13 +235,34 @@ export default function AgentConsolePage() {
     <div className="h-[calc(100vh-4rem)] flex flex-col">
       {/* Page Header */}
       <div className="border-b bg-card p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-semibold" data-testid="text-page-title">Agent Console</h1>
             <p className="text-sm text-muted-foreground">Make calls and manage dispositions</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+              <SelectTrigger className="w-[200px]" data-testid="select-campaign">
+                <SelectValue placeholder="Select campaign" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Campaigns</SelectItem>
+                {campaigns.map(campaign => (
+                  <SelectItem key={campaign.id} value={campaign.id}>
+                    {campaign.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {getStatusBadge()}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetchQueue()}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -145,52 +284,74 @@ export default function AgentConsolePage() {
               <Phone className="h-4 w-4" />
               Call Queue
             </h2>
-            <p className="text-sm text-muted-foreground mt-1">{mockQueue.length} contacts</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {queueLoading ? 'Loading...' : `${queueData.length} contacts`}
+            </p>
           </div>
           <ScrollArea className="h-[calc(100vh-12rem)]">
             <div className="p-2 space-y-2">
-              {mockQueue.map((contact) => (
-                <Card
-                  key={contact.id}
-                  className={`cursor-pointer hover-elevate ${
-                    selectedContact?.id === contact.id ? 'border-primary' : ''
-                  }`}
-                  onClick={() => setSelectedContact(contact)}
-                  data-testid={`card-queue-contact-${contact.id}`}
-                >
-                  <CardContent className="p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          <p className="font-medium text-sm truncate" data-testid={`text-contact-name-${contact.id}`}>
-                            {contact.contactName}
-                          </p>
+              {queueLoading ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  Loading queue...
+                </div>
+              ) : queueData.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  <Phone className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="font-medium">No contacts in queue</p>
+                  <p className="text-sm mt-1">
+                    {selectedCampaignId === 'all' 
+                      ? 'You have no assigned contacts' 
+                      : 'No contacts in this campaign'}
+                  </p>
+                </div>
+              ) : (
+                queueData.map((contact) => (
+                  <Card
+                    key={contact.id}
+                    className={`cursor-pointer hover-elevate ${
+                      selectedContact?.id === contact.id ? 'border-primary' : ''
+                    }`}
+                    onClick={() => setSelectedContact(contact)}
+                    data-testid={`card-queue-contact-${contact.id}`}
+                  >
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <p className="font-medium text-sm truncate" data-testid={`text-contact-name-${contact.id}`}>
+                              {contact.contactName || 'Unknown'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Building2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <p className="text-xs text-muted-foreground truncate">
+                              {contact.accountName || 'No account'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Phone className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <p className="text-xs font-mono text-muted-foreground">
+                              {contact.contactPhone || 'No phone'}
+                            </p>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Campaign: {contact.campaignName}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Building2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          <p className="text-xs text-muted-foreground truncate">
-                            {contact.accountName}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Phone className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          <p className="text-xs font-mono text-muted-foreground">
-                            {contact.phone}
-                          </p>
-                        </div>
+                        <Badge
+                          variant={contact.priority >= 3 ? 'destructive' : contact.priority >= 2 ? 'default' : 'secondary'}
+                          className="text-xs"
+                          data-testid={`badge-priority-${contact.id}`}
+                        >
+                          P{contact.priority}
+                        </Badge>
                       </div>
-                      <Badge
-                        variant={contact.priority === 'high' ? 'destructive' : contact.priority === 'medium' ? 'default' : 'secondary'}
-                        className="text-xs"
-                        data-testid={`badge-priority-${contact.id}`}
-                      >
-                        {contact.priority}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </ScrollArea>
         </div>
@@ -212,11 +373,16 @@ export default function AgentConsolePage() {
                     {selectedContact?.contactName || 'No Contact Selected'}
                   </h3>
                   <p className="text-sm text-muted-foreground" data-testid="text-current-account">
-                    {selectedContact?.accountName}
+                    {selectedContact?.accountName || '-'}
                   </p>
                   <p className="text-sm font-mono text-muted-foreground" data-testid="text-current-phone">
-                    {selectedContact?.phone}
+                    {selectedContact?.contactPhone || 'No phone number'}
                   </p>
+                  {selectedContact && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedContact.campaignName}
+                    </p>
+                  )}
                 </div>
 
                 {/* Call Duration */}
@@ -393,29 +559,139 @@ export default function AgentConsolePage() {
               </Card>
             </div>
           </ScrollArea>
-
-          {/* Disposition Bar */}
-          {callStatus === 'wrap-up' && (
-            <div className="border-t p-4 bg-background">
-              <p className="text-sm font-medium mb-3">Call Disposition Required</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" size="sm" data-testid="button-disposition-qualified">
-                  Qualified Lead
-                </Button>
-                <Button variant="outline" size="sm" data-testid="button-disposition-not-interested">
-                  Not Interested
-                </Button>
-                <Button variant="outline" size="sm" data-testid="button-disposition-callback">
-                  Schedule Callback
-                </Button>
-                <Button variant="outline" size="sm" data-testid="button-disposition-dnc">
-                  Add to DNC
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Disposition Modal */}
+      <Dialog open={showDispositionModal} onOpenChange={(open) => {
+        if (!open && callStatus === 'wrap-up') {
+          toast({
+            title: "Disposition required",
+            description: "You must save a disposition before proceeding to the next call.",
+            variant: "destructive",
+          });
+        } else {
+          setShowDispositionModal(open);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-disposition">
+          <DialogHeader>
+            <DialogTitle>Call Disposition Required</DialogTitle>
+            <DialogDescription>
+              Please provide details about this call with {selectedContact?.contactName}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Disposition Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="disposition">Call Outcome *</Label>
+              <Select value={disposition} onValueChange={setDisposition}>
+                <SelectTrigger id="disposition" data-testid="select-disposition">
+                  <SelectValue placeholder="Select disposition..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="qualified">Qualified Lead</SelectItem>
+                  <SelectItem value="callback_requested">Callback Requested</SelectItem>
+                  <SelectItem value="not_interested">Not Interested</SelectItem>
+                  <SelectItem value="voicemail">Voicemail</SelectItem>
+                  <SelectItem value="no_answer">No Answer</SelectItem>
+                  <SelectItem value="busy">Busy</SelectItem>
+                  <SelectItem value="dnc_request">DNC Request</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Call Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Call Notes</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Enter your notes about the call..."
+                className="min-h-[100px]"
+                data-testid="input-disposition-notes"
+              />
+            </div>
+
+            {/* Qualification Questions */}
+            <div className="space-y-3">
+              <Label>Qualification Details</Label>
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="budget" className="text-sm">Budget Range</Label>
+                  <Select
+                    value={qualificationData.budget || ''}
+                    onValueChange={(value) => setQualificationData({...qualificationData, budget: value})}
+                  >
+                    <SelectTrigger id="budget" data-testid="select-qual-budget">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="<10k">&lt; $10,000</SelectItem>
+                      <SelectItem value="10k-50k">$10,000 - $50,000</SelectItem>
+                      <SelectItem value="50k-100k">$50,000 - $100,000</SelectItem>
+                      <SelectItem value=">100k">&gt; $100,000</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="timeline" className="text-sm">Decision Timeline</Label>
+                  <Select
+                    value={qualificationData.timeline || ''}
+                    onValueChange={(value) => setQualificationData({...qualificationData, timeline: value})}
+                  >
+                    <SelectTrigger id="timeline" data-testid="select-qual-timeline">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="immediate">Immediate (1-30 days)</SelectItem>
+                      <SelectItem value="short">Short-term (1-3 months)</SelectItem>
+                      <SelectItem value="medium">Medium-term (3-6 months)</SelectItem>
+                      <SelectItem value="long">Long-term (6+ months)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="interest" className="text-sm">Interest Level</Label>
+                  <Select
+                    value={qualificationData.interest || ''}
+                    onValueChange={(value) => setQualificationData({...qualificationData, interest: value})}
+                  >
+                    <SelectTrigger id="interest" data-testid="select-qual-interest">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Call Duration Display */}
+            <div className="text-sm text-muted-foreground">
+              Call duration: {Math.floor(callDuration / 60)}:{(callDuration % 60).toString().padStart(2, '0')}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={handleSaveDisposition}
+              disabled={!disposition || saveDispositionMutation.isPending}
+              data-testid="button-save-disposition"
+            >
+              {saveDispositionMutation.isPending ? 'Saving...' : 'Save Disposition'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
