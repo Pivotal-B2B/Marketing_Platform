@@ -1871,7 +1871,7 @@ export function registerRoutes(app: Express) {
   // Get queue for logged-in agent
   app.get("/api/agents/me/queue", requireAuth, requireRole('agent'), async (req, res) => {
     try {
-      const agentId = req.user?.id;
+      const agentId = req.user?.userId;
       if (!agentId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -1893,7 +1893,7 @@ export function registerRoutes(app: Express) {
   // Create call disposition (agent saves disposition after call)
   app.post("/api/calls/disposition", requireAuth, requireRole('agent'), async (req, res) => {
     try {
-      const agentId = req.user?.id;
+      const agentId = req.user?.userId;
       if (!agentId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -1927,7 +1927,7 @@ export function registerRoutes(app: Express) {
   // Get calls for a specific queue item
   app.get("/api/calls/queue/:queueItemId", requireAuth, requireRole('agent'), async (req, res) => {
     try {
-      const agentId = req.user?.id;
+      const agentId = req.user?.userId;
       if (!agentId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
