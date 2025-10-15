@@ -71,17 +71,8 @@ export function CSVImportDialog({
           setHeaders(headers);
           setCsvData(parsed.slice(1));
           
-          // Auto-detect format: check if headers contain account_ prefix
-          const hasAccountFields = headers.some(h => h.startsWith('account_'));
-          
-          if (hasAccountFields) {
-            // Unified format detected - go to mapping
-            setStage("mapping");
-          } else {
-            // Contacts-only format - skip mapping, go directly to validation
-            setStage("validate");
-            validateContactsOnlyData(parsed);
-          }
+          // Always go to mapping stage first - let user review/confirm field mappings
+          setStage("mapping");
         }
       };
       reader.readAsText(selectedFile);
@@ -90,9 +81,38 @@ export function CSVImportDialog({
 
   const handleMappingComplete = (mappings: FieldMapping[]) => {
     setFieldMappings(mappings);
-    // Apply mappings and validate
-    setStage("validate");
-    validateDataWithMapping(mappings);
+    
+    // Check if this is unified format (has account fields) or contacts-only
+    const hasAccountFields = mappings.some(m => m.targetEntity === "account");
+    
+    if (hasAccountFields) {
+      // Unified format - validate with mapping
+      setStage("validate");
+      validateDataWithMapping(mappings);
+    } else {
+      // Contacts-only format - validate contacts only
+      setStage("validate");
+      validateContactsOnlyWithMapping(mappings);
+    }
+  };
+
+  const validateContactsOnlyWithMapping = (mappings: FieldMapping[]) => {
+    const validationErrors: ValidationError[] = [];
+
+    csvData.forEach((row, index) => {
+      // Map the row data to match the expected contact format
+      const mappedRow = mappings.map((mapping, idx) => row[idx] || "");
+      const mappedHeaders = mappings.map(m => m.targetField || "");
+      
+      const rowErrors = validateContactRow(mappedRow, mappedHeaders, index + 2);
+      validationErrors.push(...rowErrors);
+    });
+
+    setErrors(validationErrors);
+
+    if (validationErrors.length === 0) {
+      setStage("preview");
+    }
   };
 
   const validateContactsOnlyData = (parsed: string[][]) => {
@@ -162,8 +182,9 @@ export function CSVImportDialog({
     let failedCount = 0;
 
     try {
-      // Check if we have field mappings (unified format) or not (contacts-only)
-      const isUnifiedFormat = fieldMappings.length > 0;
+      // Check if we have account fields in the mapping
+      const hasAccountFields = fieldMappings.some(m => m.targetEntity === "account");
+      const isUnifiedFormat = hasAccountFields;
 
       // Process in batches for better performance with large files
       const BATCH_SIZE = 50;
@@ -210,8 +231,12 @@ export function CSVImportDialog({
               });
             }
           } else {
-            // Contacts-only format
-            const contacts = batchRows.map((row) => csvRowToContact(row, headers));
+            // Contacts-only format with mapping
+            const mappedHeaders = fieldMappings.map(m => m.targetField || "");
+            const contacts = batchRows.map((row) => {
+              const mappedRow = fieldMappings.map((mapping, idx) => row[idx] || "");
+              return csvRowToContact(mappedRow, mappedHeaders);
+            });
 
             for (const contactData of contacts) {
               try {
