@@ -43,7 +43,14 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <div onClick={() => setLocation('/accounts')} className="cursor-pointer group">
+            <div 
+              role="button"
+              tabIndex={0}
+              onClick={() => setLocation('/accounts')} 
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/accounts')}
+              className="cursor-pointer group"
+              data-testid="stat-card-link-accounts"
+            >
               <StatCard
                 title="Total Accounts"
                 value={stats?.totalAccounts.toLocaleString() || "0"}
@@ -51,7 +58,14 @@ export default function Dashboard() {
                 delay={0}
               />
             </div>
-            <div onClick={() => setLocation('/contacts')} className="cursor-pointer group">
+            <div 
+              role="button"
+              tabIndex={0}
+              onClick={() => setLocation('/contacts')} 
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/contacts')}
+              className="cursor-pointer group"
+              data-testid="stat-card-link-contacts"
+            >
               <StatCard
                 title="Total Contacts"
                 value={stats?.totalContacts.toLocaleString() || "0"}
@@ -59,7 +73,14 @@ export default function Dashboard() {
                 delay={100}
               />
             </div>
-            <div onClick={() => setLocation('/campaigns')} className="cursor-pointer group">
+            <div 
+              role="button"
+              tabIndex={0}
+              onClick={() => setLocation('/campaigns')} 
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/campaigns')}
+              className="cursor-pointer group"
+              data-testid="stat-card-link-campaigns"
+            >
               <StatCard
                 title="Active Campaigns"
                 value={stats?.activeCampaigns.toString() || "0"}
@@ -68,7 +89,14 @@ export default function Dashboard() {
                 delay={200}
               />
             </div>
-            <div onClick={() => setLocation('/leads')} className="cursor-pointer group">
+            <div 
+              role="button"
+              tabIndex={0}
+              onClick={() => setLocation('/leads')} 
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/leads')}
+              className="cursor-pointer group"
+              data-testid="stat-card-link-leads"
+            >
               <StatCard
                 title="Leads This Month"
                 value={stats?.leadsThisMonth.toLocaleString() || "0"}
@@ -92,8 +120,12 @@ export default function Dashboard() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <Card 
+              role="button"
+              tabIndex={0}
               className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-blue-500/10 to-blue-600/5 group" 
               onClick={() => setLocation('/accounts')}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/accounts')}
+              data-testid="quick-action-create-account"
             >
               <CardContent className="pt-6">
                 <div className="text-center">
@@ -106,8 +138,12 @@ export default function Dashboard() {
               </CardContent>
             </Card>
             <Card 
+              role="button"
+              tabIndex={0}
               className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-purple-500/10 to-purple-600/5 group"
               onClick={() => setLocation('/campaigns')}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/campaigns')}
+              data-testid="quick-action-new-campaign"
             >
               <CardContent className="pt-6">
                 <div className="text-center">
@@ -120,8 +156,12 @@ export default function Dashboard() {
               </CardContent>
             </Card>
             <Card 
+              role="button"
+              tabIndex={0}
               className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-teal-500/10 to-teal-600/5 group"
               onClick={() => setLocation('/leads')}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/leads')}
+              data-testid="quick-action-review-leads"
             >
               <CardContent className="pt-6">
                 <div className="text-center">

@@ -14,11 +14,17 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCSS, and shadcn/ui** for the frontend, and **Node.js + Express + TypeScript** with a **PostgreSQL (Neon) database via Drizzle ORM** for the backend. JWT authentication provides role-based access control.
 
 **UI/UX Design:**
-- **Color Scheme:** Primary blue (220 90% 56%) with adaptive light/dark surfaces and semantic status colors.
+- **Color Scheme:** Primary Royal Blue (220 90% 56%) with Teal accent (174 62% 42%), adaptive light/dark surfaces, and semantic status colors (success, warning, info).
 - **Typography:** Inter font for text, JetBrains Mono for data.
 - **Components:** shadcn/ui ensures consistent enterprise components, including role-based sidebar navigation, global search, data tables, and step wizards.
 - **Dark Mode:** Fully implemented with theme toggle and localStorage persistence.
 - **Global UX/UI Upgrade:** Introduced reusable components like `HeaderActionBar`, `IconButton`, and `SectionCard` for consistent interaction patterns across Account and Contact Details pages, featuring sticky headers, one-click actions, and responsive layouts.
+- **Premium Design System (October 2025):** Comprehensive visual enhancement featuring:
+  - **Animations:** Fade-in (translateY), count-up numbers, pulse-glow, slide-in-bottom, and staggered delays for lists
+  - **Visual Effects:** Glass morphism, gradient borders, shadow-smooth utilities, icon hover glows, status indicator dots with glows
+  - **Enhanced Components:** Premium login page with gradient background, animated stat cards with count-up effects, enhanced empty states with circular gradients
+  - **Micro-interactions:** Card elevation on hover, icon scaling, smooth transitions with cubic-bezier easing
+  - **Gradient Utilities:** bg-gradient-primary, bg-gradient-surface, bg-gradient-card for visual depth
 
 **Technical Implementations & Features:**
 - **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
