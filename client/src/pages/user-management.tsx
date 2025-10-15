@@ -9,17 +9,25 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Pencil, Trash2, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { User as UserType } from "@shared/schema";
 
-type UserWithoutPassword = Omit<UserType, 'password'>;
+type UserWithRoles = Omit<UserType, 'password'> & { roles?: string[] };
+
+const AVAILABLE_ROLES = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'agent', label: 'Agent' },
+  { value: 'quality_analyst', label: 'Quality Analyst' },
+  { value: 'content_creator', label: 'Content Creator' },
+  { value: 'campaign_manager', label: 'Campaign Manager' },
+];
 
 export default function UserManagementPage() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserWithoutPassword | null>(null);
+  const [editingUser, setEditingUser] = useState<UserWithRoles | null>(null);
   
   // Form state
   const [username, setUsername] = useState("");
@@ -27,17 +35,26 @@ export default function UserManagementPage() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [role, setRole] = useState<string>("agent");
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(['agent']);
 
-  const { data: users, isLoading } = useQuery<UserWithoutPassword[]>({
+  const { data: users, isLoading } = useQuery<UserWithRoles[]>({
     queryKey: ['/api/users'],
   });
 
   const createUserMutation = useMutation({
     mutationFn: async (data: any) => {
-      await apiRequest('POST', '/api/users', data);
+      const user = await apiRequest('POST', '/api/users', data);
+      return user;
     },
-    onSuccess: () => {
+    onSuccess: async (user: any) => {
+      // After creating user, assign roles
+      if (selectedRoles.length > 0 && user.id) {
+        try {
+          await apiRequest('PUT', `/api/users/${user.id}/roles`, { roles: selectedRoles });
+        } catch (error) {
+          console.error('Failed to assign roles:', error);
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       resetForm();
       setDialogOpen(false);
@@ -55,13 +72,35 @@ export default function UserManagementPage() {
     },
   });
 
+  const updateRolesMutation = useMutation({
+    mutationFn: async ({ userId, roles }: { userId: string; roles: string[] }) => {
+      return await apiRequest('PUT', `/api/users/${userId}/roles`, { roles });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      resetForm();
+      setDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "User roles updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
   const resetForm = () => {
     setUsername("");
     setEmail("");
     setPassword("");
     setFirstName("");
     setLastName("");
-    setRole("agent");
+    setSelectedRoles(['agent']);
     setEditingUser(null);
   };
 
@@ -75,16 +114,41 @@ export default function UserManagementPage() {
       return;
     }
 
-    const data = {
-      username,
-      email,
-      password,
-      firstName: firstName || null,
-      lastName: lastName || null,
-      role,
-    };
+    if (selectedRoles.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Please select at least one role",
+      });
+      return;
+    }
 
-    createUserMutation.mutate(data);
+    if (editingUser) {
+      // Update existing user roles
+      updateRolesMutation.mutate({
+        userId: editingUser.id,
+        roles: selectedRoles,
+      });
+    } else {
+      // Create new user
+      const data = {
+        username,
+        email,
+        password,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        role: selectedRoles[0] || 'agent', // Legacy role field
+      };
+      createUserMutation.mutate(data);
+    }
+  };
+
+  const toggleRole = (roleValue: string) => {
+    setSelectedRoles(prev => 
+      prev.includes(roleValue)
+        ? prev.filter(r => r !== roleValue)
+        : [...prev, roleValue]
+    );
   };
 
   const getRoleBadgeVariant = (userRole: string) => {
@@ -93,13 +157,11 @@ export default function UserManagementPage() {
         return 'destructive';
       case 'campaign_manager':
         return 'default';
-      case 'data_ops':
+      case 'quality_analyst':
         return 'secondary';
-      case 'qa_analyst':
+      case 'content_creator':
         return 'outline';
       case 'agent':
-        return 'outline';
-      case 'client_user':
         return 'outline';
       default:
         return 'outline';
@@ -107,15 +169,8 @@ export default function UserManagementPage() {
   };
 
   const getRoleLabel = (userRole: string) => {
-    const labels: Record<string, string> = {
-      admin: 'Admin',
-      campaign_manager: 'Campaign Manager',
-      data_ops: 'Data Operations',
-      qa_analyst: 'QA Analyst',
-      agent: 'Agent',
-      client_user: 'Client User',
-    };
-    return labels[userRole] || userRole;
+    const role = AVAILABLE_ROLES.find(r => r.value === userRole);
+    return role?.label || userRole;
   };
 
   return (
@@ -124,7 +179,7 @@ export default function UserManagementPage() {
         <div>
           <h1 className="text-3xl font-bold">User Management</h1>
           <p className="text-muted-foreground mt-1">
-            Manage users and their roles
+            Manage users and assign multiple roles
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => {
@@ -132,7 +187,7 @@ export default function UserManagementPage() {
           setDialogOpen(open);
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button data-testid="button-add-user">
               <Plus className="mr-2 h-4 w-4" />
               Add User
             </Button>
@@ -141,80 +196,100 @@ export default function UserManagementPage() {
             <DialogHeader>
               <DialogTitle>{editingUser ? 'Edit' : 'Create'} User</DialogTitle>
               <DialogDescription>
-                {editingUser ? 'Update user details and permissions' : 'Add a new user to the system'}
+                {editingUser ? 'Update user roles and permissions' : 'Add a new user to the system'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Username *</Label>
-                <Input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="john.doe"
-                  disabled={!!editingUser}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Email *</Label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="john.doe@company.com"
-                />
-              </div>
               {!editingUser && (
-                <div className="space-y-2">
-                  <Label>Password *</Label>
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label>Username *</Label>
+                    <Input
+                      data-testid="input-username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="john.doe"
+                      disabled={!!editingUser}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email *</Label>
+                    <Input
+                      data-testid="input-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="john.doe@company.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Password *</Label>
+                    <Input
+                      data-testid="input-password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>First Name</Label>
+                      <Input
+                        data-testid="input-firstname"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="John"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Last Name</Label>
+                      <Input
+                        data-testid="input-lastname"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Doe"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>First Name</Label>
-                  <Input
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="John"
-                  />
+              
+              <div className="space-y-3">
+                <Label>Roles * {editingUser && `(${editingUser.username})`}</Label>
+                <div className="space-y-2 border rounded-md p-3">
+                  {AVAILABLE_ROLES.map((role) => (
+                    <div key={role.value} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`role-${role.value}`}
+                        data-testid={`checkbox-role-${role.value}`}
+                        checked={selectedRoles.includes(role.value)}
+                        onCheckedChange={() => toggleRole(role.value)}
+                      />
+                      <label
+                        htmlFor={`role-${role.value}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        {role.label}
+                      </label>
+                    </div>
+                  ))}
                 </div>
-                <div className="space-y-2">
-                  <Label>Last Name</Label>
-                  <Input
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Doe"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Role *</Label>
-                <Select value={role} onValueChange={setRole}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="campaign_manager">Campaign Manager</SelectItem>
-                    <SelectItem value="data_ops">Data Operations</SelectItem>
-                    <SelectItem value="qa_analyst">QA Analyst</SelectItem>
-                    <SelectItem value="agent">Agent</SelectItem>
-                    <SelectItem value="client_user">Client User</SelectItem>
-                  </SelectContent>
-                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select one or more roles to assign to this user
+                </p>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="button-cancel">
                 Cancel
               </Button>
-              <Button onClick={handleSaveUser} disabled={createUserMutation.isPending}>
-                {createUserMutation.isPending ? 'Saving...' : (editingUser ? 'Update' : 'Create')} User
+              <Button 
+                onClick={handleSaveUser} 
+                disabled={createUserMutation.isPending || updateRolesMutation.isPending}
+                data-testid="button-save-user"
+              >
+                {(createUserMutation.isPending || updateRolesMutation.isPending) ? 'Saving...' : (editingUser ? 'Update Roles' : 'Create User')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -240,7 +315,7 @@ export default function UserManagementPage() {
                   <TableHead>Username</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Roles</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
@@ -254,7 +329,7 @@ export default function UserManagementPage() {
                   </TableRow>
                 ) : (
                   users.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-muted-foreground" />
@@ -268,9 +343,19 @@ export default function UserManagementPage() {
                       </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant={getRoleBadgeVariant(user.role)}>
-                          {getRoleLabel(user.role)}
-                        </Badge>
+                        <div className="flex gap-1 flex-wrap">
+                          {user.roles && user.roles.length > 0 ? (
+                            user.roles.map((role) => (
+                              <Badge key={role} variant={getRoleBadgeVariant(role)} data-testid={`badge-role-${role}`}>
+                                {getRoleLabel(role)}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge variant={getRoleBadgeVariant(user.role)}>
+                              {getRoleLabel(user.role)}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {new Date(user.createdAt).toLocaleDateString()}
@@ -280,13 +365,10 @@ export default function UserManagementPage() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            data-testid={`button-edit-user-${user.id}`}
                             onClick={() => {
                               setEditingUser(user);
-                              setUsername(user.username);
-                              setEmail(user.email);
-                              setFirstName(user.firstName || '');
-                              setLastName(user.lastName || '');
-                              setRole(user.role);
+                              setSelectedRoles(user.roles || [user.role]);
                               setDialogOpen(true);
                             }}
                           >
@@ -333,27 +415,21 @@ export default function UserManagementPage() {
               </p>
             </div>
             <div className="flex items-start gap-3">
-              <Badge variant="secondary">Data Operations</Badge>
+              <Badge variant="secondary">Quality Analyst</Badge>
               <p className="text-sm text-muted-foreground">
-                Manage contacts, accounts, imports, and data quality
+                Review and approve leads, access quality assurance tools
               </p>
             </div>
             <div className="flex items-start gap-3">
-              <Badge variant="outline">QA Analyst</Badge>
+              <Badge variant="outline">Content Creator</Badge>
               <p className="text-sm text-muted-foreground">
-                Review and approve leads, access quality assurance tools
+                Create and manage content assets, social posts, and marketing materials
               </p>
             </div>
             <div className="flex items-start gap-3">
               <Badge variant="outline">Agent</Badge>
               <p className="text-sm text-muted-foreground">
                 Access agent console, make calls, view assigned queue
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <Badge variant="outline">Client User</Badge>
-              <p className="text-sm text-muted-foreground">
-                Submit campaign orders, view reports for their campaigns
               </p>
             </div>
           </div>
