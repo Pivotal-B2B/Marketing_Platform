@@ -76,7 +76,6 @@ import {
   type PerDomainStats, type InsertPerDomainStats,
   customFieldDefinitions,
   type CustomFieldDefinition, type InsertCustomFieldDefinition,
-  campaignAgents,
 } from "@shared/schema";
 
 export interface IStorage {
