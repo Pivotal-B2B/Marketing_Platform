@@ -1785,13 +1785,16 @@ export class DatabaseStorage implements IStorage {
             qaStatus: 'new'
           });
 
-          // Create the lead
+          // Create the lead with call recording details
           try {
             const [newLead] = await db.insert(leads).values({
               contactId: call.contactId,
               contactName,
               contactEmail,
               campaignId: call.campaignId || null,
+              recordingUrl: call.recordingUrl || null,
+              callDuration: call.duration || null,
+              agentId: call.agentId || null,
               qaStatus: 'new',
               notes: call.notes || null,
               checklistJson: call.qualificationData || null,
@@ -1803,6 +1806,8 @@ export class DatabaseStorage implements IStorage {
               contactName: newLead.contactName,
               contactEmail: newLead.contactEmail,
               campaignId: call.campaignId,
+              hasRecording: !!newLead.recordingUrl,
+              callDuration: newLead.callDuration,
               qaStatus: newLead.qaStatus
             });
           } catch (leadError) {
