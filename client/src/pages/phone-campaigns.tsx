@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Phone, Plus, Search, Play, Pause, BarChart, UserPlus, Users } from "lucide-react";
+import { Phone, Plus, Search, Play, Pause, BarChart, UserPlus, Users, CheckCircle2, AlertCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Define Campaign type for clarity, assuming it has an 'id' property
 interface Campaign {
@@ -30,6 +31,7 @@ interface Campaign {
   connected?: number;
   qualified?: number;
   dncRequests?: number;
+  metadata?: any;
 }
 
 export default function PhoneCampaignsPage() {
@@ -41,8 +43,7 @@ export default function PhoneCampaignsPage() {
 
   const [showPopulateDialog, setShowPopulateDialog] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
-  const [contactCount, setContactCount] = useState<string>("10");
-  const [agentEmails, setAgentEmails] = useState<string>("");
+  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
 
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery<Campaign[]>({
     queryKey: ["/api/campaigns", { type: "call" }],
@@ -64,6 +65,22 @@ export default function PhoneCampaignsPage() {
       return data;
     },
     enabled: !!token,
+  });
+
+  const { data: agents = [], isLoading: agentsLoading } = useQuery({
+    queryKey: ["/api/agents"],
+    queryFn: async () => {
+      const response = await fetch("/api/agents", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch agents");
+      }
+      return response.json();
+    },
+    enabled: !!token && showPopulateDialog,
   });
 
   const launchMutation = useMutation({
@@ -99,20 +116,40 @@ export default function PhoneCampaignsPage() {
     },
   });
 
+  const assignAgentsMutation = useMutation({
+    mutationFn: async ({ campaignId, agentIds }: { campaignId: string; agentIds: string[] }) => {
+      return await apiRequest('POST', `/api/campaigns/${campaignId}/agents`, { agentIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
+      toast({
+        title: "Agents Assigned",
+        description: "Agents have been assigned to the campaign successfully.",
+      });
+      setShowPopulateDialog(false);
+      setSelectedCampaign(null);
+      setSelectedAgentIds([]);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign agents",
+        variant: "destructive",
+      });
+    },
+  });
+
   const populateQueueMutation = useMutation({
-    mutationFn: async ({ campaignId, contactIds, agentIds }: any) => {
-      return await apiRequest('POST', `/api/campaigns/${campaignId}/queue/populate`, { contactIds, agentIds, priority: 1 });
+    mutationFn: async ({ campaignId }: { campaignId: string }) => {
+      return await apiRequest('POST', `/api/campaigns/${campaignId}/queue/populate`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       toast({
         title: "Queue Populated",
-        description: "Contacts have been assigned to agents successfully.",
+        description: "Campaign queue has been populated from audience.",
       });
-      setShowPopulateDialog(false);
-      setSelectedCampaign(null);
-      setContactCount("10");
-      setAgentEmails("");
     },
     onError: (error: any) => {
       toast({
@@ -123,65 +160,38 @@ export default function PhoneCampaignsPage() {
     },
   });
 
-  const handlePopulateQueue = async () => {
+  const handleAssignAgents = () => {
     if (!selectedCampaign) return;
 
-    try {
-      // Get sample contacts (in production, this would be filtered by campaign audience)
-      const contactsRes = await fetch(`/api/contacts?limit=${contactCount}`, {
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}` 
-        }
-      }).then(r => r.json());
-      const contacts = contactsRes.contacts || [];
-      const contactIds = contacts.map((c: any) => c.id);
-
-      // Parse agent emails
-      const agentEmailList = agentEmails.split(',').map(e => e.trim()).filter(e => e);
-
-      if (agentEmailList.length === 0) {
-        toast({
-          title: "Error",
-          description: "Please enter at least one agent email",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Get agent IDs from emails
-      const agentIds: string[] = [];
-      for (const email of agentEmailList) {
-        const userRes = await fetch(`/api/users?email=${email}`, {
-          headers: { 
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}` 
-          }
-        }).then(r => r.json());
-        if (userRes && userRes.id) {
-          agentIds.push(userRes.id);
-        }
-      }
-
-      if (agentIds.length === 0) {
-        toast({
-          title: "Error",
-          description: "No valid agents found with those emails",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      populateQueueMutation.mutate({
-        campaignId: selectedCampaign.id,
-        contactIds,
-        agentIds
-      });
-    } catch (error: any) {
+    if (selectedAgentIds.length === 0) {
       toast({
         title: "Error",
-        description: error.message || "Failed to fetch contacts",
+        description: "Please select at least one agent",
         variant: "destructive",
       });
+      return;
     }
+
+    assignAgentsMutation.mutate({
+      campaignId: selectedCampaign.id.toString(),
+      agentIds: selectedAgentIds
+    });
+  };
+
+  const handlePopulateQueue = () => {
+    if (!selectedCampaign) return;
+
+    populateQueueMutation.mutate({
+      campaignId: selectedCampaign.id.toString()
+    });
+  };
+
+  const toggleAgentSelection = (agentId: string) => {
+    setSelectedAgentIds(prev => 
+      prev.includes(agentId)
+        ? prev.filter(id => id !== agentId)
+        : [...prev, agentId]
+    );
   };
 
   const getStatusBadge = (status: string) => {
@@ -367,52 +377,78 @@ export default function PhoneCampaignsPage() {
         </Card>
       )}
 
-      {/* Populate Queue Dialog */}
+      {/* Assign Agents Dialog */}
       <Dialog open={showPopulateDialog} onOpenChange={setShowPopulateDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add Contacts to Agent Queue</DialogTitle>
+            <DialogTitle>Assign Agents to Campaign</DialogTitle>
             <DialogDescription>
-              Assign contacts from this campaign to agents for calling
+              Select agents to assign to this campaign. Each agent can only be assigned to one active campaign at a time.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="contact-count">Number of Contacts</Label>
-              <Input
-                id="contact-count"
-                type="number"
-                value={contactCount}
-                onChange={(e) => setContactCount(e.target.value)}
-                placeholder="10"
-                min="1"
-              />
+              <Label>Available Agents</Label>
+              {agentsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : agents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No agents available</p>
+              ) : (
+                <div className="border rounded-md divide-y max-h-64 overflow-y-auto" data-testid="agents-list">
+                  {agents.map((agent: any) => (
+                    <div
+                      key={agent.id}
+                      className="flex items-center gap-3 p-3 hover-elevate"
+                      data-testid={`agent-item-${agent.id}`}
+                    >
+                      <Checkbox
+                        id={`agent-${agent.id}`}
+                        checked={selectedAgentIds.includes(agent.id)}
+                        onCheckedChange={() => toggleAgentSelection(agent.id)}
+                        disabled={!!agent.currentAssignment}
+                        data-testid={`checkbox-agent-${agent.id}`}
+                      />
+                      <div className="flex-1">
+                        <Label
+                          htmlFor={`agent-${agent.id}`}
+                          className="font-medium cursor-pointer"
+                        >
+                          {agent.firstName} {agent.lastName} ({agent.username})
+                        </Label>
+                        {agent.currentAssignment && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <AlertCircle className="h-3 w-3 text-amber-500" />
+                            <span className="text-xs text-muted-foreground">
+                              Assigned to: {agent.currentAssignment.campaignName}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {selectedAgentIds.includes(agent.id) && (
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
-                How many contacts to add to the queue
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="agent-emails">Agent Emails (comma-separated)</Label>
-              <Input
-                id="agent-emails"
-                value={agentEmails}
-                onChange={(e) => setAgentEmails(e.target.value)}
-                placeholder="agent1@example.com, agent2@example.com"
-              />
-              <p className="text-xs text-muted-foreground">
-                Contacts will be distributed round-robin across these agents
+                Selected: {selectedAgentIds.length} agent{selectedAgentIds.length !== 1 ? 's' : ''}
               </p>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPopulateDialog(false)}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowPopulateDialog(false)} data-testid="button-cancel">
               Cancel
             </Button>
             <Button
-              onClick={handlePopulateQueue}
-              disabled={populateQueueMutation.isPending}
+              onClick={handleAssignAgents}
+              disabled={assignAgentsMutation.isPending || selectedAgentIds.length === 0}
+              data-testid="button-assign-agents"
             >
-              {populateQueueMutation.isPending ? "Adding..." : "Add to Queue"}
+              {assignAgentsMutation.isPending ? "Assigning..." : "Assign Agents"}
             </Button>
           </DialogFooter>
         </DialogContent>
