@@ -72,12 +72,15 @@ export function registerRoutes(app: Express) {
       }
 
       const allUsers = await storage.getUsers();
-      // Return sanitized user data (exclude password)
-      const sanitizedUsers = allUsers.map(user => {
-        const { password, ...userWithoutPassword } = user;
-        return userWithoutPassword;
-      });
-      res.json(sanitizedUsers);
+      // Return sanitized user data (exclude password) and include roles
+      const sanitizedUsersWithRoles = await Promise.all(
+        allUsers.map(async (user) => {
+          const { password, ...userWithoutPassword } = user;
+          const roles = await storage.getUserRoles(user.id);
+          return { ...userWithoutPassword, roles };
+        })
+      );
+      res.json(sanitizedUsersWithRoles);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -107,6 +110,68 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== USER ROLES (Admin Only) ====================
+
+  // Get roles for a specific user
+  app.get("/api/users/:userId/roles", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const roles = await storage.getUserRoles(userId);
+      res.json({ roles });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update all roles for a user (bulk update)
+  app.put("/api/users/:userId/roles", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { roles } = req.body;
+
+      if (!Array.isArray(roles)) {
+        return res.status(400).json({ message: "Roles must be an array" });
+      }
+
+      await storage.updateUserRoles(userId, roles, req.user!.userId);
+      res.json({ message: "Roles updated successfully", roles });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Assign a single role to a user
+  app.post("/api/users/:userId/roles", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!role) {
+        return res.status(400).json({ message: "Role is required" });
+      }
+
+      await storage.assignUserRole(userId, role, req.user!.userId);
+      const roles = await storage.getUserRoles(userId);
+      res.json({ message: "Role assigned successfully", roles });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove a role from a user
+  app.delete("/api/users/:userId/roles/:role", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      const { userId, role } = req.params;
+      await storage.removeUserRole(userId, role);
+      const roles = await storage.getUserRoles(userId);
+      res.json({ message: "Role removed successfully", roles });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ==================== AUTH ====================
+
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
@@ -127,14 +192,17 @@ export function registerRoutes(app: Express) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      // Generate JWT token
-      const token = generateToken(user);
+      // Fetch user roles (multi-role support)
+      const userRoles = await storage.getUserRoles(user.id);
+      
+      // Generate JWT token with roles
+      const token = generateToken(user, userRoles);
 
-      // Return token and user info without password
+      // Return token and user info without password, including roles
       const { password: _, ...userWithoutPassword } = user;
       res.json({
         token,
-        user: userWithoutPassword
+        user: { ...userWithoutPassword, roles: userRoles }
       });
     } catch (error) {
       res.status(500).json({ message: "Login failed" });

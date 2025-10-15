@@ -432,7 +432,7 @@ export class DatabaseStorage implements IStorage {
     try {
       await db.insert(userRoles).values({
         userId,
-        role,
+        role: role as any, // Cast to enum type
         assignedBy,
       });
     } catch (error) {
@@ -445,7 +445,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(userRoles).where(
       and(
         eq(userRoles.userId, userId),
-        eq(userRoles.role, role)
+        eq(userRoles.role, role as any) // Cast to enum type
       )
     );
   }
@@ -459,7 +459,7 @@ export class DatabaseStorage implements IStorage {
       await db.insert(userRoles).values(
         roles.map(role => ({
           userId,
-          role,
+          role: role as any, // Cast to enum type
           assignedBy,
         }))
       );
