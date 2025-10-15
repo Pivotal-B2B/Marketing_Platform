@@ -33,9 +33,11 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useTelnyxWebRTC } from "@/hooks/useTelnyxWebRTC";
+import type { CallState } from "@/hooks/useTelnyxWebRTC";
 
-// Call status types
-type CallStatus = 'idle' | 'dialing' | 'ringing' | 'connected' | 'wrap-up';
+// Backwards compatibility type alias
+type CallStatus = CallState | 'wrap-up';
 
 // Queue item type
 type QueueItem = {
@@ -63,20 +65,49 @@ type Campaign = {
 export default function AgentConsolePage() {
   const { toast } = useToast();
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
-  const [isMuted, setIsMuted] = useState(false);
-  const [speakerOn, setSpeakerOn] = useState(true);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('all');
   const [selectedContact, setSelectedContact] = useState<QueueItem | null>(null);
-  const [callDuration, setCallDuration] = useState(0);
   const [showDispositionModal, setShowDispositionModal] = useState(false);
   
   // Disposition form state
   const [disposition, setDisposition] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [qualificationData, setQualificationData] = useState<any>({});
-  
-  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
-  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch SIP trunk credentials
+  const { data: sipConfig } = useQuery<{sipUsername: string; sipPassword: string; sipDomain?: string}>({
+    queryKey: ['/api/sip-trunks/default'],
+  });
+
+  // Initialize Telnyx WebRTC
+  const {
+    callState,
+    isConnected,
+    isMuted,
+    callDuration,
+    formatDuration,
+    makeCall,
+    hangup,
+    toggleMute,
+  } = useTelnyxWebRTC({
+    sipUsername: sipConfig?.sipUsername,
+    sipPassword: sipConfig?.sipPassword,
+    sipDomain: sipConfig?.sipDomain || 'sip.telnyx.com',
+    onCallStateChange: (state) => {
+      // Map Telnyx call states to our UI states
+      if (state === 'hangup') {
+        setCallStatus('wrap-up');
+        setShowDispositionModal(true);
+      } else {
+        setCallStatus(state as CallStatus);
+      }
+    },
+    onCallEnd: () => {
+      // Call ended, show disposition modal
+      setCallStatus('wrap-up');
+      setShowDispositionModal(true);
+    },
+  });
 
   // Fetch agent queue data
   const { data: queueData = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery<QueueItem[]>({
@@ -100,9 +131,10 @@ export default function AgentConsolePage() {
   // Mutation for saving disposition
   const saveDispositionMutation = useMutation({
     mutationFn: async (dispositionData: any) => {
-      return await apiRequest('/api/calls/disposition', {
+      return await apiRequest({
+        url: '/api/calls/disposition',
         method: 'POST',
-        body: JSON.stringify(dispositionData),
+        data: dispositionData,
       });
     },
     onSuccess: () => {
@@ -130,55 +162,32 @@ export default function AgentConsolePage() {
     },
   });
 
-  // Clear all timeouts
-  const clearAllTimeouts = () => {
-    timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
-    timeoutsRef.current = [];
-    if (durationIntervalRef.current) {
-      clearInterval(durationIntervalRef.current);
-      durationIntervalRef.current = null;
-    }
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => clearAllTimeouts();
-  }, []);
-
-  // Start call duration timer when connected
-  useEffect(() => {
-    if (callStatus === 'connected') {
-      setCallDuration(0);
-      durationIntervalRef.current = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-        durationIntervalRef.current = null;
-      }
-    }
-    return () => {
-      if (durationIntervalRef.current) {
-        clearInterval(durationIntervalRef.current);
-      }
-    };
-  }, [callStatus]);
-
   const handleDial = () => {
-    clearAllTimeouts();
-    setCallStatus('dialing');
-    
-    const timeout1 = setTimeout(() => setCallStatus('ringing'), 1000);
-    const timeout2 = setTimeout(() => setCallStatus('connected'), 3000);
-    
-    timeoutsRef.current = [timeout1, timeout2];
+    if (!selectedContact?.contactPhone) {
+      toast({
+        title: "No phone number",
+        description: "This contact doesn't have a phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isConnected) {
+      toast({
+        title: "Not connected",
+        description: "WebRTC client is not connected. Please wait...",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Use real Telnyx calling
+    makeCall(selectedContact.contactPhone);
   };
 
   const handleHangup = () => {
-    clearAllTimeouts();
-    setCallStatus('wrap-up');
-    setShowDispositionModal(true);
+    hangup();
+    // Disposition modal will be shown by onCallEnd callback
   };
 
   const handleSaveDisposition = () => {
@@ -212,18 +221,24 @@ export default function AgentConsolePage() {
     });
   };
 
-  const isCallActive = ['dialing', 'ringing', 'connected'].includes(callStatus);
+  const isCallActive = ['connecting', 'ringing', 'active'].includes(callStatus);
 
   const getStatusBadge = () => {
+    if (!isConnected) {
+      return <Badge variant="destructive" data-testid="badge-not-connected">Disconnected</Badge>;
+    }
+    
     switch (callStatus) {
       case 'idle':
         return <Badge variant="secondary" data-testid="badge-call-idle">Ready</Badge>;
-      case 'dialing':
-        return <Badge variant="outline" data-testid="badge-call-dialing">Dialing...</Badge>;
+      case 'connecting':
+        return <Badge variant="outline" data-testid="badge-call-connecting">Connecting...</Badge>;
       case 'ringing':
         return <Badge variant="outline" data-testid="badge-call-ringing">Ringing...</Badge>;
-      case 'connected':
-        return <Badge className="bg-green-600 hover:bg-green-700" data-testid="badge-call-connected">Connected</Badge>;
+      case 'active':
+        return <Badge className="bg-green-600 hover:bg-green-700" data-testid="badge-call-active">Active - {formatDuration()}</Badge>;
+      case 'held':
+        return <Badge variant="outline" data-testid="badge-call-held">On Hold</Badge>;
       case 'wrap-up':
         return <Badge variant="outline" data-testid="badge-call-wrapup">Wrap-Up</Badge>;
       default:
@@ -386,12 +401,12 @@ export default function AgentConsolePage() {
                 </div>
 
                 {/* Call Duration */}
-                {callStatus === 'connected' && (
+                {callStatus === 'active' && (
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-2">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <span className="font-mono text-lg" data-testid="text-call-duration">
-                        {Math.floor(callDuration / 60)}:{(callDuration % 60).toString().padStart(2, '0')}
+                        {formatDuration()}
                       </span>
                     </div>
                   </div>
@@ -419,7 +434,7 @@ export default function AgentConsolePage() {
                         variant="outline"
                         size="lg"
                         className="h-12 w-12 rounded-full"
-                        onClick={() => setIsMuted(!isMuted)}
+                        onClick={toggleMute}
                         data-testid="button-mute"
                       >
                         {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
@@ -433,16 +448,6 @@ export default function AgentConsolePage() {
                         data-testid="button-hangup"
                       >
                         <PhoneOff className="h-6 w-6" />
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="h-12 w-12 rounded-full"
-                        onClick={() => setSpeakerOn(!speakerOn)}
-                        data-testid="button-speaker"
-                      >
-                        {speakerOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
                       </Button>
                     </>
                   )}
