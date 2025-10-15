@@ -354,6 +354,9 @@ export default function AgentConsolePage() {
       return;
     }
 
+    // CRITICAL: Hang up the call immediately when disposition is submitted
+    hangup();
+
     saveDispositionMutation.mutate({
       queueItemId: currentQueueItem.id,
       campaignId: currentQueueItem.campaignId,
