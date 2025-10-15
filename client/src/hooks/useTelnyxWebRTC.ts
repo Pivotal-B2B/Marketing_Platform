@@ -45,17 +45,19 @@ export function useTelnyxWebRTC({
     }
 
     try {
-      // Username may already include @domain, so don't duplicate it
-      const loginString = sipUsername.includes('@') ? sipUsername : `${sipUsername}@${sipDomain}`;
+      // Extract just the username if full SIP URI is provided
+      // Telnyx SDK expects ONLY the username, not username@domain
+      const username = sipUsername.includes('@') ? sipUsername.split('@')[0] : sipUsername;
+      
       console.log('Telnyx WebRTC - Attempting connection with:', {
-        login: loginString,
+        login: username,
         domain: sipDomain,
         hasPassword: !!sipPassword,
       });
       console.log('SDK version: 2.22.18-beta.2');
       
       const telnyxClient = new TelnyxRTC({
-        login: loginString,
+        login: username,
         password: sipPassword,
         ringbackFile: undefined, // Use default ringback
         // Note: Telnyx SDK automatically handles:
