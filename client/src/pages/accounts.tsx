@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect as React_useEffect } from "react";
+import * as React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -49,8 +50,12 @@ export default function AccountsPage() {
   const [bulkUpdateDialogOpen, setBulkUpdateDialogOpen] = useState(false);
   const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectAllPages, setSelectAllPages] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  
+  const ITEMS_PER_PAGE = 250;
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
     queryKey: ['/api/accounts', filterGroup],
@@ -134,6 +139,18 @@ export default function AccountsPage() {
     account.industryStandardized?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredAccounts.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedAccounts = filteredAccounts.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search or filter changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+    setSelectAllPages(false);
+  }, [searchQuery, filterGroup]);
+
   const {
     selectedIds,
     selectedCount,
@@ -143,7 +160,20 @@ export default function AccountsPage() {
     isSelected,
     isAllSelected,
     isSomeSelected,
-  } = useSelection(filteredAccounts);
+  } = useSelection(selectAllPages ? filteredAccounts : paginatedAccounts);
+
+  // Handle select all pages toggle
+  const handleSelectAllPages = () => {
+    if (selectAllPages) {
+      setSelectAllPages(false);
+      clearSelection();
+    } else {
+      setSelectAllPages(true);
+      // Select all filtered accounts across all pages
+      clearSelection();
+      filteredAccounts.forEach(account => selectItem(account.id));
+    }
+  };
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -405,15 +435,48 @@ export default function AccountsPage() {
         />
       </div>
 
-      <BulkActionsToolbar
-        selectedCount={selectedCount}
-        totalCount={filteredAccounts.length}
-        onClearSelection={clearSelection}
-        onBulkExport={handleBulkExport}
-        onBulkDelete={handleBulkDelete}
-        onBulkUpdate={() => setBulkUpdateDialogOpen(true)}
-        onBulkAddToList={() => setAddToListDialogOpen(true)}
-      />
+      {selectedCount > 0 && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div>
+                <p className="font-medium">
+                  {selectAllPages 
+                    ? `All ${selectedCount} accounts selected across all pages` 
+                    : `${selectedCount} account${selectedCount !== 1 ? 's' : ''} selected on this page`}
+                </p>
+                {!selectAllPages && filteredAccounts.length > paginatedAccounts.length && (
+                  <button
+                    onClick={handleSelectAllPages}
+                    className="text-sm text-primary hover:underline mt-1"
+                  >
+                    Select all {filteredAccounts.length} accounts across all pages
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleBulkExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setBulkUpdateDialogOpen(true)}>
+                Update
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAddToListDialogOpen(true)}>
+                Add to List
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleBulkDelete}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { clearSelection(); setSelectAllPages(false); }}>
+                Clear
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="border rounded-lg">
@@ -447,28 +510,29 @@ export default function AccountsPage() {
           </Table>
         </div>
       ) : filteredAccounts.length > 0 ? (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox
-                    checked={isAllSelected ? true : isSomeSelected ? "indeterminate" : false}
-                    onCheckedChange={() => isAllSelected ? clearSelection() : selectAll()}
-                    aria-label="Select all"
-                    data-testid="checkbox-select-all"
-                  />
-                </TableHead>
-                <TableHead>Account Name</TableHead>
-                <TableHead>Domain</TableHead>
-                <TableHead>Industry</TableHead>
-                <TableHead>Employees</TableHead>
-                <TableHead>Revenue</TableHead>
-                <TableHead className="w-[120px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAccounts.map((account) => (
+        <>
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={isAllSelected ? true : isSomeSelected ? "indeterminate" : false}
+                      onCheckedChange={() => isAllSelected ? clearSelection() : selectAll()}
+                      aria-label="Select all on page"
+                      data-testid="checkbox-select-all"
+                    />
+                  </TableHead>
+                  <TableHead>Account Name</TableHead>
+                  <TableHead>Domain</TableHead>
+                  <TableHead>Industry</TableHead>
+                  <TableHead>Employees</TableHead>
+                  <TableHead>Revenue</TableHead>
+                  <TableHead className="w-[120px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedAccounts.map((account) => (
                 <TableRow 
                   key={account.id} 
                   className="hover-elevate cursor-pointer" 
@@ -529,8 +593,63 @@ export default function AccountsPage() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </div>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-muted-foreground">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredAccounts.length)} of {filteredAccounts.length} accounts
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         <EmptyState
           icon={Building2}
