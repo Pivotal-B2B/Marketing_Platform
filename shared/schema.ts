@@ -843,6 +843,11 @@ export const leads = pgTable("leads", {
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }),
+  // Link to call recording (if lead came from telephony campaign)
+  callAttemptId: varchar("call_attempt_id").references(() => callAttempts.id, { onDelete: 'set null' }),
+  recordingUrl: text("recording_url"), // Denormalized for quick access
+  callDuration: integer("call_duration"), // Duration in seconds
+  agentId: varchar("agent_id").references(() => users.id), // Agent who qualified the lead
   qaStatus: qaStatusEnum("qa_status").notNull().default('new'),
   checklistJson: jsonb("checklist_json"),
   approvedAt: timestamp("approved_at"),
@@ -854,6 +859,7 @@ export const leads = pgTable("leads", {
 }, (table) => ({
   qaStatusIdx: index("leads_qa_status_idx").on(table.qaStatus),
   campaignIdx: index("leads_campaign_idx").on(table.campaignId),
+  callAttemptIdx: index("leads_call_attempt_idx").on(table.callAttemptId),
 }));
 
 // Suppression - Email
