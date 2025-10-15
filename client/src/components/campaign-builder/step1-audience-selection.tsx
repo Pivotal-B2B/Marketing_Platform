@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Filter, List, Globe, Eye, Save, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FilterBuilder } from "@/components/filter-builder";
+import type { FilterGroup } from "@shared/filter-types";
 
 interface Step1Props {
   data: any;
@@ -18,12 +20,14 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
   const [audienceSource, setAudienceSource] = useState<"filters" | "segment" | "list" | "domain_set">("filters");
   const [selectedFilters, setSelectedFilters] = useState<any[]>(data.audience?.filters || []);
   const [audienceCount, setAudienceCount] = useState(0);
+  const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(data.audience?.filterGroup);
 
   const handleNext = () => {
     onNext({
       audience: {
         source: audienceSource,
         filters: selectedFilters,
+        filterGroup: filterGroup,
         count: audienceCount,
       },
     });
@@ -60,29 +64,51 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Filter Builder Placeholder */}
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <Filter className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-4">
-                  Use the same advanced filtering engine from Contacts/Accounts
-                </p>
-                <Button variant="outline" data-testid="button-add-filter">
-                  <Filter className="w-4 h-4 mr-2" />
-                  Add Filter Condition
-                </Button>
+              {/* Advanced Filter Builder */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex-1">
+                  <FilterBuilder
+                    entityType="contact"
+                    onApplyFilter={setFilterGroup}
+                    initialFilter={filterGroup}
+                  />
+                </div>
               </div>
+
+              {filterGroup && filterGroup.conditions.length > 0 && (
+                <div className="border rounded-lg p-4 bg-muted/50">
+                  <p className="text-sm font-medium mb-2">Active Filters:</p>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">
+                      Match <Badge variant="outline">{filterGroup.logic}</Badge> of {filterGroup.conditions.length} condition{filterGroup.conditions.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                 <div>
                   <p className="font-medium">Estimated Audience Size</p>
-                  <p className="text-2xl font-bold text-primary">2,847 contacts</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {filterGroup && filterGroup.conditions.length > 0 ? '2,847' : '0'} contacts
+                  </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" data-testid="button-preview-audience">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    data-testid="button-preview-audience"
+                    disabled={!filterGroup || filterGroup.conditions.length === 0}
+                  >
                     <Eye className="w-4 h-4 mr-2" />
                     Preview Sample
                   </Button>
-                  <Button variant="outline" size="sm" data-testid="button-save-segment">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    data-testid="button-save-segment"
+                    disabled={!filterGroup || filterGroup.conditions.length === 0}
+                  >
                     <Save className="w-4 h-4 mr-2" />
                     Save as Segment
                   </Button>
