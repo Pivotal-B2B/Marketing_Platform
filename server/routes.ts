@@ -1,11 +1,11 @@
 import type { Express } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, isNotNull } from "drizzle-orm";
 import { storage } from "./storage";
 import { comparePassword, generateToken, requireAuth, requireRole, hashPassword } from "./auth";
 import webhooksRouter from "./routes/webhooks";
 import { z } from "zod";
 import { db } from "./db";
-import { customFieldDefinitions } from "@shared/schema";
+import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems } from "@shared/schema";
 import {
   insertAccountSchema,
   insertContactSchema,
@@ -1177,24 +1177,74 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.get("/api/domain-sets/:id/accounts", requireAuth, async (req, res) => {
+  // Get accounts matched by a domain set
+  app.get('/api/domain-sets/:id/accounts', requireAuth, async (req, res) => {
     try {
-      const items = await storage.getDomainSetItems(req.params.id);
-      const accountIds = items
-        .filter(item => item.accountId)
-        .map(item => item.accountId as string);
+      const domainSetId = req.params.id;
 
-      if (accountIds.length === 0) {
+      const accounts = await db
+        .select()
+        .from(accountsTable)
+        .where(
+          inArray(
+            accountsTable.id,
+            db
+              .select({ accountId: domainSetItems.matchedAccountId })
+              .from(domainSetItems)
+              .where(
+                and(
+                  eq(domainSetItems.domainSetId, domainSetId),
+                  isNotNull(domainSetItems.matchedAccountId)
+                )
+              )
+          )
+        );
+
+      res.json(accounts);
+    } catch (error: any) {
+      console.error('Error fetching domain set accounts:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get contacts matched by a domain set
+  app.get('/api/domain-sets/:id/contacts', requireAuth, async (req, res) => {
+    try {
+      const domainSetId = req.params.id;
+
+      // Get all accounts that were matched by this domain set
+      const matchedAccountIds = await db
+        .select({ accountId: domainSetItems.matchedAccountId })
+        .from(domainSetItems)
+        .where(
+          and(
+            eq(domainSetItems.domainSetId, domainSetId),
+            isNotNull(domainSetItems.matchedAccountId)
+          )
+        );
+
+      if (matchedAccountIds.length === 0) {
         return res.json([]);
       }
 
-      const accounts = await storage.getAccountsByIds(accountIds);
-      res.json(accounts);
-    } catch (error) {
-      console.error('Get domain set accounts error:', error);
-      res.status(500).json({ message: "Failed to get domain set accounts" });
+      // Get all contacts from those accounts
+      const contacts = await db
+        .select()
+        .from(contactsTable)
+        .where(
+          inArray(
+            contactsTable.accountId,
+            matchedAccountIds.map(m => m.accountId).filter((id): id is string => id !== null)
+          )
+        );
+
+      res.json(contacts);
+    } catch (error: any) {
+      console.error('Error fetching domain set contacts:', error);
+      res.status(500).json({ error: error.message });
     }
   });
+
 
   app.post("/api/domain-sets/:id/process", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
     try {

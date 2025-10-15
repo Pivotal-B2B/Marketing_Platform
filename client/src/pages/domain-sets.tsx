@@ -357,22 +357,31 @@ export default function AccountsListTAL() {
                     <p className="text-2xl font-bold">{accountsList.totalUploaded}</p>
                     <p className="text-sm text-muted-foreground">Total Uploaded</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">{accountsList.matchedAccounts}</p>
+                  <div 
+                    className="text-center cursor-pointer hover-elevate rounded-lg p-2 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `/domain-sets/${accountsList.id}?view=accounts`;
+                    }}
+                  >
+                    <p className="text-2xl font-bold text-green-600 hover:text-green-700">{accountsList.matchedAccounts}</p>
                     <p className="text-sm text-muted-foreground">Matched Accounts</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600">{accountsList.matchedContacts}</p>
+                  <div 
+                    className="text-center cursor-pointer hover-elevate rounded-lg p-2 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `/domain-sets/${accountsList.id}?view=contacts`;
+                    }}
+                  >
+                    <p className="text-2xl font-bold text-blue-600 hover:text-blue-700">{accountsList.matchedContacts}</p>
                     <p className="text-sm text-muted-foreground">Matched Contacts</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-orange-600">{accountsList.unknownDomains}</p>
                     <p className="text-sm text-muted-foreground">Unknown</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-gray-600">{accountsList.duplicatesRemoved}</p>
-                    <p className="text-sm text-muted-foreground">Duplicates</p>
-                  </div>
+                  <div className="text-center"></div>
                 </div>
 
                 {selectedAccountsList?.id === accountsList.id && items.length > 0 && (

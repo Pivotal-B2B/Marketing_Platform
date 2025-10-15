@@ -1,7 +1,6 @@
-
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Building2 } from "lucide-react";
+import { ArrowLeft, Building2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -39,7 +38,9 @@ interface Account {
 
 export default function AccountsListDetail() {
   const { id } = useParams<{ id: string }>();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const queryParams = new URLSearchParams(location.split('?')[1] || '');
+  const viewFilter = queryParams.get('view');
 
   const { data: accountsList, isLoading: listLoading } = useQuery<DomainSet>({
     queryKey: [`/api/domain-sets/${id}`],
@@ -52,7 +53,12 @@ export default function AccountsListDetail() {
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: [`/api/domain-sets/${id}/accounts`],
-    enabled: !!id,
+    enabled: !!id && viewFilter !== 'contacts',
+  });
+
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Account[]>({
+    queryKey: [`/api/domain-sets/${id}/contacts`],
+    enabled: !!id && viewFilter !== 'accounts',
   });
 
   const getMatchTypeBadge = (matchType?: string) => {
@@ -63,6 +69,31 @@ export default function AccountsListDetail() {
       none: 'outline',
     } as const;
     return <Badge variant={variants[matchType as keyof typeof variants]}>{matchType}</Badge>;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      processing: 'secondary',
+      completed: 'default',
+      error: 'destructive',
+    } as const;
+    return variants[status as keyof typeof variants] || 'outline';
+  };
+
+  const handleCardClick = (accountId: string, matchType: string | undefined) => {
+    if (viewFilter === 'accounts') {
+      setLocation(`/accounts/${accountId}`);
+    } else if (viewFilter === 'contacts') {
+      // Assuming contacts have a similar detail page, adjust path if needed
+      setLocation(`/contacts/${accountId}`);
+    } else {
+      // Default behavior if no filter is active
+      setLocation(`/accounts/${accountId}`);
+    }
+  };
+
+  const handleNumberClick = (filterType: 'accounts' | 'contacts') => {
+    setLocation(`?view=${filterType}`);
   };
 
   if (listLoading) {
@@ -88,17 +119,37 @@ export default function AccountsListDetail() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" size="icon" onClick={() => setLocation('/domain-sets')}>
+      <div className="border-b p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setLocation('/domain-sets')}
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-3xl font-bold">{accountsList.name}</h1>
+            <div>
+              <h1 className="text-3xl font-bold">{accountsList.name}</h1>
+              <p className="text-muted-foreground mt-1">
+                {viewFilter === 'accounts' && "Showing matched accounts only"}
+                {viewFilter === 'contacts' && "Showing matched contacts only"}
+                {!viewFilter && (accountsList.description || "Domain matching results")}
+              </p>
+            </div>
           </div>
-          {accountsList.description && (
-            <p className="text-muted-foreground ml-12">{accountsList.description}</p>
-          )}
+          <div className="flex items-center gap-2">
+            {viewFilter && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setLocation(`/domain-sets/${id}`)}
+              >
+                Clear Filter
+              </Button>
+            )}
+            <Badge variant={getStatusBadge(accountsList.status)}>{accountsList.status}</Badge>
+          </div>
         </div>
       </div>
 
@@ -116,7 +167,9 @@ export default function AccountsListDetail() {
             <CardTitle className="text-sm font-medium">Matched Accounts</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{accountsList.matchedAccounts}</div>
+            <div className="text-2xl font-bold text-green-600 cursor-pointer" onClick={() => handleNumberClick('accounts')}>
+              {accountsList.matchedAccounts}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -124,7 +177,9 @@ export default function AccountsListDetail() {
             <CardTitle className="text-sm font-medium">Matched Contacts</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{accountsList.matchedContacts}</div>
+            <div className="text-2xl font-bold text-blue-600 cursor-pointer" onClick={() => handleNumberClick('contacts')}>
+              {accountsList.matchedContacts}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -137,81 +192,154 @@ export default function AccountsListDetail() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Matched Accounts</CardTitle>
-          <CardDescription>Accounts that were successfully matched from this list</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {accountsLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : accounts.length > 0 ? (
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Account Name</TableHead>
-                    <TableHead>Domain</TableHead>
-                    <TableHead>Industry</TableHead>
-                    <TableHead>Employees</TableHead>
-                    <TableHead>Revenue</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {accounts.map((account) => (
-                    <TableRow 
-                      key={account.id} 
-                      className="hover-elevate cursor-pointer"
-                      onClick={() => setLocation(`/accounts/${account.id}`)}
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
-                            <Building2 className="h-4 w-4 text-primary" />
-                          </div>
-                          {account.name}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{account.domain || "-"}</TableCell>
-                      <TableCell>
-                        {account.industryStandardized ? (
-                          <Badge variant="outline">{account.industryStandardized}</Badge>
-                        ) : "-"}
-                      </TableCell>
-                      <TableCell>{account.employeesSizeRange || "-"}</TableCell>
-                      <TableCell>{account.annualRevenue || "-"}</TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLocation(`/accounts/${account.id}`);
-                          }}
-                        >
-                          View
-                        </Button>
-                      </TableCell>
+      {(viewFilter === 'accounts' || !viewFilter) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Matched Accounts</CardTitle>
+            <CardDescription>Accounts that were successfully matched from this list</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {accountsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : accounts.length > 0 ? (
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account Name</TableHead>
+                      <TableHead>Domain</TableHead>
+                      <TableHead>Industry</TableHead>
+                      <TableHead>Employees</TableHead>
+                      <TableHead>Revenue</TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="py-8 text-center">
-              <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No matched accounts found</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {accounts.map((account) => (
+                      <TableRow 
+                        key={account.id} 
+                        className="hover-elevate cursor-pointer"
+                        onClick={() => handleCardClick(account.id, 'exact')} // Assuming 'exact' match for accounts here
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
+                              <Building2 className="h-4 w-4 text-primary" />
+                            </div>
+                            {account.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{account.domain || "-"}</TableCell>
+                        <TableCell>
+                          {account.industryStandardized ? (
+                            <Badge variant="outline">{account.industryStandardized}</Badge>
+                          ) : "-"}
+                        </TableCell>
+                        <TableCell>{account.employeesSizeRange || "-"}</TableCell>
+                        <TableCell>{account.annualRevenue || "-"}</TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCardClick(account.id, 'exact');
+                            }}
+                          >
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">No matched accounts found</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-      {items.length > 0 && (
+      {(viewFilter === 'contacts' || !viewFilter) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Matched Contacts</CardTitle>
+            <CardDescription>Contacts that were successfully matched from this list</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {contactsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : contacts.length > 0 ? (
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Contact Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Account</TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {contacts.map((contact) => (
+                      <TableRow 
+                        key={contact.id} 
+                        className="hover-elevate cursor-pointer"
+                        onClick={() => handleCardClick(contact.id, 'exact')} // Assuming 'exact' match for contacts here
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
+                              <Users className="h-4 w-4 text-primary" />
+                            </div>
+                            {contact.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{contact.domain || "-"}</TableCell> {/* Assuming domain holds email */}
+                        <TableCell>{contact.industryStandardized || "-"}</TableCell> {/* Assuming industryStandardized holds phone */}
+                        <TableCell>{contact.employeesSizeRange || "-"}</TableCell> {/* Assuming employeesSizeRange holds account name */}
+                        <TableCell>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCardClick(contact.id, 'exact');
+                            }}
+                          >
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">No matched contacts found</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+
+      {items.length > 0 && (!viewFilter || viewFilter === 'accounts') && ( // Only show if not filtering for contacts only
         <Card>
           <CardHeader>
             <CardTitle>Match Details</CardTitle>
