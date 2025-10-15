@@ -735,6 +735,10 @@ export const campaigns = pgTable("campaigns", {
   endDate: date("end_date"),
   costPerLead: decimal("cost_per_lead", { precision: 10, scale: 2 }),
 
+  // AI-Powered QA Configuration
+  qaParameters: jsonb("qa_parameters"), // Quality assurance criteria and scoring weights
+  clientSubmissionConfig: jsonb("client_submission_config"), // One-click client submission settings
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   launchedAt: timestamp("launched_at"),
@@ -862,6 +866,19 @@ export const leads = pgTable("leads", {
   approvedById: varchar("approved_by_id").references(() => users.id),
   rejectedReason: text("rejected_reason"),
   notes: text("notes"),
+
+  // AI-Powered QA Fields
+  transcript: text("transcript"), // Call transcription from AssemblyAI
+  transcriptionStatus: text("transcription_status"), // pending, processing, completed, failed
+  aiScore: numeric("ai_score", { precision: 5, scale: 2 }), // AI qualification score (0-100)
+  aiAnalysis: jsonb("ai_analysis"), // Detailed AI analysis results
+  aiQualificationStatus: text("ai_qualification_status"), // qualified, not_qualified, needs_review
+
+  // Client Submission Tracking
+  submittedToClient: boolean("submitted_to_client").default(false),
+  submittedAt: timestamp("submitted_at"),
+  submissionResponse: jsonb("submission_response"), // Client API/form response
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
