@@ -67,6 +67,41 @@ export default function PhoneCampaignsPage() {
     enabled: !!token,
   });
 
+  // Fetch queue stats for each campaign
+  const { data: queueStats = {} } = useQuery({
+    queryKey: ["/api/campaigns/queue-stats"],
+    queryFn: async () => {
+      const stats: Record<string, any> = {};
+      for (const campaign of campaigns) {
+        const [queueRes, agentsRes] = await Promise.all([
+          fetch(`/api/campaigns/${campaign.id}/queue`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }),
+          fetch(`/api/campaigns/${campaign.id}/agents`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          })
+        ]);
+        if (queueRes.ok && agentsRes.ok) {
+          const queue = await queueRes.json();
+          const agents = await agentsRes.json();
+          stats[campaign.id] = {
+            total: queue.length,
+            queued: queue.filter((q: any) => q.status === 'queued').length,
+            inProgress: queue.filter((q: any) => q.status === 'in_progress').length,
+            completed: queue.filter((q: any) => q.status === 'done').length,
+            agents: agents.length
+          };
+        }
+      }
+      return stats;
+    },
+    enabled: campaigns.length > 0 && !!token,
+  });
+
   const { data: agents = [], isLoading: agentsLoading } = useQuery({
     queryKey: ["/api/agents"],
     queryFn: async () => {
@@ -115,6 +150,35 @@ export default function PhoneCampaignsPage() {
       });
     },
   });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const newStatus = status === 'active' ? 'paused' : 'active';
+      const res = await fetch(`/api/campaigns/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error("Failed to update campaign status");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      const newStatus = variables.status === 'active' ? 'paused' : 'active';
+      toast({
+        title: "Success",
+        description: `Campaign ${newStatus === 'active' ? 'resumed' : 'paused'} successfully`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update campaign status",
+        variant: "destructive",
+      });
+    },
+  });
+
 
   const assignAgentsMutation = useMutation({
     mutationFn: async ({ campaignId, agentIds }: { campaignId: string; agentIds: string[] }) => {
@@ -279,10 +343,24 @@ export default function PhoneCampaignsPage() {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => toggleStatusMutation.mutate({ id: campaign.id, status: campaign.status })}
+                        disabled={toggleStatusMutation.isPending}
                         data-testid={`button-pause-campaign-${campaign.id}`}
                       >
                         <Pause className="mr-2 h-4 w-4" />
                         Pause
+                      </Button>
+                    )}
+                    {campaign.status === "paused" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleStatusMutation.mutate({ id: campaign.id, status: campaign.status })}
+                        disabled={toggleStatusMutation.isPending}
+                        data-testid={`button-resume-campaign-${campaign.id}`}
+                      >
+                        <Play className="mr-2 h-4 w-4" />
+                        Resume
                       </Button>
                     )}
                     <Button
@@ -319,43 +397,88 @@ export default function PhoneCampaignsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Total Calls</p>
-                      <p className="text-lg font-semibold">{campaign.totalCalls || 0}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Connected</p>
-                      <p className="text-lg font-semibold">
-                        {campaign.connected || 0} ({campaign.totalCalls ? Math.round((campaign.connected / campaign.totalCalls) * 100) : 0}%)
+                <div className="space-y-4">
+                  {/* Queue Statistics */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">In Queue</p>
+                      <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                        {queueStats[campaign.id]?.queued || 0}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Qualified</p>
-                      <p className="text-lg font-semibold">
-                        {campaign.qualified || 0}
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">In Progress</p>
+                      <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+                        {queueStats[campaign.id]?.inProgress || 0}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">DNC Requests</p>
-                      <p className="text-lg font-semibold text-red-500">
-                        {campaign.dncRequests || 0}
+                    <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
+                      <p className="text-xs text-green-600 dark:text-green-400 font-medium">Completed</p>
+                      <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+                        {queueStats[campaign.id]?.completed || 0}
                       </p>
                     </div>
                   </div>
-                  {campaign.metadata?.assignedAgents && campaign.metadata.assignedAgents.length > 0 && (
-                    <div className="pt-3 border-t">
-                      <p className="text-xs text-muted-foreground mb-2">Assigned Agents</p>
-                      <div className="flex gap-1 flex-wrap">
-                        {campaign.metadata.assignedAgents.map((agentId: string, idx: number) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            Agent {idx + 1}
-                          </Badge>
-                        ))}
-                      </div>
+
+                  {/* Agents & Total Queue */}
+                  <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {queueStats[campaign.id]?.agents || 0} Agent{queueStats[campaign.id]?.agents !== 1 ? 's' : ''} Assigned
+                      </span>
                     </div>
-                  )}
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {queueStats[campaign.id]?.total || 0} Total Contacts
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-2 border-t">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setLocation(`/campaigns/phone/${campaign.id}/queue`)}
+                      data-testid={`button-view-queue-${campaign.id}`}
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      View Queue
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => toggleStatusMutation.mutate({ id: campaign.id, status: campaign.status })}
+                      disabled={toggleStatusMutation.isPending}
+                      data-testid={`button-pause-${campaign.id}`}
+                    >
+                      {campaign.status === 'active' ? (
+                        <>
+                          <Pause className="w-4 h-4 mr-2" />
+                          Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-2" />
+                          Resume
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setLocation(`/reports?campaign=${campaign.id}`)}
+                      data-testid={`button-view-${campaign.id}`}
+                    >
+                      <BarChart className="w-4 h-4 mr-2" />
+                      Reports
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

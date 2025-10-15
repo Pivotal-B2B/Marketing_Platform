@@ -1598,6 +1598,16 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Get agents assigned to a campaign
+  app.get("/api/campaigns/:id/agents", requireAuth, async (req, res) => {
+    try {
+      const agents = await storage.getCampaignAgents(req.params.id);
+      res.json(agents);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch campaign agents" });
+    }
+  });
+
   // Release an agent from a campaign
   app.delete("/api/campaigns/:id/agents/:agentId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {

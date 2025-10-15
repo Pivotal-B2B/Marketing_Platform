@@ -70,12 +70,13 @@ import {
   type DomainAuth, type InsertDomainAuth,
   type TrackingDomain, type InsertTrackingDomain,
   type IpPool, type InsertIpPool,
-  type WarmupPlan, type InsertWarmupPlan,
+  type WarmupPlan, InsertWarmupPlan,
   type SendPolicy, type InsertSendPolicy,
   type DomainReputationSnapshot, type InsertDomainReputationSnapshot,
   type PerDomainStats, type InsertPerDomainStats,
   customFieldDefinitions,
   type CustomFieldDefinition, type InsertCustomFieldDefinition,
+  campaignAgents,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -86,7 +87,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
-  
+
   // User Roles (Multi-role support)
   getUserRoles(userId: string): Promise<string[]>;
   assignUserRole(userId: string, role: string, assignedBy?: string): Promise<void>;
@@ -132,6 +133,7 @@ export interface IStorage {
   listActiveAgentAssignments(): Promise<Array<CampaignAgentAssignment & { agentName: string; campaignName: string }>>;
   assignAgentsToCampaign(campaignId: string, agentIds: string[], assignedBy: string): Promise<void>;
   releaseAgentAssignment(campaignId: string, agentId: string): Promise<void>;
+  getCampaignAgents(campaignId: string): Promise<any[]>;
 
   // Campaign Audience Snapshots
   createCampaignAudienceSnapshot(snapshot: InsertCampaignAudienceSnapshot): Promise<CampaignAudienceSnapshot>;
@@ -146,7 +148,7 @@ export interface IStorage {
   getCampaignAccountStats(campaignId: string, accountId?: string): Promise<any[]>;
   upsertCampaignAccountStats(campaignId: string, accountId: string, updates: any): Promise<any>;
   enforceAccountCap(campaignId: string): Promise<{ removed: number; accounts: string[] }>;
-  
+
   // Agent Queue Assignment
   getAgents(): Promise<User[]>;
   assignQueueToAgents(campaignId: string, agentIds: string[], mode?: 'round_robin' | 'weighted'): Promise<{ assigned: number }>;
@@ -468,7 +470,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserRoles(userId: string, roles: string[], assignedBy?: string): Promise<void> {
     // Remove all existing roles
     await db.delete(userRoles).where(eq(userRoles.userId, userId));
-    
+
     // Insert new roles
     if (roles.length > 0) {
       await db.insert(userRoles).values(
@@ -486,7 +488,7 @@ export class DatabaseStorage implements IStorage {
       id: users.id,
       username: users.username,
     }).from(users);
-    
+
     const result = [];
     for (const user of allUsers) {
       const roles = await this.getUserRoles(user.id);
@@ -496,7 +498,7 @@ export class DatabaseStorage implements IStorage {
         roles,
       });
     }
-    
+
     return result;
   }
 
@@ -1090,13 +1092,13 @@ export class DatabaseStorage implements IStorage {
       .select({ userId: userRoles.userId })
       .from(userRoles)
       .where(eq(userRoles.role, 'agent'));
-    
+
     const agentIds = agentRoleUsers.map(r => r.userId);
-    
+
     if (agentIds.length === 0) {
       return [];
     }
-    
+
     // Get all agents with their current active assignments
     const agents = await db
       .select({
@@ -1114,7 +1116,7 @@ export class DatabaseStorage implements IStorage {
       )
       .leftJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
       .where(inArray(users.id, agentIds));
-    
+
     return agents.map(row => ({
       ...row.user,
       currentAssignment: row.assignment && row.campaign ? {
@@ -1147,7 +1149,7 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(campaignAgentAssignments.agentId, users.id))
       .innerJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
       .where(eq(campaignAgentAssignments.isActive, true));
-    
+
     return assignments.map(row => ({
       ...row.assignment,
       agentName: `${row.agent.firstName || ''} ${row.agent.lastName || ''}`.trim() || row.agent.username,
@@ -1168,11 +1170,11 @@ export class DatabaseStorage implements IStorage {
             eq(campaignAgentAssignments.isActive, true)
           )
         );
-      
+
       if (existingAssignment) {
         throw new Error(`Agent ${agentId} is already assigned to campaign ${existingAssignment.campaignId}`);
       }
-      
+
       // Create new assignment
       await db.insert(campaignAgentAssignments).values({
         campaignId,
@@ -1196,6 +1198,26 @@ export class DatabaseStorage implements IStorage {
           eq(campaignAgentAssignments.agentId, agentId)
         )
       );
+  }
+
+  async getCampaignAgents(campaignId: string): Promise<any[]> {
+    const assignments = await db
+      .select({
+        agentId: campaignAgents.agentId,
+        assignedAt: campaignAgents.assignedAt,
+        agent: {
+          id: users.id,
+          username: users.username,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        }
+      })
+      .from(campaignAgents)
+      .leftJoin(users, eq(campaignAgents.agentId, users.id))
+      .where(eq(campaignAgents.campaignId, campaignId));
+
+    return assignments;
   }
 
   // Campaign Audience Snapshots
@@ -1225,7 +1247,7 @@ export class DatabaseStorage implements IStorage {
           firstName: contacts.firstName,
           lastName: contacts.lastName,
           email: contacts.email,
-          phoneNumber: contacts.phoneNumber,
+          phoneNumber: contacts.directPhone,
         },
         account: {
           name: accounts.name,
@@ -1255,7 +1277,7 @@ export class DatabaseStorage implements IStorage {
         priority,
         status: 'queued',
       }).returning();
-      
+
       // Atomic upsert using ON CONFLICT - handles concurrent first-writes
       await tx.insert(campaignAccountStats).values({
         campaignId,
@@ -1269,7 +1291,7 @@ export class DatabaseStorage implements IStorage {
           queuedCount: sql`${campaignAccountStats.queuedCount} + 1`,
         },
       });
-      
+
       return queueItem;
     });
   }
@@ -1303,13 +1325,13 @@ export class DatabaseStorage implements IStorage {
         connectedCount: 0,
         positiveDispCount: 0,
       };
-      
+
       const updateSet: any = {};
-      
+
       if (current.status === 'queued' && status !== 'queued') {
         updateSet.queuedCount = sql`GREATEST(0, ${campaignAccountStats.queuedCount} - 1)`;
       }
-      
+
       if (status === 'done' || status === 'in_progress') {
         updateSet.connectedCount = sql`${campaignAccountStats.connectedCount} + 1`;
       }
@@ -1487,7 +1509,7 @@ export class DatabaseStorage implements IStorage {
 
     for (const { accountId } of accountsInQueue) {
       let currentCount = 0;
-      
+
       // Determine count based on mode
       if (accountCapMode === 'queue_size') {
         const stats = await this.getCampaignAccountStats(campaignId, accountId);
@@ -1502,7 +1524,7 @@ export class DatabaseStorage implements IStorage {
 
       if (currentCount > accountCapValue) {
         const overflow = currentCount - accountCapValue;
-        
+
         // Remove lowest priority items for this account
         const toRemove = await db
           .select()
@@ -1640,7 +1662,7 @@ export class DatabaseStorage implements IStorage {
   // Call Dispositions
   async createCallDisposition(callData: InsertCall): Promise<any> {
     const [call] = await db.insert(calls).values(callData).returning();
-    
+
     // If this is linked to a queue item and has a disposition, update queue status
     if (call.queueItemId && call.disposition) {
       await db
@@ -1658,7 +1680,7 @@ export class DatabaseStorage implements IStorage {
           .from(campaignQueue)
           .where(eq(campaignQueue.id, call.queueItemId))
           .limit(1);
-        
+
         if (queueItem.length > 0) {
           await this.upsertCampaignAccountStats(
             queueItem[0].campaignId,
@@ -1675,7 +1697,7 @@ export class DatabaseStorage implements IStorage {
           .from(campaignQueue)
           .where(eq(campaignQueue.id, call.queueItemId))
           .limit(1);
-        
+
         if (queueItem.length > 0) {
           await this.upsertCampaignAccountStats(
             queueItem[0].campaignId,
