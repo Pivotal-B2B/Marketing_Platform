@@ -50,14 +50,18 @@ export function registerRoutes(app: Express) {
 
   // ==================== USERS (Admin Only) ====================
 
-  app.get("/api/users", requireAuth, requireRole('admin'), async (req, res) => {
+  // Get all users (authenticated users can view, needed for agent assignment in campaigns)
+  app.get("/api/users", requireAuth, async (req, res) => {
     try {
-      const users = await storage.getUsers();
-      // Remove passwords from response
-      const usersWithoutPasswords = users.map(({ password, ...user }) => user);
-      res.json(usersWithoutPasswords);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch users" });
+      const allUsers = await storage.getUsers();
+      // Return sanitized user data (exclude password)
+      const sanitizedUsers = allUsers.map(user => {
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      });
+      res.json(sanitizedUsers);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 
@@ -1338,12 +1342,12 @@ export function registerRoutes(app: Express) {
     try {
       const typeFilter = req.query.type as string | undefined;
       let campaigns = await storage.getCampaigns();
-      
+
       // Filter by type if specified
       if (typeFilter) {
         campaigns = campaigns.filter(c => c.type === typeFilter);
       }
-      
+
       res.json(campaigns);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch campaigns" });
@@ -1425,7 +1429,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/campaigns/:id/queue/enqueue", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { contactId, accountId, priority = 0 } = req.body;
-      
+
       if (!contactId || !accountId) {
         return res.status(400).json({ message: "contactId and accountId required" });
       }
@@ -1445,7 +1449,7 @@ export function registerRoutes(app: Express) {
   app.patch("/api/campaigns/queue/:queueId/status", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { status, removedReason, isPositiveDisposition } = req.body;
-      
+
       if (!status) {
         return res.status(400).json({ message: "status required" });
       }
@@ -1470,7 +1474,7 @@ export function registerRoutes(app: Express) {
   app.delete("/api/campaigns/:id/queue/:queueId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { reason = "Manual removal" } = req.body;
-      
+
       await storage.removeFromQueueById(req.params.id, req.params.queueId, reason);
       res.status(204).send();
     } catch (error: any) {
