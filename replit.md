@@ -39,6 +39,13 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Client Portal (Bridge Model):** Allows clients to specify campaign order requirements.
 - **Compliance:** Real-time enforcement of global DNC and email unsubscribe lists; consent tracking.
 - **Security:** JWT token generation, bcrypt password hashing, and role-based access control (RBAC).
+- **Multi-Role User Management System:**
+    - **Many-to-Many Role Assignment:** Users can be assigned multiple roles simultaneously via user_roles junction table (admin, agent, quality_analyst, content_creator, campaign_manager)
+    - **Enhanced JWT Authentication:** JWT payload includes roles array; RBAC middleware checks if user has any of the allowed roles
+    - **Admin-Only Role Management API:** Full CRUD operations for user roles (GET/POST/PUT/DELETE /api/users/:userId/roles) with audit trail (assignedBy tracking)
+    - **Checkbox-Based Multi-Role UI:** User management interface with checkbox selection for multiple roles, real-time updates, and multiple role badges display
+    - **Legacy Compatibility:** Maintains backward compatibility with legacy single role field while prioritizing roles array
+    - **Migration Endpoint:** One-time migration API (POST /api/users/migrate-roles) to convert existing users to multi-role system
 - **Segmentation Engine:** Enhanced schemas for segments and lists, segment preview API, and conversion/export functionalities.
 - **Domain Sets Upgrade:** Advanced normalization, validation, and matching engine for ABM.
 - **Content Studio & Social Media Management:** Unified asset library with version control, AI content generator, and multi-platform social media publishing with scheduling.
