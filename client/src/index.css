@@ -515,6 +515,36 @@
     box-shadow: 0 0 8px hsl(var(--info) / 0.6);
   }
 
+  /* Enhanced loading skeleton pulse */
+  @keyframes skeleton-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .skeleton-enhanced {
+    animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.8) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-pulse 2s ease-in-out infinite;
+  }
+
+  /* Staggered animation delays for lists */
+  .stagger-1 { animation-delay: 0.1s; }
+  .stagger-2 { animation-delay: 0.2s; }
+  .stagger-3 { animation-delay: 0.3s; }
+  .stagger-4 { animation-delay: 0.4s; }
+  .stagger-5 { animation-delay: 0.5s; }
+  .stagger-6 { animation-delay: 0.6s; }
+
   /* .no-default-hover-elevate/no-default-active-elevate is an escape hatch so consumers of
    * buttons/badges can remove the automatic brightness adjustment on interactions
    * and program their own. */
