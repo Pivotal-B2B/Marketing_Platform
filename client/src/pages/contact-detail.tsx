@@ -237,6 +237,25 @@ export default function ContactDetailPage() {
                   </div>
                 </div>
               )}
+
+              {/* Custom Fields */}
+              {contact.customFields && Object.keys(contact.customFields).length > 0 && (
+                <div className="mt-4 pt-4 border-t">
+                  <p className="text-sm font-medium mb-3">Custom Fields</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {Object.entries(contact.customFields).map(([key, value]) => (
+                      <div key={key}>
+                        <p className="text-sm text-muted-foreground mb-1 capitalize">
+                          {key.replace(/_/g, ' ')}
+                        </p>
+                        <p className="font-medium text-sm">
+                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </SectionCard>
 
             {/* Linked Account */}
