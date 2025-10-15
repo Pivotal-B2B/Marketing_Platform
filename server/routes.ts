@@ -1184,9 +1184,7 @@ export function registerRoutes(app: Express) {
 
       // Get all domain set items with matched accounts
       const matchedItems = await db
-        .select({
-          accountId: domainSetItems.accountId
-        })
+        .select()
         .from(domainSetItems)
         .where(
           and(
@@ -1230,9 +1228,7 @@ export function registerRoutes(app: Express) {
 
       // Get all accounts that were matched by this domain set
       const matchedAccountIds = await db
-        .select({ 
-          accountId: domainSetItems.accountId 
-        })
+        .select()
         .from(domainSetItems)
         .where(
           and(
