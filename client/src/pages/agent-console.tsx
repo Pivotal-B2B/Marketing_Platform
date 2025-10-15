@@ -124,6 +124,23 @@ export default function AgentConsolePage() {
     enabled: !!currentQueueItem?.contactId,
   });
 
+  // Fetch campaign details for qualification questions
+  const { data: campaignDetails } = useQuery<{
+    id: string;
+    name: string;
+    callScript?: string;
+    qualificationQuestions?: Array<{
+      id: string;
+      label: string;
+      type: 'select' | 'text' | 'number';
+      options?: Array<{ value: string; label: string }>;
+      required?: boolean;
+    }>;
+  }>({
+    queryKey: selectedCampaignId ? [`/api/campaigns/${selectedCampaignId}`] : [],
+    enabled: !!selectedCampaignId,
+  });
+
   // Extract unique campaigns from queue data
   const campaigns: Campaign[] = Array.from(
     new Map(queueData.map(item => [item.campaignId, { id: item.campaignId, name: item.campaignName }])).values()
@@ -523,30 +540,43 @@ export default function AgentConsolePage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 bg-muted/30 rounded-lg">
-                    <p className="text-base leading-relaxed">
-                      "Hello, this is [Your Name] calling from Pivotal CRM. May I speak with{' '}
-                      <span className="font-semibold text-primary">
-                        {currentQueueItem?.contactName || '[Contact Name]'}
-                      </span>?"
-                    </p>
-                  </div>
-                  <Separator />
-                  <div className="p-4 bg-muted/30 rounded-lg">
-                    <p className="text-base leading-relaxed">
-                      "I'm calling to discuss how our B2B solutions can help{' '}
-                      <span className="font-semibold text-primary">
-                        {currentQueueItem?.accountName || '[Company Name]'}
-                      </span>{' '}
-                      streamline their customer engagement and drive growth..."
-                    </p>
-                  </div>
-                  <div className="p-4 bg-muted/30 rounded-lg">
-                    <p className="text-base leading-relaxed">
-                      "We specialize in Account-Based Marketing and multi-channel campaign management. 
-                      Do you have a few minutes to discuss your current marketing challenges?"
-                    </p>
-                  </div>
+                  {campaignDetails?.callScript ? (
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <p className="text-base leading-relaxed whitespace-pre-line">
+                        {campaignDetails.callScript
+                          .replace(/\[Contact Name\]/gi, currentQueueItem?.contactName || '[Contact Name]')
+                          .replace(/\[Company Name\]/gi, currentQueueItem?.accountName || '[Company Name]')
+                        }
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <p className="text-base leading-relaxed">
+                          "Hello, this is [Your Name] calling from Pivotal CRM. May I speak with{' '}
+                          <span className="font-semibold text-primary">
+                            {currentQueueItem?.contactName || '[Contact Name]'}
+                          </span>?"
+                        </p>
+                      </div>
+                      <Separator />
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <p className="text-base leading-relaxed">
+                          "I'm calling to discuss how our B2B solutions can help{' '}
+                          <span className="font-semibold text-primary">
+                            {currentQueueItem?.accountName || '[Company Name]'}
+                          </span>{' '}
+                          streamline their customer engagement and drive growth..."
+                        </p>
+                      </div>
+                      <div className="p-4 bg-muted/30 rounded-lg">
+                        <p className="text-base leading-relaxed">
+                          "We specialize in Account-Based Marketing and multi-channel campaign management. 
+                          Do you have a few minutes to discuss your current marketing challenges?"
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
@@ -593,62 +623,58 @@ export default function AgentConsolePage() {
                     </Select>
                   </div>
 
-                  {/* Qualification Questions */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <Label htmlFor="budget" className="text-sm">Budget Range</Label>
-                      <Select
-                        value={qualificationData.budget || ''}
-                        onValueChange={(value) => setQualificationData({...qualificationData, budget: value})}
-                      >
-                        <SelectTrigger id="budget" data-testid="select-qual-budget">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="<10k">&lt; $10,000</SelectItem>
-                          <SelectItem value="10k-50k">$10,000 - $50,000</SelectItem>
-                          <SelectItem value="50k-100k">$50,000 - $100,000</SelectItem>
-                          <SelectItem value=">100k">&gt; $100,000</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  {/* Qualification Questions - Dynamic based on Campaign */}
+                  {campaignDetails?.qualificationQuestions && campaignDetails.qualificationQuestions.length > 0 && (
+                    <div className="space-y-3">
+                      <Label className="text-sm font-semibold">Qualification Questions</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {campaignDetails.qualificationQuestions.map((question) => (
+                          <div key={question.id}>
+                            <Label htmlFor={question.id} className="text-sm">
+                              {question.label}
+                              {question.required && <span className="text-destructive ml-1">*</span>}
+                            </Label>
+                            {question.type === 'select' && question.options ? (
+                              <Select
+                                value={qualificationData[question.id] || ''}
+                                onValueChange={(value) => setQualificationData({...qualificationData, [question.id]: value})}
+                              >
+                                <SelectTrigger id={question.id} data-testid={`select-qual-${question.id}`}>
+                                  <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {question.options.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : question.type === 'text' ? (
+                              <Textarea
+                                id={question.id}
+                                value={qualificationData[question.id] || ''}
+                                onChange={(e) => setQualificationData({...qualificationData, [question.id]: e.target.value})}
+                                placeholder={`Enter ${question.label.toLowerCase()}...`}
+                                className="min-h-[60px] resize-none text-sm"
+                                data-testid={`input-qual-${question.id}`}
+                              />
+                            ) : (
+                              <input
+                                type="number"
+                                id={question.id}
+                                value={qualificationData[question.id] || ''}
+                                onChange={(e) => setQualificationData({...qualificationData, [question.id]: e.target.value})}
+                                placeholder={`Enter ${question.label.toLowerCase()}...`}
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                data-testid={`input-qual-${question.id}`}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-
-                    <div>
-                      <Label htmlFor="timeline" className="text-sm">Decision Timeline</Label>
-                      <Select
-                        value={qualificationData.timeline || ''}
-                        onValueChange={(value) => setQualificationData({...qualificationData, timeline: value})}
-                      >
-                        <SelectTrigger id="timeline" data-testid="select-qual-timeline">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="immediate">Immediate (1-30 days)</SelectItem>
-                          <SelectItem value="short">Short-term (1-3 months)</SelectItem>
-                          <SelectItem value="medium">Medium-term (3-6 months)</SelectItem>
-                          <SelectItem value="long">Long-term (6+ months)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="interest" className="text-sm">Interest Level</Label>
-                      <Select
-                        value={qualificationData.interest || ''}
-                        onValueChange={(value) => setQualificationData({...qualificationData, interest: value})}
-                      >
-                        <SelectTrigger id="interest" data-testid="select-qual-interest">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="none">None</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Save Button */}
                   {(callStatus === 'wrap-up' || disposition) && (
