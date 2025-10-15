@@ -373,16 +373,16 @@ export default function AgentConsolePage() {
                   </p>
                 </div>
               ) : (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                <Card className="shadow-sm">
+                  <CardHeader className="pb-3 bg-gradient-to-b from-primary/5 to-transparent">
+                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3 shadow-sm">
                       <User className="h-8 w-8 text-primary" />
                     </div>
-                    <CardTitle className="text-center text-base" data-testid="text-contact-name">
+                    <CardTitle className="text-center text-base font-semibold" data-testid="text-contact-name">
                       {currentQueueItem.contactName || 'Unknown Contact'}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
+                  <CardContent className="space-y-3 text-sm pt-4">
                     {/* Job Title */}
                     {contactDetails?.jobTitle && (
                       <div className="flex items-start gap-2">
@@ -401,9 +401,11 @@ export default function AgentConsolePage() {
                       <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground">Email</p>
-                        <p className="font-medium truncate" data-testid="text-contact-email">
-                          {currentQueueItem.contactEmail || contactDetails?.email || 'No email'}
-                        </p>
+                        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                          <p className="font-medium text-sm whitespace-nowrap" data-testid="text-contact-email">
+                            {currentQueueItem.contactEmail || contactDetails?.email || 'No email'}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -412,7 +414,7 @@ export default function AgentConsolePage() {
                       <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground">Phone</p>
-                        <p className="font-medium font-mono" data-testid="text-contact-phone">
+                        <p className="font-medium font-mono text-sm tracking-wide" data-testid="text-contact-phone">
                           {currentQueueItem.contactPhone || 'No phone'}
                         </p>
                       </div>
@@ -423,7 +425,7 @@ export default function AgentConsolePage() {
                       <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground">Company</p>
-                        <p className="font-medium" data-testid="text-contact-company">
+                        <p className="font-medium text-sm" data-testid="text-contact-company">
                           {currentQueueItem.accountName || 'No company'}
                         </p>
                       </div>
@@ -455,11 +457,11 @@ export default function AgentConsolePage() {
 
               {/* Softphone Controls */}
               {currentQueueItem && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Softphone</CardTitle>
+                <Card className="shadow-sm border-primary/20">
+                  <CardHeader className="pb-3 bg-gradient-to-b from-primary/5 to-transparent">
+                    <CardTitle className="text-sm font-semibold">Softphone</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-3 pt-4">
                     {/* Call Duration */}
                     {callStatus === 'active' && (
                       <div className="text-center py-2">
@@ -529,18 +531,18 @@ export default function AgentConsolePage() {
           <ScrollArea className="flex-1">
             <div className="max-w-4xl mx-auto p-6 space-y-6">
               {/* Call Script - Large and Centered */}
-              <Card className="border-2">
-                <CardHeader className="pb-3">
+              <Card className="border-2 border-primary/20 shadow-md">
+                <CardHeader className="pb-3 bg-gradient-to-r from-primary/5 to-transparent">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <FileText className="h-5 w-5 text-primary" />
                       Call Script
                     </CardTitle>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pt-4">
                   {campaignDetails?.callScript ? (
-                    <div className="p-4 bg-muted/30 rounded-lg">
+                    <div className="p-5 bg-gradient-to-br from-muted/40 to-muted/20 rounded-lg border border-muted">
                       <p className="text-base leading-relaxed whitespace-pre-line">
                         {campaignDetails.callScript
                           .replace(/\[Contact Name\]/gi, currentQueueItem?.contactName || '[Contact Name]')
@@ -550,7 +552,7 @@ export default function AgentConsolePage() {
                     </div>
                   ) : (
                     <>
-                      <div className="p-4 bg-muted/30 rounded-lg">
+                      <div className="p-5 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
                         <p className="text-base leading-relaxed">
                           "Hello, this is [Your Name] calling from Pivotal CRM. May I speak with{' '}
                           <span className="font-semibold text-primary">
@@ -559,7 +561,7 @@ export default function AgentConsolePage() {
                         </p>
                       </div>
                       <Separator />
-                      <div className="p-4 bg-muted/30 rounded-lg">
+                      <div className="p-5 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/20 rounded-lg border border-purple-200/50 dark:border-purple-800/50">
                         <p className="text-base leading-relaxed">
                           "I'm calling to discuss how our B2B solutions can help{' '}
                           <span className="font-semibold text-primary">
@@ -568,7 +570,7 @@ export default function AgentConsolePage() {
                           streamline their customer engagement and drive growth..."
                         </p>
                       </div>
-                      <div className="p-4 bg-muted/30 rounded-lg">
+                      <div className="p-5 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 rounded-lg border border-green-200/50 dark:border-green-800/50">
                         <p className="text-base leading-relaxed">
                           "We specialize in Account-Based Marketing and multi-channel campaign management. 
                           Do you have a few minutes to discuss your current marketing challenges?"
@@ -580,13 +582,13 @@ export default function AgentConsolePage() {
               </Card>
 
               {/* Call Notes */}
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Call Notes</CardTitle>
+                  <CardTitle className="text-base font-semibold">Call Notes</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Textarea
-                    className="min-h-[100px] resize-none text-base"
+                    className="min-h-[100px] resize-none text-base focus:ring-2 focus:ring-primary/20"
                     placeholder="Enter call notes here..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -596,7 +598,7 @@ export default function AgentConsolePage() {
               </Card>
 
               {/* Disposition Section - Always Visible */}
-              <Card className={callStatus === 'wrap-up' ? 'border-2 border-primary' : ''}>
+              <Card className={callStatus === 'wrap-up' ? 'border-2 border-primary shadow-lg' : 'shadow-sm'}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
                     Call Disposition {callStatus === 'wrap-up' && <span className="text-destructive">*</span>}
