@@ -40,7 +40,7 @@ export default function TelemarketingCreatePage() {
     {
       id: "summary",
       title: "Summary",
-      description: "Review and launch your telemarketing campaign",
+      description: "Review and launch your dialer campaign",
       component: Step5Summary,
     },
   ];
@@ -56,7 +56,7 @@ export default function TelemarketingCreatePage() {
 
         toast({
           title: "Draft Saved",
-          description: "Your telemarketing campaign has been saved as a draft.",
+          description: "Your dialer campaign has been saved as a draft.",
         });
       } else {
         await apiRequest("POST", "/api/campaigns", {
@@ -67,7 +67,7 @@ export default function TelemarketingCreatePage() {
 
         toast({
           title: "Campaign Launched!",
-          description: "Your telemarketing campaign is now running. Agents can start calling.",
+          description: "Your dialer campaign is now running. Agents can start calling.",
         });
       }
 

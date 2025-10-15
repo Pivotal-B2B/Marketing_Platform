@@ -34,7 +34,7 @@ export default function PhoneCampaignsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       toast({
         title: "Campaign Launched",
-        description: "Your phone campaign is now active. Agents can start calling.",
+        description: "Your dialer campaign is now active. Agents can start calling.",
       });
     },
   });
@@ -57,9 +57,9 @@ export default function PhoneCampaignsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold" data-testid="heading-phone-campaigns">Phone Campaigns</h1>
+          <h1 className="text-3xl font-bold" data-testid="heading-phone-campaigns">Pipeline Dialer</h1>
           <p className="text-muted-foreground mt-1">
-            Create, manage, and track your telemarketing campaigns
+            Create, manage, and track your outbound dialing campaigns
           </p>
         </div>
         <Button onClick={() => setLocation("/campaigns/telemarketing/create")} data-testid="button-create-phone-campaign">
@@ -74,7 +74,7 @@ export default function PhoneCampaignsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search phone campaigns..."
+            placeholder="Search dialer campaigns..."
             className="pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -175,13 +175,13 @@ export default function PhoneCampaignsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Phone className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Phone Campaigns</h3>
+            <h3 className="text-lg font-semibold mb-2">No Dialer Campaigns</h3>
             <p className="text-muted-foreground mb-4">
-              {searchQuery ? "No campaigns match your search" : "Get started by creating your first phone campaign"}
+              {searchQuery ? "No campaigns match your search" : "Get started by creating your first dialer campaign"}
             </p>
             <Button onClick={() => setLocation("/campaigns/telemarketing/create")}>
               <Plus className="mr-2 h-4 w-4" />
-              Create Phone Campaign
+              Create Dialer Campaign
             </Button>
           </CardContent>
         </Card>
