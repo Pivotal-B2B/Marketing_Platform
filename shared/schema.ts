@@ -1,11 +1,11 @@
 // CRM Database Schema - referenced from blueprint:javascript_database
 import { sql } from "drizzle-orm";
-import { 
-  pgTable, 
-  text, 
-  varchar, 
-  timestamp, 
-  jsonb, 
+import {
+  pgTable,
+  text,
+  varchar,
+  timestamp,
+  jsonb,
   integer,
   pgEnum,
   index,
@@ -23,7 +23,7 @@ import { z } from "zod";
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', [
-  'admin', 
+  'admin',
   'agent',
   'quality_analyst',
   'content_creator',
@@ -34,47 +34,47 @@ export const campaignTypeEnum = pgEnum('campaign_type', ['email', 'call', 'combo
 export const accountCapModeEnum = pgEnum('account_cap_mode', ['queue_size', 'connected_calls', 'positive_disp']);
 export const queueStatusEnum = pgEnum('queue_status', ['queued', 'in_progress', 'done', 'removed']);
 export const campaignStatusEnum = pgEnum('campaign_status', [
-  'draft', 
-  'scheduled', 
-  'active', 
-  'paused', 
-  'completed', 
+  'draft',
+  'scheduled',
+  'active',
+  'paused',
+  'completed',
   'cancelled'
 ]);
 
 export const qaStatusEnum = pgEnum('qa_status', [
-  'new', 
-  'under_review', 
-  'approved', 
-  'rejected', 
-  'returned', 
+  'new',
+  'under_review',
+  'approved',
+  'rejected',
+  'returned',
   'published'
 ]);
 
 export const emailVerificationStatusEnum = pgEnum('email_verification_status', [
-  'unknown', 
-  'valid', 
-  'invalid', 
+  'unknown',
+  'valid',
+  'invalid',
   'risky'
 ]);
 
 export const orderStatusEnum = pgEnum('order_status', [
-  'draft', 
-  'submitted', 
-  'in_progress', 
-  'completed', 
+  'draft',
+  'submitted',
+  'in_progress',
+  'completed',
   'cancelled'
 ]);
 
 export const callDispositionEnum = pgEnum('call_disposition', [
-  'no_answer',
+  'no-answer',
   'busy',
   'voicemail',
   'connected',
-  'not_interested',
-  'callback_requested',
+  'not-interested',
+  'callback-requested',
   'qualified',
-  'dnc_request'
+  'dnc-request'
 ]);
 
 export const entityTypeEnum = pgEnum('entity_type', ['account', 'contact']);
@@ -98,14 +98,14 @@ export const sourceTypeEnum = pgEnum('source_type', ['segment', 'manual_upload',
 
 export const industryAIStatusEnum = pgEnum('industry_ai_status', [
   'pending',
-  'accepted', 
+  'accepted',
   'rejected',
   'partial'
 ]);
 
 export const filterFieldCategoryEnum = pgEnum('filter_field_category', [
   'contact_fields',
-  'account_fields', 
+  'account_fields',
   'suppression_fields',
   'email_campaign_fields',
   'telemarketing_campaign_fields',
@@ -343,13 +343,13 @@ export const accounts = pgTable("accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   nameNormalized: text("name_normalized"),
-  
+
   // Dual-Industry Field Strategy (Phase 8)
   industryStandardized: text("industry_standardized"),
   industrySecondary: text("industry_secondary").array(),
   industryCode: text("industry_code"),
   industryRaw: text("industry_raw"),
-  
+
   // AI Enrichment Fields
   industryAiSuggested: text("industry_ai_suggested"),
   industryAiCandidates: jsonb("industry_ai_candidates"),
@@ -360,13 +360,13 @@ export const accounts = pgTable("accounts", {
   industryAiReviewedBy: varchar("industry_ai_reviewed_by").references(() => users.id, { onDelete: 'set null' }),
   industryAiReviewedAt: timestamp("industry_ai_reviewed_at"),
   industryAiStatus: industryAIStatusEnum("industry_ai_status"),
-  
+
   annualRevenue: text("annual_revenue"),
   revenueRange: revenueRangeEnum("revenue_range"), // Pivotal Template: "$500M - $1B", "$1B+", etc.
   employeesSizeRange: staffCountRangeEnum("employees_size_range"), // Pivotal Template: "501-1000", "10000+", etc.
   staffCount: integer("staff_count"),
   description: text("description"),
-  
+
   // Pivotal B2B Standard Template - Company Location Fields
   hqStreet1: text("hq_street_1"),
   hqStreet2: text("hq_street_2"),
@@ -378,7 +378,7 @@ export const accounts = pgTable("accounts", {
   hqPostalCode: text("hq_postal_code"),
   hqCountry: text("hq_country"),
   companyLocation: text("company_location"), // Formatted: "5420 Wade Park Boulevard, Raleigh, NC 27607, United States"
-  
+
   yearFounded: integer("year_founded"),
   sicCode: text("sic_code"),
   naicsCode: text("naics_code"),
@@ -442,7 +442,7 @@ export const contacts = pgTable("contacts", {
   department: text("department"),
   address: text("address"),
   linkedinUrl: text("linkedin_url"),
-  
+
   // Career & Tenure fields (Pivotal B2B Standard Template)
   formerPosition: text("former_position"),
   timeInCurrentPosition: text("time_in_current_position"), // e.g., "2 years"
@@ -459,11 +459,11 @@ export const contacts = pgTable("contacts", {
   sourceSystem: text("source_system"),
   sourceRecordId: text("source_record_id"),
   sourceUpdatedAt: timestamp("source_updated_at"),
-  
+
   // Pivotal B2B Standard Template fields
   researchDate: timestamp("research_date"), // Explicit research/enrichment date
   list: text("list"), // Source list identifier (e.g., "InFynd", "ZoomInfo")
-  
+
   // Timezone & Business Hours fields
   timezone: text("timezone"), // IANA timezone (e.g., 'America/New_York')
   city: text("city"),
@@ -472,13 +472,13 @@ export const contacts = pgTable("contacts", {
   postalCode: text("postal_code"), // Postal/ZIP code
   country: text("country"),
   contactLocation: text("contact_location"), // Formatted location string (e.g., "Raleigh, NC 27607, USA")
-  
+
   // Data Quality fields
   isInvalid: boolean("is_invalid").notNull().default(false),
   invalidReason: text("invalid_reason"),
   invalidatedAt: timestamp("invalidated_at"),
   invalidatedBy: varchar("invalidated_by").references(() => users.id, { onDelete: 'set null' }),
-  
+
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -719,14 +719,20 @@ export const campaigns = pgTable("campaigns", {
   accountCapEnabled: boolean("account_cap_enabled").notNull().default(false),
   accountCapValue: integer("account_cap_value"),
   accountCapMode: accountCapModeEnum("account_cap_mode"),
-  
+
   // Retry Logic & Business Hours
   retryRules: jsonb("retry_rules"),  // { voicemail: {}, no_answer: {}, backoff: "", business_hours: {}, respect_local_tz: bool }
   timezone: text("timezone"),  // Campaign timezone (e.g., 'America/New_York')
-  
+
   // Business Hours Configuration for Auto-Dialer
   businessHoursConfig: jsonb("business_hours_config"), // { enabled: bool, timezone: string, operatingDays: string[], startTime: string, endTime: string, respectContactTimezone: bool, excludedDates: string[] }
-  
+
+  // New fields for campaign creation enhancement
+  targetQualifiedLeads: integer("target_qualified_leads"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  costPerLead: numeric("cost_per_lead"),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   launchedAt: timestamp("launched_at"),
@@ -2354,21 +2360,21 @@ export const sendPolicies = pgTable("send_policies", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   scope: sendPolicyScopeEnum("scope").default('tenant').notNull(),
-  
+
   // STO Settings
   stoMode: stoModeEnum("sto_mode").default('off').notNull(),
   stoWindowHours: integer("sto_window_hours").default(24),
-  
+
   // Batching Settings
   batchSize: integer("batch_size").default(5000),
   batchGapMinutes: integer("batch_gap_minutes").default(15),
   seedTestBatch: boolean("seed_test_batch").default(false),
-  
+
   // Throttling Settings
   globalTps: integer("global_tps").default(10),
   perDomainCaps: jsonb("per_domain_caps"), // { "gmail.com": 500, "outlook.com": 300 }
   frequencyCap: integer("frequency_cap"), // max emails per contact per week
-  
+
   status: text("status").default('active').notNull(), // 'active' or 'suspended'
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

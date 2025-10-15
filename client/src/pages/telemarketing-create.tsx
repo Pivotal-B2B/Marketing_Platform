@@ -97,6 +97,10 @@ export default function TelemarketingCreatePage() {
         accountCapEnabled: data.accountCap?.enabled || false,
         accountCapValue: data.accountCap?.enabled ? data.accountCap.leadsPerAccount : null,
         accountCapMode: data.accountCap?.enabled ? data.accountCap.mode : null,
+        targetQualifiedLeads: data.scheduling?.targetQualifiedLeads ? parseInt(data.scheduling.targetQualifiedLeads) : null,
+        startDate: data.scheduling?.startDate || null,
+        endDate: data.scheduling?.endDate || null,
+        costPerLead: data.scheduling?.costPerLead ? parseFloat(data.scheduling.costPerLead) : null,
       };
 
       await apiRequest("POST", "/api/campaigns", campaignPayload);

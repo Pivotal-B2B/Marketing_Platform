@@ -4,7 +4,7 @@ import {
   Users, 
   Megaphone,
   CheckCircle,
-  BarChart,
+  BarChart3, // Changed from BarChart to BarChart3
   Briefcase,
   Settings,
   LogOut,
@@ -20,6 +20,7 @@ import {
   UserCog,
   Mail,
   Headphones,
+  Activity, // Added Activity icon
 } from "lucide-react";
 import {
   Sidebar,
@@ -164,7 +165,7 @@ const getNavSections = (): NavSection[] => [
       {
         title: "Reports",
         url: "/reports",
-        icon: BarChart,
+        icon: BarChart3, // Changed from BarChart to BarChart3
         roles: ["admin", "campaign_manager", "qa_analyst", "client_user"],
       },
       {
@@ -172,6 +173,13 @@ const getNavSections = (): NavSection[] => [
         url: "/orders",
         icon: Briefcase,
         roles: ["admin", "campaign_manager", "client_user"],
+      },
+      // Added Engagement Analytics
+      {
+        title: "Engagement Analytics",
+        url: "/engagement-analytics",
+        icon: Activity, // Added Activity icon
+        roles: ["admin", "campaign_manager", "qa_analyst", "client_user"],
       },
     ],
   },
@@ -231,7 +239,7 @@ const filterSectionsByRoles = (sections: NavSection[], userRoles: string[]): Nav
   if (userRoles.includes('admin')) {
     return sections;
   }
-  
+
   return sections
     .filter(section => section.roles.some(role => userRoles.includes(role)))
     .map(section => ({

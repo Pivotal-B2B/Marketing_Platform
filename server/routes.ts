@@ -5,7 +5,7 @@ import { comparePassword, generateToken, requireAuth, requireRole, hashPassword 
 import webhooksRouter from "./routes/webhooks";
 import { z } from "zod";
 import { db } from "./db";
-import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments } from "@shared/schema";
+import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue } from "@shared/schema";
 import {
   insertAccountSchema,
   insertContactSchema,
@@ -4225,4 +4225,84 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to generate bulk tracking URLs" });
     }
   });
+
+  // ==================== ANALYTICS ====================
+
+  app.get("/api/analytics/engagement", requireAuth, async (req, res) => {
+    try {
+      const { from, to, campaign } = req.query;
+
+      // This is a comprehensive analytics aggregation
+      // You'll want to optimize this with materialized views in production
+
+      const analytics = {
+        email: {
+          total: 0,
+          sent: 0,
+          delivered: 0,
+          opened: 0,
+          clicked: 0,
+          bounced: 0,
+        },
+        calls: {
+          total: 0,
+          attempted: 0,
+          connected: 0,
+          qualified: 0,
+          avgDuration: 0,
+        },
+        leads: {
+          total: 0,
+          qualified: 0,
+          approved: 0,
+          pending: 0,
+          rejected: 0,
+        },
+        timeline: [],
+        channelBreakdown: [
+          { name: 'Email', value: 0 },
+          { name: 'Phone', value: 0 },
+          { name: 'Other', value: 0 },
+        ],
+        dispositions: [],
+        campaignLeads: {},
+      };
+
+      // Aggregate email stats
+      const emailCampaigns = await storage.getCampaigns();
+      analytics.email.total = emailCampaigns.filter(c => c.type === 'email').length;
+
+      // Aggregate call stats
+      const callCampaigns = emailCampaigns.filter(c => c.type === 'call');
+      analytics.calls.total = callCampaigns.length;
+
+      // Aggregate leads
+      const allLeads = await storage.getLeads();
+      analytics.leads.total = allLeads.length;
+      analytics.leads.approved = allLeads.filter(l => l.qaStatus === 'approved').length;
+      analytics.leads.pending = allLeads.filter(l => l.qaStatus === 'new' || l.qaStatus === 'under_review').length;
+      analytics.leads.rejected = allLeads.filter(l => l.qaStatus === 'rejected').length;
+
+      // Channel breakdown
+      analytics.channelBreakdown = [
+        { name: 'Email', value: emailCampaigns.filter(c => c.type === 'email').length },
+        { name: 'Phone', value: callCampaigns.length },
+      ];
+
+      // Campaign leads mapping
+      for (const campaign of emailCampaigns) {
+        const campaignLeads = allLeads.filter(l => l.campaignId === campaign.id);
+        analytics.campaignLeads[campaign.id] = campaignLeads.length;
+      }
+
+      res.json(analytics);
+    } catch (error) {
+      console.error('Analytics error:', error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  // ==================== WEBHOOKS ====================
+
+  app.use("/api/webhooks", webhooksRouter);
 }

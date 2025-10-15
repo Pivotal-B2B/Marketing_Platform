@@ -37,6 +37,7 @@ import SuppressionsPage from "@/pages/suppressions";
 import OrdersPage from "@/pages/orders";
 import ImportsPage from "@/pages/imports";
 import ReportsPage from "@/pages/reports";
+import EngagementAnalyticsPage from "@/pages/engagement-analytics";
 import SettingsPage from "@/pages/settings";
 import UserManagementPage from "@/pages/user-management";
 import EventsPage from "@/pages/events";
@@ -113,6 +114,7 @@ function AuthenticatedApp() {
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />
               <Route path="/reports" component={ReportsPage} />
+          <Route path="/engagement-analytics" component={EngagementAnalyticsPage} />
               <Route path="/settings/users" component={UserManagementPage} />
               <Route path="/settings/compliance" component={SettingsPage} />
               <Route path="/settings/integrations" component={SettingsPage} />
