@@ -45,7 +45,8 @@ export function useTelnyxWebRTC({
     }
 
     try {
-      const loginString = `${sipUsername}@${sipDomain}`;
+      // Username may already include @domain, so don't duplicate it
+      const loginString = sipUsername.includes('@') ? sipUsername : `${sipUsername}@${sipDomain}`;
       console.log('Telnyx WebRTC - Attempting connection with:', {
         login: loginString,
         domain: sipDomain,
