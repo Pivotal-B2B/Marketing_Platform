@@ -280,64 +280,202 @@ export function CSVImportDialog({
     }
   };
 
-  const downloadTemplate = () => {
-    const template = generateContactsWithAccountTemplate();
-    
-    downloadCSV(
-      template,
-      `contacts_with_accounts_template_${new Date().toISOString().split("T")[0]}.csv`
-    );
+  const downloadTemplate = async () => {
+    try {
+      // Fetch current custom fields configuration
+      const [contactFieldsRes, accountFieldsRes] = await Promise.all([
+        apiRequest("GET", "/api/custom-fields/contact"),
+        apiRequest("GET", "/api/custom-fields/account"),
+      ]);
 
-    toast({
-      title: "Template Downloaded",
-      description: "Contacts with Accounts CSV template has been downloaded",
-    });
+      const contactCustomFields = await contactFieldsRes.json() as Array<{ name: string; type: string }>;
+      const accountCustomFields = await accountFieldsRes.json() as Array<{ name: string; type: string }>;
+
+      // Build headers with custom fields
+      const headers = [
+        // Contact fields
+        "firstName",
+        "lastName", 
+        "fullName",
+        "email",
+        "directPhone",
+        "jobTitle",
+        "department",
+        "seniorityLevel",
+        "linkedinUrl",
+        "consentBasis",
+        "consentSource",
+        "tags",
+        // Contact custom fields (dynamic)
+        ...contactCustomFields.map(f => `custom_${f.name}`),
+        // Account fields (prefixed with account_)
+        "account_name",
+        "account_domain",
+        "account_industry",
+        "account_employeesSize",
+        "account_revenue",
+        "account_city",
+        "account_state",
+        "account_country",
+        "account_phone",
+        "account_linkedinUrl",
+        "account_description",
+        "account_techStack",
+        "account_tags",
+        // Account custom fields (dynamic)
+        ...accountCustomFields.map(f => `account_custom_${f.name}`),
+      ];
+
+      // Build sample row with examples
+      const sampleRow = [
+        // Contact data
+        "John",
+        "Doe",
+        "John Doe",
+        "john.doe@example.com",
+        "+14155551234",
+        "VP of Sales",
+        "Sales",
+        "Executive",
+        "https://linkedin.com/in/johndoe",
+        "legitimate_interest",
+        "Website Form",
+        "enterprise,vip",
+        // Contact custom fields examples
+        ...contactCustomFields.map(f => {
+          if (f.type === 'number') return "100";
+          if (f.type === 'date') return "2024-01-15";
+          if (f.type === 'boolean') return "true";
+          return `Sample ${f.name}`;
+        }),
+        // Account data
+        "Acme Corporation",
+        "acme.com",
+        "Technology",
+        "1000-5000",
+        "$50M-$100M",
+        "San Francisco",
+        "CA",
+        "United States",
+        "+14155559999",
+        "https://linkedin.com/company/acme",
+        "Leading technology company",
+        "Salesforce,HubSpot,AWS",
+        "Enterprise,Hot Lead",
+        // Account custom fields examples
+        ...accountCustomFields.map(f => {
+          if (f.type === 'number') return "250";
+          if (f.type === 'date') return "2024-06-01";
+          if (f.type === 'boolean') return "false";
+          return `Sample ${f.name}`;
+        }),
+      ];
+
+      const csv = [headers.join(","), sampleRow.join(",")].join("\n");
+      
+      downloadCSV(
+        csv,
+        `contacts_accounts_template_${new Date().toISOString().split("T")[0]}.csv`
+      );
+
+      toast({
+        title: "Template Downloaded",
+        description: `Template includes ${contactCustomFields.length} contact custom fields and ${accountCustomFields.length} account custom fields`,
+      });
+    } catch (error) {
+      console.error("Failed to generate template:", error);
+      // Fallback to basic template
+      const template = generateContactsWithAccountTemplate();
+      downloadCSV(
+        template,
+        `contacts_accounts_template_${new Date().toISOString().split("T")[0]}.csv`
+      );
+      
+      toast({
+        title: "Template Downloaded",
+        description: "Basic template downloaded (custom fields not included)",
+      });
+    }
   };
 
-  const downloadContactsOnlyTemplate = () => {
-    const headers = [
-      "firstName",
-      "lastName", 
-      "fullName",
-      "email",
-      "directPhone",
-      "jobTitle",
-      "department",
-      "seniorityLevel",
-      "linkedinUrl",
-      "consentBasis",
-      "consentSource",
-      "tags",
-      "customFields",
-    ];
+  const downloadContactsOnlyTemplate = async () => {
+    try {
+      // Fetch current custom fields configuration
+      const contactFieldsRes = await apiRequest("GET", "/api/custom-fields/contact");
+      const contactCustomFields = await contactFieldsRes.json() as Array<{ name: string; type: string }>;
 
-    const sampleRow = [
-      "John",
-      "Doe",
-      "John Doe",
-      "john.doe@example.com",
-      "+14155551234",
-      "VP of Sales",
-      "Sales",
-      "Executive",
-      "https://linkedin.com/in/johndoe",
-      "legitimate_interest",
-      "Website Form",
-      "enterprise,vip",
-      '{"favorite_color":"blue"}',
-    ];
+      const headers = [
+        "firstName",
+        "lastName", 
+        "fullName",
+        "email",
+        "directPhone",
+        "jobTitle",
+        "department",
+        "seniorityLevel",
+        "linkedinUrl",
+        "consentBasis",
+        "consentSource",
+        "tags",
+        // Dynamic custom fields
+        ...contactCustomFields.map(f => `custom_${f.name}`),
+      ];
 
-    const csv = [headers.join(","), sampleRow.join(",")].join("\n");
-    
-    downloadCSV(
-      csv,
-      `contacts_only_template_${new Date().toISOString().split("T")[0]}.csv`
-    );
+      const sampleRow = [
+        "John",
+        "Doe",
+        "John Doe",
+        "john.doe@example.com",
+        "+14155551234",
+        "VP of Sales",
+        "Sales",
+        "Executive",
+        "https://linkedin.com/in/johndoe",
+        "legitimate_interest",
+        "Website Form",
+        "enterprise,vip",
+        // Custom fields examples
+        ...contactCustomFields.map(f => {
+          if (f.type === 'number') return "100";
+          if (f.type === 'date') return "2024-01-15";
+          if (f.type === 'boolean') return "true";
+          return `Sample ${f.name}`;
+        }),
+      ];
 
-    toast({
-      title: "Template Downloaded",
-      description: "Contacts-only CSV template has been downloaded",
-    });
+      const csv = [headers.join(","), sampleRow.join(",")].join("\n");
+      
+      downloadCSV(
+        csv,
+        `contacts_only_template_${new Date().toISOString().split("T")[0]}.csv`
+      );
+
+      toast({
+        title: "Template Downloaded",
+        description: `Template includes ${contactCustomFields.length} custom fields from your settings`,
+      });
+    } catch (error) {
+      console.error("Failed to generate template:", error);
+      // Fallback to basic template
+      const headers = [
+        "firstName", "lastName", "fullName", "email", "directPhone",
+        "jobTitle", "department", "seniorityLevel", "linkedinUrl",
+        "consentBasis", "consentSource", "tags",
+      ];
+      const sampleRow = [
+        "John", "Doe", "John Doe", "john.doe@example.com", "+14155551234",
+        "VP of Sales", "Sales", "Executive", "https://linkedin.com/in/johndoe",
+        "legitimate_interest", "Website Form", "enterprise,vip",
+      ];
+      const csv = [headers.join(","), sampleRow.join(",")].join("\n");
+      
+      downloadCSV(csv, `contacts_only_template_${new Date().toISOString().split("T")[0]}.csv`);
+      
+      toast({
+        title: "Template Downloaded",
+        description: "Basic template downloaded (custom fields not included)",
+      });
+    }
   };
 
   const downloadErrorReport = () => {
@@ -416,7 +554,10 @@ export function CSVImportDialog({
                   <Download className="h-4 w-4" />
                   <AlertDescription>
                     <div className="space-y-3">
-                      <p className="font-medium">Download a template to get started:</p>
+                      <p className="font-medium">Download a sample template to see the exact format:</p>
+                      <p className="text-xs text-muted-foreground">
+                        Templates include all your custom fields from Settings with sample data
+                      </p>
                       <div className="flex gap-2">
                         <Button
                           variant="outline"
