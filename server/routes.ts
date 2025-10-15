@@ -453,6 +453,53 @@ export function registerRoutes(app: Express) {
         errors: [] as Array<{ index: number; error: string }>,
       };
 
+      // Step 1: Collect all unique domains and normalize them
+      const domainMap = new Map<string, any>();
+      records.forEach(record => {
+        if (record.account?.domain) {
+          const normalizedDomain = record.account.domain.trim().toLowerCase();
+          if (!domainMap.has(normalizedDomain)) {
+            domainMap.set(normalizedDomain, { ...record.account, domain: normalizedDomain });
+          }
+        }
+      });
+
+      // Step 2: Fetch all existing accounts by domains in one query
+      const domains = Array.from(domainMap.keys());
+      const existingAccounts = await storage.getAccountsByDomains(domains);
+      const accountsByDomain = new Map(existingAccounts.map(acc => [acc.domain!, acc]));
+
+      // Step 3: Create new accounts in bulk for domains that don't exist
+      const newAccountsToCreate: any[] = [];
+      for (const [domain, accountData] of domainMap) {
+        if (!accountsByDomain.has(domain) && (accountData.name || accountData.domain)) {
+          try {
+            const validatedAccount = insertAccountSchema.parse(accountData);
+            newAccountsToCreate.push(validatedAccount);
+          } catch (error) {
+            // Skip invalid account data
+          }
+        }
+      }
+
+      let newAccounts: any[] = [];
+      if (newAccountsToCreate.length > 0) {
+        newAccounts = await storage.createAccountsBulk(newAccountsToCreate);
+        newAccounts.forEach(acc => accountsByDomain.set(acc.domain!, acc));
+      }
+
+      // Step 4: Collect all emails and phones for bulk suppression checks
+      const emails = records.map(r => r.contact?.email).filter(Boolean);
+      const phones = records.map(r => r.contact?.directPhone || r.contact?.mobilePhone).filter(Boolean)
+        .map(phone => normalizePhoneE164(phone)).filter(Boolean);
+
+      const suppressedEmails = await storage.checkEmailSuppressionBulk(emails);
+      const suppressedPhones = await storage.checkPhoneSuppressionBulk(phones as string[]);
+
+      // Step 5: Validate and prepare contacts for bulk insert
+      const contactsToCreate: any[] = [];
+      const recordIndexMap = new Map<number, number>(); // maps contact array index to original record index
+
       for (let i = 0; i < records.length; i++) {
         try {
           const { contact: contactData, account: accountData } = records[i];
@@ -471,51 +518,59 @@ export function registerRoutes(app: Express) {
           }
 
           // Check email suppression
-          if (await storage.isEmailSuppressed(validatedContact.email)) {
+          if (suppressedEmails.has(validatedContact.email.toLowerCase())) {
             results.failed++;
             results.errors.push({ index: i, error: "Email is on suppression list" });
             continue;
           }
 
           // Check phone suppression if provided
-          if (validatedContact.directPhoneE164 && await storage.isPhoneSuppressed(validatedContact.directPhoneE164)) {
+          if (validatedContact.directPhoneE164 && suppressedPhones.has(validatedContact.directPhoneE164)) {
             results.failed++;
             results.errors.push({ index: i, error: "Phone is on DNC list" });
             continue;
           }
 
-          let account;
-
-          // Normalize domain (trim and lowercase) to prevent duplicates from casing
-          if (accountData.domain) {
-            accountData.domain = accountData.domain.trim().toLowerCase();
+          // Link contact to account if domain exists
+          if (accountData?.domain) {
+            const normalizedDomain = accountData.domain.trim().toLowerCase();
+            const account = accountsByDomain.get(normalizedDomain);
+            if (account) {
+              validatedContact.accountId = account.id;
+            }
           }
 
-          // Try to find existing account by domain first
-          if (accountData.domain) {
-            account = await storage.getAccountByDomain(accountData.domain);
-          }
-
-          // If not found and we have account data, create new account
-          if (!account && (accountData.name || accountData.domain)) {
-            const validatedAccount = insertAccountSchema.parse(accountData);
-            account = await storage.createAccount(validatedAccount);
-          }
-
-          // Link contact to account if found/created
-          if (account) {
-            validatedContact.accountId = account.id;
-          }
-
-          // Create contact
-          await storage.createContact(validatedContact);
-          results.success++;
+          recordIndexMap.set(contactsToCreate.length, i);
+          contactsToCreate.push(validatedContact);
         } catch (error) {
           results.failed++;
           results.errors.push({
             index: i,
             error: error instanceof Error ? error.message : "Unknown error"
           });
+        }
+      }
+
+      // Step 6: Create all contacts in bulk
+      if (contactsToCreate.length > 0) {
+        try {
+          await storage.createContactsBulk(contactsToCreate);
+          results.success = contactsToCreate.length;
+        } catch (error) {
+          // If bulk insert fails, fall back to individual inserts to identify specific failures
+          for (let i = 0; i < contactsToCreate.length; i++) {
+            try {
+              await storage.createContact(contactsToCreate[i]);
+              results.success++;
+            } catch (err) {
+              results.failed++;
+              const originalIndex = recordIndexMap.get(i) || i;
+              results.errors.push({
+                index: originalIndex,
+                error: err instanceof Error ? err.message : "Unknown error"
+              });
+            }
+          }
         }
       }
 

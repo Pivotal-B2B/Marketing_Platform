@@ -30,6 +30,12 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Audience Management:** Advanced multi-criteria filtering, dynamic segments, static lists, and domain set uploaders.
 - **Data Quality & Deduplication:** Deterministic upsert, normalization, source tracking, and soft deletes.
 - **Unified CSV Import/Export System with Field Mapping:** RFC4180-compliant CSV parsing with smart field mapping, batch processing, and intelligent matching. Auto-detects Pivotal B2B Standard Template columns.
+  - **Bulk Database Operations Optimization:** Dramatically improved CSV import performance using bulk inserts and batch queries:
+    - Single bulk query to fetch existing accounts by domains (vs N individual queries)
+    - Single bulk insert for new accounts (vs N individual inserts)
+    - Bulk email and phone suppression checks (2 queries vs 2N queries)
+    - Single bulk insert for contacts (vs N individual inserts)
+    - Reduces database round-trips from O(N) to O(1) where N is number of records
 - **Bulk Operations:** Multi-page record selection with bulk actions (Export, Add to List, Update, Delete).
 - **Campaign Management:**
     - **Email:** HTML editor, personalization, tracking, pre-send guards, mandatory unsubscribe.

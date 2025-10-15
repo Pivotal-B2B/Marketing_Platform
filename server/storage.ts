@@ -99,7 +99,9 @@ export interface IStorage {
   getAccount(id: string): Promise<Account | undefined>;
   getAccountsByIds(ids: string[]): Promise<Account[]>;
   getAccountByDomain(domain: string): Promise<Account | undefined>;
+  getAccountsByDomains(domains: string[]): Promise<Account[]>;
   createAccount(account: InsertAccount): Promise<Account>;
+  createAccountsBulk(accounts: InsertAccount[]): Promise<Account[]>;
   updateAccount(id: string, account: Partial<InsertAccount>): Promise<Account | undefined>;
   deleteAccount(id: string): Promise<void>;
 
@@ -109,6 +111,7 @@ export interface IStorage {
   getContactsByIds(ids: string[]): Promise<Contact[]>;
   getContactsByAccountId(accountId: string): Promise<Contact[]>;
   createContact(contact: InsertContact): Promise<Contact>;
+  createContactsBulk(contacts: InsertContact[]): Promise<Contact[]>;
   updateContact(id: string, contact: Partial<InsertContact>): Promise<Contact | undefined>;
   deleteContact(id: string): Promise<void>;
 
@@ -273,10 +276,12 @@ export interface IStorage {
   addEmailSuppression(suppression: InsertSuppressionEmail): Promise<SuppressionEmail>;
   deleteEmailSuppression(id: number): Promise<void>;
   isEmailSuppressed(email: string): Promise<boolean>;
+  checkEmailSuppressionBulk(emails: string[]): Promise<Set<string>>;
   getPhoneSuppressions(): Promise<SuppressionPhone[]>;
   addPhoneSuppression(suppression: InsertSuppressionPhone): Promise<SuppressionPhone>;
   deletePhoneSuppression(id: number): Promise<void>;
   isPhoneSuppressed(phoneE164: string): Promise<boolean>;
+  checkPhoneSuppressionBulk(phonesE164: string[]): Promise<Set<string>>;
 
   // Campaign Orders
   getCampaignOrders(filters?: any): Promise<CampaignOrder[]>;
@@ -530,9 +535,19 @@ export class DatabaseStorage implements IStorage {
     return account || undefined;
   }
 
+  async getAccountsByDomains(domains: string[]): Promise<Account[]> {
+    if (domains.length === 0) return [];
+    return await db.select().from(accounts).where(inArray(accounts.domain, domains));
+  }
+
   async createAccount(insertAccount: InsertAccount): Promise<Account> {
     const [account] = await db.insert(accounts).values(insertAccount).returning();
     return account;
+  }
+
+  async createAccountsBulk(insertAccounts: InsertAccount[]): Promise<Account[]> {
+    if (insertAccounts.length === 0) return [];
+    return await db.insert(accounts).values(insertAccounts).returning();
   }
 
   async updateAccount(id: string, updateData: Partial<InsertAccount>): Promise<Account | undefined> {
@@ -617,6 +632,11 @@ export class DatabaseStorage implements IStorage {
   async createContact(insertContact: InsertContact): Promise<Contact> {
     const [contact] = await db.insert(contacts).values(insertContact).returning();
     return contact;
+  }
+
+  async createContactsBulk(insertContacts: InsertContact[]): Promise<Contact[]> {
+    if (insertContacts.length === 0) return [];
+    return await db.insert(contacts).values(insertContacts).returning();
   }
 
   async updateContact(id: string, updateData: Partial<InsertContact>): Promise<Contact | undefined> {
@@ -2462,6 +2482,18 @@ export class DatabaseStorage implements IStorage {
     return !!result;
   }
 
+  async checkEmailSuppressionBulk(emails: string[]): Promise<Set<string>> {
+    if (emails.length === 0) return new Set();
+    
+    const normalizedEmails = emails.map(e => e.toLowerCase());
+    const suppressedRecords = await db
+      .select()
+      .from(suppressionEmails)
+      .where(inArray(suppressionEmails.email, normalizedEmails));
+    
+    return new Set(suppressedRecords.map(r => r.email));
+  }
+
   async getPhoneSuppressions(): Promise<SuppressionPhone[]>{
     return await db.select().from(suppressionPhones).orderBy(desc(suppressionPhones.createdAt));
   }
@@ -2482,6 +2514,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(suppressionPhones.phoneE164, phoneE164))
       .limit(1);
     return !!result;
+  }
+
+  async checkPhoneSuppressionBulk(phonesE164: string[]): Promise<Set<string>> {
+    if (phonesE164.length === 0) return new Set();
+    
+    const suppressedRecords = await db
+      .select()
+      .from(suppressionPhones)
+      .where(inArray(suppressionPhones.phoneE164, phonesE164));
+    
+    return new Set(suppressedRecords.map(r => r.phoneE164));
   }
 
   // Campaign Orders
