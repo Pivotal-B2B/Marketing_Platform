@@ -5,7 +5,7 @@ import { comparePassword, generateToken, requireAuth, requireRole, hashPassword 
 import webhooksRouter from "./routes/webhooks";
 import { z } from "zod";
 import { db } from "./db";
-import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems } from "@shared/schema";
+import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users } from "@shared/schema";
 import {
   insertAccountSchema,
   insertContactSchema,
@@ -51,9 +51,26 @@ export function registerRoutes(app: Express) {
 
   // ==================== USERS (Admin Only) ====================
 
-  // Get all users (authenticated users can view, needed for agent assignment in campaigns)
+  // Get all users or find by email
   app.get("/api/users", requireAuth, async (req, res) => {
     try {
+      const { email } = req.query;
+
+      if (email) {
+        // Find user by email
+        const user = await db.select().from(users).where(eq(users.email, email as string)).limit(1);
+        if (user.length === 0) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        const { password, ...userWithoutPassword } = user[0];
+        return res.json(userWithoutPassword);
+      }
+
+      // Admin only for listing all users
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
       const allUsers = await storage.getUsers();
       // Return sanitized user data (exclude password)
       const sanitizedUsers = allUsers.map(user => {
@@ -1524,7 +1541,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/campaigns/:id/queue/assign", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { agentIds, mode = 'round_robin' } = req.body;
-      
+
       if (!agentIds || !Array.isArray(agentIds) || agentIds.length === 0) {
         return res.status(400).json({ message: "agentIds array is required" });
       }
