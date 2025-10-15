@@ -35,6 +35,13 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
 - **Pivotal B2B Standard Master Data Template:** 100% compatibility with internal data standard. 25 contact fields (Research Date, Full Name, Title, Email/Phone with AI confidence scores, location, tenure) and 21 account fields (Company location, revenue ranges, LinkedIn IDs, SIC/NAICS codes). Automated CSV field mapping recognizes exact template headers.
 - **Audience Management:** Advanced multi-criteria filtering, dynamic segments, static lists, and domain set uploaders.
+- **Advanced Filtering System:** Comprehensive server-side filtering infrastructure with 54 filter fields across 9 categories:
+    - **Filter Field Registry:** Database-driven filter field definitions with metadata (category, operators, value types)
+    - **Categories:** contact_fields (15), account_fields (14), account_relationship (2), suppression_fields (3), email_campaign_fields (6), telemarketing_campaign_fields (4), qa_fields (3), list_segment_fields (2), client_portal_fields (5)
+    - **Query Builder:** Type-safe SQL query construction via buildFilterQuery supporting accounts, contacts, and leads tables
+    - **API Integration:** Filter support on all major endpoints (/api/contacts, /api/accounts, /api/leads) with JSON filter group format
+    - **Operators:** Comprehensive operator support (equals, contains, greater_than, before, in, is_empty, etc.) based on field type
+    - **Frontend Component:** AdvancedFilterBar with field selection, operator selection, value input, and filter chips
 - **Data Quality & Deduplication:** Deterministic upsert, normalization, source tracking, and soft deletes.
 - **Unified CSV Import/Export System with Field Mapping:** RFC4180-compliant CSV parsing with smart field mapping, batch processing, and intelligent matching. Auto-detects Pivotal B2B Standard Template columns.
   - **Bulk Database Operations Optimization:** Dramatically improved CSV import performance using bulk inserts and batch queries:
