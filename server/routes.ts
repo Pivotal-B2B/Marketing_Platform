@@ -5,7 +5,7 @@ import { comparePassword, generateToken, requireAuth, requireRole, hashPassword 
 import webhooksRouter from "./routes/webhooks";
 import { z } from "zod";
 import { db } from "./db";
-import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users } from "@shared/schema";
+import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments } from "@shared/schema";
 import {
   insertAccountSchema,
   insertContactSchema,
@@ -1721,14 +1721,24 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "No contacts found in campaign audience" });
       }
 
-      // Enqueue all contacts
+      // Filter out contacts without accountId
+      const validContacts = uniqueContacts.filter(c => c.accountId);
+      const skippedCount = uniqueContacts.length - validContacts.length;
+
+      if (validContacts.length === 0) {
+        return res.status(400).json({ 
+          message: "No contacts with account IDs found. All contacts must be associated with an account." 
+        });
+      }
+
+      // Enqueue all valid contacts
       const enqueued = [];
-      for (const contact of uniqueContacts) {
+      for (const contact of validContacts) {
         try {
           const queueItem = await storage.enqueueContact(
             req.params.id,
             contact.id,
-            contact.accountId,
+            contact.accountId!,
             0 // default priority
           );
           enqueued.push(queueItem);

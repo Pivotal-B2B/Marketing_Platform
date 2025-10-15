@@ -212,16 +212,11 @@ export default function PhoneCampaignsPage() {
   const toggleStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const newStatus = status === 'active' ? 'paused' : 'active';
-      const res = await fetch(`/api/campaigns/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error("Failed to update campaign status");
-      return res.json();
+      return await apiRequest('PATCH', `/api/campaigns/${id}`, { status: newStatus });
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/queue-stats"] });
       const newStatus = variables.status === 'active' ? 'paused' : 'active';
       toast({
         title: "Success",
@@ -289,11 +284,12 @@ export default function PhoneCampaignsPage() {
     mutationFn: async ({ campaignId }: { campaignId: string }) => {
       return await apiRequest('POST', `/api/campaigns/${campaignId}/queue/populate`, {});
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/queue-stats"] });
       toast({
         title: "Queue Populated",
-        description: "Campaign queue has been populated from audience.",
+        description: data?.message || `Successfully populated queue with ${data?.enqueuedCount || 0} contacts`,
       });
     },
     onError: (error: any) => {
@@ -424,7 +420,7 @@ export default function PhoneCampaignsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => toggleStatusMutation.mutate({ id: campaign.id, status: campaign.status })}
+                        onClick={() => toggleStatusMutation.mutate({ id: campaign.id.toString(), status: campaign.status })}
                         disabled={toggleStatusMutation.isPending}
                         data-testid={`button-pause-campaign-${campaign.id}`}
                       >
@@ -436,7 +432,7 @@ export default function PhoneCampaignsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => toggleStatusMutation.mutate({ id: campaign.id, status: campaign.status })}
+                        onClick={() => toggleStatusMutation.mutate({ id: campaign.id.toString(), status: campaign.status })}
                         disabled={toggleStatusMutation.isPending}
                         data-testid={`button-resume-campaign-${campaign.id}`}
                       >
@@ -512,7 +508,7 @@ export default function PhoneCampaignsPage() {
                       size="sm"
                       variant="outline"
                       className="flex-1"
-                      onClick={() => toggleStatusMutation.mutate({ id: campaign.id, status: campaign.status })}
+                      onClick={() => toggleStatusMutation.mutate({ id: campaign.id.toString(), status: campaign.status })}
                       disabled={toggleStatusMutation.isPending}
                       data-testid={`button-pause-${campaign.id}`}
                     >
@@ -548,6 +544,17 @@ export default function PhoneCampaignsPage() {
                         <DropdownMenuLabel>Campaign Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedCampaign(campaign);
+                            populateQueueMutation.mutate({ campaignId: campaign.id.toString() });
+                          }}
+                          disabled={populateQueueMutation.isPending}
+                          data-testid={`menu-populate-queue-${campaign.id}`}
+                        >
+                          <Users className="w-4 h-4 mr-2" />
+                          Populate Queue
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           onClick={() => duplicateMutation.mutate(campaign)}
                           disabled={duplicateMutation.isPending}
                           data-testid={`menu-duplicate-${campaign.id}`}
@@ -557,7 +564,7 @@ export default function PhoneCampaignsPage() {
                         </DropdownMenuItem>
                         {(campaign.status === 'active' || campaign.status === 'paused') && (
                           <DropdownMenuItem
-                            onClick={() => completeMutation.mutate(campaign.id)}
+                            onClick={() => completeMutation.mutate(campaign.id.toString())}
                             disabled={completeMutation.isPending}
                             data-testid={`menu-complete-${campaign.id}`}
                           >
@@ -569,7 +576,7 @@ export default function PhoneCampaignsPage() {
                         <DropdownMenuItem
                           onClick={() => {
                             if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
-                              deleteMutation.mutate(campaign.id);
+                              deleteMutation.mutate(campaign.id.toString());
                             }
                           }}
                           disabled={deleteMutation.isPending}
