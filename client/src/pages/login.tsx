@@ -128,6 +128,16 @@ export default function LoginPage() {
                 'Sign In'
               )}
             </Button>
+            <div className="text-center">
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => setLocation("/register")}
+                data-testid="link-register"
+              >
+                Need to create an account? Register here
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
