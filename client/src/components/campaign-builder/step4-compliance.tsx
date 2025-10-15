@@ -2,8 +2,12 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, CheckCircle, XCircle, AlertCircle, Shield } from "lucide-react";
+import { ChevronRight, CheckCircle, XCircle, AlertCircle, Shield, Users } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface Step4Props {
   data: any;
@@ -23,6 +27,11 @@ export function Step4Compliance({ data, onNext, campaignType }: Step4Props) {
   const [checks, setChecks] = useState<ComplianceCheck[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
+  
+  // Account Lead Cap state
+  const [capEnabled, setCapEnabled] = useState(data.accountCap?.enabled || false);
+  const [leadsPerAccount, setLeadsPerAccount] = useState<number>(data.accountCap?.leadsPerAccount || 3);
+  const [capMode, setCapMode] = useState<string>(data.accountCap?.mode || 'queue_size');
 
   const emailChecks: ComplianceCheck[] = [
     {
@@ -166,11 +175,138 @@ export function Step4Compliance({ data, onNext, campaignType }: Step4Props) {
         checks: checks.map((c) => ({ id: c.id, status: c.status })),
         passed: allChecksPassed,
       },
+      accountCap: {
+        enabled: capEnabled,
+        leadsPerAccount: capEnabled ? leadsPerAccount : null,
+        mode: capEnabled ? capMode : null,
+      },
     });
   };
 
   return (
     <div className="space-y-6">
+      {/* Account Lead Cap (Telemarketing Only) */}
+      {campaignType === "telemarketing" && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>
+                  <Users className="w-5 h-5 inline mr-2" />
+                  Account Lead Cap
+                </CardTitle>
+                <CardDescription>
+                  Intelligently distribute contacts and prevent over-contacting accounts
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Enable/Disable Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="cap-enabled" className="text-base">
+                  Enable Account Lead Cap
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Limit the number of contacts attempted per account to avoid over-saturation
+                </p>
+              </div>
+              <Switch
+                id="cap-enabled"
+                checked={capEnabled}
+                onCheckedChange={setCapEnabled}
+                data-testid="switch-account-cap-enabled"
+              />
+            </div>
+
+            {/* Cap Configuration (shown when enabled) */}
+            {capEnabled && (
+              <div className="space-y-6 pt-4 border-t">
+                {/* Leads Per Account */}
+                <div className="space-y-2">
+                  <Label htmlFor="leads-per-account">
+                    Leads Per Account
+                  </Label>
+                  <Input
+                    id="leads-per-account"
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={leadsPerAccount}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 1;
+                      setLeadsPerAccount(Math.min(100, Math.max(1, value)));
+                    }}
+                    data-testid="input-leads-per-account"
+                    className="max-w-xs"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Maximum number of contacts to attempt per account
+                  </p>
+                </div>
+
+                {/* Cap Mode */}
+                <div className="space-y-3">
+                  <Label>Cap Enforcement Mode</Label>
+                  <RadioGroup value={capMode} onValueChange={setCapMode}>
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate">
+                      <RadioGroupItem value="queue_size" id="mode-queue" data-testid="radio-mode-queue" />
+                      <div className="flex-1">
+                        <Label htmlFor="mode-queue" className="font-medium cursor-pointer">
+                          Queue Size
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Limit based on number of contacts currently queued for the account
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate">
+                      <RadioGroupItem value="connected_calls" id="mode-connected" data-testid="radio-mode-connected" />
+                      <div className="flex-1">
+                        <Label htmlFor="mode-connected" className="font-medium cursor-pointer">
+                          Connected Calls
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Limit based on successful connections (answered calls)
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate">
+                      <RadioGroupItem value="positive_disp" id="mode-positive" data-testid="radio-mode-positive" />
+                      <div className="flex-1">
+                        <Label htmlFor="mode-positive" className="font-medium cursor-pointer">
+                          Positive Dispositions
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Limit based on positive outcomes (interested, scheduled, qualified)
+                        </p>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                  
+                  <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-blue-500 mt-0.5" />
+                      <div className="text-sm text-blue-600 dark:text-blue-400">
+                        <p className="font-medium">Cap Mode Selection</p>
+                        <p className="text-blue-600/80 dark:text-blue-400/80 mt-1">
+                          {capMode === 'queue_size' && 'Contacts will be queued until limit is reached. Best for controlling overall account exposure.'}
+                          {capMode === 'connected_calls' && 'Cap applies after successful connections. Best for ensuring meaningful conversations.'}
+                          {capMode === 'positive_disp' && 'Cap applies only to positive outcomes. Best for quality-focused campaigns.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Compliance Header */}
       <Card>
         <CardHeader>
