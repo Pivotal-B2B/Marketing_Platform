@@ -81,7 +81,8 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+  updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
+
   // Accounts
   getAccounts(filters?: FilterGroup): Promise<Account[]>;
   getAccount(id: string): Promise<Account | undefined>;
@@ -89,7 +90,7 @@ export interface IStorage {
   createAccount(account: InsertAccount): Promise<Account>;
   updateAccount(id: string, account: Partial<InsertAccount>): Promise<Account | undefined>;
   deleteAccount(id: string): Promise<void>;
-  
+
   // Contacts
   getContacts(filters?: FilterGroup): Promise<Contact[]>;
   getContact(id: string): Promise<Contact | undefined>;
@@ -97,32 +98,32 @@ export interface IStorage {
   createContact(contact: InsertContact): Promise<Contact>;
   updateContact(id: string, contact: Partial<InsertContact>): Promise<Contact | undefined>;
   deleteContact(id: string): Promise<void>;
-  
+
   // Custom Field Definitions
   getCustomFieldDefinitions(entityType?: 'account' | 'contact'): Promise<CustomFieldDefinition[]>;
   getCustomFieldDefinition(id: string): Promise<CustomFieldDefinition | undefined>;
   createCustomFieldDefinition(definition: InsertCustomFieldDefinition): Promise<CustomFieldDefinition>;
   updateCustomFieldDefinition(id: string, definition: Partial<InsertCustomFieldDefinition>): Promise<CustomFieldDefinition | undefined>;
   deleteCustomFieldDefinition(id: string): Promise<void>;
-  
+
   // Campaigns
   getCampaigns(filters?: any): Promise<Campaign[]>;
   getCampaign(id: string): Promise<Campaign | undefined>;
   createCampaign(campaign: InsertCampaign): Promise<Campaign>;
   updateCampaign(id: string, campaign: Partial<InsertCampaign>): Promise<Campaign | undefined>;
   deleteCampaign(id: string): Promise<void>;
-  
+
   // Campaign Audience Snapshots
   createCampaignAudienceSnapshot(snapshot: InsertCampaignAudienceSnapshot): Promise<CampaignAudienceSnapshot>;
   getCampaignAudienceSnapshots(campaignId: string): Promise<CampaignAudienceSnapshot[]>;
-  
+
   // Sender Profiles
   getSenderProfiles(): Promise<SenderProfile[]>;
   getSenderProfile(id: string): Promise<SenderProfile | undefined>;
   createSenderProfile(profile: InsertSenderProfile): Promise<SenderProfile>;
   updateSenderProfile(id: string, profile: Partial<InsertSenderProfile>): Promise<SenderProfile | undefined>;
   deleteSenderProfile(id: string): Promise<void>;
-  
+
   // Email Templates
   getEmailTemplates(): Promise<EmailTemplate[]>;
   getEmailTemplate(id: string): Promise<EmailTemplate | undefined>;
@@ -130,71 +131,71 @@ export interface IStorage {
   updateEmailTemplate(id: string, template: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined>;
   approveEmailTemplate(id: string, approvedById: string): Promise<EmailTemplate | undefined>;
   deleteEmailTemplate(id: string): Promise<void>;
-  
+
   // Email Sends
   getEmailSends(campaignId?: string): Promise<EmailSend[]>;
   getEmailSend(id: string): Promise<EmailSend | undefined>;
   createEmailSend(send: InsertEmailSend): Promise<EmailSend>;
   updateEmailSend(id: string, send: Partial<InsertEmailSend>): Promise<EmailSend | undefined>;
-  
+
   // Email Events
   createEmailEvent(event: InsertEmailEvent): Promise<EmailEvent>;
   getEmailEvents(sendId: string): Promise<EmailEvent[]>;
-  
+
   // Call Scripts
   getCallScripts(campaignId?: string): Promise<CallScript[]>;
   getCallScript(id: string): Promise<CallScript | undefined>;
   createCallScript(script: InsertCallScript): Promise<CallScript>;
   updateCallScript(id: string, script: Partial<InsertCallScript>): Promise<CallScript | undefined>;
   deleteCallScript(id: string): Promise<void>;
-  
+
   // Call Attempts
   getCallAttempts(campaignId?: string, agentId?: string): Promise<CallAttempt[]>;
   getCallAttempt(id: string): Promise<CallAttempt | undefined>;
   createCallAttempt(attempt: InsertCallAttempt): Promise<CallAttempt>;
   updateCallAttempt(id: string, attempt: Partial<InsertCallAttempt>): Promise<CallAttempt | undefined>;
-  
+
   // Call Events
   createCallEvent(event: InsertCallEvent): Promise<CallEvent>;
   getCallEvents(attemptId: string): Promise<CallEvent[]>;
-  
+
   // Softphone Profiles (Phase 27)
   getSoftphoneProfile(userId: string): Promise<SoftphoneProfile | undefined>;
   upsertSoftphoneProfile(profile: InsertSoftphoneProfile): Promise<SoftphoneProfile>;
-  
+
   // Call Recording Access Logs (Phase 27)
   createCallRecordingAccessLog(log: InsertCallRecordingAccessLog): Promise<CallRecordingAccessLog>;
   getCallRecordingAccessLogs(callAttemptId: string): Promise<CallRecordingAccessLog[]>;
-  
+
   // Campaign Content Links (Resources Centre Integration)
   getCampaignContentLinks(campaignId: string): Promise<CampaignContentLink[]>;
   getCampaignContentLink(id: number): Promise<CampaignContentLink | undefined>;
   createCampaignContentLink(link: InsertCampaignContentLink): Promise<CampaignContentLink>;
   deleteCampaignContentLink(id: number): Promise<void>;
-  
+
   // Speakers, Organizers, Sponsors
   getSpeakers(): Promise<Speaker[]>;
   getSpeaker(id: number): Promise<Speaker | undefined>;
   createSpeaker(speaker: InsertSpeaker): Promise<Speaker>;
   updateSpeaker(id: number, speaker: Partial<InsertSpeaker>): Promise<Speaker | undefined>;
   deleteSpeaker(id: number): Promise<void>;
-  
+
   getOrganizers(): Promise<Organizer[]>;
   getOrganizer(id: number): Promise<Organizer | undefined>;
   createOrganizer(organizer: InsertOrganizer): Promise<Organizer>;
   updateOrganizer(id: number, organizer: Partial<InsertOrganizer>): Promise<Organizer | undefined>;
   deleteOrganizer(id: number): Promise<void>;
-  
+
   getSponsors(): Promise<Sponsor[]>;
   getSponsor(id: number): Promise<Sponsor | undefined>;
   createSponsor(sponsor: InsertSponsor): Promise<Sponsor>;
   updateSponsor(id: number, sponsor: Partial<InsertSponsor>): Promise<Sponsor | undefined>;
   deleteSponsor(id: number): Promise<void>;
-  
+
   // Qualification Responses
   createQualificationResponse(response: InsertQualificationResponse): Promise<QualificationResponse>;
   getQualificationResponses(attemptId?: string, leadId?: string): Promise<QualificationResponse[]>;
-  
+
   // Segments
   getSegments(filters?: any): Promise<Segment[]>;
   getSegment(id: string): Promise<Segment | undefined>;
@@ -203,7 +204,7 @@ export interface IStorage {
   deleteSegment(id: string): Promise<void>;
   previewSegment(entityType: 'contact' | 'account', criteria: any): Promise<{ count: number; sampleIds: string[] }>;
   convertSegmentToList(segmentId: string, listName: string, listDescription?: string): Promise<List>;
-  
+
   // Lists
   getLists(filters?: any): Promise<List[]>;
   getList(id: string): Promise<List | undefined>;
@@ -211,14 +212,14 @@ export interface IStorage {
   updateList(id: string, list: Partial<InsertList>): Promise<List | undefined>;
   deleteList(id: string): Promise<void>;
   exportList(listId: string, format: 'csv' | 'json'): Promise<{ data: any; filename: string }>;
-  
+
   // Domain Sets
   getDomainSets(filters?: any): Promise<DomainSet[]>;
   getDomainSet(id: string): Promise<DomainSet | undefined>;
   createDomainSet(domainSet: InsertDomainSet): Promise<DomainSet>;
   updateDomainSet(id: string, domainSet: Partial<InsertDomainSet>): Promise<DomainSet | undefined>;
   deleteDomainSet(id: string): Promise<void>;
-  
+
   // Leads
   getLeads(filters?: any): Promise<Lead[]>;
   getLead(id: string): Promise<Lead | undefined>;
@@ -226,7 +227,7 @@ export interface IStorage {
   updateLead(id: string, lead: Partial<InsertLead>): Promise<Lead | undefined>;
   approveLead(id: string, approvedById: string): Promise<Lead | undefined>;
   rejectLead(id: string, reason: string): Promise<Lead | undefined>;
-  
+
   // Suppressions
   getEmailSuppressions(): Promise<SuppressionEmail[]>;
   addEmailSuppression(suppression: InsertSuppressionEmail): Promise<SuppressionEmail>;
@@ -236,94 +237,94 @@ export interface IStorage {
   addPhoneSuppression(suppression: InsertSuppressionPhone): Promise<SuppressionPhone>;
   deletePhoneSuppression(id: number): Promise<void>;
   isPhoneSuppressed(phoneE164: string): Promise<boolean>;
-  
+
   // Campaign Orders
   getCampaignOrders(filters?: any): Promise<CampaignOrder[]>;
   getCampaignOrder(id: string): Promise<CampaignOrder | undefined>;
   createCampaignOrder(order: InsertCampaignOrder): Promise<CampaignOrder>;
   updateCampaignOrder(id: string, order: Partial<InsertCampaignOrder>): Promise<CampaignOrder | undefined>;
-  
+
   // Order Campaign Links (Bridge Model)
   getOrderCampaignLinks(orderId: string): Promise<OrderCampaignLink[]>;
   createOrderCampaignLink(link: InsertOrderCampaignLink): Promise<OrderCampaignLink>;
   deleteOrderCampaignLink(id: string): Promise<void>;
-  
+
   // Bulk Imports
   getBulkImports(): Promise<BulkImport[]>;
   createBulkImport(bulkImport: InsertBulkImport): Promise<BulkImport>;
   getBulkImport(id: string): Promise<BulkImport | undefined>;
   updateBulkImport(id: string, bulkImport: Partial<InsertBulkImport>): Promise<BulkImport | undefined>;
-  
+
   // Email Messages
   createEmailMessage(message: InsertEmailMessage): Promise<EmailMessage>;
   getEmailMessagesByCampaign(campaignId: string): Promise<EmailMessage[]>;
-  
+
   // Calls
   createCall(call: InsertCall): Promise<Call>;
   getCallsByCampaign(campaignId: string): Promise<Call[]>;
-  
+
   // Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(filters?: any): Promise<AuditLog[]>;
-  
+
   // Saved Filters
   getSavedFilters(userId: string, entityType?: string): Promise<SavedFilter[]>;
   getSavedFilter(id: string, userId: string): Promise<SavedFilter | undefined>;
   createSavedFilter(filter: InsertSavedFilter): Promise<SavedFilter>;
   updateSavedFilter(id: string, userId: string, filter: Partial<InsertSavedFilter>): Promise<SavedFilter | undefined>;
   deleteSavedFilter(id: string, userId: string): Promise<boolean>;
-  
+
   // Selection Contexts (for bulk operations)
   getSelectionContext(id: string, userId: string): Promise<SelectionContext | undefined>;
   createSelectionContext(context: InsertSelectionContext): Promise<SelectionContext>;
   deleteSelectionContext(id: string, userId: string): Promise<boolean>;
   deleteExpiredSelectionContexts(): Promise<number>;
-  
+
   // Filter Fields Registry
   getFilterFields(category?: string): Promise<any[]>;
   getFilterFieldsByEntity(entity: string): Promise<any[]>;
-  
+
   // Industry Reference (Standardized Taxonomy)
   getIndustries(activeOnly?: boolean): Promise<IndustryReference[]>;
   searchIndustries(query: string, limit?: number): Promise<IndustryReference[]>;
   getIndustryById(id: string): Promise<IndustryReference | undefined>;
-  
+
   // Company Size Reference (Standardized Employee Ranges)
   getCompanySizes(activeOnly?: boolean): Promise<CompanySizeReference[]>;
   getCompanySizeByCode(code: string): Promise<CompanySizeReference | undefined>;
-  
+
   // Revenue Range Reference (Standardized Annual Revenue Brackets)
   getRevenueRanges(activeOnly?: boolean): Promise<RevenueRangeReference[]>;
   getRevenueRangeByLabel(label: string): Promise<RevenueRangeReference | undefined>;
-  
+
   // Dual-Industry Management (Phase 8)
   updateAccountIndustry(id: string, data: { primary?: string; secondary?: string[]; code?: string }): Promise<Account | undefined>;
   reviewAccountIndustryAI(id: string, userId: string, review: { accept_primary?: string; add_secondary?: string[]; reject?: string[] }): Promise<Account | undefined>;
   getAccountsNeedingReview(limit?: number): Promise<Account[]>;
-  
+
   // Domain Sets (Phase 21)
   getDomainSets(userId?: string): Promise<DomainSet[]>;
   getDomainSet(id: string): Promise<DomainSet | undefined>;
   createDomainSet(domainSet: InsertDomainSet): Promise<DomainSet>;
   updateDomainSet(id: string, domainSet: Partial<InsertDomainSet>): Promise<DomainSet | undefined>;
   deleteDomainSet(id: string): Promise<void>;
-  
+
   // Domain Set Items
   getDomainSetItems(domainSetId: string): Promise<DomainSetItem[]>;
   createDomainSetItem(item: InsertDomainSetItem): Promise<DomainSetItem>;
   createDomainSetItemsBulk(items: InsertDomainSetItem[]): Promise<DomainSetItem[]>;
   updateDomainSetItem(id: string, item: Partial<InsertDomainSetItem>): Promise<DomainSetItem | undefined>;
-  
+
   // Domain Set Contact Links
   getDomainSetContactLinks(domainSetId: string): Promise<DomainSetContactLink[]>;
   createDomainSetContactLink(link: InsertDomainSetContactLink): Promise<DomainSetContactLink>;
   createDomainSetContactLinksBulk(links: InsertDomainSetContactLink[]): Promise<DomainSetContactLink[]>;
-  
+
   // Domain Set Operations
   processDomainSetMatching(domainSetId: string): Promise<void>;
   expandDomainSetToContacts(domainSetId: string, filters?: any): Promise<Contact[]>;
   convertDomainSetToList(domainSetId: string, listName: string, userId: string): Promise<List>;
-  
+
   // Email Infrastructure (Phase 26)
   // Sender Profiles
   getSenderProfiles(): Promise<SenderProfile[]>;
@@ -331,7 +332,7 @@ export interface IStorage {
   createSenderProfile(profile: InsertSenderProfile): Promise<SenderProfile>;
   updateSenderProfile(id: string, profile: Partial<InsertSenderProfile>): Promise<SenderProfile | undefined>;
   deleteSenderProfile(id: string): Promise<void>;
-  
+
   // Domain Authentication
   getDomainAuths(): Promise<DomainAuth[]>;
   getDomainAuth(id: number): Promise<DomainAuth | undefined>;
@@ -339,21 +340,21 @@ export interface IStorage {
   createDomainAuth(domainAuth: InsertDomainAuth): Promise<DomainAuth>;
   updateDomainAuth(id: number, domainAuth: Partial<InsertDomainAuth>): Promise<DomainAuth | undefined>;
   verifyDomainAuth(id: number): Promise<DomainAuth | undefined>;
-  
+
   // Tracking Domains
   getTrackingDomains(): Promise<TrackingDomain[]>;
   getTrackingDomain(id: number): Promise<TrackingDomain | undefined>;
   createTrackingDomain(trackingDomain: InsertTrackingDomain): Promise<TrackingDomain>;
   updateTrackingDomain(id: number, trackingDomain: Partial<InsertTrackingDomain>): Promise<TrackingDomain | undefined>;
   deleteTrackingDomain(id: number): Promise<void>;
-  
+
   // IP Pools
   getIpPools(): Promise<IpPool[]>;
   getIpPool(id: number): Promise<IpPool | undefined>;
   createIpPool(ipPool: InsertIpPool): Promise<IpPool>;
   updateIpPool(id: number, ipPool: Partial<InsertIpPool>): Promise<IpPool | undefined>;
   deleteIpPool(id: number): Promise<void>;
-  
+
   // Send Policies
   getSendPolicies(): Promise<SendPolicy[]>;
   getSendPolicy(id: number): Promise<SendPolicy | undefined>;
@@ -386,17 +387,26 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUser(id: string, updateData: Partial<InsertUser>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
   // Accounts
   async getAccounts(filters?: FilterGroup): Promise<Account[]> {
     let query = db.select().from(accounts);
-    
+
     if (filters) {
       const filterCondition = buildFilterQuery(filters, accounts);
       if (filterCondition) {
         query = query.where(filterCondition) as any;
       }
     }
-    
+
     return await query.orderBy(desc(accounts.createdAt));
   }
 
@@ -431,14 +441,14 @@ export class DatabaseStorage implements IStorage {
   // Contacts
   async getContacts(filters?: FilterGroup): Promise<Contact[]> {
     let query = db.select().from(contacts);
-    
+
     if (filters) {
       const filterCondition = buildFilterQuery(filters, contacts);
       if (filterCondition) {
         query = query.where(filterCondition) as any;
       }
     }
-    
+
     return await query.orderBy(desc(contacts.createdAt));
   }
 
@@ -528,10 +538,10 @@ export class DatabaseStorage implements IStorage {
     actorId?: string
   }): Promise<{ contact: Contact, action: 'created' | 'updated' }> {
     const { normalizeEmail, normalizePhoneE164 } = await import('./normalization.js');
-    
+
     // Normalize business keys
     const emailNormalized = normalizeEmail(data.email);
-    
+
     // Deterministic lookup: find by normalized email
     const [existing] = await db
       .select()
@@ -543,7 +553,7 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .limit(1);
-    
+
     if (existing) {
       // UPDATE: Apply field-level survivorship with audit logging
       const updates: Partial<InsertContact> = {
@@ -553,24 +563,24 @@ export class DatabaseStorage implements IStorage {
         sourceUpdatedAt: options?.sourceUpdatedAt,
         updatedAt: new Date()
       };
-      
+
       const changeLogs: any[] = [];
-      
+
       // Survivorship: prefer new if not null, otherwise keep existing
       const fieldsToUpdate = [
         'fullName', 'firstName', 'lastName', 'jobTitle', 'email',
         'directPhone', 'phoneExtension', 'seniorityLevel', 'department',
         'address', 'linkedinUrl', 'consentBasis', 'consentSource', 'accountId'
       ];
-      
+
       for (const field of fieldsToUpdate) {
         if (data[field as keyof typeof data] !== undefined && data[field as keyof typeof data] !== null) {
           const newValue = data[field as keyof typeof data];
           const oldValue = (existing as any)[field];
-          
+
           if (newValue !== oldValue) {
             (updates as any)[field] = newValue;
-            
+
             // Log field change
             changeLogs.push({
               entityType: 'contact',
@@ -585,7 +595,7 @@ export class DatabaseStorage implements IStorage {
           }
         }
       }
-      
+
       // Union for array fields (tags, intentTopics)
       if (data.tags && data.tags.length > 0) {
         const existingTags = existing.tags || [];
@@ -604,7 +614,7 @@ export class DatabaseStorage implements IStorage {
           });
         }
       }
-      
+
       if (data.intentTopics && data.intentTopics.length > 0) {
         const existingTopics = existing.intentTopics || [];
         const newTopics = Array.from(new Set([...existingTopics, ...data.intentTopics]));
@@ -622,7 +632,7 @@ export class DatabaseStorage implements IStorage {
           });
         }
       }
-      
+
       // Custom fields: merge
       if (data.customFields) {
         const mergedCustomFields = { ...existing.customFields as any, ...data.customFields as any };
@@ -638,7 +648,7 @@ export class DatabaseStorage implements IStorage {
           survivorshipPolicy: 'merge'
         });
       }
-      
+
       // Normalize phone if provided
       if (data.directPhone) {
         const e164 = normalizePhoneE164(data.directPhone);
@@ -656,18 +666,18 @@ export class DatabaseStorage implements IStorage {
           });
         }
       }
-      
+
       // Write change logs if there are any changes
       if (changeLogs.length > 0) {
         await db.insert(fieldChangeLog).values(changeLogs);
       }
-      
+
       const [updated] = await db
         .update(contacts)
         .set(updates)
         .where(eq(contacts.id, existing.id))
         .returning();
-      
+
       return { contact: updated, action: 'updated' };
     } else {
       // CREATE: New contact
@@ -675,7 +685,7 @@ export class DatabaseStorage implements IStorage {
       const fullName = data.fullName || 
         (data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : 
          data.firstName || data.lastName || data.email);
-      
+
       const insertData: InsertContact = {
         ...data,
         fullName,
@@ -684,7 +694,7 @@ export class DatabaseStorage implements IStorage {
         sourceRecordId: options?.sourceRecordId,
         sourceUpdatedAt: options?.sourceUpdatedAt
       } as InsertContact;
-      
+
       // Normalize phone if provided
       if (data.directPhone) {
         const e164 = normalizePhoneE164(data.directPhone);
@@ -692,7 +702,7 @@ export class DatabaseStorage implements IStorage {
           insertData.directPhoneE164 = e164;
         }
       }
-      
+
       const [created] = await db.insert(contacts).values(insertData).returning();
       return { contact: created, action: 'created' };
     }
@@ -705,14 +715,14 @@ export class DatabaseStorage implements IStorage {
     actorId?: string
   }): Promise<{ account: Account, action: 'created' | 'updated' }> {
     const { normalizeDomain, normalizeName, normalizePhoneE164 } = await import('./normalization.js');
-    
+
     // Normalize business keys
     const nameNormalized = normalizeName(data.name);
     const domainNormalized = data.domain ? normalizeDomain(data.domain) : null;
-    
+
     // Deterministic lookup: prefer domain, fallback to name+geo
     let existing: Account | undefined;
-    
+
     if (domainNormalized) {
       [existing] = await db
         .select()
@@ -725,7 +735,7 @@ export class DatabaseStorage implements IStorage {
         )
         .limit(1);
     }
-    
+
     // Fallback: match by name + city + country if no domain match
     if (!existing && data.hqCity && data.hqCountry) {
       [existing] = await db
@@ -742,7 +752,7 @@ export class DatabaseStorage implements IStorage {
         )
         .limit(1);
     }
-    
+
     if (existing) {
       // UPDATE: Apply field-level survivorship with audit logging
       const updates: Partial<InsertAccount> = {
@@ -753,9 +763,9 @@ export class DatabaseStorage implements IStorage {
         sourceUpdatedAt: options?.sourceUpdatedAt,
         updatedAt: new Date()
       };
-      
+
       const changeLogs: any[] = [];
-      
+
       // Survivorship: prefer new if not null
       const fieldsToUpdate = [
         'name', 'domain', 'industry', 'annualRevenue', 'employeesSizeRange',
@@ -763,15 +773,15 @@ export class DatabaseStorage implements IStorage {
         'yearFounded', 'sicCode', 'naicsCode', 'linkedinUrl', 'mainPhone',
         'mainPhoneExtension', 'ownerId'
       ];
-      
+
       for (const field of fieldsToUpdate) {
         if (data[field as keyof typeof data] !== undefined && data[field as keyof typeof data] !== null) {
           const newValue = data[field as keyof typeof data];
           const oldValue = (existing as any)[field];
-          
+
           if (newValue !== oldValue) {
             (updates as any)[field] = newValue;
-            
+
             changeLogs.push({
               entityType: 'account',
               entityId: existing.id,
@@ -785,7 +795,7 @@ export class DatabaseStorage implements IStorage {
           }
         }
       }
-      
+
       // Union for array fields
       if (data.tags && data.tags.length > 0) {
         const existingTags = existing.tags || [];
@@ -804,7 +814,7 @@ export class DatabaseStorage implements IStorage {
           });
         }
       }
-      
+
       if (data.intentTopics && data.intentTopics.length > 0) {
         const existingTopics = existing.intentTopics || [];
         const newTopics = Array.from(new Set([...existingTopics, ...data.intentTopics]));
@@ -822,7 +832,7 @@ export class DatabaseStorage implements IStorage {
           });
         }
       }
-      
+
       if (data.techStack && data.techStack.length > 0) {
         const existingTech = existing.techStack || [];
         const newTech = Array.from(new Set([...existingTech, ...data.techStack]));
@@ -840,7 +850,7 @@ export class DatabaseStorage implements IStorage {
           });
         }
       }
-      
+
       if (data.linkedinSpecialties && data.linkedinSpecialties.length > 0) {
         const existingSpec = existing.linkedinSpecialties || [];
         const newSpec = Array.from(new Set([...existingSpec, ...data.linkedinSpecialties]));
@@ -858,7 +868,7 @@ export class DatabaseStorage implements IStorage {
           });
         }
       }
-      
+
       // Custom fields: merge
       if (data.customFields) {
         const mergedCustomFields = { ...existing.customFields as any, ...data.customFields as any };
@@ -874,7 +884,7 @@ export class DatabaseStorage implements IStorage {
           survivorshipPolicy: 'merge'
         });
       }
-      
+
       // Normalize phone if provided
       if (data.mainPhone) {
         const e164 = normalizePhoneE164(data.mainPhone);
@@ -892,18 +902,18 @@ export class DatabaseStorage implements IStorage {
           });
         }
       }
-      
+
       // Write change logs if there are any changes
       if (changeLogs.length > 0) {
         await db.insert(fieldChangeLog).values(changeLogs);
       }
-      
+
       const [updated] = await db
         .update(accounts)
         .set(updates)
         .where(eq(accounts.id, existing.id))
         .returning();
-      
+
       return { account: updated, action: 'updated' };
     } else {
       // CREATE: New account
@@ -915,7 +925,7 @@ export class DatabaseStorage implements IStorage {
         sourceRecordId: options?.sourceRecordId,
         sourceUpdatedAt: options?.sourceUpdatedAt
       } as InsertAccount;
-      
+
       // Normalize phone if provided
       if (data.mainPhone) {
         const e164 = normalizePhoneE164(data.mainPhone);
@@ -923,7 +933,7 @@ export class DatabaseStorage implements IStorage {
           insertData.mainPhoneE164 = e164;
         }
       }
-      
+
       const [created] = await db.insert(accounts).values(insertData).returning();
       return { account: created, action: 'created' };
     }
@@ -1108,7 +1118,7 @@ export class DatabaseStorage implements IStorage {
   // Call Attempts
   async getCallAttempts(campaignId?: string, agentId?: string): Promise<CallAttempt[]> {
     let query = db.select().from(callAttempts);
-    
+
     if (campaignId && agentId) {
       query = query.where(and(eq(callAttempts.campaignId, campaignId), eq(callAttempts.agentId, agentId)));
     } else if (campaignId) {
@@ -1116,7 +1126,7 @@ export class DatabaseStorage implements IStorage {
     } else if (agentId) {
       query = query.where(eq(callAttempts.agentId, agentId));
     }
-    
+
     return await query.orderBy(desc(callAttempts.createdAt));
   }
 
@@ -1328,10 +1338,10 @@ export class DatabaseStorage implements IStorage {
   async previewSegment(entityType: 'contact' | 'account', criteria: any): Promise<{ count: number; sampleIds: string[] }> {
     // Build query based on entity type
     const table = entityType === 'contact' ? contacts : accounts;
-    
+
     // Apply filter criteria using SQL builder
     let query = db.select({ id: table.id }).from(table);
-    
+
     // Apply filters if criteria is a FilterGroup
     if (criteria && criteria.conditions && criteria.conditions.length > 0) {
       const filterSql = buildFilterQuery(criteria, table);
@@ -1339,11 +1349,11 @@ export class DatabaseStorage implements IStorage {
         query = query.where(filterSql);
       }
     }
-    
+
     // Execute query to get all matching IDs
     const results = await query;
     const allIds = results.map(r => r.id);
-    
+
     // Return count and sample IDs (first 100 for list conversion)
     return {
       count: allIds.length,
@@ -1450,7 +1460,7 @@ export class DatabaseStorage implements IStorage {
           typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val
         ).join(',')
       );
-      
+
       return {
         data: [headers, ...rows].join('\n'),
         filename: `${sanitizedName}_${timestamp}.csv`
@@ -1695,7 +1705,7 @@ export class DatabaseStorage implements IStorage {
   // Saved Filters
   async getSavedFilters(userId: string, entityType?: string): Promise<SavedFilter[]> {
     let query = db.select().from(savedFilters).where(eq(savedFilters.userId, userId));
-    
+
     if (entityType) {
       return await query.where(
         and(
@@ -1704,7 +1714,7 @@ export class DatabaseStorage implements IStorage {
         )
       ).orderBy(desc(savedFilters.createdAt));
     }
-    
+
     return await query.orderBy(desc(savedFilters.createdAt));
   }
 
@@ -1778,7 +1788,7 @@ export class DatabaseStorage implements IStorage {
       .from(filterFieldRegistry)
       .where(eq(filterFieldRegistry.visibleInFilters, true))
       .orderBy(filterFieldRegistry.category, filterFieldRegistry.sortOrder);
-    
+
     if (category) {
       query = query.where(
         and(
@@ -1787,7 +1797,7 @@ export class DatabaseStorage implements IStorage {
         )
       ) as any;
     }
-    
+
     return await query;
   }
 
@@ -1803,21 +1813,21 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(filterFieldRegistry.sortOrder);
   }
-  
+
   // Industry Reference (Standardized Taxonomy)
   async getIndustries(activeOnly: boolean = true): Promise<IndustryReference[]> {
     let query = db
       .select()
       .from(industryReference)
       .orderBy(industryReference.name);
-    
+
     if (activeOnly) {
       query = query.where(eq(industryReference.isActive, true)) as any;
     }
-    
+
     return await query;
   }
-  
+
   async searchIndustries(query: string, limit: number = 50): Promise<IndustryReference[]> {
     return await db
       .select()
@@ -1834,7 +1844,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(industryReference.name)
       .limit(limit);
   }
-  
+
   async getIndustryById(id: string): Promise<IndustryReference | undefined> {
     const [industry] = await db
       .select()
@@ -1842,21 +1852,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(industryReference.id, id));
     return industry || undefined;
   }
-  
+
   // Company Size Reference (Standardized Employee Ranges)
   async getCompanySizes(activeOnly: boolean = true): Promise<CompanySizeReference[]> {
     let query = db
       .select()
       .from(companySizeReference)
       .orderBy(companySizeReference.sortOrder);
-    
+
     if (activeOnly) {
       query = query.where(eq(companySizeReference.isActive, true)) as any;
     }
-    
+
     return await query;
   }
-  
+
   async getCompanySizeByCode(code: string): Promise<CompanySizeReference | undefined> {
     const [size] = await db
       .select()
@@ -1864,21 +1874,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(companySizeReference.code, code));
     return size || undefined;
   }
-  
+
   // Revenue Range Reference (Standardized Annual Revenue Brackets)
   async getRevenueRanges(activeOnly: boolean = true): Promise<RevenueRangeReference[]> {
     let query = db
       .select()
       .from(revenueRangeReference)
       .orderBy(revenueRangeReference.sortOrder);
-    
+
     if (activeOnly) {
       query = query.where(eq(revenueRangeReference.isActive, true)) as any;
     }
-    
+
     return await query;
   }
-  
+
   async getRevenueRangeByLabel(label: string): Promise<RevenueRangeReference | undefined> {
     const [range] = await db
       .select()
@@ -1886,14 +1896,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(revenueRangeReference.label, label));
     return range || undefined;
   }
-  
+
   // Dual-Industry Management (Phase 8)
   async updateAccountIndustry(
     id: string, 
     data: { primary?: string; secondary?: string[]; code?: string }
   ): Promise<Account | undefined> {
     const updateData: any = { updatedAt: new Date() };
-    
+
     if (data.primary !== undefined) {
       updateData.industryStandardized = data.primary;
     }
@@ -1903,16 +1913,16 @@ export class DatabaseStorage implements IStorage {
     if (data.code !== undefined) {
       updateData.industryCode = data.code;
     }
-    
+
     const [account] = await db
       .update(accounts)
       .set(updateData)
       .where(eq(accounts.id, id))
       .returning();
-    
+
     return account || undefined;
   }
-  
+
   async reviewAccountIndustryAI(
     id: string, 
     userId: string, 
@@ -1920,18 +1930,18 @@ export class DatabaseStorage implements IStorage {
   ): Promise<Account | undefined> {
     const account = await this.getAccount(id);
     if (!account) return undefined;
-    
+
     const updateData: any = {
       industryAiReviewedBy: userId,
       industryAiReviewedAt: new Date(),
       updatedAt: new Date(),
     };
-    
+
     // Handle accept_primary - replaces primary industry
     if (review.accept_primary) {
       updateData.industryStandardized = review.accept_primary;
     }
-    
+
     // Handle add_secondary - appends to secondary industries array
     if (review.add_secondary && review.add_secondary.length > 0) {
       const currentSecondary = account.industrySecondary || [];
@@ -1940,7 +1950,7 @@ export class DatabaseStorage implements IStorage {
         ...review.add_secondary.filter(s => !currentSecondary.includes(s))
       ];
     }
-    
+
     // Determine AI status based on review actions
     if (review.accept_primary && !review.add_secondary?.length && !review.reject?.length) {
       updateData.industryAiStatus = 'accepted';
@@ -1951,19 +1961,19 @@ export class DatabaseStorage implements IStorage {
     } else if (review.accept_primary || review.add_secondary?.length) {
       updateData.industryAiStatus = 'accepted';
     }
-    
+
     // Clear AI suggestions after review
     updateData.industryAiCandidates = null;
-    
+
     const [updated] = await db
       .update(accounts)
       .set(updateData)
       .where(eq(accounts.id, id))
       .returning();
-    
+
     return updated || undefined;
   }
-  
+
   async getAccountsNeedingReview(limit: number = 50): Promise<Account[]> {
     return await db
       .select()
@@ -1978,28 +1988,28 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`${accounts.industryAiConfidence}::float DESC`)
       .limit(limit);
   }
-  
+
   // Domain Sets (Phase 21)
   async getDomainSets(userId?: string): Promise<DomainSet[]> {
     let query = db.select().from(domainSets);
-    
+
     if (userId) {
       query = query.where(eq(domainSets.ownerId, userId)) as any;
     }
-    
+
     return await query.orderBy(desc(domainSets.createdAt));
   }
-  
+
   async getDomainSet(id: string): Promise<DomainSet | undefined> {
     const [domainSet] = await db.select().from(domainSets).where(eq(domainSets.id, id));
     return domainSet || undefined;
   }
-  
+
   async createDomainSet(insertDomainSet: InsertDomainSet): Promise<DomainSet> {
     const [domainSet] = await db.insert(domainSets).values(insertDomainSet).returning();
     return domainSet;
   }
-  
+
   async updateDomainSet(id: string, updateData: Partial<InsertDomainSet>): Promise<DomainSet | undefined> {
     const [domainSet] = await db
       .update(domainSets)
@@ -2008,11 +2018,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return domainSet || undefined;
   }
-  
+
   async deleteDomainSet(id: string): Promise<void> {
     await db.delete(domainSets).where(eq(domainSets.id, id));
   }
-  
+
   // Domain Set Items
   async getDomainSetItems(domainSetId: string): Promise<DomainSetItem[]> {
     return await db
@@ -2021,17 +2031,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(domainSetItems.domainSetId, domainSetId))
       .orderBy(domainSetItems.createdAt);
   }
-  
+
   async createDomainSetItem(item: InsertDomainSetItem): Promise<DomainSetItem> {
     const [created] = await db.insert(domainSetItems).values(item).returning();
     return created;
   }
-  
+
   async createDomainSetItemsBulk(items: InsertDomainSetItem[]): Promise<DomainSetItem[]> {
     if (items.length === 0) return [];
     return await db.insert(domainSetItems).values(items).returning();
   }
-  
+
   async updateDomainSetItem(id: string, updateData: Partial<InsertDomainSetItem>): Promise<DomainSetItem | undefined> {
     const [item] = await db
       .update(domainSetItems)
@@ -2040,7 +2050,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return item || undefined;
   }
-  
+
   // Domain Set Contact Links
   async getDomainSetContactLinks(domainSetId: string): Promise<DomainSetContactLink[]> {
     return await db
@@ -2049,45 +2059,45 @@ export class DatabaseStorage implements IStorage {
       .where(eq(domainSetContactLinks.domainSetId, domainSetId))
       .orderBy(domainSetContactLinks.createdAt);
   }
-  
+
   async createDomainSetContactLink(link: InsertDomainSetContactLink): Promise<DomainSetContactLink> {
     const [created] = await db.insert(domainSetContactLinks).values(link).returning();
     return created;
   }
-  
+
   async createDomainSetContactLinksBulk(links: InsertDomainSetContactLink[]): Promise<DomainSetContactLink[]> {
     if (links.length === 0) return [];
     return await db.insert(domainSetContactLinks).values(links).returning();
   }
-  
+
   // Domain Set Operations
   async processDomainSetMatching(domainSetId: string): Promise<void> {
     // Import domain utils
     const { normalizeDomain, getMatchTypeAndConfidence, extractCompanyNameFromDomain } = await import('@shared/domain-utils');
-    
+
     // Get the domain set
     const domainSet = await this.getDomainSet(domainSetId);
     if (!domainSet) throw new Error('Domain set not found');
-    
+
     // Get all items for this set
     const items = await this.getDomainSetItems(domainSetId);
-    
+
     // Get all accounts for matching
     const allAccounts = await db.select().from(accounts);
-    
+
     let matchedAccounts = 0;
     let matchedContacts = 0;
     let unknownDomains = 0;
-    
+
     // Process each domain item
     for (const item of items) {
       const normalizedDomain = normalizeDomain(item.domain);
-      
+
       // Try to find exact match first
       const exactMatch = allAccounts.find(acc => 
         acc.domain && normalizeDomain(acc.domain) === normalizedDomain
       );
-      
+
       if (exactMatch) {
         // Exact match found
         await this.updateDomainSetItem(item.id, {
@@ -2097,7 +2107,7 @@ export class DatabaseStorage implements IStorage {
           matchConfidence: '1.00',
         });
         matchedAccounts++;
-        
+
         // Count contacts for this account
         const accountContacts = await this.getContactsByAccountId(exactMatch.id);
         await this.updateDomainSetItem(item.id, {
@@ -2107,22 +2117,22 @@ export class DatabaseStorage implements IStorage {
       } else {
         // Try fuzzy matching
         let bestMatch: { account: typeof allAccounts[0]; confidence: number } | null = null;
-        
+
         for (const account of allAccounts) {
           if (!account.domain) continue;
-          
+
           const matchResult = getMatchTypeAndConfidence(
             item.domain,
             account.domain,
             account.name
           );
-          
+
           if (matchResult.matchType === 'fuzzy' && 
               (!bestMatch || matchResult.confidence > bestMatch.confidence)) {
             bestMatch = { account, confidence: matchResult.confidence };
           }
         }
-        
+
         if (bestMatch) {
           // Fuzzy match found
           await this.updateDomainSetItem(item.id, {
@@ -2132,7 +2142,7 @@ export class DatabaseStorage implements IStorage {
             matchConfidence: bestMatch.confidence.toFixed(2),
           });
           matchedAccounts++;
-          
+
           // Count contacts
           const accountContacts = await this.getContactsByAccountId(bestMatch.account.id);
           await this.updateDomainSetItem(item.id, {
@@ -2150,7 +2160,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
     }
-    
+
     // Update domain set stats
     await this.updateDomainSet(domainSetId, {
       matchedAccounts,
@@ -2159,34 +2169,34 @@ export class DatabaseStorage implements IStorage {
       status: 'completed',
     });
   }
-  
+
   async expandDomainSetToContacts(domainSetId: string, filters?: any): Promise<Contact[]> {
     // Get all items with matched accounts
     const items = await this.getDomainSetItems(domainSetId);
     const accountIds = items
       .filter(item => item.accountId)
       .map(item => item.accountId as string);
-    
+
     if (accountIds.length === 0) return [];
-    
+
     // Get all contacts for these accounts
     let contacts: Contact[] = [];
     for (const accountId of accountIds) {
       const accountContacts = await this.getContactsByAccountId(accountId);
       contacts.push(...accountContacts);
     }
-    
+
     // Apply additional filters if provided (title, seniority, etc.)
     // This is a simplified version - full implementation would use FilterGroup
-    
+
     return contacts;
   }
-  
+
   async convertDomainSetToList(domainSetId: string, listName: string, userId: string): Promise<List> {
     // Get all contacts from the domain set
     const contacts = await this.expandDomainSetToContacts(domainSetId);
     const contactIds = contacts.map(c => c.id);
-    
+
     // Create a new list
     const list = await this.createList({
       name: listName,
@@ -2199,12 +2209,12 @@ export class DatabaseStorage implements IStorage {
       tags: ['domain-set'],
       visibilityScope: 'private',
     });
-    
+
     return list;
   }
 
   // ==================== CONTENT STUDIO ====================
-  
+
   async getContentAssets(): Promise<ContentAsset[]> {
     return await db.select().from(contentAssets).orderBy(contentAssets.updatedAt);
   }
@@ -2233,7 +2243,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== SOCIAL POSTS ====================
-  
+
   async getSocialPosts(): Promise<SocialPost[]> {
     return await db.select().from(socialPosts).orderBy(socialPosts.createdAt);
   }
@@ -2262,7 +2272,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== AI CONTENT GENERATION ====================
-  
+
   async createAIContentGeneration(data: InsertAIContentGeneration): Promise<AIContentGeneration> {
     const result = await db.insert(aiContentGenerations).values(data).returning();
     return result[0];
@@ -2278,7 +2288,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== CONTENT PUSH TRACKING ====================
-  
+
   async createContentPush(data: InsertContentAssetPush): Promise<ContentAssetPush> {
     const result = await db.insert(contentAssetPushes).values(data).returning();
     return result[0];
@@ -2313,7 +2323,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== EVENTS ====================
-  
+
   async getEvents(): Promise<Event[]> {
     return await db.select().from(events).orderBy(desc(events.createdAt));
   }
@@ -2347,7 +2357,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== RESOURCES ====================
-  
+
   async getResources(): Promise<Resource[]> {
     return await db.select().from(resources).orderBy(desc(resources.createdAt));
   }
@@ -2381,7 +2391,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== NEWS ====================
-  
+
   async getNews(): Promise<News[]> {
     return await db.select().from(news).orderBy(desc(news.createdAt));
   }
@@ -2413,9 +2423,9 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(news).where(eq(news.id, id)).returning();
     return result.length > 0;
   }
-  
+
   // ==================== EMAIL INFRASTRUCTURE (Phase 26) ====================
-  
+
   // Sender Profiles
   async getSenderProfiles(): Promise<SenderProfile[]> {
     return await db.select().from(senderProfiles).orderBy(desc(senderProfiles.createdAt));
@@ -2442,7 +2452,7 @@ export class DatabaseStorage implements IStorage {
   async deleteSenderProfile(id: string): Promise<void> {
     await db.delete(senderProfiles).where(eq(senderProfiles.id, id));
   }
-  
+
   // Domain Authentication
   async getDomainAuths(): Promise<DomainAuth[]> {
     return await db.select().from(domainAuth).orderBy(desc(domainAuth.createdAt));
@@ -2483,7 +2493,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return result || undefined;
   }
-  
+
   // Tracking Domains
   async getTrackingDomains(): Promise<TrackingDomain[]> {
     return await db.select().from(trackingDomains).orderBy(desc(trackingDomains.createdAt));
@@ -2510,7 +2520,7 @@ export class DatabaseStorage implements IStorage {
   async deleteTrackingDomain(id: number): Promise<void> {
     await db.delete(trackingDomains).where(eq(trackingDomains.id, id));
   }
-  
+
   // IP Pools
   async getIpPools(): Promise<IpPool[]> {
     return await db.select().from(ipPools).orderBy(desc(ipPools.createdAt));
@@ -2537,7 +2547,7 @@ export class DatabaseStorage implements IStorage {
   async deleteIpPool(id: number): Promise<void> {
     await db.delete(ipPools).where(eq(ipPools.id, id));
   }
-  
+
   // Send Policies
   async getSendPolicies(): Promise<SendPolicy[]> {
     return await db.select().from(sendPolicies).orderBy(desc(sendPolicies.createdAt));
