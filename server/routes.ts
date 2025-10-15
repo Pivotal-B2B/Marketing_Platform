@@ -1973,8 +1973,17 @@ export function registerRoutes(app: Express) {
         fields = [...fields, ...accountFields];
       }
 
+      // Map fields to the expected format with operators array parsed
+      const mappedFields = fields.map(field => ({
+        key: field.key,
+        label: field.label,
+        type: field.type,
+        operators: Array.isArray(field.operators) ? field.operators : [],
+        category: field.category
+      }));
+
       // Group by category for easier UI consumption (same format as /api/filters/fields)
-      const grouped = fields.reduce((acc: any, field) => {
+      const grouped = mappedFields.reduce((acc: any, field) => {
         if (!acc[field.category]) {
           acc[field.category] = [];
         }
@@ -1983,11 +1992,12 @@ export function registerRoutes(app: Express) {
       }, {});
 
       res.json({
-        fields,
+        fields: mappedFields,
         grouped,
         categories: Object.keys(grouped)
       });
     } catch (error) {
+      console.error('Error fetching filter fields:', error);
       res.status(500).json({ message: "Failed to fetch filter fields for entity" });
     }
   });

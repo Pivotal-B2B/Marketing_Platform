@@ -70,6 +70,8 @@ export function Step1AudienceSelection({ data, onNext, campaignType }: Step1Prop
       estimatedCount: calculateEstimatedCount(),
     };
 
+    console.log('Campaign audience data:', audienceData); // Debug log
+
     onNext({
       audience: audienceData,
     });

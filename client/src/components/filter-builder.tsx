@@ -66,7 +66,9 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
         : `/api/filters/fields/entity/${entityType}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch filter fields');
-      return response.json();
+      const data = await response.json();
+      console.log('Filter fields loaded:', data); // Debug log
+      return data;
     }
   });
 
@@ -266,6 +268,7 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
   };
 
   const handleApply = () => {
+    console.log('Applying filter group:', filterGroup); // Debug log
     if (filterGroup.conditions.length === 0) {
       onApplyFilter(undefined);
     } else {
