@@ -583,6 +583,7 @@ export const campaignQueue = pgTable("campaign_queue", {
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
   contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
   accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  agentId: varchar("agent_id").references(() => users.id),
   priority: integer("priority").notNull().default(0),
   status: queueStatusEnum("status").notNull().default('queued'),
   removedReason: text("removed_reason"),
@@ -592,6 +593,7 @@ export const campaignQueue = pgTable("campaign_queue", {
   campaignAccountIdx: index("campaign_queue_camp_acct_idx").on(table.campaignId, table.accountId),
   campaignStatusIdx: index("campaign_queue_camp_status_idx").on(table.campaignId, table.status),
   campaignContactUniq: uniqueIndex("campaign_queue_camp_contact_uniq").on(table.campaignId, table.contactId),
+  agentIdx: index("campaign_queue_agent_idx").on(table.agentId),
 }));
 
 // Campaign Account Stats table (for O(1) cap checks)

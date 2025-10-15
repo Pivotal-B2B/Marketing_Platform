@@ -1507,6 +1507,54 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== AGENT ASSIGNMENT & QUEUE ====================
+
+  // Get all agents
+  app.get("/api/agents", requireAuth, async (req, res) => {
+    try {
+      const agents = await storage.getAgents();
+      res.json(agents);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch agents" });
+    }
+  });
+
+  // Assign queue items to agents
+  app.post("/api/campaigns/:id/queue/assign", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { agentIds, mode = 'round_robin' } = req.body;
+      
+      if (!agentIds || !Array.isArray(agentIds) || agentIds.length === 0) {
+        return res.status(400).json({ message: "agentIds array is required" });
+      }
+
+      const result = await storage.assignQueueToAgents(req.params.id, agentIds, mode);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to assign queue to agents" });
+    }
+  });
+
+  // Get queue for logged-in agent
+  app.get("/api/agents/me/queue", requireAuth, requireRole('agent'), async (req, res) => {
+    try {
+      const agentId = req.user?.id;
+      if (!agentId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { campaignId, status } = req.query;
+      const queue = await storage.getAgentQueue(
+        agentId,
+        campaignId as string | undefined,
+        status as string | undefined
+      );
+      res.json(queue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch agent queue" });
+    }
+  });
+
   // ==================== SENDER PROFILES ====================
 
   app.get("/api/sender-profiles", requireAuth, async (req, res) => {

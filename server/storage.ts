@@ -127,6 +127,11 @@ export interface IStorage {
   getCampaignAccountStats(campaignId: string, accountId?: string): Promise<any[]>;
   upsertCampaignAccountStats(campaignId: string, accountId: string, updates: any): Promise<any>;
   enforceAccountCap(campaignId: string): Promise<{ removed: number; accounts: string[] }>;
+  
+  // Agent Queue Assignment
+  getAgents(): Promise<User[]>;
+  assignQueueToAgents(campaignId: string, agentIds: string[], mode?: 'round_robin' | 'weighted'): Promise<{ assigned: number }>;
+  getAgentQueue(agentId: string, campaignId?: string, status?: string): Promise<any[]>;
 
   // Email Templates
   getEmailTemplates(): Promise<EmailTemplate[]>;
@@ -1296,6 +1301,105 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { removed: totalRemoved, accounts: affectedAccounts };
+  }
+
+  // Agent Queue Assignment
+  async getAgents(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, 'agent'));
+  }
+
+  async assignQueueToAgents(campaignId: string, agentIds: string[], mode: 'round_robin' | 'weighted' = 'round_robin'): Promise<{ assigned: number }> {
+    // Get all unassigned queued items for this campaign
+    const queueItems = await db
+      .select()
+      .from(campaignQueue)
+      .where(and(
+        eq(campaignQueue.campaignId, campaignId),
+        eq(campaignQueue.status, 'queued'),
+        isNull(campaignQueue.agentId)
+      ))
+      .orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
+
+    if (queueItems.length === 0 || agentIds.length === 0) {
+      return { assigned: 0 };
+    }
+
+    let assignedCount = 0;
+
+    if (mode === 'round_robin') {
+      // Round robin assignment
+      for (let i = 0; i < queueItems.length; i++) {
+        const agentId = agentIds[i % agentIds.length];
+        await db
+          .update(campaignQueue)
+          .set({ agentId, updatedAt: new Date() })
+          .where(eq(campaignQueue.id, queueItems[i].id));
+        assignedCount++;
+      }
+    } else if (mode === 'weighted') {
+      // For weighted, distribute evenly (can be enhanced with actual weights later)
+      const itemsPerAgent = Math.floor(queueItems.length / agentIds.length);
+      let currentIndex = 0;
+
+      for (const agentId of agentIds) {
+        const endIndex = Math.min(currentIndex + itemsPerAgent, queueItems.length);
+        for (let i = currentIndex; i < endIndex; i++) {
+          await db
+            .update(campaignQueue)
+            .set({ agentId, updatedAt: new Date() })
+            .where(eq(campaignQueue.id, queueItems[i].id));
+          assignedCount++;
+        }
+        currentIndex = endIndex;
+      }
+
+      // Assign remaining items in round-robin
+      for (let i = currentIndex; i < queueItems.length; i++) {
+        const agentId = agentIds[(i - currentIndex) % agentIds.length];
+        await db
+          .update(campaignQueue)
+          .set({ agentId, updatedAt: new Date() })
+          .where(eq(campaignQueue.id, queueItems[i].id));
+        assignedCount++;
+      }
+    }
+
+    return { assigned: assignedCount };
+  }
+
+  async getAgentQueue(agentId: string, campaignId?: string, status?: string): Promise<any[]> {
+    let query = db
+      .select({
+        id: campaignQueue.id,
+        campaignId: campaignQueue.campaignId,
+        campaignName: campaigns.name,
+        contactId: campaignQueue.contactId,
+        contactName: sql<string>`COALESCE(${contacts.fullName}, CONCAT(${contacts.firstName}, ' ', ${contacts.lastName}))`.as('contactName'),
+        contactEmail: contacts.email,
+        contactPhone: contacts.directPhone,
+        accountId: campaignQueue.accountId,
+        accountName: accounts.name,
+        priority: campaignQueue.priority,
+        status: campaignQueue.status,
+        createdAt: campaignQueue.createdAt,
+        updatedAt: campaignQueue.updatedAt,
+      })
+      .from(campaignQueue)
+      .leftJoin(contacts, eq(campaignQueue.contactId, contacts.id))
+      .leftJoin(accounts, eq(campaignQueue.accountId, accounts.id))
+      .leftJoin(campaigns, eq(campaignQueue.campaignId, campaigns.id))
+      .where(eq(campaignQueue.agentId, agentId));
+
+    if (campaignId) {
+      query = query.where(eq(campaignQueue.campaignId, campaignId)) as any;
+    }
+
+    if (status) {
+      query = query.where(eq(campaignQueue.status, status as any)) as any;
+    }
+
+    const results = await query.orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
+    return results;
   }
 
   // Email Templates
