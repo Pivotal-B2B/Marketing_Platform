@@ -97,15 +97,6 @@ export function CSVFieldMapper({
     })) || []),
   ];
 
-  // Show loading state while custom fields are being fetched
-  if (customFieldsLoading) {
-    return (
-      <div className="space-y-4 py-8 text-center">
-        <p className="text-sm text-muted-foreground">Loading field mappings...</p>
-      </div>
-    );
-  }
-
   // Auto-mapping logic based on column name similarity
   const autoMapColumn = (csvColumn: string): FieldMapping => {
     const normalized = csvColumn.toLowerCase().replace(/[_\s-]/g, "");
@@ -180,6 +171,15 @@ export function CSVFieldMapper({
       setAutoMapped(hasAutoMapped);
     }
   }, [csvHeaders, customFields]);
+
+  // Show loading state while custom fields are being fetched
+  if (customFieldsLoading) {
+    return (
+      <div className="space-y-4 py-8 text-center">
+        <p className="text-sm text-muted-foreground">Loading field mappings...</p>
+      </div>
+    );
+  }
 
   const updateMapping = (csvColumn: string, targetField: string | null, targetEntity: "contact" | "account" | null) => {
     setMappings(prev =>
