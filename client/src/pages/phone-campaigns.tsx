@@ -245,6 +245,7 @@ export default function PhoneCampaignsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/queue-stats"] });
       toast({
         title: "Agents Assigned",
         description: "Agents have been assigned to the campaign successfully.",
@@ -257,6 +258,28 @@ export default function PhoneCampaignsPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to assign agents",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const releaseAgentMutation = useMutation({
+    mutationFn: async ({ campaignId, agentId }: { campaignId: string; agentId: string }) => {
+      return await apiRequest('DELETE', `/api/campaigns/${campaignId}/agents/${agentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/queue-stats"] });
+      toast({
+        title: "Agent Released",
+        description: "Agent has been released from the campaign.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to release agent",
         variant: "destructive",
       });
     },
@@ -586,7 +609,7 @@ export default function PhoneCampaignsPage() {
           <DialogHeader>
             <DialogTitle>Assign Agents to Campaign</DialogTitle>
             <DialogDescription>
-              Select agents to assign to this campaign. Each agent can only be assigned to one active campaign at a time.
+              Select agents to assign to this campaign. Agents assigned to other campaigns will be automatically reassigned.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -611,7 +634,6 @@ export default function PhoneCampaignsPage() {
                         id={`agent-${agent.id}`}
                         checked={selectedAgentIds.includes(agent.id)}
                         onCheckedChange={() => toggleAgentSelection(agent.id)}
-                        disabled={!!agent.currentAssignment}
                         data-testid={`checkbox-agent-${agent.id}`}
                       />
                       <div className="flex-1">
@@ -622,11 +644,27 @@ export default function PhoneCampaignsPage() {
                           {agent.firstName} {agent.lastName} ({agent.username})
                         </Label>
                         {agent.currentAssignment && (
-                          <div className="flex items-center gap-1 mt-1">
+                          <div className="flex items-center gap-2 mt-1">
                             <AlertCircle className="h-3 w-3 text-amber-500" />
                             <span className="text-xs text-muted-foreground">
-                              Assigned to: {agent.currentAssignment.campaignName}
+                              Currently assigned to: {agent.currentAssignment.campaignName}
                             </span>
+                            {agent.currentAssignment.campaignId !== selectedCampaign?.id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  releaseAgentMutation.mutate({
+                                    campaignId: agent.currentAssignment.campaignId,
+                                    agentId: agent.id
+                                  });
+                                }}
+                              >
+                                Release
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>

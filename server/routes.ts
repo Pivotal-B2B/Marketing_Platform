@@ -1577,7 +1577,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Assign agents to a campaign
+  // Assign agents to a campaign (with automatic reassignment)
   app.post("/api/campaigns/:id/agents", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { agentIds } = req.body;
@@ -1587,6 +1587,27 @@ export function registerRoutes(app: Express) {
       }
 
       const userId = req.user!.id;
+      
+      // Release agents from their current campaigns first
+      for (const agentId of agentIds) {
+        const existingAssignments = await db
+          .select()
+          .from(campaignAgentAssignments)
+          .where(
+            and(
+              eq(campaignAgentAssignments.agentId, agentId),
+              eq(campaignAgentAssignments.isActive, true)
+            )
+          );
+        
+        for (const assignment of existingAssignments) {
+          if (assignment.campaignId !== req.params.id) {
+            await storage.releaseAgentAssignment(assignment.campaignId, agentId);
+          }
+        }
+      }
+      
+      // Now assign agents to the new campaign
       await storage.assignAgentsToCampaign(req.params.id, agentIds, userId);
       
       res.status(201).json({ message: "Agents assigned successfully" });

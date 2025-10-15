@@ -1086,7 +1086,7 @@ export class DatabaseStorage implements IStorage {
 
   // Campaign Agent Assignments
   async listAgents(): Promise<Array<User & { currentAssignment?: { campaignId: string; campaignName: string } }>> {
-    // Get all users with agent role
+    // Get all users with agent role (including those from legacy role field)
     const agentRoleUsers = await db
       .select({ userId: userRoles.userId })
       .from(userRoles)
@@ -1094,7 +1094,19 @@ export class DatabaseStorage implements IStorage {
 
     const agentIds = agentRoleUsers.map(r => r.userId);
 
-    if (agentIds.length === 0) {
+    // Also get users with legacy 'agent' role
+    const legacyAgents = await db
+      .select()
+      .from(users)
+      .where(eq(users.role, 'agent'));
+
+    // Combine both sets of agent IDs
+    const allAgentIds = Array.from(new Set([
+      ...agentIds,
+      ...legacyAgents.map(u => u.id)
+    ]));
+
+    if (allAgentIds.length === 0) {
       return [];
     }
 
@@ -1114,7 +1126,7 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .leftJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
-      .where(inArray(users.id, agentIds));
+      .where(inArray(users.id, allAgentIds));
 
     return agents.map(row => ({
       ...row.user,
@@ -1159,22 +1171,24 @@ export class DatabaseStorage implements IStorage {
   async assignAgentsToCampaign(campaignId: string, agentIds: string[], assignedBy: string): Promise<void> {
     // Assign agents in a transaction to ensure atomicity
     for (const agentId of agentIds) {
-      // Check if agent already has an active assignment
+      // Check if agent already has an active assignment to this specific campaign
       const [existingAssignment] = await db
         .select()
         .from(campaignAgentAssignments)
         .where(
           and(
             eq(campaignAgentAssignments.agentId, agentId),
+            eq(campaignAgentAssignments.campaignId, campaignId),
             eq(campaignAgentAssignments.isActive, true)
           )
         );
 
+      // Skip if already assigned to this campaign
       if (existingAssignment) {
-        throw new Error(`Agent ${agentId} is already assigned to campaign ${existingAssignment.campaignId}`);
+        continue;
       }
 
-      // Create new assignment
+      // Create new assignment (any previous assignments to other campaigns should already be released)
       await db.insert(campaignAgentAssignments).values({
         campaignId,
         agentId,
