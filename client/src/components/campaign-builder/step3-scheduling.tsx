@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ChevronRight, Calendar, Clock, Zap } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -194,35 +194,79 @@ export function Step3Scheduling({ data, onNext, campaignType }: Step3Props) {
                 <Input type="number" defaultValue="7" min="1" data-testid="input-frequency-cap" />
               </div>
 
-              <div className="space-y-2">
-                <Label>Assign Agents</Label>
-                <Select 
-                  value={assignedAgents[0] || ""} 
-                  onValueChange={(value) => {
-                    if (value === "all") {
-                      setAssignedAgents(agents.map((a: any) => a.id));
-                    } else {
-                      setAssignedAgents([value]);
-                    }
-                  }}
-                >
-                  <SelectTrigger data-testid="select-agent-assignment">
-                    <SelectValue placeholder="Select agent..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Available Agents ({agents.length})</SelectItem>
-                    {agents.map((agent: any) => (
-                      <SelectItem key={agent.id} value={agent.id}>
-                        {agent.firstName} {agent.lastName} ({agent.username})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Assign Agents</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (assignedAgents.length === agents.length) {
+                        setAssignedAgents([]);
+                      } else {
+                        setAssignedAgents(agents.map((a: any) => a.id));
+                      }
+                    }}
+                    data-testid="button-toggle-all-agents"
+                  >
+                    {assignedAgents.length === agents.length ? "Deselect All" : "Select All"}
+                  </Button>
+                </div>
+                
+                <div className="border rounded-lg p-3 space-y-2 max-h-60 overflow-y-auto">
+                  {agents.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No agents available
+                    </p>
+                  ) : (
+                    agents.map((agent: any) => (
+                      <div
+                        key={agent.id}
+                        className="flex items-center space-x-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                        onClick={() => {
+                          setAssignedAgents(prev =>
+                            prev.includes(agent.id)
+                              ? prev.filter(id => id !== agent.id)
+                              : [...prev, agent.id]
+                          );
+                        }}
+                        data-testid={`agent-item-${agent.id}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={assignedAgents.includes(agent.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setAssignedAgents(prev =>
+                              prev.includes(agent.id)
+                                ? prev.filter(id => id !== agent.id)
+                                : [...prev, agent.id]
+                            );
+                          }}
+                          className="h-4 w-4"
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">
+                            {agent.firstName} {agent.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            @{agent.username}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          Agent
+                        </Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
+                
                 {assignedAgents.length > 0 && (
                   <p className="text-xs text-muted-foreground">
                     {assignedAgents.length === agents.length 
                       ? `All ${agents.length} agents assigned` 
-                      : `${assignedAgents.length} agent(s) assigned`}
+                      : `${assignedAgents.length} of ${agents.length} agent(s) assigned`}
                   </p>
                 )}
               </div>
