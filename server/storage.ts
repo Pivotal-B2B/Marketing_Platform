@@ -86,6 +86,7 @@ export interface IStorage {
   // Accounts
   getAccounts(filters?: FilterGroup): Promise<Account[]>;
   getAccount(id: string): Promise<Account | undefined>;
+  getAccountsByIds(ids: string[]): Promise<Account[]>;
   getAccountByDomain(domain: string): Promise<Account | undefined>;
   createAccount(account: InsertAccount): Promise<Account>;
   updateAccount(id: string, account: Partial<InsertAccount>): Promise<Account | undefined>;
@@ -216,7 +217,7 @@ export interface IStorage {
   deleteList(id: string): Promise<void>;
   exportList(listId: string, format: 'csv' | 'json'): Promise<{ data: any; filename: string }>;
 
-  // Domain Sets
+  // Domain Sets (will be renamed to Accounts List (TAL))
   getDomainSets(filters?: any): Promise<DomainSet[]>;
   getDomainSet(id: string): Promise<DomainSet | undefined>;
   createDomainSet(domainSet: InsertDomainSet): Promise<DomainSet>;
@@ -305,7 +306,7 @@ export interface IStorage {
   reviewAccountIndustryAI(id: string, userId: string, review: { accept_primary?: string; add_secondary?: string[]; reject?: string[] }): Promise<Account | undefined>;
   getAccountsNeedingReview(limit?: number): Promise<Account[]>;
 
-  // Domain Sets (Phase 21)
+  // Domain Sets (Phase 21) - Renamed to Accounts List (TAL)
   getDomainSets(userId?: string): Promise<DomainSet[]>;
   getDomainSet(id: string): Promise<DomainSet | undefined>;
   createDomainSet(domainSet: InsertDomainSet): Promise<DomainSet>;
@@ -416,6 +417,11 @@ export class DatabaseStorage implements IStorage {
   async getAccount(id: string): Promise<Account | undefined> {
     const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
     return account || undefined;
+  }
+
+  async getAccountsByIds(ids: string[]): Promise<Account[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(accounts).where(inArray(accounts.id, ids));
   }
 
   async getAccountByDomain(domain: string): Promise<Account | undefined> {
@@ -1497,7 +1503,7 @@ export class DatabaseStorage implements IStorage {
         .from(contacts)
         .leftJoin(accounts, eq(contacts.accountId, accounts.id))
         .where(inArray(contacts.id, list.recordIds));
-      
+
       // Map back to Contact type with account name embedded
       return contactsWithAccounts.map(c => ({
         ...c,
@@ -1581,7 +1587,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Domain Sets
+  // Domain Sets (will be renamed to Accounts List (TAL))
   async getDomainSets(filters?: any): Promise<DomainSet[]> {
     return await db.select().from(domainSets).orderBy(desc(domainSets.createdAt));
   }
@@ -1683,7 +1689,7 @@ export class DatabaseStorage implements IStorage {
     return !!result;
   }
 
-  async getPhoneSuppressions(): Promise<SuppressionPhone[]> {
+  async getPhoneSuppressions(): Promise<SuppressionPhone[]>{
     return await db.select().from(suppressionPhones).orderBy(desc(suppressionPhones.createdAt));
   }
 
@@ -2096,7 +2102,7 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  // Domain Sets (Phase 21)
+  // Domain Sets (Phase 21) - Renamed to Accounts List (TAL)
   async getDomainSets(userId?: string): Promise<DomainSet[]> {
     let query = db.select().from(domainSets);
 

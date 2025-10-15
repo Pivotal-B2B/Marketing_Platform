@@ -193,38 +193,79 @@ export function deduplicateDomains(domains: string[]): {
 
 /**
  * Get match type and confidence based on similarity
+ * Supports matching by domain, account name, or both
  */
 export function getMatchTypeAndConfidence(
-  domain: string,
+  inputDomain: string,
+  inputAccountName: string | undefined,
   accountDomain: string,
   accountName?: string
-): { matchType: 'exact' | 'fuzzy' | 'none'; confidence: number } {
-  const normalizedDomain = normalizeDomain(domain);
-  const normalizedAccountDomain = normalizeDomain(accountDomain);
-  
-  // Exact match
-  if (normalizedDomain === normalizedAccountDomain) {
-    return { matchType: 'exact', confidence: 1.0 };
+): { matchType: 'exact' | 'fuzzy' | 'none'; confidence: number; matchedBy?: 'domain' | 'name' | 'both' } {
+  let bestMatch: { matchType: 'exact' | 'fuzzy' | 'none'; confidence: number; matchedBy?: 'domain' | 'name' | 'both' } = {
+    matchType: 'none',
+    confidence: 0
+  };
+
+  // Domain matching (if input domain provided)
+  if (inputDomain && inputDomain.trim()) {
+    const normalizedInputDomain = normalizeDomain(inputDomain);
+    const normalizedAccountDomain = normalizeDomain(accountDomain);
+    
+    // Exact domain match
+    if (normalizedInputDomain === normalizedAccountDomain) {
+      bestMatch = { matchType: 'exact', confidence: 1.0, matchedBy: 'domain' };
+    } else {
+      // Fuzzy domain match
+      const domainSimilarity = calculateSimilarity(normalizedInputDomain, normalizedAccountDomain);
+      const distance = levenshteinDistance(normalizedInputDomain, normalizedAccountDomain);
+      
+      if (domainSimilarity >= 0.85 && distance <= 3) {
+        bestMatch = { 
+          matchType: 'fuzzy', 
+          confidence: parseFloat(domainSimilarity.toFixed(2)),
+          matchedBy: 'domain'
+        };
+      }
+    }
   }
   
-  // Fuzzy match by domain similarity
-  const domainSimilarity = calculateSimilarity(normalizedDomain, normalizedAccountDomain);
-  
-  // Fuzzy match by name similarity (if account name provided)
-  let nameSimilarity = 0;
-  if (accountName) {
-    const domainName = extractCompanyNameFromDomain(normalizedDomain).toLowerCase();
-    const accountNameLower = accountName.toLowerCase();
-    nameSimilarity = calculateSimilarity(domainName, accountNameLower);
+  // Account name matching (if input account name provided)
+  if (inputAccountName && inputAccountName.trim() && accountName) {
+    const normalizedInputName = inputAccountName.toLowerCase().trim();
+    const normalizedAccountName = accountName.toLowerCase().trim();
+    
+    // Exact name match
+    if (normalizedInputName === normalizedAccountName) {
+      // If we already have exact domain match, this is a "both" match
+      if (bestMatch.matchType === 'exact' && bestMatch.matchedBy === 'domain') {
+        return { matchType: 'exact', confidence: 1.0, matchedBy: 'both' };
+      }
+      // Name exact match is stronger than fuzzy domain match
+      if (bestMatch.confidence < 1.0) {
+        bestMatch = { matchType: 'exact', confidence: 1.0, matchedBy: 'name' };
+      }
+    } else {
+      // Fuzzy name match
+      const nameSimilarity = calculateSimilarity(normalizedInputName, normalizedAccountName);
+      const nameDistance = levenshteinDistance(normalizedInputName, normalizedAccountName);
+      
+      if (nameSimilarity >= 0.85 && nameDistance <= 3) {
+        const nameConfidence = parseFloat(nameSimilarity.toFixed(2));
+        
+        // If we have both domain and name fuzzy matches, combine confidence
+        if (bestMatch.matchType === 'fuzzy' && bestMatch.matchedBy === 'domain') {
+          const combinedConfidence = parseFloat(((bestMatch.confidence + nameConfidence) / 2).toFixed(2));
+          bestMatch = {
+            matchType: 'fuzzy',
+            confidence: Math.max(combinedConfidence, bestMatch.confidence),
+            matchedBy: 'both'
+          };
+        } else if (nameConfidence > bestMatch.confidence) {
+          bestMatch = { matchType: 'fuzzy', confidence: nameConfidence, matchedBy: 'name' };
+        }
+      }
+    }
   }
   
-  const maxSimilarity = Math.max(domainSimilarity, nameSimilarity);
-  
-  // Fuzzy match if similarity >= 0.85 and Levenshtein distance <= 3
-  const distance = levenshteinDistance(normalizedDomain, normalizedAccountDomain);
-  if (maxSimilarity >= 0.85 && distance <= 3) {
-    return { matchType: 'fuzzy', confidence: parseFloat(maxSimilarity.toFixed(2)) };
-  }
-  
-  return { matchType: 'none', confidence: 0 };
+  return bestMatch;
 }

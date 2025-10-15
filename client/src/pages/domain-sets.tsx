@@ -36,10 +36,10 @@ interface DomainSetItem {
   matchedContactsCount: number;
 }
 
-export default function DomainSets() {
+export default function AccountsListTAL() {
   const { toast } = useToast();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [selectedDomainSet, setSelectedDomainSet] = useState<DomainSet | null>(null);
+  const [selectedAccountsList, setSelectedAccountsList] = useState<DomainSet | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
 
   const [name, setName] = useState("");
@@ -47,13 +47,13 @@ export default function DomainSets() {
   const [csvContent, setCsvContent] = useState("");
   const [listName, setListName] = useState("");
 
-  const { data: domainSets = [], isLoading } = useQuery<DomainSet[]>({
+  const { data: accountsLists = [], isLoading } = useQuery<DomainSet[]>({
     queryKey: ['/api/domain-sets'],
   });
 
   const { data: items = [] } = useQuery<DomainSetItem[]>({
-    queryKey: ['/api/domain-sets', selectedDomainSet?.id, 'items'],
-    enabled: !!selectedDomainSet,
+    queryKey: ['/api/domain-sets', selectedAccountsList?.id, 'items'],
+    enabled: !!selectedAccountsList,
   });
 
   const createMutation = useMutation({
@@ -68,14 +68,14 @@ export default function DomainSets() {
       setDescription("");
       setCsvContent("");
       toast({
-        title: "Domain set created",
+        title: "Accounts List created",
         description: "Processing matches in background...",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to create domain set",
+        description: "Failed to create accounts list",
         variant: "destructive",
       });
     },
@@ -91,14 +91,14 @@ export default function DomainSets() {
       setConvertDialogOpen(false);
       setListName("");
       toast({
-        title: "List created",
-        description: "Domain set converted to list successfully",
+        title: "Contact List created",
+        description: "Accounts list converted to contact list successfully",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to convert to list",
+        description: "Failed to convert to contact list",
         variant: "destructive",
       });
     },
@@ -110,16 +110,16 @@ export default function DomainSets() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/domain-sets'] });
-      setSelectedDomainSet(null);
+      setSelectedAccountsList(null);
       toast({
-        title: "Domain set deleted",
-        description: "Domain set has been removed",
+        title: "Accounts List deleted",
+        description: "Accounts list has been removed",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to delete domain set",
+        description: "Failed to delete accounts list",
         variant: "destructive",
       });
     },
@@ -137,9 +137,9 @@ export default function DomainSets() {
     createMutation.mutate({ name, description, csvContent });
   };
 
-  const handleConvertToList = (domainSet: DomainSet) => {
-    setSelectedDomainSet(domainSet);
-    setListName(`${domainSet.name} - Contact List`);
+  const handleConvertToList = (accountsList: DomainSet) => {
+    setSelectedAccountsList(accountsList);
+    setListName(`${accountsList.name} - Contact List`);
     setConvertDialogOpen(true);
   };
 
@@ -192,23 +192,23 @@ export default function DomainSets() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">Domain Sets</h1>
+          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">Accounts List (TAL)</h1>
           <p className="text-muted-foreground">
-            Upload and match domains to accounts for ABM campaigns
+            Upload and match accounts by domain and/or company name for ABM campaigns
           </p>
         </div>
         <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-upload-domain-set">
               <Upload className="mr-2 h-4 w-4" />
-              Upload Domain Set
+              Upload Accounts List
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl" data-testid="dialog-upload-domain-set">
             <DialogHeader>
-              <DialogTitle>Upload Domain Set</DialogTitle>
+              <DialogTitle>Upload Accounts List</DialogTitle>
               <DialogDescription>
-                Upload a CSV file with domains. Format: domain, account_name (optional), notes (optional)
+                Upload a CSV file with domains and/or account names. Format: domain, account_name, notes (optional)
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -238,12 +238,12 @@ export default function DomainSets() {
                   id="csvContent"
                   value={csvContent}
                   onChange={(e) => setCsvContent(e.target.value)}
-                  placeholder="acme.com,Acme Corp,Enterprise prospect&#10;example.com,Example Inc&#10;test.org"
+                  placeholder="acme.com,Acme Corp,Enterprise prospect&#10;,Example Inc,Match by name only&#10;test.org,,Match by domain only"
                   rows={8}
                   data-testid="textarea-domain-set-csv"
                 />
                 <p className="text-sm text-muted-foreground">
-                  Enter one domain per line. Optionally include account name and notes separated by commas.
+                  Enter one row per line with domain and/or account name. Separate fields with commas. System will match by domain, name, or both.
                 </p>
               </div>
             </div>
@@ -259,89 +259,98 @@ export default function DomainSets() {
         </Dialog>
       </div>
 
-      {domainSets.length === 0 ? (
+      {accountsLists.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
             <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">No domain sets yet</h3>
-            <p className="text-muted-foreground mb-4">Upload your first domain set to start matching accounts</p>
+            <h3 className="text-lg font-semibold mb-2">No accounts lists yet</h3>
+            <p className="text-muted-foreground mb-4">Upload your first accounts list to start matching</p>
             <Button onClick={() => setUploadDialogOpen(true)}>
               <Upload className="mr-2 h-4 w-4" />
-              Upload Domain Set
+              Upload Accounts List
             </Button>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-6">
-          {domainSets.map((domainSet) => (
-            <Card key={domainSet.id} data-testid={`card-domain-set-${domainSet.id}`}>
+          {accountsLists.map((accountsList) => (
+            <Card key={accountsList.id} data-testid={`card-domain-set-${accountsList.id}`} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = `/domain-sets/${accountsList.id}/accounts`}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
-                      {domainSet.name}
-                      {getStatusBadge(domainSet.status)}
+                      {accountsList.name}
+                      {getStatusBadge(accountsList.status)}
                     </CardTitle>
-                    {domainSet.description && (
-                      <CardDescription>{domainSet.description}</CardDescription>
+                    {accountsList.description && (
+                      <CardDescription>{accountsList.description}</CardDescription>
                     )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleConvertToList(domainSet)}
-                      disabled={domainSet.status !== 'completed' || domainSet.matchedAccounts === 0}
-                      data-testid={`button-convert-to-list-${domainSet.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleConvertToList(accountsList);
+                      }}
+                      disabled={accountsList.status !== 'completed' || accountsList.matchedAccounts === 0}
+                      data-testid={`button-convert-to-list-${accountsList.id}`}
                     >
                       <List className="mr-2 h-4 w-4" />
-                      Convert to List
+                      Convert to Contact List
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setSelectedDomainSet(selectedDomainSet?.id === domainSet.id ? null : domainSet)}
-                      data-testid={`button-view-details-${domainSet.id}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedAccountsList(selectedAccountsList?.id === accountsList.id ? null : accountsList);
+                      }}
+                      data-testid={`button-view-details-${accountsList.id}`}
                     >
-                      {selectedDomainSet?.id === domainSet.id ? "Hide Details" : "View Details"}
+                      {selectedAccountsList?.id === accountsList.id ? "Hide Details" : "View Details"}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => deleteMutation.mutate(domainSet.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteMutation.mutate(accountsList.id);
+                      }}
                       disabled={deleteMutation.isPending}
-                      data-testid={`button-delete-${domainSet.id}`}
+                      data-testid={`button-delete-${accountsList.id}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent onClick={(e) => e.stopPropagation()}>
                 <div className="grid grid-cols-5 gap-4 mb-4">
                   <div className="text-center">
-                    <p className="text-2xl font-bold">{domainSet.totalUploaded}</p>
+                    <p className="text-2xl font-bold">{accountsList.totalUploaded}</p>
                     <p className="text-sm text-muted-foreground">Total Uploaded</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">{domainSet.matchedAccounts}</p>
+                    <p className="text-2xl font-bold text-green-600">{accountsList.matchedAccounts}</p>
                     <p className="text-sm text-muted-foreground">Matched Accounts</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600">{domainSet.matchedContacts}</p>
+                    <p className="text-2xl font-bold text-blue-600">{accountsList.matchedContacts}</p>
                     <p className="text-sm text-muted-foreground">Matched Contacts</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-orange-600">{domainSet.unknownDomains}</p>
+                    <p className="text-2xl font-bold text-orange-600">{accountsList.unknownDomains}</p>
                     <p className="text-sm text-muted-foreground">Unknown</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-gray-600">{domainSet.duplicatesRemoved}</p>
+                    <p className="text-2xl font-bold text-gray-600">{accountsList.duplicatesRemoved}</p>
                     <p className="text-sm text-muted-foreground">Duplicates</p>
                   </div>
                 </div>
 
-                {selectedDomainSet?.id === domainSet.id && items.length > 0 && (
+                {selectedAccountsList?.id === accountsList.id && items.length > 0 && (
                   <div className="border rounded-lg">
                     <Table>
                       <TableHeader>
@@ -385,14 +394,14 @@ export default function DomainSets() {
       <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
         <DialogContent data-testid="dialog-convert-to-list">
           <DialogHeader>
-            <DialogTitle>Convert to List</DialogTitle>
+            <DialogTitle>Convert to Contact List</DialogTitle>
             <DialogDescription>
-              Create a static contact list from this domain set
+              Create a static contact list from this accounts list
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="listName">List Name</Label>
+              <Label htmlFor="listName">Contact List Name</Label>
               <Input
                 id="listName"
                 value={listName}
@@ -400,11 +409,11 @@ export default function DomainSets() {
                 data-testid="input-list-name"
               />
             </div>
-            {selectedDomainSet && (
+            {selectedAccountsList && (
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-sm">
-                  This will create a list with <strong>{selectedDomainSet.matchedContacts} contacts</strong> from{' '}
-                  <strong>{selectedDomainSet.matchedAccounts} matched accounts</strong>
+                  This will create a contact list with <strong>{selectedAccountsList.matchedContacts} contacts</strong> from{' '}
+                  <strong>{selectedAccountsList.matchedAccounts} matched accounts</strong>
                 </p>
               </div>
             )}
@@ -415,14 +424,14 @@ export default function DomainSets() {
             </Button>
             <Button
               onClick={() => {
-                if (selectedDomainSet) {
-                  convertMutation.mutate({ id: selectedDomainSet.id, listName });
+                if (selectedAccountsList) {
+                  convertMutation.mutate({ id: selectedAccountsList.id, listName });
                 }
               }}
               disabled={!listName || convertMutation.isPending}
               data-testid="button-confirm-convert"
             >
-              {convertMutation.isPending ? "Creating..." : "Create List"}
+              {convertMutation.isPending ? "Creating..." : "Create Contact List"}
             </Button>
           </DialogFooter>
         </DialogContent>

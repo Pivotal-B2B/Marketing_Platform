@@ -6,8 +6,8 @@ import webhooksRouter from "./routes/webhooks";
 import { z } from "zod";
 import { db } from "./db";
 import { customFieldDefinitions } from "@shared/schema";
-import { 
-  insertAccountSchema, 
+import {
+  insertAccountSchema,
   insertContactSchema,
   insertCustomFieldDefinitionSchema,
   updateCustomFieldDefinitionSchema,
@@ -110,9 +110,9 @@ export function registerRoutes(app: Express) {
 
       // Return token and user info without password
       const { password: _, ...userWithoutPassword } = user;
-      res.json({ 
-        token, 
-        user: userWithoutPassword 
+      res.json({
+        token,
+        user: userWithoutPassword
       });
     } catch (error) {
       res.status(500).json({ message: "Login failed" });
@@ -369,9 +369,9 @@ export function registerRoutes(app: Express) {
           results.success++;
         } catch (error) {
           results.failed++;
-          results.errors.push({ 
-            index: i, 
-            error: error instanceof Error ? error.message : "Unknown error" 
+          results.errors.push({
+            index: i,
+            error: error instanceof Error ? error.message : "Unknown error"
           });
         }
       }
@@ -611,7 +611,7 @@ export function registerRoutes(app: Express) {
       const { id } = req.params;
 
       const [field] = await db.update(customFieldDefinitions)
-        .set({ 
+        .set({
           active: false,
           updatedAt: new Date(),
         })
@@ -655,7 +655,7 @@ export function registerRoutes(app: Express) {
 
           // Find matching account by domain
           const accounts = await storage.getAccounts();
-          const matchingAccount = accounts.find(a => 
+          const matchingAccount = accounts.find(a =>
             a.domain?.toLowerCase() === emailDomain
           );
 
@@ -720,7 +720,7 @@ export function registerRoutes(app: Express) {
         const normalized = normalizePhoneE164(contactData.mobilePhone, contactData.country || undefined);
         contactData.mobilePhoneE164 = normalized;
       }
-      
+
       // Check phone suppression if provided
       if (contactData.directPhoneE164 && await storage.isPhoneSuppressed(contactData.directPhoneE164)) {
         return res.status(400).json({ message: "Phone is on DNC list" });
@@ -832,16 +832,16 @@ export function registerRoutes(app: Express) {
 
       // Get all lists for this entity type that contain this ID
       const allLists = await storage.getLists();
-      const listsContainingEntity = allLists.filter(list => 
-        list.entityType === normalizedEntityType && 
-        list.recordIds && 
+      const listsContainingEntity = allLists.filter(list =>
+        list.entityType === normalizedEntityType &&
+        list.recordIds &&
         list.recordIds.includes(id)
       );
 
       // Get all segments for this entity type
       const allSegments = await storage.getSegments();
-      const relevantSegments = allSegments.filter(seg => 
-        seg.entityType === normalizedEntityType && 
+      const relevantSegments = allSegments.filter(seg =>
+        seg.entityType === normalizedEntityType &&
         seg.isActive
       );
 
@@ -850,7 +850,7 @@ export function registerRoutes(app: Express) {
       for (const segment of relevantSegments) {
         if (segment.definitionJson) {
           const preview = await storage.previewSegment(
-            normalizedEntityType, 
+            normalizedEntityType,
             segment.definitionJson
           );
           if (preview.sampleIds.includes(id)) {
@@ -888,7 +888,7 @@ export function registerRoutes(app: Express) {
           segment.entityType || 'contact',
           segment.definitionJson
         );
-        await storage.updateSegment(segment.id, { 
+        await storage.updateSegment(segment.id, {
           recordCountCache: preview.count,
           lastRefreshedAt: new Date()
         });
@@ -1148,7 +1148,7 @@ export function registerRoutes(app: Express) {
         tags: tags || [],
       });
 
-      // Create domain items
+      // Create domain item
       const items = unique.map(domain => ({
         domainSetId: domainSet.id,
         domain,
@@ -1172,7 +1172,27 @@ export function registerRoutes(app: Express) {
       const items = await storage.getDomainSetItems(req.params.id);
       res.json(items);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch domain set items" });
+      console.error('Get domain set items error:', error);
+      res.status(500).json({ message: "Failed to get domain set items" });
+    }
+  });
+
+  app.get("/api/domain-sets/:id/accounts", requireAuth, async (req, res) => {
+    try {
+      const items = await storage.getDomainSetItems(req.params.id);
+      const accountIds = items
+        .filter(item => item.accountId)
+        .map(item => item.accountId as string);
+
+      if (accountIds.length === 0) {
+        return res.json([]);
+      }
+
+      const accounts = await storage.getAccountsByIds(accountIds);
+      res.json(accounts);
+    } catch (error) {
+      console.error('Get domain set accounts error:', error);
+      res.status(500).json({ message: "Failed to get domain set accounts" });
     }
   });
 
@@ -1744,7 +1764,7 @@ export function registerRoutes(app: Express) {
       thisMonth.setDate(1);
       thisMonth.setHours(0, 0, 0, 0);
 
-      const leadsThisMonth = leads.filter(l => 
+      const leadsThisMonth = leads.filter(l =>
         l.createdAt && new Date(l.createdAt) >= thisMonth
       ).length;
 
@@ -1760,7 +1780,7 @@ export function registerRoutes(app: Express) {
       });
     } catch (error) {
       console.error("Dashboard stats error:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: "Failed to fetch dashboard stats",
         error: error instanceof Error ? error.message : String(error)
       });
@@ -1957,7 +1977,7 @@ export function registerRoutes(app: Express) {
       const userId = req.user!.id;
 
       // Opportunistic cleanup of expired contexts
-      await storage.deleteExpiredSelectionContexts().catch(() => {});
+      await storage.deleteExpiredSelectionContexts().catch(() => { });
 
       const context = await storage.getSelectionContext(req.params.id, userId);
       if (!context) {
@@ -1974,7 +1994,7 @@ export function registerRoutes(app: Express) {
       const userId = req.user!.id;
 
       // Opportunistic cleanup of expired contexts
-      await storage.deleteExpiredSelectionContexts().catch(() => {});
+      await storage.deleteExpiredSelectionContexts().catch(() => { });
 
       // Validate client payload (omit server-managed fields)
       const clientSchema = insertSelectionContextSchema.omit({ userId: true, expiresAt: true });
@@ -2181,9 +2201,9 @@ export function registerRoutes(app: Express) {
       }
     } catch (error) {
       console.error("Error pushing content:", error);
-      res.status(500).json({ 
-        message: "Failed to push content", 
-        error: error instanceof Error ? error.message : String(error) 
+      res.status(500).json({
+        message: "Failed to push content",
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -2210,7 +2230,7 @@ export function registerRoutes(app: Express) {
 
       // Enforce max attempts limit BEFORE updating or retrying
       if (pushRecord.attemptCount >= pushRecord.maxAttempts) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Max retry attempts reached",
           attemptCount: pushRecord.attemptCount,
           maxAttempts: pushRecord.maxAttempts
@@ -2226,7 +2246,7 @@ export function registerRoutes(app: Express) {
       // Calculate new attempt count and verify it doesn't exceed max
       const newAttemptCount = pushRecord.attemptCount + 1;
       if (newAttemptCount > pushRecord.maxAttempts) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Cannot retry: would exceed max attempts",
           attemptCount: pushRecord.attemptCount,
           maxAttempts: pushRecord.maxAttempts
@@ -2234,9 +2254,9 @@ export function registerRoutes(app: Express) {
       }
 
       // Update attempt count and status atomically
-      await storage.updateContentPush(id, { 
-        status: 'retrying', 
-        attemptCount: newAttemptCount 
+      await storage.updateContentPush(id, {
+        status: 'retrying',
+        attemptCount: newAttemptCount
       });
 
       // Retry push
@@ -2270,9 +2290,9 @@ export function registerRoutes(app: Express) {
       }
     } catch (error) {
       console.error("Error retrying push:", error);
-      res.status(500).json({ 
-        message: "Failed to retry push", 
-        error: error instanceof Error ? error.message : String(error) 
+      res.status(500).json({
+        message: "Failed to retry push",
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });
@@ -2702,21 +2722,21 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes('environment variable')) {
-          return res.status(400).json({ 
-            message: "Configuration error", 
-            error: error.message 
+          return res.status(400).json({
+            message: "Configuration error",
+            error: error.message
           });
         }
         if (error.message.includes('API key')) {
-          return res.status(401).json({ 
-            message: "Authentication failed with Resources Centre", 
-            error: error.message 
+          return res.status(401).json({
+            message: "Authentication failed with Resources Centre",
+            error: error.message
           });
         }
       }
-      res.status(500).json({ 
-        message: "Sync failed", 
-        error: error instanceof Error ? error.message : "Unknown error" 
+      res.status(500).json({
+        message: "Sync failed",
+        error: error instanceof Error ? error.message : "Unknown error"
       });
     }
   });

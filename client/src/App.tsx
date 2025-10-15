@@ -20,6 +20,7 @@ import SegmentsPage from "@/pages/segments";
 import SegmentDetailPage from "@/pages/segment-detail";
 import ListDetailPage from "@/pages/list-detail";
 import DomainSetsPage from "@/pages/domain-sets";
+import AccountsListDetail from "@/pages/accounts-list-detail";
 import CampaignsPage from "@/pages/campaigns";
 import EmailCampaignsPage from "@/pages/email-campaigns";
 import EmailCampaignCreatePage from "@/pages/email-campaign-create";
@@ -44,7 +45,7 @@ import ResourcesCentrePage from "@/pages/resources-centre";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
-  
+
   // Custom sidebar width for enterprise CRM
   const style = {
     "--sidebar-width": "16rem",       // 256px for better navigation
@@ -68,6 +69,7 @@ function AuthenticatedApp() {
               <Route path="/segments/:id" component={SegmentDetailPage} />
               <Route path="/segments" component={SegmentsPage} />
               <Route path="/domain-sets" component={DomainSetsPage} />
+              <Route path="/domain-sets/:id/accounts" component={AccountsListDetail} />
               <Route path="/campaigns" component={CampaignsPage} />
               <Route path="/campaigns/email/create" component={EmailCampaignCreatePage} />
               <Route path="/campaigns/email" component={EmailCampaignsPage} />

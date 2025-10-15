@@ -22,7 +22,8 @@ import {
   Sparkles,
   Share2,
   FileText,
-  Cloud
+  Cloud,
+  Layers, // Added Layers icon for clarity, assuming it might be relevant for "Accounts List"
 } from "lucide-react";
 import {
   Sidebar,
@@ -75,7 +76,7 @@ const getNavStructure = (): NavItem[] => [
     items: [
       { title: "All Accounts", url: "/accounts", roles: ["admin", "campaign_manager", "data_ops"] },
       { title: "Segments & Lists", url: "/segments?entity=account", roles: ["admin", "campaign_manager", "data_ops"] },
-      { title: "Domain Sets", url: "/domain-sets", roles: ["admin", "data_ops"] },
+      { title: "Accounts List (TAL)", url: "/accounts-list", roles: ["admin", "data_ops"] }, // Changed from "Domain Sets"
     ],
   },
   {
@@ -179,22 +180,22 @@ export function AppSidebar({ userRole = "admin" }: { userRole?: string }) {
       // Handle URLs with query parameters
       const urlWithoutParams = url.split('?')[0];
       const locationWithoutParams = location.split('?')[0];
-      
+
       // Exact match for simple URLs
       if (location === url) return true;
-      
+
       // Base path match for URLs with query params
       if (url.includes('?') && locationWithoutParams === urlWithoutParams) {
         return location.includes(url.split('?')[1]);
       }
-      
+
       return false;
     }
     if (items) {
       return items.some(item => {
         const itemUrlWithoutParams = item.url.split('?')[0];
         const locationWithoutParams = location.split('?')[0];
-        
+
         if (location === item.url) return true;
         if (item.url.includes('?') && locationWithoutParams === itemUrlWithoutParams) {
           return location.includes(item.url.split('?')[1]);
