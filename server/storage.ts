@@ -967,34 +967,6 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(campaignAudienceSnapshots).where(eq(campaignAudienceSnapshots.campaignId, campaignId));
   }
 
-  // Sender Profiles
-  async getSenderProfiles(): Promise<SenderProfile[]> {
-    return await db.select().from(senderProfiles).where(eq(senderProfiles.isActive, true));
-  }
-
-  async getSenderProfile(id: string): Promise<SenderProfile | undefined> {
-    const [profile] = await db.select().from(senderProfiles).where(eq(senderProfiles.id, id));
-    return profile || undefined;
-  }
-
-  async createSenderProfile(insertProfile: InsertSenderProfile): Promise<SenderProfile> {
-    const [profile] = await db.insert(senderProfiles).values(insertProfile).returning();
-    return profile;
-  }
-
-  async updateSenderProfile(id: string, updateData: Partial<InsertSenderProfile>): Promise<SenderProfile | undefined> {
-    const [profile] = await db
-      .update(senderProfiles)
-      .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(senderProfiles.id, id))
-      .returning();
-    return profile || undefined;
-  }
-
-  async deleteSenderProfile(id: string): Promise<void> {
-    await db.delete(senderProfiles).where(eq(senderProfiles.id, id));
-  }
-
   // Email Templates
   async getEmailTemplates(): Promise<EmailTemplate[]> {
     return await db.select().from(emailTemplates).orderBy(desc(emailTemplates.createdAt));
