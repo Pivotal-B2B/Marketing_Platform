@@ -105,31 +105,42 @@ export default function UserManagementPage() {
   };
 
   const handleSaveUser = () => {
-    if (!username || !email || (!editingUser && !password)) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-      });
-      return;
-    }
-
-    if (selectedRoles.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Please select at least one role",
-      });
-      return;
-    }
-
     if (editingUser) {
+      // Editing existing user - only validate roles
+      if (selectedRoles.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Please select at least one role",
+        });
+        return;
+      }
+
       // Update existing user roles
       updateRolesMutation.mutate({
         userId: editingUser.id,
         roles: selectedRoles,
       });
     } else {
+      // Creating new user - validate all required fields
+      if (!username || !email || !password) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Please fill in all required fields",
+        });
+        return;
+      }
+
+      if (selectedRoles.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Please select at least one role",
+        });
+        return;
+      }
+
       // Create new user
       const data = {
         username,
@@ -194,9 +205,9 @@ export default function UserManagementPage() {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>{editingUser ? 'Edit' : 'Create'} User</DialogTitle>
+              <DialogTitle>{editingUser ? 'Edit User Roles' : 'Create User'}</DialogTitle>
               <DialogDescription>
-                {editingUser ? 'Update user roles and permissions' : 'Add a new user to the system'}
+                {editingUser ? `Update roles for ${editingUser.username}` : 'Add a new user to the system'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -256,7 +267,7 @@ export default function UserManagementPage() {
               )}
               
               <div className="space-y-3">
-                <Label>Roles * {editingUser && `(${editingUser.username})`}</Label>
+                <Label>Roles *</Label>
                 <div className="space-y-2 border rounded-md p-3">
                   {AVAILABLE_ROLES.map((role) => (
                     <div key={role.value} className="flex items-center space-x-2">
