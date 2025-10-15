@@ -191,27 +191,26 @@ export const contentStatusEnum = pgEnum('content_status', [
 
 // Pivotal B2B Standard Template Enums
 export const revenueRangeEnum = pgEnum('revenue_range', [
-  'Under $1M',
-  '$1M - $10M',
-  '$10M - $50M',
+  '$0 - $100K',
+  '$100K - $1M',
+  '$1M - $5M',
+  '$5M - $20M',
+  '$20M - $50M',
   '$50M - $100M',
   '$100M - $500M',
   '$500M - $1B',
-  '$1B - $5B',
-  'Over $5B',
-  'Unknown'
+  '$1B+'
 ]);
 
 export const staffCountRangeEnum = pgEnum('staff_count_range', [
-  '1-10',
-  '11-50',
-  '50-100',
-  '100-500',
-  '500-1000',
-  '1000-5000',
-  '5000-10000',
-  '10000+',
-  'Unknown'
+  '2-10 employees',
+  '11 - 50 employees',
+  '51 - 200 employees',
+  '201 - 500 employees',
+  '501 - 1,000 employees',
+  '1,001 - 5,000 employees',
+  '5,001 - 10,000 employees',
+  '10,001+ employees'
 ]);
 
 // Disposition & Call Management Enums
