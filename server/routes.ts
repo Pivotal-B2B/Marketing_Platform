@@ -2038,7 +2038,22 @@ export function registerRoutes(app: Express) {
     try {
       const config = await storage.getDefaultSipTrunkConfig();
       if (!config) {
-        return res.status(404).json({ message: "No default SIP trunk configured" });
+        // If no default is set, try to get any active trunk
+        const allConfigs = await storage.getSipTrunkConfigs();
+        const activeConfig = allConfigs.find(c => c.isActive);
+        
+        if (!activeConfig) {
+          return res.status(404).json({ message: "No default SIP trunk configured" });
+        }
+        
+        // Use the first active trunk as fallback
+        const secureConfig = {
+          ...activeConfig,
+          sipUsername: process.env.TELNYX_SIP_USERNAME || activeConfig.sipUsername,
+          sipPassword: process.env.TELNYX_SIP_PASSWORD || activeConfig.sipPassword,
+        };
+        
+        return res.json(secureConfig);
       }
       
       // Override credentials with secure environment variables
