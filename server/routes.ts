@@ -1735,9 +1735,9 @@ export function registerRoutes(app: Express) {
         storage.getLeads()
       ]);
 
-      const activeCampaigns = campaigns.filter(c => c.status === 'active' || c.status === 'launched');
+      const activeCampaigns = campaigns.filter(c => c.status === 'active');
       const emailCampaigns = activeCampaigns.filter(c => c.type === 'email').length;
-      const callCampaigns = activeCampaigns.filter(c => c.type === 'telemarketing').length;
+      const callCampaigns = activeCampaigns.filter(c => c.type === 'call').length;
 
       const thisMonth = new Date();
       thisMonth.setDate(1);
