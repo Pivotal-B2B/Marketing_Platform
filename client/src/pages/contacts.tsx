@@ -305,27 +305,11 @@ export default function ContactsPage() {
     },
   });
 
-  // Use a dummy selection object for now, as the actual one is not defined in the original code.
-  // This is a placeholder to make the code compile and address the specific mutation fix.
-  const selection = {
-    selectedIds: new Set<string>(),
-    selectedCount: 0,
-    selectItem: (id: string) => {},
-    selectAll: () => {},
-    clearSelection: () => {},
-    isSelected: (id: string) => false,
-    isAllSelected: false,
-    isSomeSelected: false,
-  };
-
   const addToListMutation = useMutation({
     mutationFn: async (listId: string) => {
-      // Note: The original code used `selection.selectedIds`. Assuming `selectedIds` from `useSelection` hook is intended.
-      const response = await apiRequest(`/api/lists/${listId}/contacts`, {
-        method: 'POST',
-        body: JSON.stringify({ contactIds: Array.from(selectedIds) }),
+      return await apiRequest('POST', `/api/lists/${listId}/contacts`, {
+        contactIds: Array.from(selectedIds)
       });
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
