@@ -33,8 +33,11 @@ export function Step3Scheduling({ data, onNext, campaignType }: Step3Props) {
       });
       if (!response.ok) throw new Error("Failed to fetch agents");
       const users = await response.json();
-      // Filter to only show agents
-      return users.filter((user: any) => user.role === 'agent');
+      // Filter to only show users with 'agent' role (multi-role support)
+      return users.filter((user: any) => {
+        const userRoles = user.roles || [user.role];
+        return userRoles.includes('agent');
+      });
     },
     enabled: campaignType === "telemarketing",
   });
