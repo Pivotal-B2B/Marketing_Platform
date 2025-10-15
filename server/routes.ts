@@ -370,7 +370,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/accounts/:id/industry/ai-review", requireAuth, requireRole('admin', 'data_ops', 'campaign_manager'), async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const validatedReview = reviewAccountIndustryAISchema.parse(req.body);
       const account = await storage.reviewAccountIndustryAI(req.params.id, userId, validatedReview);
       if (!account) {
@@ -878,7 +878,7 @@ export function registerRoutes(app: Express) {
           sourceSystem,
           sourceRecordId,
           sourceUpdatedAt: sourceUpdatedAt ? new Date(sourceUpdatedAt) : undefined,
-          actorId: req.user!.id
+          actorId: req.user!.userId
         }
       );
 
@@ -920,7 +920,7 @@ export function registerRoutes(app: Express) {
           sourceSystem,
           sourceRecordId,
           sourceUpdatedAt: sourceUpdatedAt ? new Date(sourceUpdatedAt) : undefined,
-          actorId: req.user!.id
+          actorId: req.user!.userId
         }
       );
 
@@ -2329,7 +2329,7 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/saved-filters", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const entityType = req.query.entityType as string | undefined;
       const filters = await storage.getSavedFilters(userId, entityType);
       res.json(filters);
@@ -2340,7 +2340,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/saved-filters", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const validated = insertSavedFilterSchema.parse(req.body);
       const savedFilter = await storage.createSavedFilter({ ...validated, userId });
       res.status(201).json(savedFilter);
@@ -2354,7 +2354,7 @@ export function registerRoutes(app: Express) {
 
   app.patch("/api/saved-filters/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const filter = await storage.updateSavedFilter(req.params.id, userId, req.body);
       if (!filter) {
         return res.status(404).json({ message: "Saved filter not found" });
@@ -2367,7 +2367,7 @@ export function registerRoutes(app: Express) {
 
   app.delete("/api/saved-filters/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const deleted = await storage.deleteSavedFilter(req.params.id, userId);
       if (!deleted) {
         return res.status(404).json({ message: "Saved filter not found" });
@@ -2535,7 +2535,7 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/selection-contexts/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       // Opportunistic cleanup of expired contexts
       await storage.deleteExpiredSelectionContexts().catch(() => { });
@@ -2552,7 +2552,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/selection-contexts", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       // Opportunistic cleanup of expired contexts
       await storage.deleteExpiredSelectionContexts().catch(() => { });
@@ -2581,7 +2581,7 @@ export function registerRoutes(app: Express) {
 
   app.delete("/api/selection-contexts/:id", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const deleted = await storage.deleteSelectionContext(req.params.id, userId);
       if (!deleted) {
         return res.status(404).json({ message: "Selection context not found" });
@@ -2899,7 +2899,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/ai-content", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const { prompt, contentType, targetAudience, tone, ctaGoal } = req.body;
 
       // TODO: Integrate with OpenAI/Anthropic API for real generation
@@ -2937,7 +2937,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/events", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const validated = insertEventSchema.parse(req.body);
       const event = await storage.createEvent({ ...validated, createdBy: userId });
       res.status(201).json(event);
@@ -3002,7 +3002,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/resources", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const validated = insertResourceSchema.parse(req.body);
       const resource = await storage.createResource({ ...validated, createdBy: userId });
       res.status(201).json(resource);
@@ -3067,7 +3067,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/news", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const validated = insertNewsSchema.parse(req.body);
       const newsItem = await storage.createNews({ ...validated, createdBy: userId });
       res.status(201).json(newsItem);
@@ -3316,7 +3316,7 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/sender-profiles", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const validated = insertSenderProfileSchema.parse(req.body);
       const profile = await storage.createSenderProfile({ ...validated, createdBy: userId });
       res.status(201).json(profile);
@@ -3370,7 +3370,7 @@ export function registerRoutes(app: Express) {
   // Softphone Profile Routes
   app.get("/api/softphone/profile", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const profile = await storage.getSoftphoneProfile(userId);
       if (!profile) {
         return res.status(404).json({ message: "Softphone profile not found" });
@@ -3383,7 +3383,7 @@ export function registerRoutes(app: Express) {
 
   app.put("/api/softphone/profile", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const validated = insertSoftphoneProfileSchema.parse(req.body);
       const profile = await storage.upsertSoftphoneProfile({ ...validated, userId });
       res.json(profile);
@@ -3398,7 +3398,7 @@ export function registerRoutes(app: Express) {
   // Call Recording Access Routes
   app.post("/api/calls/:attemptId/recording/access", requireAuth, requireRole('admin', 'qa_specialist'), async (req, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const { attemptId } = req.params;
       const { action } = req.body; // 'play' or 'download'
 
