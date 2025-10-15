@@ -4,12 +4,12 @@
  */
 
 import { neon } from '@neondatabase/serverless';
-import bcrypt from 'bcryptjs';
+const bcrypt = require('bcryptjs');
 
 async function fixProductionLogin() {
-  // Use DATABASE_URL from environment (this will be production when deployed)
+  // Use DATABASE_URL from environment (this will be deployed when deployed)
   const databaseUrl = process.env.DATABASE_URL;
-  
+
   if (!databaseUrl) {
     console.error('❌ DATABASE_URL not found in environment');
     process.exit(1);
@@ -21,9 +21,10 @@ async function fixProductionLogin() {
 
   try {
     // Generate new password hash
-    const newPassword = 'admin123';
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
+    const password = 'admin123';
+    // Use salt rounds of 10 to match auth.ts
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     console.log('🔑 Generated new password hash');
 
     // Update admin user password
@@ -36,14 +37,14 @@ async function fixProductionLogin() {
 
     if (result.length === 0) {
       console.log('⚠️  Admin user not found. Creating new admin user...');
-      
+
       // Create admin user if not exists
       const newUser = await sql`
         INSERT INTO users (username, email, password, role, first_name, last_name)
         VALUES ('admin', 'admin@crm.local', ${hashedPassword}, 'admin', 'System', 'Administrator')
         RETURNING id, username, email, role
       `;
-      
+
       console.log('✅ Admin user created:');
       console.log('   Username:', newUser[0].username);
       console.log('   Email:', newUser[0].email);
