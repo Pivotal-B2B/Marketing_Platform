@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 
 export default function CampaignsPage() {
   const [activeTab, setActiveTab] = useState("all");
+  const [, setLocation] = useLocation();
 
   // Placeholder: In real implementation, these would fetch from API
   const { data: campaigns = [], isLoading } = useQuery({
@@ -170,11 +172,18 @@ export default function CampaignsPage() {
                 </TabsTrigger>
               </TabsList>
               <div className="flex gap-2">
-                <Button data-testid="button-new-email-campaign">
+                <Button 
+                  onClick={() => setLocation("/campaigns/email/create")}
+                  data-testid="button-new-email-campaign"
+                >
                   <Mail className="mr-2 h-4 w-4" />
                   New Email Campaign
                 </Button>
-                <Button variant="outline" data-testid="button-new-phone-campaign">
+                <Button 
+                  variant="outline"
+                  onClick={() => setLocation("/campaigns/telemarketing/create")}
+                  data-testid="button-new-phone-campaign"
+                >
                   <Phone className="mr-2 h-4 w-4" />
                   New Phone Campaign
                 </Button>
