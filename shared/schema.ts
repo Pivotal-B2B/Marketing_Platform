@@ -14,7 +14,8 @@ import {
   boolean,
   real,
   numeric,
-  foreignKey
+  foreignKey,
+  primaryKey
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -31,6 +32,8 @@ export const userRoleEnum = pgEnum('user_role', [
 ]);
 
 export const campaignTypeEnum = pgEnum('campaign_type', ['email', 'call', 'combo']);
+export const accountCapModeEnum = pgEnum('account_cap_mode', ['queue_size', 'connected_calls', 'positive_disp']);
+export const queueStatusEnum = pgEnum('queue_status', ['queued', 'in_progress', 'done', 'removed']);
 export const campaignStatusEnum = pgEnum('campaign_status', [
   'draft', 
   'scheduled', 
@@ -563,12 +566,44 @@ export const campaigns = pgTable("campaigns", {
   callScript: text("call_script"),
   qualificationQuestions: jsonb("qualification_questions"),
   ownerId: varchar("owner_id").references(() => users.id),
+  accountCapEnabled: boolean("account_cap_enabled").notNull().default(false),
+  accountCapValue: integer("account_cap_value"),
+  accountCapMode: accountCapModeEnum("account_cap_mode"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   launchedAt: timestamp("launched_at"),
 }, (table) => ({
   statusIdx: index("campaigns_status_idx").on(table.status),
   typeIdx: index("campaigns_type_idx").on(table.type),
+}));
+
+// Campaign Queue table (for account lead cap enforcement)
+export const campaignQueue = pgTable("campaign_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  priority: integer("priority").notNull().default(0),
+  status: queueStatusEnum("status").notNull().default('queued'),
+  removedReason: text("removed_reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignAccountIdx: index("campaign_queue_camp_acct_idx").on(table.campaignId, table.accountId),
+  campaignStatusIdx: index("campaign_queue_camp_status_idx").on(table.campaignId, table.status),
+  campaignContactUniq: uniqueIndex("campaign_queue_camp_contact_uniq").on(table.campaignId, table.contactId),
+}));
+
+// Campaign Account Stats table (for O(1) cap checks)
+export const campaignAccountStats = pgTable("campaign_account_stats", {
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  queuedCount: integer("queued_count").notNull().default(0),
+  connectedCount: integer("connected_count").notNull().default(0),
+  positiveDispCount: integer("positive_disp_count").notNull().default(0),
+  lastEnforcedAt: timestamp("last_enforced_at"),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.campaignId, table.accountId] }),
 }));
 
 // Email Messages table
@@ -1106,6 +1141,16 @@ export const insertCampaignSchema = createInsertSchema(campaigns).omit({
   createdAt: true,
   updatedAt: true,
   launchedAt: true,
+});
+
+export const insertCampaignQueueSchema = createInsertSchema(campaignQueue).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCampaignAccountStatsSchema = createInsertSchema(campaignAccountStats).omit({
+  lastEnforcedAt: true,
 });
 
 export const insertCampaignAudienceSnapshotSchema = createInsertSchema(campaignAudienceSnapshots).omit({
