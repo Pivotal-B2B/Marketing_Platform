@@ -4305,7 +4305,7 @@ export function registerRoutes(app: Express) {
   // ==================== AI-POWERED QA SYSTEM ====================
 
   // Trigger transcription for a lead
-  app.post("/api/leads/:id/transcribe", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+  app.post("/api/leads/:id/transcribe", requireAuth, async (req, res) => {
     try {
       const { transcribeLeadCall } = await import('./services/assemblyai-transcription');
       const success = await transcribeLeadCall(req.params.id);
@@ -4322,7 +4322,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Analyze lead with AI
-  app.post("/api/leads/:id/analyze", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+  app.post("/api/leads/:id/analyze", requireAuth, async (req, res) => {
     try {
       const { analyzeLeadQualification } = await import('./services/ai-qa-analyzer');
       const analysis = await analyzeLeadQualification(req.params.id);
@@ -4339,7 +4339,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Enrich account data with AI
-  app.post("/api/accounts/:id/enrich", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+  app.post("/api/accounts/:id/enrich", requireAuth, async (req, res) => {
     try {
       const { enrichAccountData } = await import('./services/ai-account-enrichment');
       const enrichmentResult = await enrichAccountData(req.params.id);
@@ -4356,7 +4356,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Verify account against client criteria
-  app.post("/api/accounts/:id/verify", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+  app.post("/api/accounts/:id/verify", requireAuth, async (req, res) => {
     try {
       const { verifyAccountAgainstCriteria } = await import('./services/ai-account-enrichment');
       const { client_criteria } = req.body;
@@ -4370,7 +4370,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Batch enrich accounts for a campaign
-  app.post("/api/campaigns/:id/enrich-accounts", requireAuth, requireRole(['admin', 'campaign_manager']), async (req, res) => {
+  app.post("/api/campaigns/:id/enrich-accounts", requireAuth, async (req, res) => {
     try {
       const { enrichCampaignAccounts } = await import('./services/ai-account-enrichment');
       
@@ -4387,7 +4387,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Update campaign QA parameters
-  app.patch("/api/campaigns/:id/qa-parameters", requireAuth, requireRole(['admin', 'campaign_manager']), async (req, res) => {
+  app.patch("/api/campaigns/:id/qa-parameters", requireAuth, async (req, res) => {
     try {
       const { qaParameters, clientSubmissionConfig } = req.body;
       
@@ -4404,7 +4404,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Submit lead to client
-  app.post("/api/leads/:id/submit-to-client", requireAuth, requireRole(['admin', 'quality_analyst']), async (req, res) => {
+  app.post("/api/leads/:id/submit-to-client", requireAuth, async (req, res) => {
     try {
       const { leads } = await import('@shared/schema');
       
@@ -4418,7 +4418,7 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "Lead has no associated campaign" });
       }
 
-      const campaign = await storage.getCampaignById(lead.campaignId);
+      const campaign = await storage.getCampaign(lead.campaignId);
       if (!campaign?.clientSubmissionConfig) {
         return res.status(400).json({ message: "Campaign has no client submission configuration" });
       }
@@ -4426,8 +4426,8 @@ export function registerRoutes(app: Express) {
       const submissionConfig = campaign.clientSubmissionConfig as any;
       
       // Get contact and account data
-      const contact = lead.contactId ? await storage.getContactById(lead.contactId) : null;
-      const account = contact?.accountId ? await storage.getAccountById(contact.accountId) : null;
+      const [contact] = lead.contactId ? await db.select().from(contactsTable).where(eq(contactsTable.id, lead.contactId)).limit(1) : [null];
+      const [account] = contact?.accountId ? await db.select().from(accountsTable).where(eq(accountsTable.id, contact.accountId)).limit(1) : [null];
 
       // Prepare submission data
       const submissionData: any = {};

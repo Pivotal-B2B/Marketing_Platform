@@ -13,6 +13,13 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 ## System Architecture
 The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCSS, and shadcn/ui** for the frontend, and **Node.js + Express + TypeScript** with a **PostgreSQL (Neon) database via Drizzle ORM** for the backend. JWT authentication provides role-based access control.
 
+**AI-Powered Quality Assurance:**
+- **AssemblyAI Integration:** Automatic call transcription for qualified leads (~$0.30/hour)
+- **Replit AI Integrations (OpenAI-compatible):** GPT-4.1-mini for lead qualification scoring and account enrichment
+- **Multi-Factor Scoring:** Analyzes content interest, permission, email confirmation, compliance consent, qualification answers, data accuracy, email deliverability, and phone validity
+- **Account Enrichment & Verification:** AI-powered web research to validate industry, size, revenue, and technology stack against client criteria
+- **One-Click Client Submission:** Configurable webhook/form submission to client landing pages after approval
+
 **UI/UX Design:**
 - **Color Scheme:** Primary Royal Blue with Teal accent, adaptive light/dark surfaces, and semantic status colors.
 - **Typography:** Inter font for text, JetBrains Mono for data.
