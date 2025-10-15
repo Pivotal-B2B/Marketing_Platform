@@ -15,7 +15,9 @@ import {
   real,
   numeric,
   foreignKey,
-  primaryKey
+  primaryKey,
+  date,
+  decimal
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -727,11 +729,11 @@ export const campaigns = pgTable("campaigns", {
   // Business Hours Configuration for Auto-Dialer
   businessHoursConfig: jsonb("business_hours_config"), // { enabled: bool, timezone: string, operatingDays: string[], startTime: string, endTime: string, respectContactTimezone: bool, excludedDates: string[] }
 
-  // New fields for campaign creation enhancement
+  // Campaign goals and timeline (Phase 31)
   targetQualifiedLeads: integer("target_qualified_leads"),
-  startDate: timestamp("start_date"),
-  endDate: timestamp("end_date"),
-  costPerLead: numeric("cost_per_lead"),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  costPerLead: decimal("cost_per_lead", { precision: 10, scale: 2 }),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
