@@ -27,6 +27,7 @@ interface DomainSet {
   unknownDomains: number;
   status: 'processing' | 'completed' | 'error';
   createdAt: string;
+  domains: string[]; // Added for filter construction
 }
 
 interface DomainSetItem {

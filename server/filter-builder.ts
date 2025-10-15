@@ -58,6 +58,37 @@ function buildCondition(condition: FilterCondition, table: TableType): SQL | und
     return boolValue ? isNotNull(contacts.accountId) : isNull(contacts.accountId);
   }
 
+  // Handle account relationship fields for contacts
+  if (table === contacts && field === 'accountName') {
+    if (operator === 'equals') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.name} = ${value})`;
+    } else if (operator === 'contains') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.name} ILIKE ${'%' + value + '%'})`;
+    } else if (operator === 'startsWith') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.name} ILIKE ${value + '%'})`;
+    } else if (operator === 'isEmpty') {
+      return isNull(contacts.accountId);
+    } else if (operator === 'isNotEmpty') {
+      return isNotNull(contacts.accountId);
+    }
+  }
+
+  if (table === contacts && field === 'accountDomain') {
+    if (operator === 'equals') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.domain} = ${value})`;
+    } else if (operator === 'contains') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.domain} ILIKE ${'%' + value + '%'})`;
+    } else if (operator === 'containsAny') {
+      const values = value as string[];
+      if (values.length === 0) return undefined;
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.domain} = ANY(${values}))`;
+    } else if (operator === 'isEmpty') {
+      return isNull(contacts.accountId);
+    } else if (operator === 'isNotEmpty') {
+      return isNotNull(contacts.accountId);
+    }
+  }
+
   // Get the actual column name from field mapping
   const columnName = getColumnName(field, table);
   

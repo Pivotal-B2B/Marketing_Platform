@@ -674,13 +674,14 @@ export default function AccountDetailPage() {
                 <Card 
                   className="hover-elevate cursor-pointer transition-all"
                   onClick={() => {
-                    // Navigate to contacts page with account filter
+                    // Navigate to contacts page with account name filter
                     const accountFilter: FilterGroup = {
                       logic: 'AND',
                       conditions: [{
-                        field: 'accountId',
-                        operator: '=',
-                        value: account.id
+                        id: `filter-${Date.now()}`,
+                        field: 'accountName',
+                        operator: 'equals',
+                        value: account.name
                       }]
                     };
                     // Store filter in sessionStorage for contacts page to pick up

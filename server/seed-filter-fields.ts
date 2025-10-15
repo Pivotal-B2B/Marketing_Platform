@@ -16,10 +16,10 @@ interface FilterFieldDef {
 
 const filterFields: FilterFieldDef[] = [
   // Contact Fields
-  { entity: 'contact', key: 'fullName', label: 'Full Name', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 1 },
-  { entity: 'contact', key: 'firstName', label: 'First Name', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 2 },
-  { entity: 'contact', key: 'lastName', label: 'Last Name', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 3 },
-  { entity: 'contact', key: 'email', label: 'Email Address', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 4 },
+  { entity: 'contact', key: 'fullName', label: 'Full Name', type: 'string', operators: ['equals', 'contains', 'startsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 1 },
+  { entity: 'contact', key: 'firstName', label: 'First Name', type: 'string', operators: ['equals', 'contains', 'startsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 2 },
+  { entity: 'contact', key: 'lastName', label: 'Last Name', type: 'string', operators: ['equals', 'contains', 'startsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 3 },
+  { entity: 'contact', key: 'email', label: 'Email Address', type: 'string', operators: ['equals', 'contains', 'endsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 4 },
   { entity: 'contact', key: 'emailVerificationStatus', label: 'Email Verification Status', type: 'string', operators: ['equals', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 5 },
   { entity: 'contact', key: 'directPhone', label: 'Phone Number', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 6 },
   { entity: 'contact', key: 'jobTitle', label: 'Job Title', type: 'string', operators: ['equals', 'contains', 'startsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 7 },
@@ -31,6 +31,8 @@ const filterFields: FilterFieldDef[] = [
   { entity: 'contact', key: 'linkedinUrl', label: 'LinkedIn Profile URL', type: 'string', operators: ['equals', 'contains', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 13 },
   { entity: 'contact', key: 'intentTopics', label: 'Intent Topics', type: 'array', operators: ['containsAny', 'containsAll', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 14 },
   { entity: 'contact', key: 'tags', label: 'Contact Tags', type: 'array', operators: ['containsAny', 'containsAll', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 15 },
+  { entity: 'contact', key: 'accountName', label: 'Account Name', type: 'string', operators: ['equals', 'contains', 'startsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'account_relationship', isCustom: false, sortOrder: 100 },
+  { entity: 'contact', key: 'accountDomain', label: 'Account Domain', type: 'string', operators: ['equals', 'contains', 'containsAny', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'account_relationship', isCustom: false, sortOrder: 101 },
 
   // Account Fields
   { entity: 'account', key: 'name', label: 'Company Name', type: 'string', operators: ['equals', 'contains', 'startsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'account_fields', isCustom: false, sortOrder: 1 },
@@ -86,10 +88,10 @@ const filterFields: FilterFieldDef[] = [
 
 export async function seedFilterFields() {
   console.log('Seeding filter field registry...');
-  
+
   // Clear existing fields (optional - remove if you want to preserve custom fields)
   await db.delete(filterFieldRegistry).execute();
-  
+
   // Insert all field definitions
   await db.insert(filterFieldRegistry).values(
     filterFields.map(field => ({
@@ -97,7 +99,7 @@ export async function seedFilterFields() {
       visibleInFilters: true,
     }))
   ).execute();
-  
+
   console.log(`✓ Seeded ${filterFields.length} filter fields across ${new Set(filterFields.map(f => f.category)).size} categories`);
 }
 
