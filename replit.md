@@ -3,6 +3,15 @@
 ## Overview
 Pivotal CRM is an enterprise-grade B2B customer relationship management platform designed to streamline B2B sales and marketing operations. It specializes in Account-Based Marketing (ABM), multi-channel campaign management (Email & Telemarketing), lead qualification, and includes a client portal. The platform emphasizes efficient customer engagement, robust compliance (DNC/Unsubscribe), comprehensive lead QA workflows, and features a "bridge model" for linking campaigns to orders.
 
+## Recent Changes (October 15, 2025)
+- **Campaign Builder Bug Fixes:** Resolved critical issues preventing campaign creation:
+  - Fixed campaign type enum: Changed from "telemarketing" to "call" to match database schema (campaigns.type enum: "email" | "call" | "combo")
+  - Corrected audience data structure: Transformed flat audience selections into `audienceRefs` jsonb format containing segments, lists, domainSets, and filters
+  - Fixed field mappings: `scheduleConfig` → `scheduleJson`, `assignedAgents` → `assignedTeams`, `dialingPace` → `throttlingConfig`
+  - Added campaign name input field to wizard Step 5 Summary for both email and telemarketing flows
+  - Fixed typos in audience selection toggle functions for domain sets and excluded lists
+  - **Important:** Compliance checks (Step 4) are frontend validation only and not stored in database - campaigns table has no compliance field
+
 ## User Preferences
 - Clean, minimal enterprise design
 - Professional blue color scheme (trust, reliability)
