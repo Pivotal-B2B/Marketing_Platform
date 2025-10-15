@@ -1171,16 +1171,25 @@ export function registerRoutes(app: Express) {
     try {
       const items = await storage.getDomainSetItems(req.params.id);
       
-      // Enrich items with account names
-      const enrichedItems = await Promise.all(items.map(async (item) => {
-        if (item.accountId) {
-          const account = await storage.getAccount(item.accountId);
-          return {
-            ...item,
-            accountName: account?.name || null
-          };
-        }
-        return { ...item, accountName: null };
+      // Batch fetch account names for efficiency (deduplicate accountIds)
+      const accountIds = [...new Set(items
+        .map(item => item.accountId)
+        .filter((id): id is string => id !== null && id !== undefined))];
+      
+      const accountMap = new Map<string, string>();
+      if (accountIds.length > 0) {
+        const accounts = await db
+          .select({ id: accountsTable.id, name: accountsTable.name })
+          .from(accountsTable)
+          .where(inArray(accountsTable.id, accountIds));
+        
+        accounts.forEach(acc => accountMap.set(acc.id, acc.name));
+      }
+      
+      // Enrich items with account names from the batch fetch
+      const enrichedItems = items.map(item => ({
+        ...item,
+        accountName: item.accountId ? (accountMap.get(item.accountId) || null) : null
       }));
       
       res.json(enrichedItems);

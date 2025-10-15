@@ -347,11 +347,11 @@ export default function AccountsListDetail() {
       )}
 
 
-      {items.length > 0 && (!viewFilter || viewFilter === 'accounts') && ( // Only show if not filtering for contacts only
+      {items.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Match Details</CardTitle>
-            <CardDescription>Detailed matching results for each entry</CardDescription>
+            <CardDescription>Detailed matching results for each domain</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="border rounded-lg">
