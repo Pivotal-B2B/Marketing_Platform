@@ -42,7 +42,6 @@ import { insertAccountSchema, type InsertAccount, type Account } from "@shared/s
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { CSVImportAccountsDialog } from "@/components/csv-import-accounts-dialog";
 import { AccountCardPremium } from "@/components/accounts/account-card-premium";
-import { AdvancedFilterBar } from "@/components/filter-bar-advanced";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -434,42 +433,51 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "table" | "cards")} className="flex-shrink-0">
-          <TabsList className="grid grid-cols-2 w-[160px] bg-muted/50 rounded-xl">
-            <TabsTrigger value="cards" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" data-testid="view-cards">
-              <LayoutGrid className="size-4 mr-1.5" />
-              Cards
-            </TabsTrigger>
-            <TabsTrigger value="table" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" data-testid="view-table">
-              <List className="size-4 mr-1.5" />
-              Table
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        {viewMode === "cards" && paginatedAccounts.length > 0 && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Checkbox
-              checked={isAllSelected ? true : isSomeSelected ? "indeterminate" : false}
-              onCheckedChange={() => isAllSelected ? clearSelection() : selectAll()}
-              aria-label="Select all on page"
-              data-testid="checkbox-select-all-cards"
-            />
-            <span className="text-sm text-muted-foreground">Select all</span>
+      <div className="flex flex-col gap-4 mb-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "table" | "cards")} className="flex-shrink-0">
+              <TabsList className="grid grid-cols-2 w-[140px]">
+                <TabsTrigger value="cards" data-testid="view-cards">
+                  <LayoutGrid className="size-4 mr-1.5" />
+                  Cards
+                </TabsTrigger>
+                <TabsTrigger value="table" data-testid="view-table">
+                  <List className="size-4 mr-1.5" />
+                  Table
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {viewMode === "cards" && paginatedAccounts.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={isAllSelected ? true : isSomeSelected ? "indeterminate" : false}
+                  onCheckedChange={() => isAllSelected ? clearSelection() : selectAll()}
+                  aria-label="Select all on page"
+                  data-testid="checkbox-select-all-cards"
+                />
+                <span className="text-sm text-muted-foreground">Select all</span>
+              </div>
+            )}
           </div>
-        )}
-        <div className="flex-1">
-          <AdvancedFilterBar
-            placeholder="Search by name, domain, industry..."
-            onSearch={(query) => setSearchQuery(query)}
-            activeFilters={[]}
+          <FilterBuilder
+            entityType="account"
+            onApplyFilter={setFilterGroup}
+            initialFilter={filterGroup}
           />
         </div>
-        <FilterBuilder
-          entityType="account"
-          onApplyFilter={setFilterGroup}
-          initialFilter={filterGroup}
-        />
+        
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search by name, domain, industry..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="input-search-accounts"
+          />
+        </div>
       </div>
 
       {selectedCount > 0 && (
