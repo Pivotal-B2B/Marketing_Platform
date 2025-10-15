@@ -130,9 +130,9 @@ export default function AccountsListDetail() {
       <div className="border-b p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setLocation('/domain-sets')}
             >
               <ArrowLeft className="h-5 w-5" />
@@ -148,8 +148,8 @@ export default function AccountsListDetail() {
           </div>
           <div className="flex items-center gap-2">
             {viewFilter && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setLocation(`/domain-sets/${id}`)}
               >
@@ -228,8 +228,8 @@ export default function AccountsListDetail() {
                   </TableHeader>
                   <TableBody>
                     {accounts.map((account) => (
-                      <TableRow 
-                        key={account.id} 
+                      <TableRow
+                        key={account.id}
                         className="hover-elevate cursor-pointer"
                         onClick={() => handleCardClick(account.id, 'exact')} // Assuming 'exact' match for accounts here
                       >
@@ -250,8 +250,8 @@ export default function AccountsListDetail() {
                         <TableCell>{account.employeesSizeRange || "-"}</TableCell>
                         <TableCell>{account.annualRevenue || "-"}</TableCell>
                         <TableCell>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -279,8 +279,8 @@ export default function AccountsListDetail() {
       {(viewFilter === 'contacts' || !viewFilter) && (
         <Card>
           <CardHeader>
-            <CardTitle>Matched Contacts</CardTitle>
-            <CardDescription>Contacts that were successfully matched from this list</CardDescription>
+            <CardTitle>Matched Contacts ({contacts.length})</CardTitle>
+            <CardDescription>Contacts from accounts matched by this list</CardDescription>
           </CardHeader>
           <CardContent>
             {contactsLoading ? (
@@ -303,8 +303,8 @@ export default function AccountsListDetail() {
                   </TableHeader>
                   <TableBody>
                     {contacts.map((contact) => (
-                      <TableRow 
-                        key={contact.id} 
+                      <TableRow
+                        key={contact.id}
                         className="hover-elevate cursor-pointer"
                         onClick={() => handleCardClick(contact.id, 'exact')}
                       >
@@ -320,8 +320,8 @@ export default function AccountsListDetail() {
                         <TableCell>{contact.directPhone || "-"}</TableCell>
                         <TableCell>{contact.jobTitle || "-"}</TableCell>
                         <TableCell>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -346,52 +346,116 @@ export default function AccountsListDetail() {
         </Card>
       )}
 
-
-      {items.length > 0 && (
-        <Card>
+      {!viewFilter && (
+        <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Match Details</CardTitle>
-            <CardDescription>Detailed matching results for each domain</CardDescription>
+            <CardTitle>Domain Items ({items.length})</CardTitle>
+            <CardDescription>All domains uploaded in this list with their match status</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Domain</TableHead>
-                    <TableHead>Normalized</TableHead>
-                    <TableHead>Match Type</TableHead>
-                    <TableHead>Confidence</TableHead>
-                    <TableHead>Contacts</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono">
-                        {item.domain || '-'}
-                        {item.accountName && (
-                          <span className="ml-2 font-sans text-sm text-muted-foreground">
-                            {item.accountName}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
-                        {item.normalizedDomain || '-'}
-                      </TableCell>
-                      <TableCell>{getMatchTypeBadge(item.matchType)}</TableCell>
-                      <TableCell>
-                        {item.matchConfidence ? `${(parseFloat(item.matchConfidence) * 100).toFixed(0)}%` : '-'}
-                      </TableCell>
-                      <TableCell>{item.matchedContactsCount}</TableCell>
+            {itemsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : items.length > 0 ? (
+              <div className="border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Domain</TableHead>
+                      <TableHead>Match Type</TableHead>
+                      <TableHead>Matched Account</TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-mono text-sm">{item.domain}</TableCell>
+                        <TableCell>{getMatchTypeBadge(item.matchType)}</TableCell>
+                        <TableCell>
+                          {item.accountId && item.accountName ? (
+                            <Button
+                              variant="link"
+                              className="p-0 h-auto"
+                              onClick={() => setLocation(`/accounts/${item.accountId}`)}
+                            >
+                              {item.accountName}
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item.accountId && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setLocation(`/accounts/${item.accountId}`)}
+                            >
+                              View
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="p-12 text-center">
+                <p className="text-muted-foreground">No domain items found</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Match Details</CardTitle>
+          <CardDescription>Detailed matching results for each domain</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Domain</TableHead>
+                  <TableHead>Normalized</TableHead>
+                  <TableHead>Match Type</TableHead>
+                  <TableHead>Confidence</TableHead>
+                  <TableHead>Contacts</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-mono">
+                      {item.domain || '-'}
+                      {item.accountName && (
+                        <span className="ml-2 font-sans text-sm text-muted-foreground">
+                          {item.accountName}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {item.normalizedDomain || '-'}
+                    </TableCell>
+                    <TableCell>{getMatchTypeBadge(item.matchType)}</TableCell>
+                    <TableCell>
+                      {item.matchConfidence ? `${(parseFloat(item.matchConfidence) * 100).toFixed(0)}%` : '-'}
+                    </TableCell>
+                    <TableCell>{item.matchedContactsCount}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
