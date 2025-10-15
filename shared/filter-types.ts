@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 // Filter operators
-export const textOperators = ['equals', 'contains', 'startsWith', 'endsWith', 'notEquals'] as const;
-export const numberOperators = ['equals', 'greaterThan', 'lessThan', 'between', 'notEquals'] as const;
+export const textOperators = ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'] as const;
+export const numberOperators = ['equals', 'notEquals', 'greaterThan', 'lessThan', 'between', 'isEmpty', 'isNotEmpty'] as const;
 export const arrayOperators = ['containsAny', 'containsAll', 'isEmpty', 'isNotEmpty'] as const;
 export const booleanOperators = ['is'] as const;
-export const dateOperators = ['before', 'after', 'between'] as const;
+export const dateOperators = ['before', 'after', 'between', 'isEmpty', 'isNotEmpty'] as const;
 
 export type TextOperator = typeof textOperators[number];
 export type NumberOperator = typeof numberOperators[number];
@@ -13,6 +13,26 @@ export type ArrayOperator = typeof arrayOperators[number];
 export type BooleanOperator = typeof booleanOperators[number];
 export type DateOperator = typeof dateOperators[number];
 export type Operator = TextOperator | NumberOperator | ArrayOperator | BooleanOperator | DateOperator;
+
+// Operator display labels
+export const operatorLabels: Record<string, string> = {
+  equals: 'Equals (=)',
+  notEquals: 'Not Equals (≠)',
+  contains: 'Contains',
+  doesNotContain: 'Does Not Contain',
+  startsWith: 'Begins With',
+  endsWith: 'Ends With',
+  greaterThan: 'Greater Than (>)',
+  lessThan: 'Less Than (<)',
+  between: 'Between',
+  before: 'Before',
+  after: 'After',
+  containsAny: 'Contains Any',
+  containsAll: 'Contains All',
+  isEmpty: 'Is Empty',
+  isNotEmpty: 'Has Value',
+  is: 'Is',
+};
 
 // Filter field types
 export type FilterFieldType = 'text' | 'number' | 'array' | 'boolean' | 'date';
@@ -76,8 +96,10 @@ export const filterConditionSchema = z.object({
     z.number(),
     z.boolean(),
     z.array(z.string()),
-    z.object({ from: z.union([z.string(), z.number()]), to: z.union([z.string(), z.number()]) })
-  ]),
+    z.object({ from: z.union([z.string(), z.number()]), to: z.union([z.string(), z.number()]) }),
+    z.null(),
+    z.undefined()
+  ]).optional(),
 });
 
 export type FilterCondition = z.infer<typeof filterConditionSchema>;

@@ -16,12 +16,12 @@ interface FilterFieldDef {
 
 const filterFields: FilterFieldDef[] = [
   // Contact Fields
-  { entity: 'contact', key: 'fullName', label: 'Full Name', type: 'string', operators: ['equals', 'contains', 'startsWith', 'endsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 1 },
-  { entity: 'contact', key: 'firstName', label: 'First Name', type: 'string', operators: ['equals', 'contains', 'startsWith', 'endsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 2 },
-  { entity: 'contact', key: 'lastName', label: 'Last Name', type: 'string', operators: ['equals', 'contains', 'startsWith', 'endsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 3 },
-  { entity: 'contact', key: 'email', label: 'Email Address', type: 'string', operators: ['equals', 'contains', 'startsWith', 'endsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 4 },
-  { entity: 'contact', key: 'emailVerificationStatus', label: 'Email Verification Status', type: 'string', operators: ['equals', 'notEquals'], category: 'contact_fields', isCustom: false, sortOrder: 5 },
-  { entity: 'contact', key: 'directPhone', label: 'Phone Number', type: 'string', operators: ['equals', 'contains', 'startsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 6 },
+  { entity: 'contact', key: 'fullName', label: 'Full Name', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 1 },
+  { entity: 'contact', key: 'firstName', label: 'First Name', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 2 },
+  { entity: 'contact', key: 'lastName', label: 'Last Name', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 3 },
+  { entity: 'contact', key: 'email', label: 'Email Address', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 4 },
+  { entity: 'contact', key: 'emailVerificationStatus', label: 'Email Verification Status', type: 'string', operators: ['equals', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 5 },
+  { entity: 'contact', key: 'directPhone', label: 'Phone Number', type: 'string', operators: ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 6 },
   { entity: 'contact', key: 'jobTitle', label: 'Job Title', type: 'string', operators: ['equals', 'contains', 'startsWith', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 7 },
   { entity: 'contact', key: 'department', label: 'Department', type: 'string', operators: ['equals', 'contains', 'notEquals', 'isEmpty', 'isNotEmpty'], category: 'contact_fields', isCustom: false, sortOrder: 8 },
   { entity: 'contact', key: 'seniorityLevel', label: 'Seniority Level', type: 'string', operators: ['equals', 'notEquals'], category: 'contact_fields', isCustom: false, sortOrder: 9 },

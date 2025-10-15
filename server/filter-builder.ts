@@ -79,6 +79,9 @@ function buildCondition(condition: FilterCondition, table: TableType): SQL | und
     case 'contains':
       return ilike(column, `%${value}%`);
     
+    case 'doesNotContain':
+      return sql`${column} NOT ILIKE ${'%' + value + '%'}`;
+    
     case 'startsWith':
       return ilike(column, `${value}%`);
     

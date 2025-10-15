@@ -15,6 +15,7 @@ import {
   numberOperators,
   arrayOperators,
   booleanOperators,
+  operatorLabels,
   type TextOperator,
   type NumberOperator,
   type ArrayOperator,
@@ -215,7 +216,13 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
     }
 
     if (operator === 'isEmpty' || operator === 'isNotEmpty') {
-      return <div className="text-sm text-muted-foreground">No value needed</div>;
+      return (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground p-2 bg-muted rounded">
+          <span className="font-medium">
+            {operator === 'isEmpty' ? 'Will find empty/null values' : 'Will find non-empty values'}
+          </span>
+        </div>
+      );
     }
 
     if (fieldType === 'array' && (operator === 'containsAny' || operator === 'containsAll')) {
@@ -410,7 +417,7 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
                         <SelectContent>
                           {getOperatorsForField(condition.field).map((op) => (
                             <SelectItem key={op} value={op}>
-                              {op.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              {operatorLabels[op] || op.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                             </SelectItem>
                           ))}
                         </SelectContent>
