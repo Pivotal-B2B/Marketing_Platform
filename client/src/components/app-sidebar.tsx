@@ -9,21 +9,17 @@ import {
   Settings,
   LogOut,
   ChevronDown,
-  ListFilter,
-  Globe,
-  Mail,
   Phone,
   Settings2,
-  ShieldAlert,
-  Upload,
-  UserCog,
-  Lock,
-  Zap,
   Sparkles,
-  Share2,
-  FileText,
   Cloud,
-  Layers, // Added Layers icon for clarity, assuming it might be relevant for "Accounts List"
+  Zap,
+  Palette,
+  Share2,
+  ShieldCheck,
+  UserCog,
+  Mail,
+  Headphones,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,6 +34,7 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
   SidebarFooter,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import {
   Collapsible,
@@ -61,138 +58,199 @@ interface SubNavItem {
   roles: string[];
 }
 
-// Navigation structure per Phase 22 spec
-const getNavStructure = (): NavItem[] => [
+interface NavSection {
+  label: string;
+  items: NavItem[];
+  roles: string[];
+}
+
+// Organized navigation structure with sections
+const getNavSections = (): NavSection[] => [
+  // Core CRM Section
   {
-    title: "Dashboard",
-    url: "/",
-    icon: LayoutDashboard,
+    label: "CRM",
     roles: ["admin", "campaign_manager", "data_ops", "qa_analyst", "agent", "client_user"],
-  },
-  {
-    title: "Accounts",
-    icon: Building2,
-    roles: ["admin", "campaign_manager", "data_ops"],
     items: [
-      { title: "All Accounts", url: "/accounts", roles: ["admin", "campaign_manager", "data_ops"] },
-      { title: "Segments & Lists", url: "/segments?entity=account", roles: ["admin", "campaign_manager", "data_ops"] },
-      { title: "Accounts List (TAL)", url: "/domain-sets", roles: ["admin", "data_ops"] }, // Changed from "Domain Sets"
+      {
+        title: "Dashboard",
+        url: "/",
+        icon: LayoutDashboard,
+        roles: ["admin", "campaign_manager", "data_ops", "qa_analyst", "agent", "client_user"],
+      },
+      {
+        title: "Accounts",
+        icon: Building2,
+        roles: ["admin", "campaign_manager", "data_ops"],
+        items: [
+          { title: "All Accounts", url: "/accounts", roles: ["admin", "campaign_manager", "data_ops"] },
+          { title: "Segments & Lists", url: "/segments?entity=account", roles: ["admin", "campaign_manager", "data_ops"] },
+          { title: "Accounts List (TAL)", url: "/domain-sets", roles: ["admin", "data_ops"] },
+        ],
+      },
+      {
+        title: "Contacts",
+        icon: Users,
+        roles: ["admin", "campaign_manager", "data_ops"],
+        items: [
+          { title: "All Contacts", url: "/contacts", roles: ["admin", "campaign_manager", "data_ops"] },
+          { title: "Segments & Lists", url: "/segments?entity=contact", roles: ["admin", "campaign_manager", "data_ops"] },
+          { title: "Bulk Import", url: "/imports", roles: ["admin", "data_ops"] },
+        ],
+      },
     ],
   },
+  
+  // Campaigns & Outreach Section
   {
-    title: "Contacts",
-    icon: Users,
-    roles: ["admin", "campaign_manager", "data_ops"],
-    items: [
-      { title: "All Contacts", url: "/contacts", roles: ["admin", "campaign_manager", "data_ops"] },
-      { title: "Segments & Lists", url: "/segments?entity=contact", roles: ["admin", "campaign_manager", "data_ops"] },
-      { title: "Bulk Import", url: "/imports", roles: ["admin", "data_ops"] },
-    ],
-  },
-  {
-    title: "Campaigns",
-    icon: Megaphone,
+    label: "Campaigns & Outreach",
     roles: ["admin", "campaign_manager", "agent"],
     items: [
-      { title: "All Campaigns", url: "/campaigns", roles: ["admin", "campaign_manager"] },
-      { title: "Email Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
-      { title: "Pipeline Dialer", url: "/campaigns/phone", roles: ["admin", "campaign_manager", "agent"] },
-      { title: "Campaign Configuration", url: "/campaigns/config", roles: ["admin", "campaign_manager"] },
+      {
+        title: "Campaigns",
+        icon: Megaphone,
+        roles: ["admin", "campaign_manager"],
+        items: [
+          { title: "All Campaigns", url: "/campaigns", roles: ["admin", "campaign_manager"] },
+          { title: "Email Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
+          { title: "Pipeline Dialer", url: "/campaigns/phone", roles: ["admin", "campaign_manager"] },
+          { title: "Campaign Configuration", url: "/campaigns/config", roles: ["admin", "campaign_manager"] },
+        ],
+      },
+      {
+        title: "Agent Console",
+        url: "/agent-console",
+        icon: Headphones,
+        roles: ["admin", "campaign_manager", "agent"],
+      },
+      {
+        title: "QA & Leads",
+        url: "/leads",
+        icon: CheckCircle,
+        roles: ["admin", "campaign_manager", "qa_analyst"],
+      },
     ],
   },
+
+  // Creative & Content Section
   {
-    title: "Agent Console",
-    url: "/agent-console",
-    icon: Phone,
-    roles: ["admin", "campaign_manager", "agent"],
-  },
-  {
-    title: "Content Studio",
-    icon: Sparkles,
-    roles: ["admin", "campaign_manager"],
+    label: "Creative & Content",
+    roles: ["admin", "campaign_manager", "content_creator"],
     items: [
-      { title: "Content Library", url: "/content-studio", roles: ["admin", "campaign_manager"] },
-      { title: "AI Content Generator", url: "/content-studio/ai-generator", roles: ["admin", "campaign_manager"] },
-      { title: "Social Media Publisher", url: "/content-studio/social-publisher", roles: ["admin", "campaign_manager"] },
+      {
+        title: "Content Studio",
+        icon: Palette,
+        roles: ["admin", "campaign_manager", "content_creator"],
+        items: [
+          { title: "Content Library", url: "/content-studio", roles: ["admin", "campaign_manager", "content_creator"] },
+          { title: "AI Content Generator", url: "/content-studio/ai-generator", roles: ["admin", "campaign_manager", "content_creator"] },
+          { title: "Social Media Publisher", url: "/content-studio/social-publisher", roles: ["admin", "campaign_manager", "content_creator"] },
+        ],
+      },
+      {
+        title: "Resources Centre",
+        url: "/resources-centre",
+        icon: Cloud,
+        roles: ["admin", "campaign_manager", "data_ops", "content_creator"],
+      },
     ],
   },
+
+  // Analytics & Reporting Section
   {
-    title: "Resources Centre",
-    url: "/resources-centre",
-    icon: Cloud,
-    roles: ["admin", "campaign_manager", "data_ops"],
-  },
-  {
-    title: "Email Infrastructure",
-    icon: Settings2,
-    roles: ["admin"],
-    items: [
-      { title: "Sender Profiles", url: "/email-infrastructure/sender-profiles", roles: ["admin"] },
-    ],
-  },
-  {
-    title: "Telephony Settings",
-    icon: Phone,
-    roles: ["admin"],
-    items: [
-      { title: "SIP Trunk Configuration", url: "/telephony/sip-trunks", roles: ["admin"] },
-    ],
-  },
-  {
-    title: "QA & Leads Delivery",
-    url: "/leads",
-    icon: CheckCircle,
-    roles: ["admin", "campaign_manager", "qa_analyst"],
-  },
-  {
-    title: "Reports",
-    url: "/reports",
-    icon: BarChart,
+    label: "Analytics & Reporting",
     roles: ["admin", "campaign_manager", "qa_analyst", "client_user"],
+    items: [
+      {
+        title: "Reports",
+        url: "/reports",
+        icon: BarChart,
+        roles: ["admin", "campaign_manager", "qa_analyst", "client_user"],
+      },
+      {
+        title: "Projects Management",
+        url: "/orders",
+        icon: Briefcase,
+        roles: ["admin", "campaign_manager", "client_user"],
+      },
+    ],
   },
+
+  // Infrastructure & Technical Section
   {
-    title: "Projects Management",
-    url: "/orders",
-    icon: Briefcase,
-    roles: ["admin", "campaign_manager", "client_user"],
-  },
-  {
-    title: "Organization Settings",
-    icon: Settings,
+    label: "Infrastructure",
     roles: ["admin"],
     items: [
-      { title: "User & Role Management", url: "/settings/users", roles: ["admin"] },
-      { title: "Suppression Management", url: "/suppressions", roles: ["admin"] },
-      { title: "Compliance Center", url: "/settings/compliance", roles: ["admin"] },
-      { title: "Integrations & APIs", url: "/settings/integrations", roles: ["admin"] },
+      {
+        title: "Email Infrastructure",
+        icon: Mail,
+        roles: ["admin"],
+        items: [
+          { title: "Sender Profiles", url: "/email-infrastructure/sender-profiles", roles: ["admin"] },
+        ],
+      },
+      {
+        title: "Telephony",
+        icon: Phone,
+        roles: ["admin"],
+        items: [
+          { title: "SIP Trunk Configuration", url: "/telephony/sip-trunks", roles: ["admin"] },
+        ],
+      },
+      {
+        title: "Integrations & APIs",
+        url: "/settings/integrations",
+        icon: Zap,
+        roles: ["admin"],
+      },
+    ],
+  },
+
+  // Administration Section
+  {
+    label: "Administration",
+    roles: ["admin"],
+    items: [
+      {
+        title: "Organization",
+        icon: Settings,
+        roles: ["admin"],
+        items: [
+          { title: "User & Role Management", url: "/settings/users", roles: ["admin"] },
+          { title: "Suppression Management", url: "/suppressions", roles: ["admin"] },
+          { title: "Compliance Center", url: "/settings/compliance", roles: ["admin"] },
+        ],
+      },
     ],
   },
 ];
 
-// Filter navigation items based on user role
-const filterNavByRole = (navItems: NavItem[], userRole: string): NavItem[] => {
-  return navItems
-    .filter(item => item.roles.includes(userRole))
-    .map(item => ({
-      ...item,
-      items: item.items?.filter(subItem => subItem.roles.includes(userRole)),
-    }));
+// Filter sections and items based on user roles
+const filterSectionsByRoles = (sections: NavSection[], userRoles: string[]): NavSection[] => {
+  return sections
+    .filter(section => section.roles.some(role => userRoles.includes(role)))
+    .map(section => ({
+      ...section,
+      items: section.items
+        .filter(item => item.roles.some(role => userRoles.includes(role)))
+        .map(item => ({
+          ...item,
+          items: item.items?.filter(subItem => subItem.roles.some(role => userRoles.includes(role))),
+        })),
+    }))
+    .filter(section => section.items.length > 0);
 };
 
-export function AppSidebar({ userRole = "admin" }: { userRole?: string }) {
+export function AppSidebar({ userRoles = ["admin"] }: { userRoles?: string[] }) {
   const [location] = useLocation();
-  const navItems = filterNavByRole(getNavStructure(), userRole);
+  const filteredSections = filterSectionsByRoles(getNavSections(), userRoles);
 
   const isActive = (url?: string, items?: SubNavItem[]) => {
     if (url) {
-      // Handle URLs with query parameters
       const urlWithoutParams = url.split('?')[0];
       const locationWithoutParams = location.split('?')[0];
 
-      // Exact match for simple URLs
       if (location === url) return true;
 
-      // Base path match for URLs with query params
       if (url.includes('?') && locationWithoutParams === urlWithoutParams) {
         return location.includes(url.split('?')[1]);
       }
@@ -218,74 +276,84 @@ export function AppSidebar({ userRole = "admin" }: { userRole?: string }) {
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-lg font-semibold px-4 py-3">
+          <SidebarGroupLabel className="text-lg font-semibold px-4 py-3 mb-2">
             Pivotal CRM
           </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => {
-                // Top-level item without dropdown
-                if (!item.items || item.items.length === 0) {
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton 
-                        asChild 
-                        isActive={isActive(item.url)}
-                        data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        <a href={item.url}>
-                          <item.icon />
-                          <span>{item.title}</span>
-                        </a>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                }
-
-                // Collapsible item with nested dropdown
-                return (
-                  <Collapsible
-                    key={item.title}
-                    defaultOpen={isActive(undefined, item.items)}
-                    className="group/collapsible"
-                  >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton
-                          isActive={isActive(undefined, item.items)}
-                          data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                        >
-                          <item.icon />
-                          <span>{item.title}</span>
-                          <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {item.items.map((subItem) => (
-                            <SidebarMenuSubItem key={subItem.title}>
-                              <SidebarMenuSubButton
-                                asChild
-                                isActive={location === subItem.url}
-                                data-testid={`nav-sub-${subItem.title.toLowerCase().replace(/\s+/g, '-')}`}
-                              >
-                                <a href={subItem.url}>
-                                  <span>{subItem.title}</span>
-                                </a>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
         </SidebarGroup>
+
+        {filteredSections.map((section, sectionIndex) => (
+          <div key={section.label}>
+            {sectionIndex > 0 && <SidebarSeparator className="my-2" />}
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/70 px-4 py-2">
+                {section.label}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {section.items.map((item) => {
+                    if (!item.items || item.items.length === 0) {
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton 
+                            asChild 
+                            isActive={isActive(item.url)}
+                            data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            <a href={item.url}>
+                              <item.icon className="h-4 w-4" />
+                              <span>{item.title}</span>
+                            </a>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    }
+
+                    return (
+                      <Collapsible
+                        key={item.title}
+                        defaultOpen={isActive(undefined, item.items)}
+                        className="group/collapsible"
+                      >
+                        <SidebarMenuItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton
+                              isActive={isActive(undefined, item.items)}
+                              data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                            >
+                              <item.icon className="h-4 w-4" />
+                              <span>{item.title}</span>
+                              <ChevronDown className="ml-auto h-3 w-3 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {item.items.map((subItem) => (
+                                <SidebarMenuSubItem key={subItem.title}>
+                                  <SidebarMenuSubButton
+                                    asChild
+                                    isActive={location === subItem.url}
+                                    data-testid={`nav-sub-${subItem.title.toLowerCase().replace(/\s+/g, '-')}`}
+                                  >
+                                    <a href={subItem.url}>
+                                      <span>{subItem.title}</span>
+                                    </a>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              ))}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuItem>
+                      </Collapsible>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </div>
+        ))}
       </SidebarContent>
-      <SidebarFooter className="p-4">
+      
+      <SidebarFooter className="p-4 border-t">
         <Button 
           variant="ghost" 
           className="w-full justify-start" 
