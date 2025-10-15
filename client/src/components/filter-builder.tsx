@@ -16,6 +16,7 @@ import {
   numberOperators,
   arrayOperators,
   booleanOperators,
+  enumOperators,
   operatorLabels,
   operatorDescriptions,
   type TextOperator,
@@ -23,6 +24,7 @@ import {
   type ArrayOperator,
   type BooleanOperator
 } from "@shared/filter-types";
+import { REVENUE_RANGE_VALUES, STAFF_COUNT_RANGE_VALUES } from "@shared/schema";
 
 type EntityType = 'account' | 'contact';
 
@@ -36,7 +38,7 @@ interface FilterBuilderProps {
 interface FilterFieldConfig {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'array' | 'boolean';
+  type: 'text' | 'number' | 'array' | 'boolean' | 'enum';
   operators: string[];
   category: string;
 }
@@ -168,6 +170,8 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
         return arrayOperators;
       case 'boolean':
         return booleanOperators;
+      case 'enum':
+        return enumOperators;
       default:
         return textOperators;
     }
@@ -190,6 +194,39 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
           <SelectContent>
             <SelectItem value="true">Yes</SelectItem>
             <SelectItem value="false">No</SelectItem>
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    if (fieldType === 'enum') {
+      // Get enum values based on field
+      const getEnumValues = (field: string) => {
+        if (field === 'revenueRange') {
+          return REVENUE_RANGE_VALUES;
+        }
+        if (field === 'employeesSizeRange') {
+          return STAFF_COUNT_RANGE_VALUES;
+        }
+        return [];
+      };
+
+      const enumValues = getEnumValues(condition.field);
+      
+      return (
+        <Select
+          value={condition.value as string || ''}
+          onValueChange={(val) => updateCondition(condition.id, { value: val })}
+        >
+          <SelectTrigger data-testid={`select-value-${condition.id}`}>
+            <SelectValue placeholder="Select value" />
+          </SelectTrigger>
+          <SelectContent>
+            {enumValues.map((val) => (
+              <SelectItem key={val} value={val}>
+                {val}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       );

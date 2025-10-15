@@ -38,8 +38,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertAccountSchema, type InsertAccount, type Account } from "@shared/schema";
+import { insertAccountSchema, type InsertAccount, type Account, REVENUE_RANGE_VALUES, STAFF_COUNT_RANGE_VALUES } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CSVImportAccountsDialog } from "@/components/csv-import-accounts-dialog";
 import { AccountCardPremium } from "@/components/accounts/account-card-premium";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -101,7 +102,8 @@ export default function AccountsPage() {
       name: "",
       domain: "",
       industryStandardized: "",
-      employeesSizeRange: "",
+      employeesSizeRange: undefined,
+      revenueRange: undefined,
       annualRevenue: "",
     },
   });
@@ -399,23 +401,45 @@ export default function AccountsPage() {
                     name="employeesSizeRange"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Employees</FormLabel>
-                        <FormControl>
-                          <Input placeholder="100-500" {...field} value={field.value || ""} />
-                        </FormControl>
+                        <FormLabel>Staff Count Range</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-employees-size-range">
+                              <SelectValue placeholder="Select range" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {STAFF_COUNT_RANGE_VALUES.map((value) => (
+                              <SelectItem key={value} value={value}>
+                                {value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
                     control={createForm.control}
-                    name="annualRevenue"
+                    name="revenueRange"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Revenue</FormLabel>
-                        <FormControl>
-                          <Input placeholder="$10M" {...field} value={field.value || ""} />
-                        </FormControl>
+                        <FormLabel>Revenue Range</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-revenue-range">
+                              <SelectValue placeholder="Select range" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {REVENUE_RANGE_VALUES.map((value) => (
+                              <SelectItem key={value} value={value}>
+                                {value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

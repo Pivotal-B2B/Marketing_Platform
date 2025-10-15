@@ -55,7 +55,10 @@ export const operatorDescriptions: Record<string, string> = {
 };
 
 // Filter field types
-export type FilterFieldType = 'text' | 'number' | 'array' | 'boolean' | 'date';
+export type FilterFieldType = 'text' | 'number' | 'array' | 'boolean' | 'date' | 'enum';
+
+// Enum operators (dropdown selection)
+export const enumOperators = ['equals', 'notEquals', 'isEmpty', 'isNotEmpty'] as const;
 
 // Account filter fields
 export const accountFilterFields = {
@@ -68,6 +71,9 @@ export const accountFilterFields = {
   hqCountry: { type: 'text' as const, label: 'Country' },
   sicCode: { type: 'text' as const, label: 'SIC Code' },
   naicsCode: { type: 'text' as const, label: 'NAICS Code' },
+  // Enum fields (dropdown only)
+  revenueRange: { type: 'enum' as const, label: 'Company Revenue Range' },
+  employeesSizeRange: { type: 'enum' as const, label: 'Company Staff Count Range' },
   // Number fields
   staffCount: { type: 'number' as const, label: 'Staff Count' },
   yearFounded: { type: 'number' as const, label: 'Year Founded' },
@@ -109,7 +115,8 @@ export const filterConditionSchema = z.object({
     ...numberOperators,
     ...arrayOperators,
     ...booleanOperators,
-    ...dateOperators
+    ...dateOperators,
+    ...enumOperators
   ]),
   value: z.union([
     z.string(),

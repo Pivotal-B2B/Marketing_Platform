@@ -189,6 +189,31 @@ export const contentStatusEnum = pgEnum('content_status', [
   'archived'
 ]);
 
+// Pivotal B2B Standard Template Enums
+export const revenueRangeEnum = pgEnum('revenue_range', [
+  'Under $1M',
+  '$1M - $10M',
+  '$10M - $50M',
+  '$50M - $100M',
+  '$100M - $500M',
+  '$500M - $1B',
+  '$1B - $5B',
+  'Over $5B',
+  'Unknown'
+]);
+
+export const staffCountRangeEnum = pgEnum('staff_count_range', [
+  '1-10',
+  '11-50',
+  '50-100',
+  '100-500',
+  '500-1000',
+  '1000-5000',
+  '5000-10000',
+  '10000+',
+  'Unknown'
+]);
+
 // Disposition & Call Management Enums
 export const dispositionSystemActionEnum = pgEnum('disposition_system_action', [
   'add_to_global_dnc',
@@ -329,8 +354,8 @@ export const accounts = pgTable("accounts", {
   industryAiStatus: industryAIStatusEnum("industry_ai_status"),
   
   annualRevenue: text("annual_revenue"),
-  revenueRange: text("revenue_range"), // Pivotal Template: "$500M - $1B", "$1B+", etc.
-  employeesSizeRange: text("employees_size_range"),
+  revenueRange: revenueRangeEnum("revenue_range"), // Pivotal Template: "$500M - $1B", "$1B+", etc.
+  employeesSizeRange: staffCountRangeEnum("employees_size_range"), // Pivotal Template: "501-1000", "10000+", etc.
   staffCount: integer("staff_count"),
   description: text("description"),
   
@@ -2438,3 +2463,7 @@ export type InsertContentEvent = z.infer<typeof insertContentEventSchema>;
 
 export type CampaignContentLink = typeof campaignContentLinks.$inferSelect;
 export type InsertCampaignContentLink = z.infer<typeof insertCampaignContentLinkSchema>;
+
+// Enum value arrays for dropdowns
+export const REVENUE_RANGE_VALUES = revenueRangeEnum.enumValues;
+export const STAFF_COUNT_RANGE_VALUES = staffCountRangeEnum.enumValues;
