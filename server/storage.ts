@@ -90,6 +90,7 @@ export interface IStorage {
   assignUserRole(userId: string, role: string, assignedBy?: string): Promise<void>;
   removeUserRole(userId: string, role: string): Promise<void>;
   updateUserRoles(userId: string, roles: string[], assignedBy?: string): Promise<void>;
+  getAllUsersWithRoles(): Promise<Array<{ id: string; username: string; roles: string[] }>>;
 
   // Accounts
   getAccounts(filters?: FilterGroup): Promise<Account[]>;
@@ -464,6 +465,25 @@ export class DatabaseStorage implements IStorage {
         }))
       );
     }
+  }
+
+  async getAllUsersWithRoles(): Promise<Array<{ id: string; username: string; roles: string[] }>> {
+    const allUsers = await db.select({
+      id: users.id,
+      username: users.username,
+    }).from(users);
+    
+    const result = [];
+    for (const user of allUsers) {
+      const roles = await this.getUserRoles(user.id);
+      result.push({
+        id: user.id,
+        username: user.username,
+        roles,
+      });
+    }
+    
+    return result;
   }
 
   // Accounts

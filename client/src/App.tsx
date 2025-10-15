@@ -56,10 +56,13 @@ function AuthenticatedApp() {
     "--sidebar-width-icon": "4rem",   // default icon width
   };
 
+  // Get user roles array (support both legacy single role and new multi-role system)
+  const userRoles = (user as any)?.roles || [user?.role || 'agent'];
+
   return (
     <SidebarProvider style={style as React.CSSProperties}>
       <div className="flex h-screen w-full">
-        <AppSidebar userRole={user?.role || 'agent'} />
+        <AppSidebar userRoles={userRoles} />
         <div className="flex flex-col flex-1 overflow-hidden">
           <TopBar userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || 'User'} />
           <main className="flex-1 overflow-auto p-6 bg-background">

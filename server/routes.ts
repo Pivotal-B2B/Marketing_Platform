@@ -223,7 +223,23 @@ export function registerRoutes(app: Express) {
       }
 
       // Fetch user roles (multi-role support)
-      const userRoles = await storage.getUserRoles(user.id);
+      let userRoles = await storage.getUserRoles(user.id);
+      
+      // Bootstrap check: If user has no roles and no admin users exist in the system,
+      // automatically assign admin role to this user (first user setup)
+      if (userRoles.length === 0) {
+        const allUsersWithRoles = await storage.getAllUsersWithRoles();
+        const hasAdmin = allUsersWithRoles.some(u => u.roles.includes('admin'));
+        
+        if (!hasAdmin) {
+          // This is the first user - give them admin role
+          await storage.assignUserRole(user.id, 'admin', user.id);
+          userRoles = ['admin'];
+        } else {
+          // Use legacy role as fallback
+          userRoles = [user.role];
+        }
+      }
       
       // Generate JWT token with roles
       const token = generateToken(user, userRoles);
