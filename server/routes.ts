@@ -1754,9 +1754,15 @@ export function registerRoutes(app: Express) {
   // Get agents assigned to a campaign
   app.get("/api/campaigns/:id/agents", requireAuth, async (req, res) => {
     try {
+      console.log(`[GET CAMPAIGN AGENTS] Fetching agents for campaign ${req.params.id}`);
       const agents = await storage.getCampaignAgents(req.params.id);
+      console.log(`[GET CAMPAIGN AGENTS] Returning ${agents.length} agents:`, agents.map(a => ({
+        id: a.agentId,
+        name: a.agent?.firstName + ' ' + a.agent?.lastName
+      })));
       res.json(agents);
     } catch (error) {
+      console.error('[GET CAMPAIGN AGENTS] Error:', error);
       res.status(500).json({ message: "Failed to fetch campaign agents" });
     }
   });

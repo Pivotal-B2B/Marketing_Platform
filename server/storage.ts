@@ -1345,7 +1345,7 @@ export class DatabaseStorage implements IStorage {
         }
       })
       .from(campaignAgentAssignments)
-      .leftJoin(users, eq(campaignAgentAssignments.agentId, users.id))
+      .innerJoin(users, eq(campaignAgentAssignments.agentId, users.id))
       .where(
         and(
           eq(campaignAgentAssignments.campaignId, campaignId),
@@ -1353,6 +1353,7 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
+    console.log(`[GET CAMPAIGN AGENTS] Found ${assignments.length} agents for campaign ${campaignId}`);
     return assignments;
   }
 
