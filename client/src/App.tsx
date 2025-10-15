@@ -60,7 +60,9 @@ function AuthenticatedApp() {
   const userRoles = (user as any)?.roles || [user?.role || 'agent'];
   
   // Debug log to help troubleshoot role issues
+  console.log('Current user:', user);
   console.log('Current user roles:', userRoles);
+  console.log('User roles type:', typeof userRoles, Array.isArray(userRoles));
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>

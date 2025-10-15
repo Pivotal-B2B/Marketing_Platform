@@ -227,6 +227,11 @@ const getNavSections = (): NavSection[] => [
 
 // Filter sections and items based on user roles
 const filterSectionsByRoles = (sections: NavSection[], userRoles: string[]): NavSection[] => {
+  // If user has admin role, show everything
+  if (userRoles.includes('admin')) {
+    return sections;
+  }
+  
   return sections
     .filter(section => section.roles.some(role => userRoles.includes(role)))
     .map(section => ({
