@@ -1,5 +1,6 @@
 import { storage } from "../storage";
 import type { AgentStatus, Campaign } from "@shared/schema";
+import { isWithinBusinessHours, type BusinessHoursConfig } from "../utils/business-hours";
 
 interface DialerConfig {
   pollingIntervalMs: number;
