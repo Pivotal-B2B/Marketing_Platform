@@ -1555,6 +1555,59 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== CAMPAIGN AGENT ASSIGNMENTS ====================
+
+  // List all agents with their current assignment status
+  app.get("/api/agents", requireAuth, async (req, res) => {
+    try {
+      const agents = await storage.listAgents();
+      res.json(agents);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch agents" });
+    }
+  });
+
+  // Get agent assignments for a specific campaign
+  app.get("/api/campaigns/:id/agents", requireAuth, async (req, res) => {
+    try {
+      const assignments = await storage.getCampaignAgentAssignments(req.params.id);
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch campaign agent assignments" });
+    }
+  });
+
+  // Assign agents to a campaign
+  app.post("/api/campaigns/:id/agents", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { agentIds } = req.body;
+      
+      if (!Array.isArray(agentIds) || agentIds.length === 0) {
+        return res.status(400).json({ message: "agentIds array is required" });
+      }
+
+      const userId = req.user!.id;
+      await storage.assignAgentsToCampaign(req.params.id, agentIds, userId);
+      
+      res.status(201).json({ message: "Agents assigned successfully" });
+    } catch (error) {
+      console.error('Agent assignment error:', error);
+      res.status(400).json({ 
+        message: error instanceof Error ? error.message : "Failed to assign agents" 
+      });
+    }
+  });
+
+  // Release an agent from a campaign
+  app.delete("/api/campaigns/:id/agents/:agentId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      await storage.releaseAgentAssignment(req.params.id, req.params.agentId);
+      res.json({ message: "Agent released successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to release agent" });
+    }
+  });
+
   // ==================== CAMPAIGN QUEUE (ACCOUNT LEAD CAP) ====================
 
   app.get("/api/campaigns/:id/queue", requireAuth, async (req, res) => {
