@@ -329,13 +329,23 @@ export const accounts = pgTable("accounts", {
   industryAiStatus: industryAIStatusEnum("industry_ai_status"),
   
   annualRevenue: text("annual_revenue"),
+  revenueRange: text("revenue_range"), // Pivotal Template: "$500M - $1B", "$1B+", etc.
   employeesSizeRange: text("employees_size_range"),
   staffCount: integer("staff_count"),
   description: text("description"),
-  hqAddress: text("hq_address"),
+  
+  // Pivotal B2B Standard Template - Company Location Fields
+  hqStreet1: text("hq_street_1"),
+  hqStreet2: text("hq_street_2"),
+  hqStreet3: text("hq_street_3"),
+  hqAddress: text("hq_address"), // Legacy combined address
   hqCity: text("hq_city"),
   hqState: text("hq_state"),
+  hqStateAbbr: text("hq_state_abbr"), // State abbreviation (e.g., "NC", "CA")
+  hqPostalCode: text("hq_postal_code"),
   hqCountry: text("hq_country"),
+  companyLocation: text("company_location"), // Formatted: "5420 Wade Park Boulevard, Raleigh, NC 27607, United States"
+  
   yearFounded: integer("year_founded"),
   sicCode: text("sic_code"),
   naicsCode: text("naics_code"),
@@ -343,6 +353,7 @@ export const accounts = pgTable("accounts", {
   domainNormalized: text("domain_normalized"),
   previousNames: text("previous_names").array(),
   linkedinUrl: text("linkedin_url"),
+  linkedinId: text("linkedin_id"), // LinkedIn numeric ID
   linkedinSpecialties: text("linkedin_specialties").array(),
   mainPhone: text("main_phone"),
   mainPhoneE164: text("main_phone_e164"),
