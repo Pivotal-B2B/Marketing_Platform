@@ -607,6 +607,17 @@ export const campaignAgentAssignments = pgTable("campaign_agent_assignments", {
   agentIdx: index("campaign_agent_assignments_agent_idx").on(table.agentId),
 }));
 
+// Campaign Agents table (simplified many-to-many for agent assignments)
+export const campaignAgents = pgTable("campaign_agents", {
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  agentId: varchar("agent_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.campaignId, table.agentId] }),
+  campaignIdx: index("campaign_agents_campaign_idx").on(table.campaignId),
+  agentIdx: index("campaign_agents_agent_idx").on(table.agentId),
+}));
+
 // Campaign Queue table (for account lead cap enforcement)
 export const campaignQueue = pgTable("campaign_queue", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

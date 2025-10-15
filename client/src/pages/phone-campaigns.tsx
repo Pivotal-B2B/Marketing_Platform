@@ -4,7 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Phone, Plus, Search, Play, Pause, BarChart, UserPlus, Users, CheckCircle2, AlertCircle } from "lucide-react";
+import { Phone, Plus, Search, Play, Pause, BarChart, UserPlus, Users, CheckCircle2, AlertCircle, MoreVertical, Copy, Trash2, CheckSquare } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -136,7 +144,7 @@ export default function PhoneCampaignsPage() {
       return await apiRequest('DELETE', `/api/campaigns/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", { type: "phone" }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", { type: "call" }] });
       toast({
         title: "Campaign Deleted",
         description: "Phone campaign has been deleted successfully.",
@@ -146,6 +154,56 @@ export default function PhoneCampaignsPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete campaign",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('PATCH', `/api/campaigns/${id}`, { status: 'completed' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      toast({
+        title: "Campaign Completed",
+        description: "Campaign has been marked as completed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to complete campaign",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async (campaign: Campaign) => {
+      const duplicateData = {
+        ...campaign,
+        name: `${campaign.name} (Copy)`,
+        status: 'draft',
+        launchedAt: null,
+      };
+      delete (duplicateData as any).id;
+      delete (duplicateData as any).createdAt;
+      delete (duplicateData as any).updatedAt;
+      
+      return await apiRequest('POST', '/api/campaigns', duplicateData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      toast({
+        title: "Campaign Duplicated",
+        description: "A copy of the campaign has been created.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to duplicate campaign",
         variant: "destructive",
       });
     },
@@ -372,27 +430,6 @@ export default function PhoneCampaignsPage() {
                       <BarChart className="mr-2 h-4 w-4" />
                       View Stats
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setLocation(`/campaigns/phone/${campaign.id}/queue`)}
-                        data-testid={`button-view-queue-${campaign.id}`}
-                      >
-                        <Users className="w-4 h-4 mr-2" />
-                        Queue
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCampaign(campaign);
-                          setShowPopulateDialog(true);
-                        }}
-                        data-testid={`button-populate-${campaign.id}`}
-                      >
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Add to Queue
-                      </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -478,6 +515,49 @@ export default function PhoneCampaignsPage() {
                       <BarChart className="w-4 h-4 mr-2" />
                       Reports
                     </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="ghost" data-testid={`button-more-${campaign.id}`}>
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Campaign Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => duplicateMutation.mutate(campaign)}
+                          disabled={duplicateMutation.isPending}
+                          data-testid={`menu-duplicate-${campaign.id}`}
+                        >
+                          <Copy className="w-4 h-4 mr-2" />
+                          Duplicate
+                        </DropdownMenuItem>
+                        {(campaign.status === 'active' || campaign.status === 'paused') && (
+                          <DropdownMenuItem
+                            onClick={() => completeMutation.mutate(campaign.id)}
+                            disabled={completeMutation.isPending}
+                            data-testid={`menu-complete-${campaign.id}`}
+                          >
+                            <CheckSquare className="w-4 h-4 mr-2" />
+                            Mark Complete
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+                              deleteMutation.mutate(campaign.id);
+                            }
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="text-destructive"
+                          data-testid={`menu-delete-${campaign.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </CardContent>
