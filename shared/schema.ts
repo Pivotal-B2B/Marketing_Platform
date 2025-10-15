@@ -309,6 +309,8 @@ export const contacts = pgTable("contacts", {
   directPhoneE164: text("direct_phone_e164"),
   phoneExtension: text("phone_extension"),
   phoneVerifiedAt: timestamp("phone_verified_at"),
+  mobilePhone: text("mobile_phone"),
+  mobilePhoneE164: text("mobile_phone_e164"),
   seniorityLevel: text("seniority_level"),
   department: text("department"),
   address: text("address"),
@@ -1064,6 +1066,8 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  mobilePhone: z.string().optional(),
 });
 
 export const insertSegmentSchema = createInsertSchema(segments).omit({

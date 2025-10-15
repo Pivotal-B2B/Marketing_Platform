@@ -292,6 +292,30 @@ export default function ContactDetailPage() {
                 </div>
 
                 <div>
+                  <p className="text-sm text-muted-foreground mb-1">Direct Work Phone</p>
+                  {contact.directPhoneE164 ? (
+                    <a href={`tel:${contact.directPhoneE164}`} className="font-medium text-primary hover:underline flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      {contact.directPhone}
+                    </a>
+                  ) : (
+                    <p className="font-medium">-</p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Mobile Direct</p>
+                  {contact.mobilePhoneE164 ? (
+                    <a href={`tel:${contact.mobilePhoneE164}`} className="font-medium text-primary hover:underline flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      {contact.mobilePhone}
+                    </a>
+                  ) : (
+                    <p className="font-medium">-</p>
+                  )}
+                </div>
+
+                <div>
                   <p className="text-sm text-muted-foreground mb-1">Email Status</p>
                   <Badge variant={contact.emailVerificationStatus === 'valid' ? 'default' : 'secondary'}>
                     {contact.emailVerificationStatus || 'unknown'}

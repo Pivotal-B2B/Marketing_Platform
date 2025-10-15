@@ -471,10 +471,10 @@ export default function ContactsPage() {
                     name="directPhone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone</FormLabel>
+                        <FormLabel>Direct Work Phone</FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder="+1234567890" 
+                            placeholder="+1 (555) 123-4567" 
                             {...field} 
                             value={field.value || ""}
                             className={phoneIsSuppressed ? "border-destructive" : ""}
@@ -487,6 +487,30 @@ export default function ContactsPage() {
                             Warning: This phone is on the DNC list
                           </FormDescription>
                         )}
+                        <FormDescription>
+                          Will be formatted based on country
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={createForm.control}
+                    name="mobilePhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mobile Direct (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="+1 (555) 987-6543" 
+                            {...field} 
+                            value={field.value || ""}
+                            data-testid="input-contact-mobile"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Will be formatted based on country
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -707,7 +731,17 @@ export default function ContactsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm">{contact.directPhone || "-"}</span>
+                        {contact.directPhoneE164 ? (
+                          <a 
+                            href={`tel:${contact.directPhoneE164}`} 
+                            className="font-mono text-sm text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {contact.directPhone}
+                          </a>
+                        ) : (
+                          <span className="font-mono text-sm">-</span>
+                        )}
                         {contactPhoneSuppressed && (
                           <Badge variant="destructive" className="text-xs" data-testid={`badge-phone-suppressed-${contact.id}`}>
                             <PhoneIcon className="h-3 w-3 mr-1" />

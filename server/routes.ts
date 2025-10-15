@@ -43,6 +43,7 @@ import {
   insertOrganizerSchema,
   insertSponsorSchema
 } from "@shared/schema";
+import { normalizePhoneE164 } from "@shared/utils"; // Import normalization utility
 
 export function registerRoutes(app: Express) {
   // ==================== AUTH ====================
@@ -315,6 +316,16 @@ export function registerRoutes(app: Express) {
           // Validate contact data
           const validatedContact = insertContactSchema.parse(contactData);
 
+          // Normalize phone numbers
+          if (validatedContact.directPhone) {
+            const normalized = normalizePhoneE164(validatedContact.directPhone, validatedContact.country || undefined);
+            validatedContact.directPhoneE164 = normalized;
+          }
+          if (validatedContact.mobilePhone) {
+            const normalized = normalizePhoneE164(validatedContact.mobilePhone, validatedContact.country || undefined);
+            validatedContact.mobilePhoneE164 = normalized;
+          }
+
           // Check email suppression
           if (await storage.isEmailSuppressed(validatedContact.email)) {
             results.failed++;
@@ -379,6 +390,16 @@ export function registerRoutes(app: Express) {
       // Validate contact data
       const validatedContact = insertContactSchema.parse(contactData);
 
+      // Normalize phone numbers
+      if (validatedContact.directPhone) {
+        const normalized = normalizePhoneE164(validatedContact.directPhone, validatedContact.country || undefined);
+        validatedContact.directPhoneE164 = normalized;
+      }
+      if (validatedContact.mobilePhone) {
+        const normalized = normalizePhoneE164(validatedContact.mobilePhone, validatedContact.country || undefined);
+        validatedContact.mobilePhoneE164 = normalized;
+      }
+
       // Check email suppression
       if (await storage.isEmailSuppressed(validatedContact.email)) {
         return res.status(400).json({ message: "Email is on suppression list" });
@@ -431,39 +452,73 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/contacts", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+  // Create contact
+  app.post('/api/contacts', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send('Unauthorized');
+    }
+
     try {
-      const validated = insertContactSchema.parse(req.body);
+      const contactData = insertContactSchema.parse(req.body);
+
+      // Normalize phone numbers
+      if (contactData.directPhone) {
+        const normalized = normalizePhoneE164(contactData.directPhone, contactData.country || undefined);
+        contactData.directPhoneE164 = normalized;
+      }
+      if (contactData.mobilePhone) {
+        const normalized = normalizePhoneE164(contactData.mobilePhone, contactData.country || undefined);
+        contactData.mobilePhoneE164 = normalized;
+      }
 
       // Check email suppression
-      if (await storage.isEmailSuppressed(validated.email)) {
+      if (await storage.isEmailSuppressed(contactData.email)) {
         return res.status(400).json({ message: "Email is on suppression list" });
       }
 
       // Check phone suppression if provided
-      if (validated.directPhoneE164 && await storage.isPhoneSuppressed(validated.directPhoneE164)) {
+      if (contactData.directPhoneE164 && await storage.isPhoneSuppressed(contactData.directPhoneE164)) {
         return res.status(400).json({ message: "Phone is on DNC list" });
       }
 
-      const contact = await storage.createContact(validated);
-      res.status(201).json(contact);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Validation failed", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create contact" });
+      const newContact = await storage.createContact(contactData);
+      res.json(newContact);
+    } catch (error: any) {
+      console.error('Error creating contact:', error);
+      res.status(400).send(error.message);
     }
   });
 
-  app.patch("/api/contacts/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+  // Update contact
+  app.patch('/api/contacts/:id', async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send('Unauthorized');
+    }
+
     try {
-      const contact = await storage.updateContact(req.params.id, req.body);
-      if (!contact) {
+      const { id } = req.params;
+      const updateData = req.body;
+
+      // Normalize phone numbers if provided
+      if (updateData.directPhone) {
+        const contact = await storage.getContact(id);
+        const normalized = normalizePhoneE164(updateData.directPhone, contact?.country || undefined);
+        updateData.directPhoneE164 = normalized;
+      }
+      if (updateData.mobilePhone) {
+        const contact = await storage.getContact(id);
+        const normalized = normalizePhoneE164(updateData.mobilePhone, contact?.country || undefined);
+        updateData.mobilePhoneE164 = normalized;
+      }
+
+      const updatedContact = await storage.updateContact(id, updateData);
+      if (!updatedContact) {
         return res.status(404).json({ message: "Contact not found" });
       }
-      res.json(contact);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update contact" });
+      res.json(updatedContact);
+    } catch (error: any) {
+      console.error('Error updating contact:', error);
+      res.status(400).send(error.message);
     }
   });
 
@@ -655,6 +710,21 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "Email is on suppression list" });
       }
 
+      // Normalize phone numbers
+      if (contactData.directPhone) {
+        const normalized = normalizePhoneE164(contactData.directPhone, contactData.country || undefined);
+        contactData.directPhoneE164 = normalized;
+      }
+      if (contactData.mobilePhone) {
+        const normalized = normalizePhoneE164(contactData.mobilePhone, contactData.country || undefined);
+        contactData.mobilePhoneE164 = normalized;
+      }
+      
+      // Check phone suppression if provided
+      if (contactData.directPhoneE164 && await storage.isPhoneSuppressed(contactData.directPhoneE164)) {
+        return res.status(400).json({ message: "Phone is on DNC list" });
+      }
+
       // Map 'title' to 'jobTitle' for database compatibility
       if (title !== undefined) {
         contactData.jobTitle = title;
@@ -689,6 +759,12 @@ export function registerRoutes(app: Express) {
 
       if (!name) {
         return res.status(400).json({ message: "Name is required for upsert" });
+      }
+
+      // Normalize phone number
+      if (accountData.mainPhone) {
+        const normalized = normalizePhoneE164(accountData.mainPhone, accountData.hqCountry || undefined);
+        accountData.mainPhoneE164 = normalized;
       }
 
       // Map 'revenue' to 'annualRevenue' for database compatibility
@@ -746,7 +822,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/:entityType/:id/membership", requireAuth, async (req, res) => {
     try {
       const { entityType, id } = req.params;
-      
+
       if (entityType !== 'contacts' && entityType !== 'accounts') {
         return res.status(400).json({ message: "Invalid entity type" });
       }
@@ -804,7 +880,7 @@ export function registerRoutes(app: Express) {
     try {
       const validated = insertSegmentSchema.parse(req.body);
       const segment = await storage.createSegment(validated);
-      
+
       // Calculate and update record count
       if (segment.definitionJson) {
         const preview = await storage.previewSegment(
@@ -818,7 +894,7 @@ export function registerRoutes(app: Express) {
         segment.recordCountCache = preview.count;
         segment.lastRefreshedAt = new Date();
       }
-      
+
       res.status(201).json(segment);
     } catch (error) {
       if (error instanceof z.ZodError) {

@@ -49,7 +49,8 @@ import {
   Briefcase,
   TrendingUp,
   Shield,
-  List
+  List,
+  Phone
 } from "lucide-react";
 import type { Account, Contact } from "@shared/schema";
 import { HeaderActionBar } from "@/components/shared/header-action-bar";
@@ -60,11 +61,11 @@ export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  
+
   const [selectedPrimary, setSelectedPrimary] = useState<string | null>(null);
   const [selectedSecondary, setSelectedSecondary] = useState<string[]>([]);
   const [selectedReject, setSelectedReject] = useState<string[]>([]);
-  
+
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -76,6 +77,7 @@ export default function AccountDetailPage() {
     hqState: "",
     hqCountry: "",
     mainPhone: "",
+    mainPhoneE164: "", // Added for E.164 formatted phone number
     linkedinUrl: "",
     description: "",
     yearFounded: "",
@@ -148,6 +150,7 @@ export default function AccountDetailPage() {
         hqState: account.hqState || "",
         hqCountry: account.hqCountry || "",
         mainPhone: account.mainPhone || "",
+        mainPhoneE164: account.mainPhoneE164 || "", // Populate E.164 format
         linkedinUrl: account.linkedinUrl || "",
         description: account.description || "",
         yearFounded: account.yearFounded?.toString() || "",
@@ -160,6 +163,10 @@ export default function AccountDetailPage() {
     const updateData: any = { ...editForm };
     if (editForm.yearFounded) {
       updateData.yearFounded = parseInt(editForm.yearFounded);
+    }
+    // Ensure mainPhone is updated if mainPhoneE164 is changed
+    if (editForm.mainPhoneE164 && !editForm.mainPhone) {
+        updateData.mainPhone = editForm.mainPhoneE164; // Or handle based on your normalization logic
     }
     updateAccountMutation.mutate(updateData);
   };
@@ -210,7 +217,7 @@ export default function AccountDetailPage() {
     },
     {
       type: "call" as const,
-      value: account.mainPhone ?? undefined,
+      value: account.mainPhoneE164 ?? undefined, // Use E.164 for click-to-call
       label: "Call Main Number",
     },
     {
@@ -317,12 +324,17 @@ export default function AccountDetailPage() {
                   </div>
                 )}
 
-                {account.mainPhone && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Main Phone</p>
-                    <p className="font-medium font-mono text-sm">{account.mainPhone}</p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Main HQ Phone</p>
+                  {account.mainPhoneE164 ? (
+                    <a href={`tel:${account.mainPhoneE164}`} className="font-medium font-mono text-primary hover:underline flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      {account.mainPhone}
+                    </a>
+                  ) : (
+                    <p className="font-medium">-</p>
+                  )}
+                </div>
 
                 {account.description && (
                   <div className="col-span-2">
@@ -404,7 +416,8 @@ export default function AccountDetailPage() {
                         <TableHead>Name</TableHead>
                         <TableHead>Title</TableHead>
                         <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
+                        <TableHead>Direct Work Phone</TableHead>
+                        <TableHead>Mobile Direct</TableHead>
                         <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -429,7 +442,26 @@ export default function AccountDetailPage() {
                             </TableCell>
                             <TableCell>{contact.jobTitle || "-"}</TableCell>
                             <TableCell className="font-mono text-sm">{contact.email}</TableCell>
-                            <TableCell className="font-mono text-sm">{contact.directPhone || "-"}</TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {contact.directWorkPhoneE164 ? (
+                                <a href={`tel:${contact.directWorkPhoneE164}`} className="text-primary hover:underline flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />
+                                  {contact.directWorkPhone}
+                                </a>
+                              ) : (
+                                contact.directWorkPhone || "-"
+                              )}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {contact.mobileDirectE164 ? (
+                                <a href={`tel:${contact.mobileDirectE164}`} className="text-primary hover:underline flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />
+                                  {contact.mobileDirect}
+                                </a>
+                              ) : (
+                                contact.mobileDirect || "-"
+                              )}
+                            </TableCell>
                             <TableCell>
                               <Button 
                                 variant="ghost" 
@@ -475,7 +507,7 @@ export default function AccountDetailPage() {
                     const isPrimary = selectedPrimary === candidateName;
                     const isSecondary = selectedSecondary.includes(candidateName);
                     const isRejected = selectedReject.includes(candidateName);
-                    
+
                     return (
                       <div key={idx} className="flex items-center justify-between p-4 border rounded-lg hover-elevate">
                         <div className="flex-1">
@@ -555,7 +587,7 @@ export default function AccountDetailPage() {
                       if (selectedPrimary) reviewData.accept_primary = selectedPrimary;
                       if (selectedSecondary.length > 0) reviewData.add_secondary = selectedSecondary;
                       if (selectedReject.length > 0) reviewData.reject = selectedReject;
-                      
+
                       if (!selectedPrimary && selectedSecondary.length === 0 && selectedReject.length === 0) {
                         toast({
                           variant: "destructive",
@@ -564,7 +596,7 @@ export default function AccountDetailPage() {
                         });
                         return;
                       }
-                      
+
                       reviewAIMutation.mutate(reviewData);
                     }}
                     disabled={reviewAIMutation.isPending}
@@ -784,7 +816,7 @@ export default function AccountDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">Main Phone</Label>
+                <Label htmlFor="phone">Main HQ Phone</Label>
                 <Input
                   id="phone"
                   value={editForm.mainPhone}

@@ -121,26 +121,136 @@ export function normalizeName(name: string): string {
 }
 
 /**
+ * Get country code from country name
+ */
+export function getCountryCodeFromName(countryName: string): string {
+  const countryCodeMap: Record<string, string> = {
+    'United States': '1',
+    'USA': '1',
+    'US': '1',
+    'Canada': '1',
+    'United Kingdom': '44',
+    'UK': '44',
+    'Australia': '61',
+    'India': '91',
+    'Germany': '49',
+    'France': '33',
+    'Spain': '34',
+    'Italy': '39',
+    'Netherlands': '31',
+    'Belgium': '32',
+    'Switzerland': '41',
+    'Austria': '43',
+    'Poland': '48',
+    'Sweden': '46',
+    'Norway': '47',
+    'Denmark': '45',
+    'Finland': '358',
+    'Ireland': '353',
+    'Portugal': '351',
+    'Greece': '30',
+    'Czech Republic': '420',
+    'Hungary': '36',
+    'Romania': '40',
+    'Bulgaria': '359',
+    'Singapore': '65',
+    'Malaysia': '60',
+    'Hong Kong': '852',
+    'Japan': '81',
+    'South Korea': '82',
+    'China': '86',
+    'Taiwan': '886',
+    'Thailand': '66',
+    'Philippines': '63',
+    'Indonesia': '62',
+    'Vietnam': '84',
+    'Brazil': '55',
+    'Mexico': '52',
+    'Argentina': '54',
+    'Chile': '56',
+    'Colombia': '57',
+    'Peru': '51',
+    'South Africa': '27',
+    'Nigeria': '234',
+    'Kenya': '254',
+    'Egypt': '20',
+    'UAE': '971',
+    'Saudi Arabia': '966',
+    'Israel': '972',
+    'Turkey': '90',
+    'Russia': '7',
+    'New Zealand': '64',
+  };
+  
+  return countryCodeMap[countryName] || '1'; // Default to US/Canada
+}
+
+/**
  * Validates and normalizes a phone number to E.164 format
  * Returns null if invalid
  */
-export function normalizePhoneE164(phone: string, defaultCountryCode = '1'): string | null {
+export function normalizePhoneE164(phone: string, country?: string): string | null {
   if (!phone) return null;
   
-  // Remove all non-digit characters
-  let digits = phone.replace(/\D/g, '');
+  // Remove all non-digit characters except leading +
+  let cleaned = phone.trim();
+  const hasPlus = cleaned.startsWith('+');
+  let digits = cleaned.replace(/\D/g, '');
   
-  // If no country code, prepend default
-  if (!digits.startsWith('+') && digits.length === 10) {
-    digits = defaultCountryCode + digits;
+  // If already has country code (starts with + or has 11+ digits), use as-is
+  if (hasPlus || digits.length >= 11) {
+    // Basic validation (E.164: + followed by 1-15 digits)
+    if (digits.length < 7 || digits.length > 15) {
+      return null;
+    }
+    return '+' + digits;
   }
   
-  // Basic validation (E.164: + followed by 1-15 digits)
-  if (digits.length < 10 || digits.length > 15) {
+  // Get country code from country name
+  const countryCode = country ? getCountryCodeFromName(country) : '1';
+  
+  // For 10-digit numbers (common in US/Canada), prepend country code
+  if (digits.length === 10 && countryCode === '1') {
+    return '+1' + digits;
+  }
+  
+  // For other countries, check if length makes sense
+  if (digits.length >= 7 && digits.length <= 12) {
+    return '+' + countryCode + digits;
+  }
+  
+  // Basic validation failed
+  if (digits.length < 7 || digits.length > 15) {
     return null;
   }
   
-  return '+' + digits;
+  return '+' + countryCode + digits;
+}
+
+/**
+ * Format phone number for display (click-to-call ready)
+ */
+export function formatPhoneForDisplay(phoneE164: string | null): string {
+  if (!phoneE164) return '';
+  
+  // Remove + for display, but keep it in data
+  const digits = phoneE164.replace(/\D/g, '');
+  
+  // US/Canada format: +1 (555) 123-4567
+  if (phoneE164.startsWith('+1') && digits.length === 11) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  
+  // UK format: +44 20 1234 5678
+  if (phoneE164.startsWith('+44')) {
+    const local = digits.slice(2);
+    if (local.length === 10) {
+      return `+44 ${local.slice(0, 2)} ${local.slice(2, 6)} ${local.slice(6)}`;
+    }
+  }
+  
+  // Default: just add + and group by 3s
+  return '+' + digits.replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, '$1 ');
 }
 
 /**

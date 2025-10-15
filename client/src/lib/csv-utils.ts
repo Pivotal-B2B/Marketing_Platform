@@ -1,11 +1,12 @@
 import type { Account, Contact } from "@shared/schema";
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 // Escape and quote a CSV field according to RFC4180
 function escapeCSVField(field: string): string {
   if (field == null) return "";
-  
+
   const stringField = String(field);
-  
+
   // Check if field contains comma, quote, or newline
   if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n') || stringField.includes('\r')) {
     // Escape quotes by doubling them
@@ -13,19 +14,47 @@ function escapeCSVField(field: string): string {
     // Wrap in quotes
     return `"${escaped}"`;
   }
-  
+
   return stringField;
 }
+
+// Helper function to normalize email
+const normalizeEmail = (email: string): string => {
+  return email.toLowerCase().trim();
+};
+
+// Helper function to clean phone number (remove dots, dashes, spaces)
+const cleanPhoneNumber = (phone: string): string => {
+  if (!phone) return '';
+  return phone.replace(/[\.\-\s\(\)]/g, '').trim();
+};
+
+// Helper function to format phone number with country code
+const formatPhoneNumber = (phone: string, country?: string): string => {
+  if (!phone) return '';
+  try {
+    const phoneNumber = parsePhoneNumberFromString(phone, country as any);
+    if (phoneNumber) {
+      return phoneNumber.formatInternational();
+    }
+  } catch (error) {
+    console.error(`Error formatting phone number ${phone} for country ${country}:`, error);
+  }
+  // Fallback to cleaned number if formatting fails
+  return cleanPhoneNumber(phone);
+};
+
 
 // Generate unified CSV template for Contacts with Account information
 export function generateContactsWithAccountTemplate(): string {
   const headers = [
     // Contact fields
     "firstName",
-    "lastName", 
+    "lastName",
     "fullName",
     "email",
     "directPhone",
+    "mobilePhone", // Added mobilePhone field
     "jobTitle",
     "department",
     "seniorityLevel",
@@ -58,6 +87,7 @@ export function generateContactsWithAccountTemplate(): string {
     escapeCSVField("John Doe"),
     escapeCSVField("john.doe@example.com"),
     escapeCSVField("+14155551234"),
+    escapeCSVField("+14155555678"), // Sample mobile direct phone
     escapeCSVField("VP of Sales"),
     escapeCSVField("Sales"),
     escapeCSVField("Executive"),
@@ -152,6 +182,7 @@ export function exportContactsToCSV(contacts: Contact[]): string {
     "fullName",
     "email",
     "directPhone",
+    "mobilePhone", // Added mobilePhone field
     "jobTitle",
     "department",
     "seniorityLevel",
@@ -173,6 +204,7 @@ export function exportContactsToCSV(contacts: Contact[]): string {
     escapeCSVField(contact.fullName || ""),
     escapeCSVField(contact.email),
     escapeCSVField(contact.directPhone || ""),
+    escapeCSVField(contact.mobilePhone || ""), // Export mobilePhone
     escapeCSVField(contact.jobTitle || ""),
     escapeCSVField(contact.department || ""),
     escapeCSVField(contact.seniorityLevel || ""),
@@ -265,13 +297,13 @@ export function parseCSV(content: string): string[][] {
       // End of row (handle both LF and CRLF)
       row.push(current);
       current = "";
-      
+
       // Only add non-empty rows
       if (row.length > 0 && row.some(field => field.trim())) {
         result.push(row);
       }
       row = [];
-      
+
       // Skip the LF if we just processed CR
       if (char === '\r' && nextChar === '\n') {
         i++; // Skip the \n
@@ -280,7 +312,7 @@ export function parseCSV(content: string): string[][] {
       // Standalone CR (old Mac format) - treat as line break
       row.push(current);
       current = "";
-      
+
       if (row.length > 0 && row.some(field => field.trim())) {
         result.push(row);
       }
@@ -406,8 +438,9 @@ export function csvRowToContact(
     firstName: data.firstName || "",
     lastName: data.lastName || "",
     fullName: data.fullName || `${data.firstName} ${data.lastName}`.trim(),
-    email: data.email,
-    directPhone: data.directPhone || undefined,
+    email: normalizeEmail(data.email),
+    directPhone: formatPhoneNumber(data.directPhone, data.country), // Format with country
+    mobilePhone: formatPhoneNumber(data.mobilePhone, data.country), // Format with country
     jobTitle: data.jobTitle || undefined,
     department: data.department || undefined,
     seniorityLevel: data.seniorityLevel || undefined,
@@ -453,7 +486,7 @@ export function csvRowToAccount(
     hqCity: data.hqCity || undefined,
     hqState: data.hqState || undefined,
     hqCountry: data.hqCountry || undefined,
-    mainPhone: data.mainPhone || undefined,
+    mainPhone: formatPhoneNumber(data.mainPhone, data.hqCountry), // Format with country
     linkedinUrl: data.linkedinUrl || undefined,
     description: data.description || undefined,
   };
@@ -522,7 +555,7 @@ export function validateContactWithAccountRow(
 
   // Account validations
   // Either account name or domain is required
-  if ((!rowData.account_name || rowData.account_name.trim().length === 0) && 
+  if ((!rowData.account_name || rowData.account_name.trim().length === 0) &&
       (!rowData.account_domain || rowData.account_domain.trim().length === 0)) {
     errors.push({
       row: rowIndex,
@@ -563,8 +596,9 @@ export function csvRowToContactFromUnified(
     firstName: data.firstName || "",
     lastName: data.lastName || "",
     fullName: data.fullName || `${data.firstName} ${data.lastName}`.trim(),
-    email: data.email,
-    directPhone: data.directPhone || undefined,
+    email: normalizeEmail(data.email),
+    directPhone: formatPhoneNumber(data.directPhone, data.account_country), // Use account country for formatting
+    mobilePhone: formatPhoneNumber(data.mobilePhone, data.account_country), // Use account country for formatting
     jobTitle: data.jobTitle || undefined,
     department: data.department || undefined,
     seniorityLevel: data.seniorityLevel || undefined,
@@ -610,7 +644,7 @@ export function csvRowToAccountFromUnified(
     hqCity: data.account_city || data.account_hqCity || undefined,
     hqState: data.account_state || data.account_hqState || undefined,
     hqCountry: data.account_country || data.account_hqCountry || undefined,
-    mainPhone: data.account_phone || data.account_mainPhone || undefined,
+    mainPhone: formatPhoneNumber(data.account_phone, data.account_country), // Format with account country
     linkedinUrl: data.account_linkedinUrl || undefined,
     description: data.account_description || undefined,
   };
