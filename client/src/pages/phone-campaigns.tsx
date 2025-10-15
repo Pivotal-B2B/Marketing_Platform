@@ -45,9 +45,9 @@ export default function PhoneCampaignsPage() {
   const [agentEmails, setAgentEmails] = useState<string>("");
 
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery<Campaign[]>({
-    queryKey: ["/api/campaigns", { type: "telemarketing" }],
+    queryKey: ["/api/campaigns", { type: "call" }],
     queryFn: async () => {
-      const response = await fetch("/api/campaigns?type=telemarketing", {
+      const response = await fetch("/api/campaigns?type=call", {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

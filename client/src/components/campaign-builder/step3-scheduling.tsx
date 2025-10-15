@@ -49,7 +49,7 @@ export function Step3Scheduling({ data, onNext, campaignType }: Step3Props) {
         date: scheduleDate,
         time: scheduleTime,
         timezone,
-        throttle,
+        dialingPace: throttle,
         assignedAgents: campaignType === "telemarketing" ? assignedAgents : undefined,
       },
     });
