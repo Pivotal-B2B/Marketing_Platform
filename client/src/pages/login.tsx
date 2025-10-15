@@ -57,23 +57,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Premium gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-teal-accent/5 to-background"></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-accent/10 rounded-full blur-3xl"></div>
+      
+      <Card className="w-full max-w-md relative shadow-smooth-lg border-0 animate-fade-in">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="h-12 w-12 rounded-lg bg-primary flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-primary-foreground" />
+            <div className="h-16 w-16 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-smooth relative">
+              <div className="absolute inset-0 bg-white/20 rounded-2xl blur-sm"></div>
+              <Building2 className="h-8 w-8 text-white relative z-10" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Pivotal CRM</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-3xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+            Pivotal CRM
+          </CardTitle>
+          <CardDescription className="text-base">
             Sign in to access your B2B campaign management platform
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="text-sm font-medium">Username</Label>
               <Input
                 id="username"
                 type="text"
@@ -82,10 +90,11 @@ export default function LoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 data-testid="input-username"
+                className="h-11"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -94,12 +103,18 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 data-testid="input-password"
+                className="h-11"
               />
             </div>
-            <Button type="submit" className="w-full" data-testid="button-login" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full h-11 text-base font-semibold shadow-smooth" 
+              data-testid="button-login" 
+              disabled={isLoading}
+            >
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Signing in...
                 </>
               ) : (
