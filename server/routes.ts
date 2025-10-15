@@ -1184,7 +1184,9 @@ export function registerRoutes(app: Express) {
 
       // Get all domain set items with matched accounts
       const matchedItems = await db
-        .select()
+        .select({
+          accountId: domainSetItems.accountId
+        })
         .from(domainSetItems)
         .where(
           and(
@@ -1197,8 +1199,12 @@ export function registerRoutes(app: Express) {
         return res.json([]);
       }
 
-      // Get unique account IDs
-      const accountIds = [...new Set(matchedItems.map(item => item.accountId).filter((id): id is string => id !== null))];
+      // Get unique account IDs, filtering out any null values
+      const accountIds = [...new Set(
+        matchedItems
+          .map(item => item.accountId)
+          .filter((id): id is string => id !== null && id !== undefined)
+      )];
 
       if (accountIds.length === 0) {
         return res.json([]);
@@ -1224,7 +1230,9 @@ export function registerRoutes(app: Express) {
 
       // Get all accounts that were matched by this domain set
       const matchedAccountIds = await db
-        .select({ accountId: domainSetItems.accountId })
+        .select({ 
+          accountId: domainSetItems.accountId 
+        })
         .from(domainSetItems)
         .where(
           and(
@@ -1237,16 +1245,22 @@ export function registerRoutes(app: Express) {
         return res.json([]);
       }
 
+      // Get unique account IDs, filtering out any null/undefined values
+      const accountIds = [...new Set(
+        matchedAccountIds
+          .map(m => m.accountId)
+          .filter((id): id is string => id !== null && id !== undefined)
+      )];
+
+      if (accountIds.length === 0) {
+        return res.json([]);
+      }
+
       // Get all contacts from those accounts
       const contacts = await db
         .select()
         .from(contactsTable)
-        .where(
-          inArray(
-            contactsTable.accountId,
-            matchedAccountIds.map(m => m.accountId).filter((id): id is string => id !== null)
-          )
-        );
+        .where(inArray(contactsTable.accountId, accountIds));
 
       res.json(contacts);
     } catch (error: any) {
