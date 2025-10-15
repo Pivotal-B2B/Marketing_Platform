@@ -1341,7 +1341,7 @@ export class DatabaseStorage implements IStorage {
     // Execute query to get all matching records
     const allRecords = await query;
 
-    if (sampleIds.length === 0) {
+    if (allRecords.length === 0) {
       return [];
     }
 
@@ -1350,9 +1350,6 @@ export class DatabaseStorage implements IStorage {
     } else {
       // For contacts, we already have the full records from the query
       return allRecords as Contact[];
-          sourceSystem: contacts.sourceSystem,
-          sourceRecordId: contacts.sourceRecordId,
-          sourceUpdatedAt: contacts.sourceUpdatedAt,
           deletedAt: contacts.deletedAt,
           createdAt: contacts.createdAt,
           updatedAt: contacts.updatedAt,
