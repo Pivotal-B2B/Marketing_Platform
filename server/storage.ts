@@ -1326,52 +1326,30 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Segment not found');
     }
 
-    // Get all matching records using the segment's filter definition
-    const { sampleIds } = await this.previewSegment(
-      segment.entityType || 'contact',
-      segment.definitionJson
-    );
+    // Build query based on entity type to get ALL matching records
+    const table = segment.entityType === 'account' ? accounts : contacts;
+    let query = db.select().from(table);
+
+    // Apply filters if criteria exists
+    if (segment.definitionJson && (segment.definitionJson as any).conditions?.length > 0) {
+      const filterSql = buildFilterQuery(segment.definitionJson as any, table);
+      if (filterSql) {
+        query = query.where(filterSql);
+      }
+    }
+
+    // Execute query to get all matching records
+    const allRecords = await query;
 
     if (sampleIds.length === 0) {
       return [];
     }
 
     if (segment.entityType === 'account') {
-      const accountsList = await db
-        .select()
-        .from(accounts)
-        .where(inArray(accounts.id, sampleIds));
-      return accountsList;
+      return allRecords as Account[];
     } else {
-      // For contacts, join with accounts to get account names
-      const contactsWithAccounts = await db
-        .select({
-          id: contacts.id,
-          accountId: contacts.accountId,
-          fullName: contacts.fullName,
-          firstName: contacts.firstName,
-          lastName: contacts.lastName,
-          jobTitle: contacts.jobTitle,
-          email: contacts.email,
-          emailNormalized: contacts.emailNormalized,
-          emailVerificationStatus: contacts.emailVerificationStatus,
-          directPhone: contacts.directPhone,
-          directPhoneE164: contacts.directPhoneE164,
-          phoneExtension: contacts.phoneExtension,
-          phoneVerifiedAt: contacts.phoneVerifiedAt,
-          seniorityLevel: contacts.seniorityLevel,
-          department: contacts.department,
-          address: contacts.address,
-          linkedinUrl: contacts.linkedinUrl,
-          intentTopics: contacts.intentTopics,
-          tags: contacts.tags,
-          consentBasis: contacts.consentBasis,
-          consentSource: contacts.consentSource,
-          consentTimestamp: contacts.consentTimestamp,
-          ownerId: contacts.ownerId,
-          customFields: contacts.customFields,
-          emailStatus: contacts.emailStatus,
-          phoneStatus: contacts.phoneStatus,
+      // For contacts, we already have the full records from the query
+      return allRecords as Contact[];
           sourceSystem: contacts.sourceSystem,
           sourceRecordId: contacts.sourceRecordId,
           sourceUpdatedAt: contacts.sourceUpdatedAt,
