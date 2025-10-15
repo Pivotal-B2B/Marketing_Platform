@@ -245,6 +245,15 @@ export const callSessionStatusEnum = pgEnum('call_session_status', [
   'completed'
 ]);
 
+export const agentStatusEnum = pgEnum('agent_status_type', [
+  'offline',        // Agent not logged in
+  'available',      // Ready to receive calls
+  'busy',          // On active call
+  'after_call_work', // Call ended, completing disposition/notes
+  'break',         // On break
+  'away'           // Temporarily away
+]);
+
 export const activityEventTypeEnum = pgEnum('activity_event_type', [
   'call_job_created',
   'call_job_scheduled',
@@ -1261,6 +1270,47 @@ export const qualificationResponses = pgTable("qualification_responses", {
 }, (table) => ({
   attemptIdx: index("qualification_responses_attempt_idx").on(table.attemptId),
   leadIdx: index("qualification_responses_lead_idx").on(table.leadId),
+}));
+
+// ==================== AUTO-DIALER & AGENT STATUS ====================
+
+// Agent Status - Real-time agent availability for auto-dialer
+export const agentStatus = pgTable("agent_status", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").references(() => users.id, { onDelete: 'cascade' }).notNull().unique(),
+  status: agentStatusEnum("status").notNull().default('offline'),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'set null' }),
+  currentCallId: varchar("current_call_id").references(() => callSessions.id, { onDelete: 'set null' }),
+  lastStatusChangeAt: timestamp("last_status_change_at").notNull().defaultNow(),
+  lastCallEndedAt: timestamp("last_call_ended_at"),
+  totalCallsToday: integer("total_calls_today").default(0),
+  totalTalkTimeToday: integer("total_talk_time_today").default(0), // seconds
+  breakReason: text("break_reason"), // Optional reason for break
+  statusMetadata: jsonb("status_metadata"), // Additional context
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  agentIdx: uniqueIndex("agent_status_agent_idx").on(table.agentId),
+  statusIdx: index("agent_status_status_idx").on(table.status),
+  campaignIdx: index("agent_status_campaign_idx").on(table.campaignId),
+}));
+
+// Auto-Dialer Queue - Active dialing campaigns with settings
+export const autoDialerQueues = pgTable("auto_dialer_queues", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull().unique(),
+  isActive: boolean("is_active").notNull().default(false),
+  dialMode: text("dial_mode").notNull().default('progressive'), // 'progressive', 'predictive', 'preview'
+  maxConcurrentCalls: integer("max_concurrent_calls").default(1), // Calls per agent
+  answeringMachineDetection: boolean("answering_machine_detection").default(true),
+  callTimeout: integer("call_timeout").default(30), // seconds to wait for answer
+  dialRateLimitPerMin: integer("dial_rate_limit_per_min").default(60),
+  contactsDialedToday: integer("contacts_dialed_today").default(0),
+  lastDialedAt: timestamp("last_dialed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignIdx: uniqueIndex("auto_dialer_queues_campaign_idx").on(table.campaignId),
+  activeIdx: index("auto_dialer_queues_active_idx").on(table.isActive),
 }));
 
 // Bulk Imports
@@ -2463,6 +2513,27 @@ export type InsertContentEvent = z.infer<typeof insertContentEventSchema>;
 export type CampaignContentLink = typeof campaignContentLinks.$inferSelect;
 export type InsertCampaignContentLink = z.infer<typeof insertCampaignContentLinkSchema>;
 
+// Auto-Dialer Insert Schemas
+export const insertAgentStatusSchema = createInsertSchema(agentStatus).omit({
+  id: true,
+  lastStatusChangeAt: true,
+  updatedAt: true,
+});
+
+export const insertAutoDialerQueueSchema = createInsertSchema(autoDialerQueues).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Auto-Dialer Types
+export type AgentStatus = typeof agentStatus.$inferSelect;
+export type InsertAgentStatus = z.infer<typeof insertAgentStatusSchema>;
+
+export type AutoDialerQueue = typeof autoDialerQueues.$inferSelect;
+export type InsertAutoDialerQueue = z.infer<typeof insertAutoDialerQueueSchema>;
+
 // Enum value arrays for dropdowns
 export const REVENUE_RANGE_VALUES = revenueRangeEnum.enumValues;
 export const STAFF_COUNT_RANGE_VALUES = staffCountRangeEnum.enumValues;
+export const AGENT_STATUS_VALUES = agentStatusEnum.enumValues;

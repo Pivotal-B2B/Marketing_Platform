@@ -14,6 +14,7 @@ import {
   contentAssets, socialPosts, aiContentGenerations, contentAssetPushes,
   events, resources, news,
   softphoneProfiles, callRecordingAccessLogs, sipTrunkConfigs,
+  agentStatus, autoDialerQueues,
   campaignContentLinks,
   speakers, organizers, sponsors,
   userRoles,
@@ -54,6 +55,8 @@ import {
   type SoftphoneProfile, type InsertSoftphoneProfile,
   type CallRecordingAccessLog, type InsertCallRecordingAccessLog,
   type SipTrunkConfig, type InsertSipTrunkConfig,
+  type AgentStatus, type InsertAgentStatus,
+  type AutoDialerQueue, type InsertAutoDialerQueue,
   type CampaignContentLink, type InsertCampaignContentLink,
   type ContentAsset, type InsertContentAsset,
   type SocialPost, type InsertSocialPost,
@@ -213,6 +216,20 @@ export interface IStorage {
   updateSipTrunkConfig(id: string, config: Partial<InsertSipTrunkConfig>): Promise<SipTrunkConfig | undefined>;
   deleteSipTrunkConfig(id: string): Promise<void>;
   setDefaultSipTrunk(id: string): Promise<void>;
+
+  // Agent Status (Auto-Dialer)
+  getAgentStatus(agentId: string): Promise<AgentStatus | undefined>;
+  getAllAgentStatuses(campaignId?: string): Promise<AgentStatus[]>;
+  upsertAgentStatus(status: InsertAgentStatus): Promise<AgentStatus>;
+  updateAgentStatus(agentId: string, updates: Partial<InsertAgentStatus>): Promise<AgentStatus | undefined>;
+  getAvailableAgents(campaignId?: string): Promise<AgentStatus[]>;
+
+  // Auto-Dialer Queue
+  getAutoDialerQueue(campaignId: string): Promise<AutoDialerQueue | undefined>;
+  getAllAutoDialerQueues(activeOnly?: boolean): Promise<AutoDialerQueue[]>;
+  createAutoDialerQueue(queue: InsertAutoDialerQueue): Promise<AutoDialerQueue>;
+  updateAutoDialerQueue(campaignId: string, updates: Partial<InsertAutoDialerQueue>): Promise<AutoDialerQueue | undefined>;
+  toggleAutoDialerQueue(campaignId: string, isActive: boolean): Promise<AutoDialerQueue | undefined>;
 
   // Campaign Content Links (Resources Centre Integration)
   getCampaignContentLinks(campaignId: string): Promise<CampaignContentLink[]>;
@@ -2024,6 +2041,102 @@ export class DatabaseStorage implements IStorage {
     await db.update(sipTrunkConfigs).set({ isDefault: false });
     // Then set the specified one as default
     await db.update(sipTrunkConfigs).set({ isDefault: true }).where(eq(sipTrunkConfigs.id, id));
+  }
+
+  // Agent Status (Auto-Dialer)
+  async getAgentStatus(agentId: string): Promise<AgentStatus | undefined> {
+    const [status] = await db.select().from(agentStatus).where(eq(agentStatus.agentId, agentId));
+    return status || undefined;
+  }
+
+  async getAllAgentStatuses(campaignId?: string): Promise<AgentStatus[]> {
+    if (campaignId) {
+      return await db.select().from(agentStatus).where(eq(agentStatus.campaignId, campaignId)).orderBy(agentStatus.status);
+    }
+    return await db.select().from(agentStatus).orderBy(agentStatus.status);
+  }
+
+  async upsertAgentStatus(insertStatus: InsertAgentStatus): Promise<AgentStatus> {
+    const [status] = await db
+      .insert(agentStatus)
+      .values({ ...insertStatus, lastStatusChangeAt: new Date(), updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: agentStatus.agentId,
+        set: {
+          status: insertStatus.status,
+          campaignId: insertStatus.campaignId,
+          currentCallId: insertStatus.currentCallId,
+          lastStatusChangeAt: new Date(),
+          lastCallEndedAt: insertStatus.lastCallEndedAt,
+          totalCallsToday: insertStatus.totalCallsToday,
+          totalTalkTimeToday: insertStatus.totalTalkTimeToday,
+          breakReason: insertStatus.breakReason,
+          statusMetadata: insertStatus.statusMetadata,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return status;
+  }
+
+  async updateAgentStatus(agentId: string, updates: Partial<InsertAgentStatus>): Promise<AgentStatus | undefined> {
+    const [status] = await db
+      .update(agentStatus)
+      .set({ ...updates, lastStatusChangeAt: new Date(), updatedAt: new Date() })
+      .where(eq(agentStatus.agentId, agentId))
+      .returning();
+    return status || undefined;
+  }
+
+  async getAvailableAgents(campaignId?: string): Promise<AgentStatus[]> {
+    if (campaignId) {
+      return await db
+        .select()
+        .from(agentStatus)
+        .where(and(eq(agentStatus.status, 'available'), eq(agentStatus.campaignId, campaignId)))
+        .orderBy(agentStatus.lastCallEndedAt);
+    }
+    return await db
+      .select()
+      .from(agentStatus)
+      .where(eq(agentStatus.status, 'available'))
+      .orderBy(agentStatus.lastCallEndedAt);
+  }
+
+  // Auto-Dialer Queue
+  async getAutoDialerQueue(campaignId: string): Promise<AutoDialerQueue | undefined> {
+    const [queue] = await db.select().from(autoDialerQueues).where(eq(autoDialerQueues.campaignId, campaignId));
+    return queue || undefined;
+  }
+
+  async getAllAutoDialerQueues(activeOnly?: boolean): Promise<AutoDialerQueue[]> {
+    if (activeOnly) {
+      return await db.select().from(autoDialerQueues).where(eq(autoDialerQueues.isActive, true)).orderBy(autoDialerQueues.campaignId);
+    }
+    return await db.select().from(autoDialerQueues).orderBy(autoDialerQueues.campaignId);
+  }
+
+  async createAutoDialerQueue(insertQueue: InsertAutoDialerQueue): Promise<AutoDialerQueue> {
+    const [queue] = await db.insert(autoDialerQueues).values({ ...insertQueue, updatedAt: new Date() }).returning();
+    return queue;
+  }
+
+  async updateAutoDialerQueue(campaignId: string, updates: Partial<InsertAutoDialerQueue>): Promise<AutoDialerQueue | undefined> {
+    const [queue] = await db
+      .update(autoDialerQueues)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(autoDialerQueues.campaignId, campaignId))
+      .returning();
+    return queue || undefined;
+  }
+
+  async toggleAutoDialerQueue(campaignId: string, isActive: boolean): Promise<AutoDialerQueue | undefined> {
+    const [queue] = await db
+      .update(autoDialerQueues)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(autoDialerQueues.campaignId, campaignId))
+      .returning();
+    return queue || undefined;
   }
 
   // Campaign Content Links (Resources Centre Integration)
