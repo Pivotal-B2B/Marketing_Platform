@@ -65,9 +65,21 @@ export function CSVImportDialog({
         const parsed = parseCSV(content);
         
         if (parsed.length > 0) {
-          setHeaders(parsed[0]);
+          const headers = parsed[0];
+          setHeaders(headers);
           setCsvData(parsed.slice(1));
-          setStage("mapping");
+          
+          // Auto-detect format: check if headers contain account_ prefix
+          const hasAccountFields = headers.some(h => h.startsWith('account_'));
+          
+          if (hasAccountFields) {
+            // Unified format detected - go to mapping
+            setStage("mapping");
+          } else {
+            // Contacts-only format - skip mapping, go directly to validation
+            setStage("validate");
+            validateContactsOnlyData(parsed);
+          }
         }
       };
       reader.readAsText(selectedFile);
@@ -79,6 +91,23 @@ export function CSVImportDialog({
     // Apply mappings and validate
     setStage("validate");
     validateDataWithMapping(mappings);
+  };
+
+  const validateContactsOnlyData = (parsed: string[][]) => {
+    const dataRows = parsed.slice(1);
+    const headerRow = parsed[0];
+    const validationErrors: ValidationError[] = [];
+
+    dataRows.forEach((row, index) => {
+      const rowErrors = validateContactRow(row, headerRow, index + 2);
+      validationErrors.push(...rowErrors);
+    });
+
+    setErrors(validationErrors);
+
+    if (validationErrors.length === 0) {
+      setStage("preview");
+    }
   };
 
   const validateDataWithMapping = (mappings: FieldMapping[]) => {
@@ -128,14 +157,11 @@ export function CSVImportDialog({
     let successCount = 0;
     let failedCount = 0;
 
-    // Create mapped headers based on field mappings
-    const mappedHeaders = fieldMappings.map(m => {
-      if (!m.targetField || !m.targetEntity) return "";
-      return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
-    });
+    // Check if we have field mappings (unified format) or not (contacts-only)
+    const isUnifiedFormat = fieldMappings.length > 0;
 
     // Process in batches for better performance with large files
-    const BATCH_SIZE = 50; // Process 50 records at a time
+    const BATCH_SIZE = 50;
     const totalBatches = Math.ceil(csvData.length / BATCH_SIZE);
     
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
@@ -144,52 +170,72 @@ export function CSVImportDialog({
       const batchRows = csvData.slice(start, end);
 
       try {
-        // Prepare batch records
-        const records = batchRows.map((row) => {
-          const mappedRow = fieldMappings.map((mapping, idx) => row[idx] || "");
-          const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
-          const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
-          return { contact: contactData, account: accountData };
-        });
-
-        // Send batch to server
-        const response = await apiRequest(
-          "POST",
-          "/api/contacts/batch-import",
-          { records }
-        );
-        
-        const result = await response.json() as {
-          success: number;
-          failed: number;
-          errors: Array<{ index: number; error: string }>;
-        };
-        
-        successCount += result.success;
-        failedCount += result.failed;
-
-        // Log any batch errors
-        if (result.errors.length > 0) {
-          result.errors.forEach((err: { index: number; error: string }) => {
-            console.error(`Row ${start + err.index + 2}: ${err.error}`);
+        if (isUnifiedFormat) {
+          // Unified format with account data
+          const mappedHeaders = fieldMappings.map(m => {
+            if (!m.targetField || !m.targetEntity) return "";
+            return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
           });
+
+          const records = batchRows.map((row) => {
+            const mappedRow = fieldMappings.map((mapping, idx) => row[idx] || "");
+            const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
+            const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
+            return { contact: contactData, account: accountData };
+          });
+
+          const response = await apiRequest(
+            "POST",
+            "/api/contacts/batch-import",
+            { records }
+          );
+          
+          const result = await response.json() as {
+            success: number;
+            failed: number;
+            errors: Array<{ index: number; error: string }>;
+          };
+          
+          successCount += result.success;
+          failedCount += result.failed;
+
+          if (result.errors.length > 0) {
+            result.errors.forEach((err: { index: number; error: string }) => {
+              console.error(`Row ${start + err.index + 2}: ${err.error}`);
+            });
+          }
+        } else {
+          // Contacts-only format
+          const contacts = batchRows.map((row) => csvRowToContact(row, headers));
+
+          for (const contactData of contacts) {
+            try {
+              await apiRequest("POST", "/api/contacts", contactData);
+              successCount++;
+            } catch (error) {
+              failedCount++;
+              console.error("Failed to import contact:", error);
+            }
+          }
         }
       } catch (error) {
-        // If batch fails entirely, count all as failed
         failedCount += batchRows.length;
         console.error(`Failed to import batch ${batchIndex + 1}:`, error);
       }
 
-      // Update progress after each batch
       setImportProgress(Math.round(((end) / csvData.length) * 100));
     }
 
     setImportResults({ success: successCount, failed: failedCount });
     setStage("complete");
 
+    const message = isUnifiedFormat 
+      ? `Successfully imported ${successCount} contacts with accounts. ${failedCount} failed.`
+      : `Successfully imported ${successCount} contacts. ${failedCount} failed.`;
+
     toast({
       title: "Import Complete",
-      description: `Successfully imported ${successCount} contacts with accounts. ${failedCount} failed.`,
+      description: message,
     });
 
     onImportComplete();
@@ -206,6 +252,52 @@ export function CSVImportDialog({
     toast({
       title: "Template Downloaded",
       description: "Contacts with Accounts CSV template has been downloaded",
+    });
+  };
+
+  const downloadContactsOnlyTemplate = () => {
+    const headers = [
+      "firstName",
+      "lastName", 
+      "fullName",
+      "email",
+      "directPhone",
+      "jobTitle",
+      "department",
+      "seniorityLevel",
+      "linkedinUrl",
+      "consentBasis",
+      "consentSource",
+      "tags",
+      "customFields",
+    ];
+
+    const sampleRow = [
+      "John",
+      "Doe",
+      "John Doe",
+      "john.doe@example.com",
+      "+14155551234",
+      "VP of Sales",
+      "Sales",
+      "Executive",
+      "https://linkedin.com/in/johndoe",
+      "legitimate_interest",
+      "Website Form",
+      "enterprise,vip",
+      '{"favorite_color":"blue"}',
+    ];
+
+    const csv = [headers.join(","), sampleRow.join(",")].join("\n");
+    
+    downloadCSV(
+      csv,
+      `contacts_only_template_${new Date().toISOString().split("T")[0]}.csv`
+    );
+
+    toast({
+      title: "Template Downloaded",
+      description: "Contacts-only CSV template has been downloaded",
     });
   };
 
@@ -245,11 +337,11 @@ export function CSVImportDialog({
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>
-            Import Contacts with Accounts from CSV
+            Import Contacts from CSV
           </DialogTitle>
           <DialogDescription>
-            Upload a CSV file to bulk import contacts along with their account information.
-            The system will automatically find or create accounts based on domain.
+            Upload a CSV file to bulk import contacts. Supports both contacts-only format and unified contacts+accounts format.
+            The system will automatically detect the format and handle account linking.
           </DialogDescription>
         </DialogHeader>
 
@@ -280,21 +372,36 @@ export function CSVImportDialog({
                 </label>
               </div>
 
-              <Alert>
-                <Download className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between">
-                  <span>Need a template? Download a sample CSV file</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={downloadTemplate}
-                    data-testid="button-download-template"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Template
-                  </Button>
-                </AlertDescription>
-              </Alert>
+              <div className="space-y-2">
+                <Alert>
+                  <Download className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="space-y-3">
+                      <p className="font-medium">Download a template to get started:</p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={downloadContactsOnlyTemplate}
+                          data-testid="button-download-contacts-template"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Contacts Only
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={downloadTemplate}
+                          data-testid="button-download-unified-template"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Contacts + Accounts
+                        </Button>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              </div>
             </div>
           )}
 

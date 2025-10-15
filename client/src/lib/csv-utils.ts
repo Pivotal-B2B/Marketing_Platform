@@ -304,7 +304,7 @@ export function parseCSV(content: string): string[][] {
   return result;
 }
 
-// Validate contact row
+// Validation error interface
 export interface ValidationError {
   row: number;
   field: string;
@@ -312,6 +312,7 @@ export interface ValidationError {
   error: string;
 }
 
+// Validate contact row (contacts-only format)
 export function validateContactRow(
   row: string[],
   headers: string[],
