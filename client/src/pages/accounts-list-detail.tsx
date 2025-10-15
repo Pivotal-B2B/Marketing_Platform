@@ -22,6 +22,7 @@ interface DomainSetItem {
   domain: string;
   normalizedDomain: string;
   accountId?: string;
+  accountName?: string | null;
   matchType?: 'exact' | 'fuzzy' | 'none';
   matchConfidence?: string;
   matchedContactsCount: number;
@@ -34,6 +35,15 @@ interface Account {
   industryStandardized?: string;
   employeesSizeRange?: string;
   annualRevenue?: string;
+}
+
+interface Contact {
+  id: string;
+  fullName: string;
+  email: string;
+  directPhone?: string;
+  jobTitle?: string;
+  accountId?: string;
 }
 
 export default function AccountsListDetail() {
@@ -56,7 +66,7 @@ export default function AccountsListDetail() {
     enabled: !!id && viewFilter !== 'contacts',
   });
 
-  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Account[]>({
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: [`/api/domain-sets/${id}/contacts`],
     enabled: !!id && viewFilter !== 'accounts',
   });
@@ -287,7 +297,7 @@ export default function AccountsListDetail() {
                       <TableHead>Contact Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
-                      <TableHead>Account</TableHead>
+                      <TableHead>Job Title</TableHead>
                       <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -296,19 +306,19 @@ export default function AccountsListDetail() {
                       <TableRow 
                         key={contact.id} 
                         className="hover-elevate cursor-pointer"
-                        onClick={() => handleCardClick(contact.id, 'exact')} // Assuming 'exact' match for contacts here
+                        onClick={() => handleCardClick(contact.id, 'exact')}
                       >
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
                               <Users className="h-4 w-4 text-primary" />
                             </div>
-                            {contact.name}
+                            {contact.fullName}
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-sm">{contact.domain || "-"}</TableCell> {/* Assuming domain holds email */}
-                        <TableCell>{contact.industryStandardized || "-"}</TableCell> {/* Assuming industryStandardized holds phone */}
-                        <TableCell>{contact.employeesSizeRange || "-"}</TableCell> {/* Assuming employeesSizeRange holds account name */}
+                        <TableCell className="font-mono text-sm">{contact.email || "-"}</TableCell>
+                        <TableCell>{contact.directPhone || "-"}</TableCell>
+                        <TableCell>{contact.jobTitle || "-"}</TableCell>
                         <TableCell>
                           <Button 
                             variant="ghost" 
@@ -358,7 +368,14 @@ export default function AccountsListDetail() {
                 <TableBody>
                   {items.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-mono">{item.domain || '-'}</TableCell>
+                      <TableCell className="font-mono">
+                        {item.domain || '-'}
+                        {item.accountName && (
+                          <span className="ml-2 font-sans text-sm text-muted-foreground">
+                            {item.accountName}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="font-mono text-sm text-muted-foreground">
                         {item.normalizedDomain || '-'}
                       </TableCell>

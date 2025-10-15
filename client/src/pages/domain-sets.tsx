@@ -35,6 +35,7 @@ interface DomainSetItem {
   domain: string;
   normalizedDomain: string;
   accountId?: string;
+  accountName?: string | null;
   matchType?: 'exact' | 'fuzzy' | 'none';
   matchConfidence?: string;
   matchedContactsCount: number;
@@ -402,7 +403,14 @@ export default function AccountsListTAL() {
                       <TableBody>
                         {items.slice(0, 10).map((item) => (
                           <TableRow key={item.id}>
-                            <TableCell className="font-mono">{item.domain}</TableCell>
+                            <TableCell className="font-mono">
+                              {item.domain}
+                              {item.accountName && (
+                                <span className="ml-2 font-sans text-sm text-muted-foreground">
+                                  {item.accountName}
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell className="font-mono text-sm text-muted-foreground">
                               {item.normalizedDomain}
                             </TableCell>

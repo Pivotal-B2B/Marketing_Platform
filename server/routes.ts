@@ -1170,7 +1170,20 @@ export function registerRoutes(app: Express) {
   app.get("/api/domain-sets/:id/items", requireAuth, async (req, res) => {
     try {
       const items = await storage.getDomainSetItems(req.params.id);
-      res.json(items);
+      
+      // Enrich items with account names
+      const enrichedItems = await Promise.all(items.map(async (item) => {
+        if (item.accountId) {
+          const account = await storage.getAccount(item.accountId);
+          return {
+            ...item,
+            accountName: account?.name || null
+          };
+        }
+        return { ...item, accountName: null };
+      }));
+      
+      res.json(enrichedItems);
     } catch (error) {
       console.error('Get domain set items error:', error);
       res.status(500).json({ message: "Failed to get domain set items" });
