@@ -32,7 +32,7 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Bulk Operations:** Multi-page record selection with bulk actions (Export, Add to List, Update, Delete).
 - **Campaign Management:**
     - **Email:** HTML editor, personalization, tracking, pre-send guards, mandatory unsubscribe.
-    - **Telemarketing:** Telnyx WebRTC integration, call scripts, qualification forms, DNC handling, Agent Console with disposition workflow.
+    - **Telemarketing:** Telnyx WebRTC integration with browser-based calling, real-time SIP trunk management, call scripts, qualification forms, DNC handling, Agent Console with disposition workflow and live audio.
     - **Advanced Features:** Audience snapshotting, compliance guardrails, pacing/throttling, frequency caps, multi-provider email support, A/B/n testing, pre-flight checklists, and reporting.
 - **Account Lead Cap Implementation:** Intelligent contact distribution system to prevent over-contacting accounts across campaigns, with configurable cap modes (Queue Size, Connected Calls, Positive Dispositions).
 - **Lead QA Workflow:** Multi-stage workflow (New → Under Review → Approved/Rejected → Published) with checklist validation.
@@ -46,7 +46,12 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Resources Centre Integration:** Bi-directional integration for content distribution and reference data sync (speakers, organizers, sponsors), with admin UI for management.
 - **Email Infrastructure Settings:** Enterprise-grade email deliverability management including domain authentication, tracking domains, IP pools, warmup plans, and sender profiles with full CRUD management.
 - **Campaign-Content Linking & Tracking URL System:** Integration with Resources Centre for linking campaigns to external content and generating personalized tracking URLs.
-- **Telephony - Softphone UI & Compliance:** Browser-based calling interface with softphone profiles, call recording access logs, and an Agent Console UI for call management.
+- **Telephony - Telnyx WebRTC Integration:**
+    - **Browser-Based Calling:** Real WebRTC calling through Telnyx SDK (@telnyx/webrtc) enabling agents to make actual phone calls directly from the browser
+    - **SIP Trunk Management:** Admin UI for configuring and managing multiple SIP trunk credentials with default trunk selection and active/inactive status toggles
+    - **WebRTC Hook (useTelnyxWebRTC):** React hook managing TelnyxRTC client lifecycle, call state transitions (connecting → ringing → active → hangup), call duration tracking, mute/unmute controls, and automatic error recovery
+    - **Agent Console Integration:** Real-time call controls (dial, hangup, mute), live call status indicators, audio playback through dedicated HTML5 audio element, and seamless disposition workflow after call completion
+    - **Security:** SIP credentials stored securely in database with RBAC enforcement; agents retrieve default trunk config via authenticated API endpoint
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)
