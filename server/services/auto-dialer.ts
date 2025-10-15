@@ -203,6 +203,29 @@ export class AutoDialerService {
       const agent = sortedAgents[i];
 
       try {
+        // Check business hours if enabled
+        if (campaign.businessHoursConfig) {
+          const config = campaign.businessHoursConfig as BusinessHoursConfig;
+          
+          // Get full contact details for timezone detection
+          const fullContact = await storage.getContact(contact.contactId);
+          
+          const contactTimezoneInfo = fullContact ? {
+            timezone: fullContact.timezone,
+            city: fullContact.city,
+            state: fullContact.state,
+            country: fullContact.country,
+          } : undefined;
+
+          const canCall = isWithinBusinessHours(config, contactTimezoneInfo);
+          
+          if (!canCall) {
+            console.log(`[AutoDialer] Contact ${contact.contactId} is outside business hours, skipping`);
+            // Don't mark as removed - will be retried in next cycle
+            continue;
+          }
+        }
+
         // Check DNC if enabled
         if (queue.checkDnc) {
           const isDnc = await this.checkDnc(contact.phone);
