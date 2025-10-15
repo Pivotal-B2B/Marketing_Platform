@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Filter, Plus, X, Search, ChevronDown, ChevronRight } from "lucide-react";
+import { Filter, Plus, X, Search, ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   FilterGroup, 
   FilterCondition, 
@@ -16,6 +17,7 @@ import {
   arrayOperators,
   booleanOperators,
   operatorLabels,
+  operatorDescriptions,
   type TextOperator,
   type NumberOperator,
   type ArrayOperator,
@@ -289,9 +291,31 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
       </SheetTrigger>
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Advanced Filters</SheetTitle>
+          <div className="flex items-center gap-2">
+            <SheetTitle>Advanced Filters</SheetTitle>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm">
+                  <div className="space-y-2 text-xs">
+                    <p className="font-semibold">🔍 Advanced Filter Options</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li><strong>Equals (=)</strong>: Exact match</li>
+                      <li><strong>Contains</strong>: Partial match (case-insensitive)</li>
+                      <li><strong>Begins With</strong>: Starts with text</li>
+                      <li><strong>Ends With</strong>: Ends with text</li>
+                      <li><strong>Has Value</strong>: Field is not empty</li>
+                      <li><strong>Is Empty</strong>: Field has no value</li>
+                    </ul>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <SheetDescription>
-            Build complex filters with multiple conditions
+            Build complex filters with multiple conditions using AND/OR logic
           </SheetDescription>
         </SheetHeader>
 
@@ -406,7 +430,21 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
 
                     {/* Operator Selector */}
                     <div>
-                      <Label className="text-xs">Operator</Label>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Label className="text-xs">Operator</Label>
+                        {operatorDescriptions[condition.operator] && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="text-xs">{operatorDescriptions[condition.operator]}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
                       <Select
                         value={condition.operator}
                         onValueChange={(val) => updateCondition(condition.id, { operator: val as any, value: '' })}

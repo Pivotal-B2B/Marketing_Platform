@@ -4,6 +4,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, CheckCircle, XCircle, Clock, Download, Loader2 } from "lucide-react";
+import { FilterBuilder } from "@/components/filter-builder";
+import type { FilterGroup } from "@shared/filter-types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -37,6 +39,7 @@ export default function LeadsPage() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingLeadId, setRejectingLeadId] = useState<string | null>(null);
+  const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -294,15 +297,22 @@ export default function LeadsPage() {
 
         <TabsContent value="review" className="space-y-4 mt-6">
           <div className="flex items-center justify-between">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search leads..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search-leads"
+            <div className="flex items-center gap-4 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search leads..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="input-search-leads"
+                />
+              </div>
+              <FilterBuilder
+                entityType="contact"
+                onApplyFilter={setFilterGroup}
+                initialFilter={filterGroup}
               />
             </div>
             {selectedLeads.length > 0 && (

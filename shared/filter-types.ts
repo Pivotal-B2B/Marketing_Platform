@@ -14,7 +14,7 @@ export type BooleanOperator = typeof booleanOperators[number];
 export type DateOperator = typeof dateOperators[number];
 export type Operator = TextOperator | NumberOperator | ArrayOperator | BooleanOperator | DateOperator;
 
-// Operator display labels
+// Operator display labels with descriptions
 export const operatorLabels: Record<string, string> = {
   equals: 'Equals (=)',
   notEquals: 'Not Equals (≠)',
@@ -32,6 +32,26 @@ export const operatorLabels: Record<string, string> = {
   isEmpty: 'Is Empty',
   isNotEmpty: 'Has Value',
   is: 'Is',
+};
+
+// Operator descriptions for tooltips/help text
+export const operatorDescriptions: Record<string, string> = {
+  equals: 'Returns records that exactly match the entered value',
+  notEquals: 'Excludes records that exactly match the entered value',
+  contains: 'Finds records where the field contains the specified text (case-insensitive)',
+  doesNotContain: 'Excludes records that contain the specified text',
+  startsWith: 'Returns records where the field starts with the entered text',
+  endsWith: 'Returns records where the field ends with the entered text',
+  greaterThan: 'Returns records where the value is greater than the specified number',
+  lessThan: 'Returns records where the value is less than the specified number',
+  between: 'Returns records where the value falls within the specified range',
+  before: 'Returns records with a date before the specified date',
+  after: 'Returns records with a date after the specified date',
+  containsAny: 'Returns records containing at least one of the specified values',
+  containsAll: 'Returns records containing all of the specified values',
+  isEmpty: 'Displays records where the field is empty or null',
+  isNotEmpty: 'Displays records where the field has a value (not empty or null)',
+  is: 'Checks if the boolean field matches the specified true/false value',
 };
 
 // Filter field types

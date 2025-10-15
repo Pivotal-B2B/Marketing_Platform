@@ -1,6 +1,8 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Upload, Trash2, List, RefreshCw } from "lucide-react";
+import { Plus, Upload, Trash2, List, RefreshCw, Search } from "lucide-react";
+import { FilterBuilder } from "@/components/filter-builder";
+import type { FilterGroup } from "@shared/filter-types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -41,6 +43,8 @@ export default function AccountsListTAL() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedAccountsList, setSelectedAccountsList] = useState<DomainSet | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -197,7 +201,8 @@ export default function AccountsListTAL() {
             Upload and match accounts by domain and/or company name for ABM campaigns
           </p>
         </div>
-        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <div className="flex gap-2">
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-upload-domain-set">
               <Upload className="mr-2 h-4 w-4" />
@@ -257,6 +262,26 @@ export default function AccountsListTAL() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search accounts lists..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="input-search-accounts-lists"
+          />
+        </div>
+        <FilterBuilder
+          entityType="account"
+          onApplyFilter={setFilterGroup}
+          initialFilter={filterGroup}
+        />
       </div>
 
       {accountsLists.length === 0 ? (
