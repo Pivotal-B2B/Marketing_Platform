@@ -36,8 +36,15 @@ export function useTelnyxWebRTC({
     }
 
     try {
+      const loginString = `${sipUsername}@${sipDomain}`;
+      console.log('Telnyx WebRTC - Attempting connection with:', {
+        login: loginString,
+        domain: sipDomain,
+        hasPassword: !!sipPassword,
+      });
+      
       const telnyxClient = new TelnyxRTC({
-        login: `${sipUsername}@${sipDomain}`,
+        login: loginString,
         password: sipPassword,
         ringbackFile: undefined, // Use default ringback
       });
