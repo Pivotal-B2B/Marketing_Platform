@@ -1646,13 +1646,13 @@ export function registerRoutes(app: Express) {
   app.post("/api/campaigns/:id/agents", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { agentIds } = req.body;
-      
+
       if (!Array.isArray(agentIds) || agentIds.length === 0) {
         return res.status(400).json({ message: "agentIds array is required" });
       }
 
       const userId = req.user!.userId;
-      
+
       // Release agents from their current campaigns first
       for (const agentId of agentIds) {
         const existingAssignments = await db
@@ -1664,26 +1664,85 @@ export function registerRoutes(app: Express) {
               eq(campaignAgentAssignments.isActive, true)
             )
           );
-        
+
         for (const assignment of existingAssignments) {
           if (assignment.campaignId !== req.params.id) {
             await storage.releaseAgentAssignment(assignment.campaignId, agentId);
           }
         }
       }
-      
+
       // Now assign agents to the new campaign
       await storage.assignAgentsToCampaign(req.params.id, agentIds, userId);
-      
-      // Automatically assign ALL existing unassigned queue items to the newly assigned agents
-      // This includes items that were created before agents were assigned
-      const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
-      
-      res.status(201).json({ 
-        message: "Agents assigned successfully",
-        queueItemsAssigned: assignResult.assigned,
-        note: assignResult.assigned === 0 ? "No unassigned queue items found. Queue may need to be populated first." : undefined
-      });
+
+      // Automatically populate queue from campaign audience if not already populated
+      const campaign = await storage.getCampaign(req.params.id);
+      if (campaign && campaign.audienceRefs) {
+        const audienceRefs = campaign.audienceRefs as any;
+        let contacts: any[] = [];
+
+        // Resolve contacts from segments
+        if (audienceRefs.segments && Array.isArray(audienceRefs.segments)) {
+          for (const segmentId of audienceRefs.segments) {
+            const segment = await storage.getSegment(segmentId);
+            if (segment && segment.definitionJson) {
+              const segmentContacts = await storage.getContacts(segment.definitionJson as any);
+              contacts.push(...segmentContacts);
+            }
+          }
+        }
+
+        // Resolve contacts from lists
+        if (audienceRefs.lists && Array.isArray(audienceRefs.lists)) {
+          for (const listId of audienceRefs.lists) {
+            const list = await storage.getList(listId);
+            if (list && list.recordIds) {
+              const listContacts = await storage.getContactsByIds(list.recordIds);
+              contacts.push(...listContacts);
+            }
+          }
+        }
+
+        // Remove duplicates and filter valid contacts
+        const uniqueContacts = Array.from(
+          new Map(contacts.map(c => [c.id, c])).values()
+        );
+        const validContacts = uniqueContacts.filter(c => c.accountId);
+
+        // Enqueue all valid contacts (skip if already in queue)
+        let enqueuedCount = 0;
+        for (const contact of validContacts) {
+          try {
+            await storage.enqueueContact(
+              req.params.id,
+              contact.id,
+              contact.accountId!,
+              0
+            );
+            enqueuedCount++;
+          } catch (error) {
+            // Skip contacts that can't be enqueued (e.g., already in queue)
+          }
+        }
+
+        // Assign queue items to the newly assigned agents
+        const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
+
+        res.status(201).json({ 
+          message: "Agents assigned and queue populated successfully",
+          queueItemsAssigned: assignResult.assigned,
+          contactsEnqueued: enqueuedCount,
+          totalContactsProcessed: validContacts.length
+        });
+      } else {
+        // No audience defined, just assign agents
+        const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
+        res.status(201).json({ 
+          message: "Agents assigned successfully",
+          queueItemsAssigned: assignResult.assigned,
+          note: "Campaign has no audience defined. Please configure audience first."
+        });
+      }
     } catch (error) {
       console.error('Agent assignment error:', error);
       res.status(400).json({ 
@@ -1824,13 +1883,13 @@ export function registerRoutes(app: Express) {
       // Get agents assigned to this campaign
       const campaignAgents = await storage.getCampaignAgents(req.params.id);
       const agentIds = campaignAgents.map(a => a.agentId);
-      
+
       // Automatically assign queue items to agents if agents are assigned
       let assignResult = { assigned: 0 };
       if (agentIds.length > 0) {
         assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
       }
-      
+
       res.json({
         message: `Successfully enqueued ${enqueued.length} contacts${skippedCount > 0 ? ` (${skippedCount} skipped without account)` : ''}`,
         enqueuedCount: enqueued.length,
@@ -1994,7 +2053,7 @@ export function registerRoutes(app: Express) {
         if (!queueItem) {
           return res.status(404).json({ message: "Queue item not found" });
         }
-        
+
         // STRICT: Only allow disposition if the queue item is assigned to this agent (or admin)
         if (!isAdmin && queueItem.agentId !== agentId) {
           return res.status(403).json({ message: "You can only create dispositions for queue items assigned to you" });
@@ -2033,7 +2092,7 @@ export function registerRoutes(app: Express) {
       if (!queueItem) {
         return res.status(404).json({ message: "Queue item not found" });
       }
-      
+
       if (!isAdmin && queueItem.agentId !== agentId) {
         return res.status(403).json({ message: "You can only view calls for queue items assigned to you" });
       }
@@ -2075,28 +2134,28 @@ export function registerRoutes(app: Express) {
         // If no default is set, try to get any active trunk
         const allConfigs = await storage.getSipTrunkConfigs();
         const activeConfig = allConfigs.find(c => c.isActive);
-        
+
         if (!activeConfig) {
           return res.status(404).json({ message: "No default SIP trunk configured" });
         }
-        
+
         // Use the first active trunk as fallback
         const secureConfig = {
           ...activeConfig,
           sipUsername: process.env.TELNYX_SIP_USERNAME || activeConfig.sipUsername,
           sipPassword: process.env.TELNYX_SIP_PASSWORD || activeConfig.sipPassword,
         };
-        
+
         return res.json(secureConfig);
       }
-      
+
       // Override credentials with secure environment variables
       const secureConfig = {
         ...config,
         sipUsername: process.env.TELNYX_SIP_USERNAME || config.sipUsername,
         sipPassword: process.env.TELNYX_SIP_PASSWORD || config.sipPassword,
       };
-      
+
       res.json(secureConfig);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch default SIP trunk" });
@@ -3942,16 +4001,16 @@ export function registerRoutes(app: Express) {
   app.post("/api/telnyx/webhook", async (req, res) => {
     try {
       console.log("Telnyx webhook received:", JSON.stringify(req.body, null, 2));
-      
+
       // Acknowledge receipt immediately
       res.status(200).json({ received: true });
-      
+
       // Process webhook event types
       const eventType = req.body?.data?.event_type;
-      
+
       if (eventType) {
         console.log(`Telnyx event type: ${eventType}`);
-        
+
         // Handle specific event types as needed
         switch (eventType) {
           case 'call.initiated':

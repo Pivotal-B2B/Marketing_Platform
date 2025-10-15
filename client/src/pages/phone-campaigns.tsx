@@ -269,26 +269,7 @@ export default function PhoneCampaignsPage() {
     },
   });
 
-  const populateQueueMutation = useMutation({
-    mutationFn: async ({ campaignId }: { campaignId: string }) => {
-      return await apiRequest('POST', `/api/campaigns/${campaignId}/queue/populate`, {});
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/queue-stats"] });
-      toast({
-        title: "Queue Populated",
-        description: data?.message || `Successfully populated queue with ${data?.enqueuedCount || 0} contacts`,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to populate queue",
-        variant: "destructive",
-      });
-    },
-  });
+  
 
   const handleAssignAgents = () => {
     if (!selectedCampaign) return;
@@ -308,13 +289,7 @@ export default function PhoneCampaignsPage() {
     });
   };
 
-  const handlePopulateQueue = () => {
-    if (!selectedCampaign) return;
-
-    populateQueueMutation.mutate({
-      campaignId: selectedCampaign.id.toString()
-    });
-  };
+  
 
   const toggleAgentSelection = (agentId: string) => {
     setSelectedAgentIds(prev => 
@@ -542,17 +517,7 @@ export default function PhoneCampaignsPage() {
                           <UserPlus className="w-4 h-4 mr-2" />
                           Assign Agents
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedCampaign(campaign);
-                            populateQueueMutation.mutate({ campaignId: campaign.id.toString() });
-                          }}
-                          disabled={populateQueueMutation.isPending}
-                          data-testid={`menu-populate-queue-${campaign.id}`}
-                        >
-                          <Users className="w-4 h-4 mr-2" />
-                          Populate Queue
-                        </DropdownMenuItem>
+                        
                         <DropdownMenuItem
                           onClick={() => duplicateMutation.mutate(campaign)}
                           disabled={duplicateMutation.isPending}
