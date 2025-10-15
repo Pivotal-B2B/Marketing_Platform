@@ -261,6 +261,48 @@ export function Step5Summary({ data, onNext, campaignType }: Step5Props) {
         </CardContent>
       </Card>
 
+      {/* Account Lead Cap (Telemarketing Only) */}
+      {campaignType === "telemarketing" && data.accountCap?.enabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <Users className="w-5 h-5 inline mr-2" />
+              Account Lead Cap
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Cap Status</span>
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+                Enabled
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Leads Per Account</span>
+              <span className="font-medium text-primary">{data.accountCap.leadsPerAccount}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Enforcement Mode</span>
+              <Badge variant="secondary" className="capitalize">
+                {data.accountCap.mode === 'queue_size' && 'Queue Size'}
+                {data.accountCap.mode === 'connected_calls' && 'Connected Calls'}
+                {data.accountCap.mode === 'positive_disp' && 'Positive Dispositions'}
+              </Badge>
+            </div>
+            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg mt-3">
+              <div className="text-sm text-blue-600 dark:text-blue-400">
+                <p className="font-medium">Cap Protection Active</p>
+                <p className="text-blue-600/80 dark:text-blue-400/80 mt-1">
+                  {data.accountCap.mode === 'queue_size' && `Each account will have a maximum of ${data.accountCap.leadsPerAccount} contact(s) in the calling queue.`}
+                  {data.accountCap.mode === 'connected_calls' && `Calling will stop after ${data.accountCap.leadsPerAccount} successful connection(s) per account.`}
+                  {data.accountCap.mode === 'positive_disp' && `Calling will stop after ${data.accountCap.leadsPerAccount} positive outcome(s) per account.`}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Action Buttons */}
       <div className="grid grid-cols-3 gap-4">
         <Button

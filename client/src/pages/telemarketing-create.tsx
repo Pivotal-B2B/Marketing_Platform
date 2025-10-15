@@ -94,6 +94,9 @@ export default function TelemarketingCreatePage() {
         scheduleJson,
         assignedTeams: data.scheduling?.assignedAgents,
         throttlingConfig,
+        accountCapEnabled: data.accountCap?.enabled || false,
+        accountCapValue: data.accountCap?.enabled ? data.accountCap.leadsPerAccount : null,
+        accountCapMode: data.accountCap?.enabled ? data.accountCap.mode : null,
       };
 
       await apiRequest("POST", "/api/campaigns", campaignPayload);
