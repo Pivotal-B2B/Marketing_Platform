@@ -123,6 +123,7 @@ export interface IStorage {
   enqueueContact(campaignId: string, contactId: string, accountId: string, priority?: number): Promise<any>;
   updateQueueStatus(id: string, status: string, removedReason?: string, isPositiveDisposition?: boolean): Promise<any>;
   removeFromQueue(campaignId: string, contactId: string, reason: string): Promise<void>;
+  removeFromQueueById(campaignId: string, queueId: string, reason: string): Promise<void>;
   getCampaignAccountStats(campaignId: string, accountId?: string): Promise<any[]>;
   upsertCampaignAccountStats(campaignId: string, accountId: string, updates: any): Promise<any>;
   enforceAccountCap(campaignId: string): Promise<{ removed: number; accounts: string[] }>;
@@ -978,11 +979,40 @@ export class DatabaseStorage implements IStorage {
 
   // Campaign Queue (Account Lead Cap)
   async getCampaignQueue(campaignId: string, status?: string): Promise<any[]> {
-    let query = db.select().from(campaignQueue).where(eq(campaignQueue.campaignId, campaignId));
+    const baseQuery = db
+      .select({
+        id: campaignQueue.id,
+        campaignId: campaignQueue.campaignId,
+        contactId: campaignQueue.contactId,
+        accountId: campaignQueue.accountId,
+        priority: campaignQueue.priority,
+        status: campaignQueue.status,
+        removedReason: campaignQueue.removedReason,
+        queuedAt: campaignQueue.createdAt,
+        processedAt: campaignQueue.updatedAt,
+        contact: {
+          firstName: contacts.firstName,
+          lastName: contacts.lastName,
+          email: contacts.email,
+          phoneNumber: contacts.phoneNumber,
+        },
+        account: {
+          name: accounts.name,
+        },
+      })
+      .from(campaignQueue)
+      .leftJoin(contacts, eq(campaignQueue.contactId, contacts.id))
+      .leftJoin(accounts, eq(campaignQueue.accountId, accounts.id))
+      .where(eq(campaignQueue.campaignId, campaignId));
+
     if (status) {
-      query = query.where(and(eq(campaignQueue.campaignId, campaignId), eq(campaignQueue.status, status as any)));
+      const results = await baseQuery
+        .where(and(eq(campaignQueue.campaignId, campaignId), eq(campaignQueue.status, status as any)))
+        .orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
+      return results;
     }
-    return await query.orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
+
+    return await baseQuery.orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
   }
 
   async enqueueContact(campaignId: string, contactId: string, accountId: string, priority: number = 0): Promise<any> {
@@ -1105,16 +1135,69 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async removeFromQueueById(campaignId: string, queueId: string, reason: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(campaignQueue).where(
+        and(
+          eq(campaignQueue.id, queueId),
+          eq(campaignQueue.campaignId, campaignId)
+        )
+      );
+
+      if (!current) {
+        throw new Error("Queue item not found or does not belong to this campaign");
+      }
+
+      await tx
+        .update(campaignQueue)
+        .set({ status: 'removed', removedReason: reason, updatedAt: new Date() })
+        .where(
+          and(
+            eq(campaignQueue.id, queueId),
+            eq(campaignQueue.campaignId, campaignId)
+          )
+        );
+
+      // Atomic decrement using ON CONFLICT if was queued
+      if (current.status === 'queued') {
+        await tx.insert(campaignAccountStats).values({
+          campaignId: current.campaignId,
+          accountId: current.accountId,
+          queuedCount: 0,
+          connectedCount: 0,
+          positiveDispCount: 0,
+        }).onConflictDoUpdate({
+          target: [campaignAccountStats.campaignId, campaignAccountStats.accountId],
+          set: {
+            queuedCount: sql`GREATEST(0, ${campaignAccountStats.queuedCount} - 1)`,
+          },
+        });
+      }
+    });
+  }
+
   async getCampaignAccountStats(campaignId: string, accountId?: string): Promise<any[]> {
+    const baseQuery = db
+      .select({
+        accountId: campaignAccountStats.accountId,
+        accountName: accounts.name,
+        queuedCount: campaignAccountStats.queuedCount,
+        connectedCount: campaignAccountStats.connectedCount,
+        positiveDispCount: campaignAccountStats.positiveDispCount,
+      })
+      .from(campaignAccountStats)
+      .leftJoin(accounts, eq(campaignAccountStats.accountId, accounts.id))
+      .where(eq(campaignAccountStats.campaignId, campaignId));
+
     if (accountId) {
-      return await db.select().from(campaignAccountStats).where(
+      return await baseQuery.where(
         and(
           eq(campaignAccountStats.campaignId, campaignId),
           eq(campaignAccountStats.accountId, accountId)
         )
       );
     }
-    return await db.select().from(campaignAccountStats).where(eq(campaignAccountStats.campaignId, campaignId));
+    return await baseQuery;
   }
 
   async upsertCampaignAccountStats(campaignId: string, accountId: string, updates: any): Promise<any> {

@@ -43,6 +43,7 @@ import NewsPage from "@/pages/news";
 import SenderProfilesPage from "@/pages/sender-profiles";
 import AgentConsolePage from "./pages/agent-console";
 import ResourcesCentrePage from "@/pages/resources-centre";
+import CampaignQueuePage from "@/pages/campaign-queue";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -77,6 +78,7 @@ function AuthenticatedApp() {
               <Route path="/campaigns/telemarketing/create" component={TelemarketingCreatePage} />
               <Route path="/campaigns/phone" component={PhoneCampaignsPage} />
               <Route path="/campaigns/telemarketing" component={TelemarketingPage} />
+              <Route path="/campaigns/:id/queue" component={CampaignQueuePage} />
               <Route path="/campaigns/config" component={CampaignConfigPage} />
               <Route path="/leads" component={LeadsPage} />
               <Route path="/suppressions" component={SuppressionsPage} />

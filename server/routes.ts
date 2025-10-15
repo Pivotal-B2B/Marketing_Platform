@@ -1460,13 +1460,16 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.delete("/api/campaigns/:id/queue/:contactId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+  app.delete("/api/campaigns/:id/queue/:queueId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { reason = "Manual removal" } = req.body;
       
-      await storage.removeFromQueue(req.params.id, req.params.contactId, reason);
+      await storage.removeFromQueueById(req.params.id, req.params.queueId, reason);
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes("not found") || error?.message?.includes("does not belong")) {
+        return res.status(404).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to remove from queue" });
     }
   });
