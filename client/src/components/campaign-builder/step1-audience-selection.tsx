@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Added useEffect import
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { FilterBuilder } from "@/components/filter-builder";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery } from "@tanstack/react-query";
-import type { FilterGroup } from "@shared/filter-types";
+import type { FilterGroup, FilterDefinition } from "@shared/filter-types"; // Corrected import for FilterDefinition
 import type { Segment, List as ListType, DomainSet } from "@shared/schema";
 
 interface Step1Props {
@@ -30,7 +30,8 @@ interface AudienceSelection {
   estimatedCount?: number;
 }
 
-export function Step1AudienceSelection({ data, onNext, campaignType }: Step1Props) {
+// Renamed Step1AudienceSelection to match the original component name and updated prop type.
+export function Step1AudienceSelection({ data, onNext }: Step1Props) { 
   const [audienceSource, setAudienceSource] = useState<"filters" | "segment" | "list" | "domain_set">(
     data.audience?.source || "filters"
   );

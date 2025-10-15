@@ -47,42 +47,55 @@ export default function TelemarketingCreatePage() {
 
   const handleComplete = async (data: any) => {
     try {
-      if (data.action === "draft") {
-        await apiRequest("POST", "/api/campaigns", {
-          ...data,
-          type: "telemarketing",
-          status: "draft",
-        });
+      // Ensure required fields are present
+      const campaignPayload = {
+        name: data.name || `Dialer Campaign ${new Date().toISOString()}`,
+        type: "telemarketing",
+        status: data.action === "draft" ? "draft" : "active",
+        // Audience data
+        sourceType: data.sourceType,
+        segmentId: data.segmentId,
+        listId: data.listId,
+        domainSetId: data.domainSetId,
+        filtersJson: data.filtersJson || data.filters,
+        // Call script data
+        callScript: data.callScript,
+        qualificationQuestions: data.qualificationQuestions,
+        // Scheduling data
+        scheduleConfig: data.scheduleConfig,
+        assignedAgents: data.assignedAgents,
+        dialingPace: data.dialingPace,
+        // Compliance data
+        complianceConfig: data.complianceConfig,
+      };
 
+      await apiRequest("POST", "/api/campaigns", campaignPayload);
+
+      if (data.action === "draft") {
         toast({
           title: "Draft Saved",
           description: "Your dialer campaign has been saved as a draft.",
         });
       } else {
-        await apiRequest("POST", "/api/campaigns", {
-          ...data,
-          type: "telemarketing",
-          status: "active",
-        });
-
         toast({
           title: "Campaign Launched!",
           description: "Your dialer campaign is now running. Agents can start calling.",
         });
       }
 
-      setLocation("/campaigns/telemarketing");
-    } catch (error) {
+      setLocation("/campaigns/phone");
+    } catch (error: any) {
+      console.error("Campaign creation error:", error);
       toast({
         title: "Error",
-        description: "Failed to create campaign. Please try again.",
+        description: error?.message || "Failed to create campaign. Please try again.",
         variant: "destructive",
       });
     }
   };
 
   const handleCancel = () => {
-    setLocation("/campaigns/telemarketing");
+    setLocation("/campaigns/phone");
   };
 
   return (
