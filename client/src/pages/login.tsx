@@ -18,9 +18,11 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[LOGIN] Form submitted, username:', username);
     setIsLoading(true);
 
     try {
+      console.log('[LOGIN] Sending POST request to /api/auth/login');
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -29,16 +31,20 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
 
+      console.log('[LOGIN] Response status:', response.status);
       const data = await response.json();
+      console.log('[LOGIN] Response data:', data);
 
       if (!response.ok) {
         throw new Error(data.message || "Login failed");
       }
 
       // Store auth data
+      console.log('[LOGIN] Calling login() with token and user');
       login(data.token, data.user);
       
       // Redirect to dashboard
+      console.log('[LOGIN] Redirecting to /');
       setLocation("/");
       
       toast({
@@ -46,6 +52,7 @@ export default function LoginPage() {
         description: `Logged in as ${data.user.username}`,
       });
     } catch (error) {
+      console.error('[LOGIN] Error during login:', error);
       toast({
         variant: "destructive",
         title: "Login failed",
