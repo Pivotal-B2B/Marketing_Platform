@@ -45,6 +45,7 @@ import { CSVImportAccountsDialog } from "@/components/csv-import-accounts-dialog
 import { AccountCardPremium } from "@/components/accounts/account-card-premium";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatRevenue } from "@/lib/utils";
 
 export default function AccountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -667,7 +668,9 @@ export default function AccountsPage() {
                     ) : "-"}
                   </TableCell>
                   <TableCell>{account.employeesSizeRange || "-"}</TableCell>
-                  <TableCell>{account.revenueRange || "-"}</TableCell>
+                  <TableCell>
+                    {account.annualRevenue ? formatRevenue(account.annualRevenue) : "-"}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Button 

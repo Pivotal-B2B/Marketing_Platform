@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconActionButton } from "@/components/shared/icon-action-button";
 import type { Account } from "@shared/schema";
+import { formatRevenue } from "@/lib/utils";
 
 interface AccountCardPremiumProps {
   account: Account;
@@ -136,9 +137,9 @@ export function AccountCardPremium({ account, onCardClick, index = 0, isSelected
                 {account.hqCountry}
               </Badge>
             )}
-            {account.revenueRange && (
+            {account.annualRevenue && (
               <Badge variant="outline" className="rounded-full px-2.5 py-0.5">
-                {account.revenueRange}
+                {formatRevenue(account.annualRevenue)}
               </Badge>
             )}
           </div>
