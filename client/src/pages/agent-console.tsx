@@ -214,7 +214,24 @@ export default function AgentConsolePage() {
       return;
     }
 
-    makeCall(currentQueueItem.contactPhone, sipConfig?.callerIdNumber);
+    // Normalize phone number to E.164 format
+    // Remove all non-digit characters
+    const digitsOnly = currentQueueItem.contactPhone.replace(/\D/g, '');
+    
+    // Add + and country code if needed
+    let e164Phone = digitsOnly;
+    if (digitsOnly.length === 10) {
+      // Assume US number, add +1
+      e164Phone = `+1${digitsOnly}`;
+    } else if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+      // Already has country code, just add +
+      e164Phone = `+${digitsOnly}`;
+    } else if (!digitsOnly.startsWith('+')) {
+      // Add + to other formats
+      e164Phone = `+${digitsOnly}`;
+    }
+
+    makeCall(e164Phone, sipConfig?.callerIdNumber);
   };
 
   const handleHangup = () => {
