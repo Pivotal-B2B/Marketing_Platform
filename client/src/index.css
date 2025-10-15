@@ -6,6 +6,11 @@
 
 @layer utilities {
   /* Custom scrollbar styles */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 transparent;
+  }
+
   .scrollbar-thin::-webkit-scrollbar {
     height: 6px;
     width: 6px;
@@ -22,6 +27,10 @@
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: #a0aec0;
+  }
+
+  .dark .scrollbar-thin {
+    scrollbar-color: #4a5568 transparent;
   }
 
   .dark .scrollbar-thin::-webkit-scrollbar-thumb {

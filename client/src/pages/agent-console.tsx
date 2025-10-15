@@ -401,7 +401,7 @@ export default function AgentConsolePage() {
                       <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-muted-foreground">Email</p>
-                        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                        <div className="overflow-x-auto scrollbar-thin max-w-full">
                           <p className="font-medium text-sm whitespace-nowrap" data-testid="text-contact-email">
                             {currentQueueItem.contactEmail || contactDetails?.email || 'No email'}
                           </p>
