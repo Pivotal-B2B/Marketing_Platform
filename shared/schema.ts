@@ -108,6 +108,7 @@ export const industryAIStatusEnum = pgEnum('industry_ai_status', [
 export const filterFieldCategoryEnum = pgEnum('filter_field_category', [
   'contact_fields',
   'account_fields',
+  'account_relationship',
   'suppression_fields',
   'email_campaign_fields',
   'telemarketing_campaign_fields',
