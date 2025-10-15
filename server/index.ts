@@ -49,6 +49,10 @@ app.use((req, res, next) => {
   await autoDialerService.start();
   log("[AutoDialer] Service initialized and started");
   
+  // Start AI-powered QA background jobs
+  const { startBackgroundJobs } = await import("./services/background-jobs");
+  startBackgroundJobs();
+  
   registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

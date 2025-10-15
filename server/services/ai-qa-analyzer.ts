@@ -117,7 +117,7 @@ export async function analyzeLeadQualification(leadId: string): Promise<AIAnalys
     // Save AI analysis to database
     await db.update(leads)
       .set({
-        aiScore: analysis.score.toString(),
+        aiScore: analysis.score, // Store as number
         aiAnalysis: analysis as any,
         aiQualificationStatus: analysis.qualification_status,
       })

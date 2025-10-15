@@ -4304,20 +4304,27 @@ export function registerRoutes(app: Express) {
 
   // ==================== AI-POWERED QA SYSTEM ====================
 
-  // Trigger transcription for a lead
+  // Trigger transcription for a lead (async - returns immediately)
   app.post("/api/leads/:id/transcribe", requireAuth, async (req, res) => {
     try {
       const { transcribeLeadCall } = await import('./services/assemblyai-transcription');
-      const success = await transcribeLeadCall(req.params.id);
+      const { leads } = await import('@shared/schema');
       
-      if (success) {
-        res.json({ message: "Transcription completed successfully" });
-      } else {
-        res.status(400).json({ message: "Transcription failed - check recording URL" });
-      }
+      // Update status to pending
+      await db.update(leads)
+        .set({ transcriptionStatus: 'pending' })
+        .where(eq(leads.id, req.params.id));
+      
+      // Start transcription in background (don't wait)
+      transcribeLeadCall(req.params.id).catch(err => {
+        console.error('Background transcription error:', err);
+      });
+      
+      // Return immediately
+      res.status(202).json({ message: "Transcription started - check status later" });
     } catch (error) {
       console.error('Transcription error:', error);
-      res.status(500).json({ message: "Failed to transcribe call" });
+      res.status(500).json({ message: "Failed to start transcription" });
     }
   });
 
