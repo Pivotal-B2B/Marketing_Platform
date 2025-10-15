@@ -14,11 +14,30 @@ export function formatRevenue(revenue: string | number | null | undefined): stri
   // Handle zero
   if (num === 0) return "$0";
   
-  // Billions
+  // Helper to format number without trailing .0
+  const formatNumber = (n: number): string => {
+    const rounded = parseFloat(n.toFixed(1));
+    return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+  };
+  
+  // Trillions (cap at $999.9T - no company has higher revenue)
+  if (num >= 1_000_000_000_000) {
+    const trillions = num / 1_000_000_000_000;
+    const rounded = parseFloat(trillions.toFixed(1));
+    if (rounded >= 1000) {
+      return "$999.9T"; // Cap at maximum displayable value
+    }
+    return `$${formatNumber(trillions)}T`;
+  }
+  
+  // Billions (check for round-up overflow to trillions)
   if (num >= 1_000_000_000) {
     const billions = num / 1_000_000_000;
     const rounded = parseFloat(billions.toFixed(1));
-    return `$${rounded}B`;
+    if (rounded >= 1000) {
+      return `$${formatNumber(rounded / 1000)}T`;
+    }
+    return `$${formatNumber(billions)}B`;
   }
   
   // Millions (check for round-up overflow to billions)
@@ -26,9 +45,9 @@ export function formatRevenue(revenue: string | number | null | undefined): stri
     const millions = num / 1_000_000;
     const rounded = parseFloat(millions.toFixed(1));
     if (rounded >= 1000) {
-      return `$${(rounded / 1000).toFixed(1)}B`;
+      return `$${formatNumber(rounded / 1000)}B`;
     }
-    return `$${rounded}M`;
+    return `$${formatNumber(millions)}M`;
   }
   
   // Thousands (check for round-up overflow to millions)
@@ -36,9 +55,9 @@ export function formatRevenue(revenue: string | number | null | undefined): stri
     const thousands = num / 1_000;
     const rounded = parseFloat(thousands.toFixed(1));
     if (rounded >= 1000) {
-      return `$${(rounded / 1000).toFixed(1)}M`;
+      return `$${formatNumber(rounded / 1000)}M`;
     }
-    return `$${rounded}K`;
+    return `$${formatNumber(thousands)}K`;
   }
   
   return `$${num.toFixed(0)}`;
