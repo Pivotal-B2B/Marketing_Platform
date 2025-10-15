@@ -325,13 +325,13 @@ export function validateContactRow(
     rowData[header] = row[index] || "";
   });
 
-  // Email is required
-  if (!rowData.email || !rowData.email.includes("@")) {
+  // Email validation - only validate format if email is provided
+  if (rowData.email && !rowData.email.includes("@")) {
     errors.push({
       row: rowIndex,
       field: "email",
       value: rowData.email || "",
-      error: "Valid email is required",
+      error: "Invalid email format",
     });
   }
 
@@ -496,13 +496,13 @@ export function validateContactWithAccountRow(
   });
 
   // Contact validations
-  // Email is required
-  if (!rowData.email || !rowData.email.includes("@")) {
+  // Email validation - only validate format if email is provided
+  if (rowData.email && !rowData.email.includes("@")) {
     errors.push({
       row: rowIndex,
       field: "email",
       value: rowData.email || "",
-      error: "Valid email is required for contact",
+      error: "Invalid email format for contact",
     });
   }
 

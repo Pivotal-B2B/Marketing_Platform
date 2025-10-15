@@ -203,48 +203,75 @@ export function CSVImportDialog({
               return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
             });
 
-            const records = batchRows.map((row) => {
-              const mappedRow = fieldMappings.map((mapping, idx) => row[idx] || "");
-              const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
-              const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
-              return { contact: contactData, account: accountData };
-            });
-
-            const response = await apiRequest(
-              "POST",
-              "/api/contacts/batch-import",
-              { records }
-            );
-            
-            const result = await response.json() as {
-              success: number;
-              failed: number;
-              errors: Array<{ index: number; error: string }>;
-            };
-            
-            successCount += result.success;
-            failedCount += result.failed;
-
-            if (result.errors.length > 0) {
-              result.errors.forEach((err: { index: number; error: string }) => {
-                console.error(`Row ${start + err.index + 2}: ${err.error}`);
+            const records = batchRows
+              .map((row, idx) => {
+                const mappedRow = fieldMappings.map((mapping, mapIdx) => row[mapIdx] || "");
+                const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
+                const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
+                return { 
+                  contact: contactData, 
+                  account: accountData,
+                  rowIndex: start + idx + 2
+                };
+              })
+              .filter((record) => {
+                // Filter out records with empty emails
+                if (!record.contact.email || !record.contact.email.trim()) {
+                  failedCount++;
+                  console.error(`Row ${record.rowIndex}: Skipped - Email is required`);
+                  return false;
+                }
+                return true;
               });
+
+            if (records.length > 0) {
+              const response = await apiRequest(
+                "POST",
+                "/api/contacts/batch-import",
+                { records: records.map(r => ({ contact: r.contact, account: r.account })) }
+              );
+              
+              const result = await response.json() as {
+                success: number;
+                failed: number;
+                errors: Array<{ index: number; error: string }>;
+              };
+              
+              successCount += result.success;
+              failedCount += result.failed;
+
+              if (result.errors.length > 0) {
+                result.errors.forEach((err: { index: number; error: string }) => {
+                  const actualRowIndex = records[err.index]?.rowIndex || (start + err.index + 2);
+                  console.error(`Row ${actualRowIndex}: ${err.error}`);
+                });
+              }
             }
           } else {
             // Contacts-only format with mapping
             const mappedHeaders = fieldMappings.map(m => m.targetField || "");
-            const contacts = batchRows.map((row) => {
-              const mappedRow = fieldMappings.map((mapping, idx) => row[idx] || "");
-              return csvRowToContact(mappedRow, mappedHeaders);
+            const contacts = batchRows.map((row, idx) => {
+              const mappedRow = fieldMappings.map((mapping, mapIdx) => row[mapIdx] || "");
+              return { 
+                data: csvRowToContact(mappedRow, mappedHeaders),
+                rowIndex: start + idx + 2 // +2 for header and 1-based indexing
+              };
             });
 
-            for (const contactData of contacts) {
+            for (const contact of contacts) {
               try {
-                await apiRequest("POST", "/api/contacts", contactData);
+                // Skip contacts with empty or invalid email
+                if (!contact.data.email || !contact.data.email.trim()) {
+                  failedCount++;
+                  console.error(`Row ${contact.rowIndex}: Skipped - Email is required`);
+                  continue;
+                }
+                
+                await apiRequest("POST", "/api/contacts", contact.data);
                 successCount++;
               } catch (error) {
                 failedCount++;
-                console.error("Failed to import contact:", error);
+                console.error(`Row ${contact.rowIndex}: Failed to import contact -`, error);
               }
             }
           }
