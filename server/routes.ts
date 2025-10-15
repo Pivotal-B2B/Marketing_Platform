@@ -35,6 +35,8 @@ import {
   insertSoftphoneProfileSchema,
   insertCallRecordingAccessLogSchema,
   insertSipTrunkConfigSchema,
+  insertAgentStatusSchema,
+  insertAutoDialerQueueSchema,
   insertContentAssetSchema,
   insertSocialPostSchema,
   insertAIContentGenerationSchema,
@@ -2133,6 +2135,172 @@ export function registerRoutes(app: Express) {
       res.json({ message: "Default SIP trunk updated successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to set default SIP trunk" });
+    }
+  });
+
+  // ==================== AGENT STATUS (AUTO-DIALER) ====================
+
+  // Get agent status for a specific agent or current user
+  app.get("/api/agent-status/:agentId?", requireAuth, async (req, res) => {
+    try {
+      const agentId = req.params.agentId || req.user?.userId;
+      if (!agentId) {
+        return res.status(400).json({ message: "Agent ID required" });
+      }
+      const status = await storage.getAgentStatus(agentId);
+      if (!status) {
+        return res.status(404).json({ message: "Agent status not found" });
+      }
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch agent status" });
+    }
+  });
+
+  // Get all agent statuses (optionally filtered by campaign)
+  app.get("/api/agent-statuses", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      const statuses = await storage.getAllAgentStatuses(campaignId);
+      res.json(statuses);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch agent statuses" });
+    }
+  });
+
+  // Get available agents (optionally filtered by campaign)
+  app.get("/api/agent-statuses/available", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId as string | undefined;
+      const agents = await storage.getAvailableAgents(campaignId);
+      res.json(agents);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch available agents" });
+    }
+  });
+
+  // Update agent status (for the current user or specified agent)
+  app.patch("/api/agent-status/:agentId?", requireAuth, async (req, res) => {
+    try {
+      const agentId = req.params.agentId || req.user?.userId;
+      if (!agentId) {
+        return res.status(400).json({ message: "Agent ID required" });
+      }
+
+      // Agents can only update their own status unless they're admin
+      const userRoles = req.user?.roles || [];
+      if (agentId !== req.user?.userId && !userRoles.includes('admin')) {
+        return res.status(403).json({ message: "Not authorized to update other agent statuses" });
+      }
+
+      const validated = insertAgentStatusSchema.partial().parse(req.body);
+      const status = await storage.updateAgentStatus(agentId, validated);
+      if (!status) {
+        // If status doesn't exist, create it
+        const newStatus = await storage.upsertAgentStatus({
+          agentId,
+          ...validated,
+        } as any);
+        return res.status(201).json(newStatus);
+      }
+      res.json(status);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update agent status" });
+    }
+  });
+
+  // Upsert agent status (create or update)
+  app.post("/api/agent-status", requireAuth, async (req, res) => {
+    try {
+      const agentId = req.user?.userId;
+      if (!agentId) {
+        return res.status(400).json({ message: "Agent ID required" });
+      }
+
+      const validated = insertAgentStatusSchema.parse({
+        ...req.body,
+        agentId,
+      });
+      const status = await storage.upsertAgentStatus(validated);
+      res.status(201).json(status);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to upsert agent status" });
+    }
+  });
+
+  // ==================== AUTO-DIALER QUEUE ====================
+
+  // Get auto-dialer queue for a campaign
+  app.get("/api/auto-dialer-queue/:campaignId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const queue = await storage.getAutoDialerQueue(req.params.campaignId);
+      if (!queue) {
+        return res.status(404).json({ message: "Auto-dialer queue not found" });
+      }
+      res.json(queue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch auto-dialer queue" });
+    }
+  });
+
+  // Get all auto-dialer queues
+  app.get("/api/auto-dialer-queues", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const activeOnly = req.query.activeOnly === 'true';
+      const queues = await storage.getAllAutoDialerQueues(activeOnly);
+      res.json(queues);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch auto-dialer queues" });
+    }
+  });
+
+  // Create auto-dialer queue
+  app.post("/api/auto-dialer-queue", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const validated = insertAutoDialerQueueSchema.parse(req.body);
+      const queue = await storage.createAutoDialerQueue(validated);
+      res.status(201).json(queue);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create auto-dialer queue" });
+    }
+  });
+
+  // Update auto-dialer queue
+  app.patch("/api/auto-dialer-queue/:campaignId", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const queue = await storage.updateAutoDialerQueue(req.params.campaignId, req.body);
+      if (!queue) {
+        return res.status(404).json({ message: "Auto-dialer queue not found" });
+      }
+      res.json(queue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update auto-dialer queue" });
+    }
+  });
+
+  // Toggle auto-dialer queue (start/stop)
+  app.post("/api/auto-dialer-queue/:campaignId/toggle", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { isActive } = req.body;
+      if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ message: "isActive must be a boolean" });
+      }
+      const queue = await storage.toggleAutoDialerQueue(req.params.campaignId, isActive);
+      if (!queue) {
+        return res.status(404).json({ message: "Auto-dialer queue not found" });
+      }
+      res.json(queue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to toggle auto-dialer queue" });
     }
   });
 

@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./db-init";
+import { autoDialerService } from "./services/auto-dialer";
 
 const app = express();
 app.use(express.json({ limit: '50gb' }));
@@ -43,6 +44,10 @@ app.use((req, res, next) => {
   
   // Initialize database with default admin if needed
   await initializeDatabase();
+  
+  // Start auto-dialer service
+  await autoDialerService.start();
+  log("[AutoDialer] Service initialized and started");
   
   registerRoutes(app);
 

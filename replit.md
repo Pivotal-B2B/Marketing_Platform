@@ -66,6 +66,14 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
     - **WebRTC Hook (useTelnyxWebRTC):** React hook managing TelnyxRTC client lifecycle, call state transitions (connecting → ringing → active → hangup), call duration tracking, mute/unmute controls, and automatic error recovery
     - **Agent Console Integration:** Real-time call controls (dial, hangup, mute), live call status indicators, audio playback through dedicated HTML5 audio element, and seamless disposition workflow after call completion
     - **Security:** SIP credentials stored securely in database with RBAC enforcement; agents retrieve default trunk config via authenticated API endpoint
+- **Auto-Dialer System (Progressive Dialing):**
+    - **Progressive Dialer Service:** Automated dialing system that distributes calls to available agents using Telnyx Call Control API; runs every 10 seconds to process active campaigns
+    - **Agent Status Tracking:** Real-time agent availability management with status types (offline, available, busy, after_call_work, break) tracked in agent_status table
+    - **Longest-Idle Distribution:** Intelligent call distribution algorithm assigns calls to agents who have been idle the longest for fair workload distribution
+    - **Campaign Queue Management:** auto_dialer_queues table manages active dialing campaigns with configurable settings (dialing mode, max concurrent calls, dial ratio, AMD, DNC checking, priority mode, pacing strategy, target occupancy)
+    - **DNC Compliance:** Built-in DNC checking using bulk suppression validation before dialing contacts
+    - **Auto-Dialer Control Center UI:** Admin/campaign manager interface at /telephony/auto-dialer for managing dialer campaigns, monitoring queue status, and configuring dialer settings
+    - **Database Schema:** Integrated agent_status and auto_dialer_queues tables with full Drizzle ORM support
 
 ## Production Database Setup
 The system automatically initializes the production database with a default admin user when deployed with an empty database.

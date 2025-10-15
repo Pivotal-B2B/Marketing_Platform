@@ -28,6 +28,7 @@ import TelemarketingPage from "@/pages/telemarketing";
 import TelemarketingCreatePage from "@/pages/telemarketing-create";
 import PhoneCampaignsPage from "@/pages/phone-campaigns";
 import CampaignConfigPage from "@/pages/campaign-config";
+import AutoDialerControlPage from "@/pages/auto-dialer-control";
 import LeadsPage from "@/pages/leads";
 import ContentStudioPage from "@/pages/content-studio";
 import AIContentGeneratorPage from "@/pages/ai-content-generator";
@@ -107,6 +108,7 @@ function AuthenticatedApp() {
               <Route path="/resources-centre" component={ResourcesCentrePage} />
               <Route path="/agent-console" component={AgentConsolePage} />
               <Route path="/email-infrastructure/sender-profiles" component={SenderProfilesPage} />
+              <Route path="/telephony/auto-dialer" component={AutoDialerControlPage} />
               <Route path="/telephony/sip-trunks" component={SipTrunkSettingsPage} />
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />

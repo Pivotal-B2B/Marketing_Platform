@@ -1299,13 +1299,15 @@ export const autoDialerQueues = pgTable("auto_dialer_queues", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull().unique(),
   isActive: boolean("is_active").notNull().default(false),
-  dialMode: text("dial_mode").notNull().default('progressive'), // 'progressive', 'predictive', 'preview'
-  maxConcurrentCalls: integer("max_concurrent_calls").default(1), // Calls per agent
-  answeringMachineDetection: boolean("answering_machine_detection").default(true),
-  callTimeout: integer("call_timeout").default(30), // seconds to wait for answer
-  dialRateLimitPerMin: integer("dial_rate_limit_per_min").default(60),
-  contactsDialedToday: integer("contacts_dialed_today").default(0),
-  lastDialedAt: timestamp("last_dialed_at"),
+  dialingMode: varchar("dialing_mode").notNull().default('progressive'), // 'progressive', 'predictive', 'preview'
+  maxConcurrentCalls: integer("max_concurrent_calls").default(1),
+  dialRatio: numeric("dial_ratio").default('1.0'),
+  answeringMachineDetection: boolean("answering_machine_detection").default(false),
+  checkDnc: boolean("check_dnc").default(true),
+  priorityMode: varchar("priority_mode").default('fifo'),
+  pacingStrategy: varchar("pacing_strategy").default('agent_based'),
+  targetAgentOccupancy: numeric("target_agent_occupancy").default('0.85'),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
