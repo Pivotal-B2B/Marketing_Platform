@@ -218,13 +218,14 @@ export default function ContactDetailPage() {
         actions={headerActions}
         loading={contactLoading}
         rightContent={
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button 
               variant="ghost" 
               size="icon"
               onClick={() => prevContact && setLocation(`/contacts/${prevContact.id}`)}
               disabled={!prevContact}
               data-testid="button-prev-contact"
+              className="h-9 w-9 rounded-lg border border-border/50 hover:border-border hover:bg-accent/50 disabled:opacity-30"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
@@ -234,6 +235,7 @@ export default function ContactDetailPage() {
               onClick={() => nextContact && setLocation(`/contacts/${nextContact.id}`)}
               disabled={!nextContact}
               data-testid="button-next-contact"
+              className="h-9 w-9 rounded-lg border border-border/50 hover:border-border hover:bg-accent/50 disabled:opacity-30"
             >
               <ChevronRight className="h-5 w-5" />
             </Button>

@@ -36,6 +36,8 @@ import {
   Building2, 
   UserPlus, 
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Globe,
   Users,
   DollarSign,
@@ -63,6 +65,14 @@ export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const { data: accounts = [] } = useQuery<Account[]>({
+    queryKey: ['/api/accounts'],
+  });
+
+  const currentIndex = accounts.findIndex(a => a.id === id);
+  const prevAccount = currentIndex > 0 ? accounts[currentIndex - 1] : null;
+  const nextAccount = currentIndex < accounts.length - 1 ? accounts[currentIndex + 1] : null;
 
   const [selectedPrimary, setSelectedPrimary] = useState<string | null>(null);
   const [selectedSecondary, setSelectedSecondary] = useState<string[]>([]);
@@ -252,14 +262,38 @@ export default function AccountDetailPage() {
         actions={headerActions}
         loading={accountLoading}
         rightContent={
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setLocation('/accounts')}
-            data-testid="button-back-accounts"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => prevAccount && setLocation(`/accounts/${prevAccount.id}`)}
+              disabled={!prevAccount}
+              data-testid="button-prev-account"
+              className="h-9 w-9 rounded-lg border border-border/50 hover:border-border hover:bg-accent/50 disabled:opacity-30"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => nextAccount && setLocation(`/accounts/${nextAccount.id}`)}
+              disabled={!nextAccount}
+              data-testid="button-next-account"
+              className="h-9 w-9 rounded-lg border border-border/50 hover:border-border hover:bg-accent/50 disabled:opacity-30"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+            <div className="w-px h-6 bg-border mx-1" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setLocation('/accounts')}
+              data-testid="button-back-accounts"
+              className="h-9 w-9 rounded-lg border border-border/50 hover:border-border hover:bg-accent/50"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          </div>
         }
       />
 
