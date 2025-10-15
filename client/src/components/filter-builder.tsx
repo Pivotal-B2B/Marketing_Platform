@@ -30,6 +30,7 @@ interface FilterBuilderProps {
   entityType: EntityType;
   onApplyFilter: (filterGroup: FilterGroup | undefined) => void;
   initialFilter?: FilterGroup;
+  includeRelatedEntities?: boolean;
 }
 
 interface FilterFieldConfig {
@@ -45,7 +46,7 @@ interface FilterFieldsResponse {
   grouped: Record<string, FilterFieldConfig[]>;
 }
 
-export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: FilterBuilderProps) {
+export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includeRelatedEntities = false }: FilterBuilderProps) {
   const [filterGroup, setFilterGroup] = useState<FilterGroup>(
     initialFilter || {
       logic: 'AND',
@@ -56,9 +57,17 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter }: Filt
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
-  // Fetch dynamic filter fields from API
+  // Fetch dynamic filter fields from API - include related entities if flag is set
   const { data: filterFieldsData } = useQuery<FilterFieldsResponse>({
-    queryKey: [`/api/filters/fields/entity/${entityType}`],
+    queryKey: [`/api/filters/fields/entity/${entityType}`, includeRelatedEntities],
+    queryFn: async () => {
+      const url = includeRelatedEntities 
+        ? `/api/filters/fields/entity/${entityType}?includeRelated=true`
+        : `/api/filters/fields/entity/${entityType}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch filter fields');
+      return response.json();
+    }
   });
 
   // Auto-expand first category on load

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +34,7 @@ export function Step1AudienceSelection({ data, onNext, campaignType }: Step1Prop
   const [audienceSource, setAudienceSource] = useState<"filters" | "segment" | "list" | "domain_set">(
     data.audience?.source || "filters"
   );
-  
+
   const [selectedSegments, setSelectedSegments] = useState<string[]>(data.audience?.selectedSegments || []);
   const [selectedLists, setSelectedLists] = useState<string[]>(data.audience?.selectedLists || []);
   const [selectedDomainSets, setSelectedDomainSets] = useState<string[]>(data.audience?.selectedDomainSets || []);
@@ -183,6 +182,7 @@ export function Step1AudienceSelection({ data, onNext, campaignType }: Step1Prop
                     entityType="contact"
                     onApplyFilter={setFilterGroup}
                     initialFilter={filterGroup}
+                    includeRelatedEntities={true}
                   />
                 </div>
               </div>
@@ -298,6 +298,7 @@ export function Step1AudienceSelection({ data, onNext, campaignType }: Step1Prop
                       entityType="contact"
                       onApplyFilter={setFilterGroup}
                       initialFilter={filterGroup}
+                      includeRelatedEntities={true}
                     />
                   </div>
 
@@ -411,6 +412,7 @@ export function Step1AudienceSelection({ data, onNext, campaignType }: Step1Prop
                       entityType="contact"
                       onApplyFilter={setFilterGroup}
                       initialFilter={filterGroup}
+                      includeRelatedEntities={true}
                     />
                   </div>
 

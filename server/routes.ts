@@ -1170,28 +1170,28 @@ export function registerRoutes(app: Express) {
   app.get("/api/domain-sets/:id/items", requireAuth, async (req, res) => {
     try {
       const items = await storage.getDomainSetItems(req.params.id);
-      
+
       // Batch fetch account names for efficiency (deduplicate accountIds)
       const accountIds = [...new Set(items
         .map(item => item.accountId)
         .filter((id): id is string => id !== null && id !== undefined))];
-      
+
       const accountMap = new Map<string, string>();
       if (accountIds.length > 0) {
         const accounts = await db
           .select({ id: accountsTable.id, name: accountsTable.name })
           .from(accountsTable)
           .where(inArray(accountsTable.id, accountIds));
-        
+
         accounts.forEach(acc => accountMap.set(acc.id, acc.name));
       }
-      
+
       // Enrich items with account names from the batch fetch
       const enrichedItems = items.map(item => ({
         ...item,
         accountName: item.accountId ? (accountMap.get(item.accountId) || null) : null
       }));
-      
+
       res.json(enrichedItems);
     } catch (error) {
       console.error('Get domain set items error:', error);
@@ -1955,10 +1955,23 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Get filter fields by entity type (contact or account)
   app.get("/api/filters/fields/entity/:entity", async (req, res) => {
     try {
-      // Return all filter fields regardless of entity for maximum flexibility
-      const fields = await storage.getFilterFields();
+      const entity = req.params.entity;
+      const includeRelated = req.query.includeRelated === 'true';
+
+      if (!['contact', 'account'].includes(entity)) {
+        return res.status(400).json({ message: "Invalid entity type. Must be 'contact' or 'account'" });
+      }
+
+      let fields = await storage.getFilterFieldsByEntity(entity);
+
+      // If includeRelated is true and entity is contact, also include account fields
+      if (includeRelated && entity === 'contact') {
+        const accountFields = await storage.getFilterFieldsByEntity('account');
+        fields = [...fields, ...accountFields];
+      }
 
       // Group by category for easier UI consumption (same format as /api/filters/fields)
       const grouped = fields.reduce((acc: any, field) => {
