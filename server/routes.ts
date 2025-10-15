@@ -3660,6 +3660,38 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== TELNYX WEBHOOKS ====================
+  // Telnyx webhook endpoint for call events (used for Telephony Credential configuration)
+  app.post("/api/telnyx/webhook", async (req, res) => {
+    try {
+      console.log("Telnyx webhook received:", JSON.stringify(req.body, null, 2));
+      
+      // Acknowledge receipt immediately
+      res.status(200).json({ received: true });
+      
+      // Process webhook event types
+      const eventType = req.body?.data?.event_type;
+      
+      if (eventType) {
+        console.log(`Telnyx event type: ${eventType}`);
+        
+        // Handle specific event types as needed
+        switch (eventType) {
+          case 'call.initiated':
+          case 'call.answered':
+          case 'call.hangup':
+            console.log(`Call event: ${eventType}`, req.body?.data);
+            break;
+          default:
+            console.log(`Unhandled Telnyx event: ${eventType}`);
+        }
+      }
+    } catch (error: any) {
+      console.error("Telnyx webhook error:", error.message);
+      res.status(500).json({ error: "Webhook processing failed" });
+    }
+  });
+
   // ==================== WEBHOOKS (Resources Centre Reverse Webhook) ====================
   app.use("/api/webhooks", webhooksRouter);
 
