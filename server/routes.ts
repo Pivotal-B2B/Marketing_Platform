@@ -269,6 +269,58 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Temporary registration endpoint - REMOVE AFTER CREATING ADMIN USER
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, email, password, firstName, lastName } = req.body;
+
+      if (!username || !email || !password) {
+        return res.status(400).json({ message: "Username, email, and password required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(409).json({ message: "Username already exists" });
+      }
+
+      // Check if this is the first user (should get admin role)
+      const allUsers = await storage.getAllUsers();
+      const isFirstUser = allUsers.length === 0;
+
+      // Hash password
+      const hashedPassword = await hashPassword(password);
+
+      // Create user
+      const newUser = await storage.createUser({
+        username,
+        email,
+        password: hashedPassword,
+        role: isFirstUser ? 'admin' : 'agent',
+        firstName: firstName || username,
+        lastName: lastName || '',
+      });
+
+      // If first user, assign admin role in junction table
+      if (isFirstUser) {
+        await storage.assignUserRole(newUser.id, 'admin', newUser.id);
+      }
+
+      res.status(201).json({
+        message: "User created successfully",
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          role: newUser.role,
+        }
+      });
+    } catch (error: any) {
+      console.error('[REGISTER] Error:', error);
+      res.status(500).json({ message: "Registration failed: " + error.message });
+    }
+  });
+
   app.post("/api/auth/change-password", requireAuth, async (req, res) => {
     try {
       const userId = req.user!.userId;
