@@ -33,6 +33,7 @@ import {
   insertCallAttemptSchema,
   insertSoftphoneProfileSchema,
   insertCallRecordingAccessLogSchema,
+  insertSipTrunkConfigSchema,
   insertContentAssetSchema,
   insertSocialPostSchema,
   insertAIContentGenerationSchema,
@@ -1622,6 +1623,94 @@ export function registerRoutes(app: Express) {
       res.json(calls);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch call history" });
+    }
+  });
+
+  // ==================== SIP TRUNK CONFIGURATION ====================
+
+  // Get all SIP trunk configurations
+  app.get("/api/sip-trunks", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      const configs = await storage.getSipTrunkConfigs();
+      res.json(configs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch SIP trunk configurations" });
+    }
+  });
+
+  // Get default SIP trunk config (for agents)
+  app.get("/api/sip-trunks/default", requireAuth, async (req, res) => {
+    try {
+      const config = await storage.getDefaultSipTrunkConfig();
+      if (!config) {
+        return res.status(404).json({ message: "No default SIP trunk configured" });
+      }
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch default SIP trunk" });
+    }
+  });
+
+  // Get specific SIP trunk config
+  app.get("/api/sip-trunks/:id", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      const config = await storage.getSipTrunkConfig(req.params.id);
+      if (!config) {
+        return res.status(404).json({ message: "SIP trunk configuration not found" });
+      }
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch SIP trunk configuration" });
+    }
+  });
+
+  // Create SIP trunk config
+  app.post("/api/sip-trunks", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      const validated = insertSipTrunkConfigSchema.parse(req.body);
+      const config = await storage.createSipTrunkConfig({
+        ...validated,
+        createdById: req.user?.id,
+      });
+      res.status(201).json(config);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create SIP trunk configuration" });
+    }
+  });
+
+  // Update SIP trunk config
+  app.patch("/api/sip-trunks/:id", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      const config = await storage.updateSipTrunkConfig(req.params.id, req.body);
+      if (!config) {
+        return res.status(404).json({ message: "SIP trunk configuration not found" });
+      }
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update SIP trunk configuration" });
+    }
+  });
+
+  // Delete SIP trunk config
+  app.delete("/api/sip-trunks/:id", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      await storage.deleteSipTrunkConfig(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete SIP trunk configuration" });
+    }
+  });
+
+  // Set default SIP trunk
+  app.post("/api/sip-trunks/:id/set-default", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      await storage.setDefaultSipTrunk(req.params.id);
+      res.json({ message: "Default SIP trunk updated successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to set default SIP trunk" });
     }
   });
 

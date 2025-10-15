@@ -13,7 +13,7 @@ import {
   callScripts, callAttempts, callEvents, qualificationResponses,
   contentAssets, socialPosts, aiContentGenerations, contentAssetPushes,
   events, resources, news,
-  softphoneProfiles, callRecordingAccessLogs,
+  softphoneProfiles, callRecordingAccessLogs, sipTrunkConfigs,
   campaignContentLinks,
   speakers, organizers, sponsors,
   type User, type InsertUser,
@@ -51,6 +51,7 @@ import {
   type QualificationResponse, type InsertQualificationResponse,
   type SoftphoneProfile, type InsertSoftphoneProfile,
   type CallRecordingAccessLog, type InsertCallRecordingAccessLog,
+  type SipTrunkConfig, type InsertSipTrunkConfig,
   type CampaignContentLink, type InsertCampaignContentLink,
   type ContentAsset, type InsertContentAsset,
   type SocialPost, type InsertSocialPost,
@@ -181,6 +182,15 @@ export interface IStorage {
   // Call Recording Access Logs (Phase 27)
   createCallRecordingAccessLog(log: InsertCallRecordingAccessLog): Promise<CallRecordingAccessLog>;
   getCallRecordingAccessLogs(callAttemptId: string): Promise<CallRecordingAccessLog[]>;
+
+  // SIP Trunk Configuration (WebRTC)
+  getSipTrunkConfigs(): Promise<SipTrunkConfig[]>;
+  getSipTrunkConfig(id: string): Promise<SipTrunkConfig | undefined>;
+  getDefaultSipTrunkConfig(): Promise<SipTrunkConfig | undefined>;
+  createSipTrunkConfig(config: InsertSipTrunkConfig): Promise<SipTrunkConfig>;
+  updateSipTrunkConfig(id: string, config: Partial<InsertSipTrunkConfig>): Promise<SipTrunkConfig | undefined>;
+  deleteSipTrunkConfig(id: string): Promise<void>;
+  setDefaultSipTrunk(id: string): Promise<void>;
 
   // Campaign Content Links (Resources Centre Integration)
   getCampaignContentLinks(campaignId: string): Promise<CampaignContentLink[]>;
@@ -1667,6 +1677,46 @@ export class DatabaseStorage implements IStorage {
       .from(callRecordingAccessLogs)
       .where(eq(callRecordingAccessLogs.callAttemptId, callAttemptId))
       .orderBy(desc(callRecordingAccessLogs.createdAt));
+  }
+
+  // SIP Trunk Configuration (WebRTC)
+  async getSipTrunkConfigs(): Promise<SipTrunkConfig[]> {
+    return await db.select().from(sipTrunkConfigs).orderBy(desc(sipTrunkConfigs.isDefault), sipTrunkConfigs.name);
+  }
+
+  async getSipTrunkConfig(id: string): Promise<SipTrunkConfig | undefined> {
+    const [config] = await db.select().from(sipTrunkConfigs).where(eq(sipTrunkConfigs.id, id));
+    return config || undefined;
+  }
+
+  async getDefaultSipTrunkConfig(): Promise<SipTrunkConfig | undefined> {
+    const [config] = await db.select().from(sipTrunkConfigs).where(and(eq(sipTrunkConfigs.isDefault, true), eq(sipTrunkConfigs.isActive, true)));
+    return config || undefined;
+  }
+
+  async createSipTrunkConfig(insertConfig: InsertSipTrunkConfig): Promise<SipTrunkConfig> {
+    const [config] = await db.insert(sipTrunkConfigs).values({ ...insertConfig, updatedAt: new Date() }).returning();
+    return config;
+  }
+
+  async updateSipTrunkConfig(id: string, updateData: Partial<InsertSipTrunkConfig>): Promise<SipTrunkConfig | undefined> {
+    const [config] = await db
+      .update(sipTrunkConfigs)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(sipTrunkConfigs.id, id))
+      .returning();
+    return config || undefined;
+  }
+
+  async deleteSipTrunkConfig(id: string): Promise<void> {
+    await db.delete(sipTrunkConfigs).where(eq(sipTrunkConfigs.id, id));
+  }
+
+  async setDefaultSipTrunk(id: string): Promise<void> {
+    // First, set all to non-default
+    await db.update(sipTrunkConfigs).set({ isDefault: false });
+    // Then set the specified one as default
+    await db.update(sipTrunkConfigs).set({ isDefault: true }).where(eq(sipTrunkConfigs.id, id));
   }
 
   // Campaign Content Links (Resources Centre Integration)

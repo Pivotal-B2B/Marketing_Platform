@@ -904,6 +904,26 @@ export const softphoneProfiles = pgTable("softphone_profiles", {
   userIdx: index("softphone_profiles_user_idx").on(table.userId),
 }));
 
+// SIP Trunk Configuration - Telnyx WebRTC connection credentials
+export const sipTrunkConfigs = pgTable("sip_trunk_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // Friendly name for this SIP connection
+  provider: text("provider").notNull().default('telnyx'), // 'telnyx', 'twilio', etc.
+  sipUsername: text("sip_username").notNull(), // SIP username for WebRTC authentication
+  sipPassword: text("sip_password").notNull(), // SIP password (encrypted in production)
+  sipDomain: text("sip_domain").notNull().default('sip.telnyx.com'), // SIP domain/proxy
+  connectionId: text("connection_id"), // Telnyx connection ID (optional)
+  outboundVoiceProfileId: text("outbound_voice_profile_id"), // For outbound calls
+  isActive: boolean("is_active").default(true), // Enable/disable this trunk
+  isDefault: boolean("is_default").default(false), // Default trunk for agents
+  createdById: varchar("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  activeIdx: index("sip_trunk_configs_active_idx").on(table.isActive),
+  defaultIdx: index("sip_trunk_configs_default_idx").on(table.isDefault),
+}));
+
 // Call Recording Access Log - Audit trail for QA/Admin playback & downloads
 export const callRecordingAccessLogs = pgTable("call_recording_access_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1208,6 +1228,12 @@ export const insertSoftphoneProfileSchema = createInsertSchema(softphoneProfiles
   updatedAt: true,
 });
 
+export const insertSipTrunkConfigSchema = createInsertSchema(sipTrunkConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertCallRecordingAccessLogSchema = createInsertSchema(callRecordingAccessLogs).omit({
   id: true,
   createdAt: true,
@@ -1411,6 +1437,9 @@ export type InsertCallEvent = z.infer<typeof insertCallEventSchema>;
 
 export type SoftphoneProfile = typeof softphoneProfiles.$inferSelect;
 export type InsertSoftphoneProfile = z.infer<typeof insertSoftphoneProfileSchema>;
+
+export type SipTrunkConfig = typeof sipTrunkConfigs.$inferSelect;
+export type InsertSipTrunkConfig = z.infer<typeof insertSipTrunkConfigSchema>;
 
 export type CallRecordingAccessLog = typeof callRecordingAccessLogs.$inferSelect;
 export type InsertCallRecordingAccessLog = z.infer<typeof insertCallRecordingAccessLogSchema>;
