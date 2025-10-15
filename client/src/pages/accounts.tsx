@@ -447,6 +447,17 @@ export default function AccountsPage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+        {viewMode === "cards" && paginatedAccounts.length > 0 && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Checkbox
+              checked={isAllSelected ? true : isSomeSelected ? "indeterminate" : false}
+              onCheckedChange={() => isAllSelected ? clearSelection() : selectAll()}
+              aria-label="Select all on page"
+              data-testid="checkbox-select-all-cards"
+            />
+            <span className="text-sm text-muted-foreground">Select all</span>
+          </div>
+        )}
         <div className="flex-1">
           <AdvancedFilterBar
             placeholder="Search by name, domain, industry..."
@@ -567,6 +578,8 @@ export default function AccountsPage() {
                   account={account}
                   onCardClick={(id) => setLocation(`/accounts/${id}`)}
                   index={index}
+                  isSelected={isSelected(account.id)}
+                  onToggleSelect={selectItem}
                 />
               ))}
             </div>

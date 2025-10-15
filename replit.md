@@ -20,11 +20,18 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Dark Mode:** Fully implemented with theme toggle and localStorage persistence.
 - **Global UX/UI Upgrade:** Introduced reusable components like `HeaderActionBar`, `IconButton`, and `SectionCard` for consistent interaction patterns across Account and Contact Details pages, featuring sticky headers, one-click actions, and responsive layouts.
 - **Premium Design System (October 2025):** Comprehensive visual enhancement featuring:
-  - **Animations:** Fade-in (translateY), count-up numbers, pulse-glow, slide-in-bottom, and staggered delays for lists
+  - **Animations:** Fade-in (translateY), count-up numbers, pulse-glow, slide-in-bottom, and staggered delays for lists (framer-motion)
   - **Visual Effects:** Glass morphism, gradient borders, shadow-smooth utilities, icon hover glows, status indicator dots with glows
   - **Enhanced Components:** Premium login page with gradient background, animated stat cards with count-up effects, enhanced empty states with circular gradients
   - **Micro-interactions:** Card elevation on hover, icon scaling, smooth transitions with cubic-bezier easing
   - **Gradient Utilities:** bg-gradient-primary, bg-gradient-surface, bg-gradient-card for visual depth
+  - **Advanced Filtering:** AdvancedFilterBar component with multi-operator support, filter chips, and sophisticated search controls
+  - **View Toggle System:** Dual-view architecture for Accounts (Cards/Table) with seamless state preservation:
+    - **Premium Card View:** AccountCardPremium with gradient avatars, responsive grid layout (1/2/3 columns), animated hover effects, and icon action buttons
+    - **Full Keyboard Accessibility:** role="button", tabIndex, Enter/Space navigation, focus rings, and ARIA labels
+    - **Bulk Selection Support:** Individual checkboxes per card, "Select All" header control, integrated with existing bulk actions toolbar
+    - **Event Isolation:** Proper stopPropagation for checkbox interactions to prevent unintended navigation
+  - **Icon Action Buttons:** IconActionButton component with tooltips for quick actions (website, LinkedIn, email, phone)
 
 **Technical Implementations & Features:**
 - **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
@@ -69,6 +76,7 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Data Fetching:** TanStack Query
 - **Form Management:** React Hook Form
 - **Charting:** Recharts
+- **Animations:** Framer Motion
 - **Authentication:** JWT
 - **Password Hashing:** bcrypt
 - **Telephony Integration:** Telnyx WebRTC

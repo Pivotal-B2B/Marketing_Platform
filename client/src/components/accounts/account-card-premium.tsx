@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Building2, Globe, Mail, Phone, Linkedin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { IconActionButton } from "@/components/shared/icon-action-button";
 import type { Account } from "@shared/schema";
 
@@ -9,9 +10,11 @@ interface AccountCardPremiumProps {
   account: Account;
   onCardClick?: (id: string) => void;
   index?: number;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
-export function AccountCardPremium({ account, onCardClick, index = 0 }: AccountCardPremiumProps) {
+export function AccountCardPremium({ account, onCardClick, index = 0, isSelected = false, onToggleSelect }: AccountCardPremiumProps) {
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -26,6 +29,21 @@ export function AccountCardPremium({ account, onCardClick, index = 0 }: AccountC
     return range.replace(/employees/i, '').trim();
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onCardClick?.(account.id);
+    }
+  };
+
+  const handleCheckboxKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+  };
+
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -33,12 +51,34 @@ export function AccountCardPremium({ account, onCardClick, index = 0 }: AccountC
       transition={{ duration: 0.3, delay: index * 0.05 }}
     >
       <Card 
-        className="rounded-2xl shadow-smooth hover:shadow-smooth-lg transition-all duration-300 card-hover cursor-pointer border-0 group"
+        role="button"
+        tabIndex={0}
+        className="rounded-2xl shadow-smooth hover:shadow-smooth-lg transition-all duration-300 card-hover cursor-pointer border-0 group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         onClick={() => onCardClick?.(account.id)}
+        onKeyDown={handleKeyDown}
         data-testid={`account-card-${account.id}`}
+        aria-label={`Account ${account.name}`}
       >
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
+            {onToggleSelect && (
+              <div 
+                className="flex-shrink-0 pt-1" 
+                onClick={handleCheckboxClick}
+                onKeyDown={handleCheckboxKeyDown}
+              >
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={(checked) => {
+                    if (checked !== isSelected) {
+                      onToggleSelect(account.id);
+                    }
+                  }}
+                  aria-label={`Select ${account.name}`}
+                  data-testid={`checkbox-account-${account.id}`}
+                />
+              </div>
+            )}
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div className="size-12 rounded-xl bg-gradient-to-br from-primary to-teal-accent flex items-center justify-center flex-shrink-0 shadow-sm">
                 <span className="text-white font-semibold text-sm">
