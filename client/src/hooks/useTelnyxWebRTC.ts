@@ -247,6 +247,13 @@ export function useTelnyxWebRTC({
     }
 
     try {
+      console.log('Making call with params:', {
+        destinationNumber: phoneNumber,
+        callerNumber: callerIdNumber,
+        hasClient: !!client,
+        isConnected,
+      });
+
       const call = client.newCall({
         destinationNumber: phoneNumber,
         callerNumber: callerIdNumber,
@@ -256,6 +263,8 @@ export function useTelnyxWebRTC({
         remoteElement: 'remoteAudio',
       });
 
+      console.log('Call object created:', call);
+
       setActiveCall(call);
       updateCallState('connecting');
 
@@ -263,12 +272,19 @@ export function useTelnyxWebRTC({
         title: "Dialing",
         description: `Calling ${phoneNumber}...`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to make call:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error name:', error?.name);
+      console.error('Error message:', error?.message);
+      console.error('Error stack:', error?.stack);
+      
+      const errorMessage = error?.message || error?.toString() || "Failed to initiate call";
+      
       toast({
         variant: "destructive",
         title: "Call Failed",
-        description: "Failed to initiate call",
+        description: errorMessage,
       });
       updateCallState('idle');
     }
