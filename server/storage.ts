@@ -28,7 +28,7 @@ import {
   type DomainSet, type InsertDomainSet,
   type DomainSetItem, type InsertDomainSetItem,
   type DomainSetContactLink, type InsertDomainSetContactLink,
-  type Lead, type InsertLead,
+  type Lead, type InsertLead, type LeadWithAccount,
   type EmailMessage, type InsertEmailMessage,
   type Call, type InsertCall,
   type SuppressionEmail, type InsertSuppressionEmail,
@@ -265,7 +265,7 @@ export interface IStorage {
   exportList(listId: string, format: 'csv' | 'json'): Promise<{ data: any; filename: string }>;
 
   // Leads
-  getLeads(filters?: any): Promise<Lead[]>;
+  getLeads(filters?: any): Promise<LeadWithAccount[]>;
   getLead(id: string): Promise<Lead | undefined>;
   createLead(lead: InsertLead): Promise<Lead>;
   createLeadFromCallAttempt(callAttemptId: string): Promise<Lead | undefined>;
@@ -2560,8 +2560,37 @@ export class DatabaseStorage implements IStorage {
 
 
   // Leads
-  async getLeads(filters?: any): Promise<Lead[]> {
-    return await db.select().from(leads).orderBy(desc(leads.createdAt));
+  async getLeads(filters?: any): Promise<LeadWithAccount[]> {
+    // Join with contacts and accounts to get full details including company name
+    const results = await db
+      .select({
+        id: leads.id,
+        contactId: leads.contactId,
+        contactName: leads.contactName,
+        contactEmail: leads.contactEmail,
+        campaignId: leads.campaignId,
+        callAttemptId: leads.callAttemptId,
+        recordingUrl: leads.recordingUrl,
+        callDuration: leads.callDuration,
+        agentId: leads.agentId,
+        qaStatus: leads.qaStatus,
+        checklistJson: leads.checklistJson,
+        approvedAt: leads.approvedAt,
+        approvedById: leads.approvedById,
+        rejectedReason: leads.rejectedReason,
+        notes: leads.notes,
+        createdAt: leads.createdAt,
+        updatedAt: leads.updatedAt,
+        // Join contact and account info
+        accountName: accounts.name,
+        accountId: contacts.accountId,
+      })
+      .from(leads)
+      .leftJoin(contacts, eq(leads.contactId, contacts.id))
+      .leftJoin(accounts, eq(contacts.accountId, accounts.id))
+      .orderBy(desc(leads.createdAt));
+    
+    return results;
   }
 
   async getLead(id: string): Promise<Lead | undefined> {

@@ -31,7 +31,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Lead } from "@shared/schema";
+import type { LeadWithAccount } from "@shared/schema";
 
 export default function LeadsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,7 +43,7 @@ export default function LeadsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const { data: leads = [], isLoading } = useQuery<Lead[]>({
+  const { data: leads = [], isLoading } = useQuery<LeadWithAccount[]>({
     queryKey: ['/api/leads'],
   });
 
@@ -127,7 +127,7 @@ export default function LeadsPage() {
   const approvedLeads = leads.filter(l => l.qaStatus === 'approved' || l.qaStatus === 'published');
   const rejectedLeads = leads.filter(l => l.qaStatus === 'rejected');
 
-  const renderLeadsTable = (leadsData: Lead[], showCheckbox = false, showActions = false) => {
+  const renderLeadsTable = (leadsData: LeadWithAccount[], showCheckbox = false, showActions = false) => {
     if (isLoading) {
       return (
         <div className="border rounded-lg">
@@ -216,6 +216,9 @@ export default function LeadsPage() {
                       <div>
                         <div className="font-medium" data-testid={`text-contact-name-${lead.id}`}>
                           {lead.contactName || 'Unknown'}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {lead.accountName || 'No company'}
                         </div>
                         <div className="text-sm text-muted-foreground font-mono">
                           {lead.contactEmail || 'No email'}
