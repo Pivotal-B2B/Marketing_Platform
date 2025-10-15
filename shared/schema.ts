@@ -588,6 +588,25 @@ export const campaigns = pgTable("campaigns", {
   typeIdx: index("campaigns_type_idx").on(table.type),
 }));
 
+// Campaign Agent Assignments table (enforces one-campaign-per-agent rule)
+export const campaignAgentAssignments = pgTable("campaign_agent_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  agentId: varchar("agent_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  assignedBy: varchar("assigned_by").references(() => users.id),
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  releasedAt: timestamp("released_at"),
+  isActive: boolean("is_active").notNull().default(true),
+}, (table) => ({
+  campaignAgentUniq: uniqueIndex("campaign_agent_assignments_uniq").on(table.campaignId, table.agentId),
+  // Partial unique index: only one active assignment per agent
+  activeAgentUniq: uniqueIndex("campaign_agent_assignments_active_agent_uniq")
+    .on(table.agentId)
+    .where(sql`${table.isActive} = true`),
+  campaignIdx: index("campaign_agent_assignments_campaign_idx").on(table.campaignId),
+  agentIdx: index("campaign_agent_assignments_agent_idx").on(table.agentId),
+}));
+
 // Campaign Queue table (for account lead cap enforcement)
 export const campaignQueue = pgTable("campaign_queue", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1183,6 +1202,12 @@ export const insertCampaignSchema = createInsertSchema(campaigns).omit({
   launchedAt: true,
 });
 
+export const insertCampaignAgentAssignmentSchema = createInsertSchema(campaignAgentAssignments).omit({
+  id: true,
+  assignedAt: true,
+  releasedAt: true,
+});
+
 export const insertCampaignQueueSchema = createInsertSchema(campaignQueue).omit({
   id: true,
   createdAt: true,
@@ -1429,6 +1454,9 @@ export type InsertDomainSetContactLink = z.infer<typeof insertDomainSetContactLi
 
 export type Campaign = typeof campaigns.$inferSelect;
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
+
+export type CampaignAgentAssignment = typeof campaignAgentAssignments.$inferSelect;
+export type InsertCampaignAgentAssignment = z.infer<typeof insertCampaignAgentAssignmentSchema>;
 
 export type CampaignAudienceSnapshot = typeof campaignAudienceSnapshots.$inferSelect;
 export type InsertCampaignAudienceSnapshot = z.infer<typeof insertCampaignAudienceSnapshotSchema>;
