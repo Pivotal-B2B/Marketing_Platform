@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { initializeDatabase } from "./db-init";
 
 const app = express();
 app.use(express.json({ limit: '50gb' }));
@@ -39,6 +40,9 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = createServer(app);
+  
+  // Initialize database with default admin if needed
+  await initializeDatabase();
   
   registerRoutes(app);
 
