@@ -1182,23 +1182,33 @@ export function registerRoutes(app: Express) {
     try {
       const domainSetId = req.params.id;
 
+      // Get all domain set items with matched accounts
+      const matchedItems = await db
+        .select()
+        .from(domainSetItems)
+        .where(
+          and(
+            eq(domainSetItems.domainSetId, domainSetId),
+            isNotNull(domainSetItems.accountId)
+          )
+        );
+
+      if (matchedItems.length === 0) {
+        return res.json([]);
+      }
+
+      // Get unique account IDs
+      const accountIds = [...new Set(matchedItems.map(item => item.accountId).filter((id): id is string => id !== null))];
+
+      if (accountIds.length === 0) {
+        return res.json([]);
+      }
+
+      // Get the actual account records
       const accounts = await db
         .select()
         .from(accountsTable)
-        .where(
-          inArray(
-            accountsTable.id,
-            db
-              .select({ accountId: domainSetItems.matchedAccountId })
-              .from(domainSetItems)
-              .where(
-                and(
-                  eq(domainSetItems.domainSetId, domainSetId),
-                  isNotNull(domainSetItems.matchedAccountId)
-                )
-              )
-          )
-        );
+        .where(inArray(accountsTable.id, accountIds));
 
       res.json(accounts);
     } catch (error: any) {
@@ -1214,12 +1224,12 @@ export function registerRoutes(app: Express) {
 
       // Get all accounts that were matched by this domain set
       const matchedAccountIds = await db
-        .select({ accountId: domainSetItems.matchedAccountId })
+        .select({ accountId: domainSetItems.accountId })
         .from(domainSetItems)
         .where(
           and(
             eq(domainSetItems.domainSetId, domainSetId),
-            isNotNull(domainSetItems.matchedAccountId)
+            isNotNull(domainSetItems.accountId)
           )
         );
 
