@@ -955,6 +955,7 @@ export const sipTrunkConfigs = pgTable("sip_trunk_configs", {
   sipDomain: text("sip_domain").notNull().default('sip.telnyx.com'), // SIP domain/proxy
   connectionId: text("connection_id"), // Telnyx connection ID (optional)
   outboundVoiceProfileId: text("outbound_voice_profile_id"), // For outbound calls
+  callerIdNumber: text("caller_id_number"), // Phone number to use as caller ID
   isActive: boolean("is_active").default(true), // Enable/disable this trunk
   isDefault: boolean("is_default").default(false), // Default trunk for agents
   createdById: varchar("created_by_id").references(() => users.id),

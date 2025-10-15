@@ -79,7 +79,12 @@ export default function AgentConsolePage() {
   const [qualificationData, setQualificationData] = useState<any>({});
 
   // Fetch SIP trunk credentials
-  const { data: sipConfig } = useQuery<{sipUsername: string; sipPassword: string; sipDomain?: string}>({
+  const { data: sipConfig } = useQuery<{
+    sipUsername: string; 
+    sipPassword: string; 
+    sipDomain?: string;
+    callerIdNumber?: string;
+  }>({
     queryKey: ['/api/sip-trunks/default'],
   });
 
@@ -209,7 +214,7 @@ export default function AgentConsolePage() {
       return;
     }
 
-    makeCall(currentQueueItem.contactPhone);
+    makeCall(currentQueueItem.contactPhone, sipConfig?.callerIdNumber);
   };
 
   const handleHangup = () => {
