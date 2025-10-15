@@ -11,22 +11,27 @@ interface StatCardProps {
     isPositive: boolean;
   };
   description?: string;
+  delay?: number;
 }
 
-export function StatCard({ title, value, icon: Icon, trend, description }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, trend, description, delay = 0 }: StatCardProps) {
   return (
-    <Card data-testid={`stat-card-${title.toLowerCase().replace(/\s+/g, '-')}`} className="card-hover border-0 shadow-smooth-lg overflow-hidden relative">
+    <Card 
+      data-testid={`stat-card-${title.toLowerCase().replace(/\s+/g, '-')}`} 
+      className="card-hover border-0 shadow-smooth-lg overflow-hidden relative animate-fade-in"
+      style={{ animationDelay: `${delay}ms` }}
+    >
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2 relative z-10">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
-        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
           <Icon className="h-5 w-5 text-primary" />
         </div>
       </CardHeader>
       <CardContent className="relative z-10">
-        <div className="text-3xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent" data-testid={`stat-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+        <div className="text-3xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent animate-count-up" data-testid={`stat-value-${title.toLowerCase().replace(/\s+/g, '-')}`}>
           {value}
         </div>
         {trend && (
