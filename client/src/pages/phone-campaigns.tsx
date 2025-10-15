@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Phone, Plus, Search, Play, Pause, BarChart, UserPlus, Users, CheckCircle2, AlertCircle, MoreVertical, Copy, Trash2, CheckSquare } from "lucide-react";
+import { Phone, Plus, Search, Play, Pause, BarChart, UserPlus, Users, CheckCircle2, AlertCircle, MoreVertical, Copy, Trash2, CheckSquare, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -110,20 +110,9 @@ export default function PhoneCampaignsPage() {
     enabled: campaigns.length > 0 && !!token,
   });
 
-  const { data: agents = [], isLoading: agentsLoading } = useQuery({
+  // Fetch available agents
+  const { data: agents = [], isLoading: agentsLoading } = useQuery<any[]>({
     queryKey: ["/api/agents"],
-    queryFn: async () => {
-      const response = await fetch("/api/agents", {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch agents");
-      }
-      return response.json();
-    },
-    enabled: !!token && showPopulateDialog,
   });
 
   const launchMutation = useMutation({
@@ -190,7 +179,7 @@ export default function PhoneCampaignsPage() {
       delete (duplicateData as any).id;
       delete (duplicateData as any).createdAt;
       delete (duplicateData as any).updatedAt;
-      
+
       return await apiRequest('POST', '/api/campaigns', duplicateData);
     },
     onSuccess: () => {
@@ -543,6 +532,16 @@ export default function PhoneCampaignsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Campaign Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedCampaign(campaign);
+                            setShowPopulateDialog(true);
+                          }}
+                          data-testid={`button-assign-agents-${campaign.id}`}
+                        >
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Assign Agents
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => {
                             setSelectedCampaign(campaign);
