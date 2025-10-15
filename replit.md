@@ -26,9 +26,10 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 
 **Technical Implementations & Features:**
 - **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
+- **Pivotal B2B Standard Master Data Template:** 100% compatibility with internal data standard. 25 contact fields (Research Date, Full Name, Title, Email/Phone with AI confidence scores, location, tenure) and 21 account fields (Company location, revenue ranges, LinkedIn IDs, SIC/NAICS codes). Automated CSV field mapping recognizes exact template headers.
 - **Audience Management:** Advanced multi-criteria filtering, dynamic segments, static lists, and domain set uploaders.
 - **Data Quality & Deduplication:** Deterministic upsert, normalization, source tracking, and soft deletes.
-- **Unified CSV Import/Export System with Field Mapping:** RFC4180-compliant CSV parsing with smart field mapping, batch processing, and intelligent matching.
+- **Unified CSV Import/Export System with Field Mapping:** RFC4180-compliant CSV parsing with smart field mapping, batch processing, and intelligent matching. Auto-detects Pivotal B2B Standard Template columns.
 - **Bulk Operations:** Multi-page record selection with bulk actions (Export, Add to List, Update, Delete).
 - **Campaign Management:**
     - **Email:** HTML editor, personalization, tracking, pre-send guards, mandatory unsubscribe.
