@@ -76,7 +76,7 @@ export function CSVFieldMapper({
   const [autoMapped, setAutoMapped] = useState(false);
 
   // Fetch custom fields
-  const { data: customFields } = useQuery<CustomFieldDefinition[]>({
+  const { data: customFields, isLoading: customFieldsLoading } = useQuery<CustomFieldDefinition[]>({
     queryKey: ['/api/custom-fields'],
   });
 
@@ -96,6 +96,15 @@ export function CSVFieldMapper({
       label: `${f.displayLabel} (Custom)`,
     })) || []),
   ];
+
+  // Show loading state while custom fields are being fetched
+  if (customFieldsLoading) {
+    return (
+      <div className="space-y-4 py-8 text-center">
+        <p className="text-sm text-muted-foreground">Loading field mappings...</p>
+      </div>
+    );
+  }
 
   // Auto-mapping logic based on column name similarity
   const autoMapColumn = (csvColumn: string): FieldMapping => {

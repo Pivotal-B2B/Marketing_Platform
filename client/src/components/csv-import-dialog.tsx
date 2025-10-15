@@ -613,15 +613,16 @@ export function CSVImportDialog({
           )}
 
           {/* Mapping Stage */}
-          {stage === "mapping" && (
-            <CSVFieldMapper
-              csvHeaders={headers}
-              sampleData={csvData.slice(0, 3)}
-              onMappingComplete={handleMappingComplete}
-              onCancel={handleClose}
-            />
+          {stage === "mapping" && headers.length > 0 && (
+            <div className="space-y-4">
+              <CSVFieldMapper
+                csvHeaders={headers}
+                sampleData={csvData.slice(0, 3)}
+                onMappingComplete={handleMappingComplete}
+                onCancel={handleClose}
+              />
+            </div>
           )}
-
 
           {/* Validation Stage */}
           {stage === "validate" && errors.length > 0 && (
