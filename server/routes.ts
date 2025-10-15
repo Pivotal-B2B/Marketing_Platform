@@ -207,20 +207,27 @@ export function registerRoutes(app: Express) {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body;
+      console.log('[LOGIN DEBUG] Received username:', username);
 
       if (!username || !password) {
         return res.status(400).json({ message: "Username and password required" });
       }
 
       const user = await storage.getUserByUsername(username);
+      console.log('[LOGIN DEBUG] User found:', user ? 'YES' : 'NO');
+      console.log('[LOGIN DEBUG] User details:', user ? { id: user.id, username: user.username, email: user.email } : null);
 
       if (!user) {
+        console.log('[LOGIN DEBUG] User not found, returning 401');
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
       // Verify password
+      console.log('[LOGIN DEBUG] Comparing password...');
       const isValid = await comparePassword(password, user.password);
+      console.log('[LOGIN DEBUG] Password valid:', isValid);
       if (!isValid) {
+        console.log('[LOGIN DEBUG] Invalid password, returning 401');
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
