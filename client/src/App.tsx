@@ -91,6 +91,7 @@ function AuthenticatedApp() {
               <Route path="/campaigns/email" component={EmailCampaignsPage} />
               <Route path="/campaigns/telemarketing/create" component={TelemarketingCreatePage} />
           <Route path="/campaigns/phone/create" component={TelemarketingCreatePage} />
+              <Route path="/campaigns/phone/:id/queue" component={CampaignQueuePage} />
               <Route path="/campaigns/phone" component={PhoneCampaignsPage} />
               <Route path="/campaigns/telemarketing" component={TelemarketingPage} />
               <Route path="/campaigns/:id/queue" component={CampaignQueuePage} />
