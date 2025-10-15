@@ -52,6 +52,8 @@ export default function PhoneCampaignsPage() {
   const [showPopulateDialog, setShowPopulateDialog] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
+  const [assignAgentsDialogOpen, setAssignAgentsDialogOpen] = useState(false);
+
 
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery<Campaign[]>({
     queryKey: ["/api/campaigns", { type: "call" }],
@@ -224,19 +226,27 @@ export default function PhoneCampaignsPage() {
 
   const assignAgentsMutation = useMutation({
     mutationFn: async ({ campaignId, agentIds }: { campaignId: string; agentIds: string[] }) => {
-      return await apiRequest('POST', `/api/campaigns/${campaignId}/agents`, { agentIds });
+      return await apiRequest('POST', `/api/campaigns/${campaignId}/agents/assign`, { agentIds });
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/agents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns/queue-stats"] });
-      toast({
-        title: "Agents Assigned",
-        description: "Agents have been assigned to the campaign successfully.",
-      });
-      setShowPopulateDialog(false);
-      setSelectedCampaign(null);
+      setAssignAgentsDialogOpen(false);
       setSelectedAgentIds([]);
+
+      const messages = [];
+      messages.push("Agents assigned successfully");
+      if (data.queuePopulated) {
+        messages.push(`Queue auto-populated with ${data.contactsEnqueued} contacts`);
+      }
+      if (data.queueItemsAssigned > 0) {
+        messages.push(`${data.queueItemsAssigned} contacts assigned to agents`);
+      }
+
+      toast({
+        title: "Success",
+        description: messages.join(". "),
+      });
     },
     onError: (error: any) => {
       toast({
@@ -269,7 +279,26 @@ export default function PhoneCampaignsPage() {
     },
   });
 
-  
+  const populateQueueMutation = useMutation({
+    mutationFn: async ({ campaignId }: { campaignId: string }) => {
+      return await apiRequest('POST', `/api/campaigns/${campaignId}/queue/populate`, {});
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns/queue-stats"] });
+      toast({
+        title: "Queue Populated",
+        description: data?.message || `Successfully populated queue with ${data?.enqueuedCount || 0} contacts`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to populate queue",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleAssignAgents = () => {
     if (!selectedCampaign) return;
@@ -289,7 +318,13 @@ export default function PhoneCampaignsPage() {
     });
   };
 
-  
+  const handlePopulateQueue = () => {
+    if (!selectedCampaign) return;
+
+    populateQueueMutation.mutate({
+      campaignId: selectedCampaign.id.toString()
+    });
+  };
 
   const toggleAgentSelection = (agentId: string) => {
     setSelectedAgentIds(prev => 
@@ -510,14 +545,13 @@ export default function PhoneCampaignsPage() {
                         <DropdownMenuItem
                           onClick={() => {
                             setSelectedCampaign(campaign);
-                            setShowPopulateDialog(true);
+                            setAssignAgentsDialogOpen(true);
                           }}
-                          data-testid={`button-assign-agents-${campaign.id}`}
+                          data-testid={`menu-assign-agents-${campaign.id}`}
                         >
                           <UserPlus className="w-4 h-4 mr-2" />
                           Assign Agents
                         </DropdownMenuItem>
-                        
                         <DropdownMenuItem
                           onClick={() => duplicateMutation.mutate(campaign)}
                           disabled={duplicateMutation.isPending}
@@ -575,7 +609,7 @@ export default function PhoneCampaignsPage() {
       )}
 
       {/* Assign Agents Dialog */}
-      <Dialog open={showPopulateDialog} onOpenChange={setShowPopulateDialog}>
+      <Dialog open={assignAgentsDialogOpen} onOpenChange={setAssignAgentsDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Assign Agents to Campaign</DialogTitle>
@@ -652,7 +686,7 @@ export default function PhoneCampaignsPage() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowPopulateDialog(false)} data-testid="button-cancel">
+            <Button variant="outline" onClick={() => setAssignAgentsDialogOpen(false)} data-testid="button-cancel">
               Cancel
             </Button>
             <Button

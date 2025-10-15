@@ -1728,7 +1728,7 @@ export function registerRoutes(app: Express) {
         // Assign queue items to the newly assigned agents
         const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
 
-        res.status(201).json({ 
+        res.status(201).json({
           message: "Agents assigned and queue populated successfully",
           queueItemsAssigned: assignResult.assigned,
           contactsEnqueued: enqueuedCount,
@@ -1737,7 +1737,7 @@ export function registerRoutes(app: Express) {
       } else {
         // No audience defined, just assign agents
         const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
-        res.status(201).json({ 
+        res.status(201).json({
           message: "Agents assigned successfully",
           queueItemsAssigned: assignResult.assigned,
           note: "Campaign has no audience defined. Please configure audience first."
@@ -1745,8 +1745,8 @@ export function registerRoutes(app: Express) {
       }
     } catch (error) {
       console.error('Agent assignment error:', error);
-      res.status(400).json({ 
-        message: error instanceof Error ? error.message : "Failed to assign agents" 
+      res.status(400).json({
+        message: error instanceof Error ? error.message : "Failed to assign agents"
       });
     }
   });
@@ -1858,8 +1858,8 @@ export function registerRoutes(app: Express) {
       const skippedCount = uniqueContacts.length - validContacts.length;
 
       if (validContacts.length === 0) {
-        return res.status(400).json({ 
-          message: "No contacts with account IDs found. All contacts must be associated with an account." 
+        return res.status(400).json({
+          message: "No contacts with account IDs found. All contacts must be associated with an account."
         });
       }
 
@@ -1899,8 +1899,8 @@ export function registerRoutes(app: Express) {
       });
     } catch (error) {
       console.error('Queue population error:', error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to populate queue" 
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to populate queue"
       });
     }
   });
@@ -2001,10 +2001,10 @@ export function registerRoutes(app: Express) {
       }
 
       const result = await storage.assignQueueToAgents(req.params.id, agentIds, mode);
-      res.json({ 
+      res.json({
         ...result,
-        message: reassignAll 
-          ? `Re-assigned all queue items to ${agentIds.length} agent(s)` 
+        message: reassignAll
+          ? `Re-assigned all queue items to ${agentIds.length} agent(s)`
           : `Assigned unassigned queue items to ${agentIds.length} agent(s)`
       });
     } catch (error) {
@@ -2042,6 +2042,13 @@ export function registerRoutes(app: Express) {
       if (!agentId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
+
+      console.log('[DISPOSITION] Received disposition request:', {
+        disposition: req.body.disposition,
+        contactId: req.body.contactId,
+        campaignId: req.body.campaignId,
+        queueItemId: req.body.queueItemId
+      });
 
       // Check if user is admin
       const userRoles = req.user?.roles || [req.user?.role];

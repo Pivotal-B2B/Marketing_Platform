@@ -805,13 +805,13 @@ export default function AgentConsolePage() {
                         <SelectValue placeholder="Select disposition..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="qualified">Qualified Lead</SelectItem>
-                        <SelectItem value="callback_requested">Callback Requested</SelectItem>
-                        <SelectItem value="not_interested">Not Interested</SelectItem>
-                        <SelectItem value="voicemail">Voicemail</SelectItem>
-                        <SelectItem value="no_answer">No Answer</SelectItem>
-                        <SelectItem value="busy">Busy</SelectItem>
-                        <SelectItem value="dnc_request">DNC Request</SelectItem>
+                        <SelectItem value="qualified">✅ Qualified Lead</SelectItem>
+                        <SelectItem value="callback_requested">📞 Callback Requested</SelectItem>
+                        <SelectItem value="not_interested">❌ Not Interested</SelectItem>
+                        <SelectItem value="voicemail">📧 Voicemail</SelectItem>
+                        <SelectItem value="no_answer">📵 No Answer</SelectItem>
+                        <SelectItem value="busy">⏰ Busy</SelectItem>
+                        <SelectItem value="dnc_request">🚫 DNC Request</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

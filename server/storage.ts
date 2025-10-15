@@ -16,7 +16,7 @@ import {
   softphoneProfiles, callRecordingAccessLogs, sipTrunkConfigs,
   campaignContentLinks,
   speakers, organizers, sponsors,
-  userRoles, autoDialerQueues, // Added autoDialerQueues here
+  userRoles,
   type User, type InsertUser, type UserRole, type InsertUserRole,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -401,10 +401,6 @@ export interface IStorage {
   createSendPolicy(sendPolicy: InsertSendPolicy): Promise<SendPolicy>;
   updateSendPolicy(id: number, sendPolicy: Partial<InsertSendPolicy>): Promise<SendPolicy | undefined>;
   deleteSendPolicy(id: number): Promise<void>;
-
-  // Auto Dialer Queues (New Method)
-  getAllAutoDialerQueues(activeOnly?: boolean): Promise<any[]>;
-  toggleAutoDialerQueue(campaignId: string, isActive: boolean): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1697,11 +1693,11 @@ export class DatabaseStorage implements IStorage {
   async getAgentQueue(agentId: string, campaignId?: string, status?: string): Promise<any[]> {
     // Build the where conditions
     const conditions = [eq(campaignQueue.agentId, agentId)];
-
+    
     if (campaignId) {
       conditions.push(eq(campaignQueue.campaignId, campaignId));
     }
-
+    
     if (status) {
       conditions.push(eq(campaignQueue.status, status as any));
     }
@@ -1728,7 +1724,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(campaigns, eq(campaignQueue.campaignId, campaigns.id))
       .where(and(...conditions))
       .orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
-
+    
     return results;
   }
 
@@ -1757,28 +1753,48 @@ export class DatabaseStorage implements IStorage {
 
       // Auto-create Lead for qualified dispositions
       if (call.disposition === 'qualified' && call.contactId) {
+        console.log('[LEAD CREATION] Qualified disposition detected for contact:', call.contactId);
+        
         // Get contact and campaign info
         const contact = await this.getContact(call.contactId);
-
-        if (contact) {
+        
+        if (!contact) {
+          console.error('[LEAD CREATION] Contact not found:', call.contactId);
+        } else {
+          console.log('[LEAD CREATION] Contact found:', contact.id, contact.email);
+          
           // Get contact name for the lead
           const contactName = contact.fullName || 
             `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 
             contact.email;
-
+          
           const contactEmail = contact.email;
 
           // Create the lead
-          await db.insert(leads).values({
-            contactId: call.contactId,
-            contactName,
-            contactEmail,
-            campaignId: call.campaignId || null,
-            qaStatus: 'new',
-            notes: call.notes || null,
-            checklistJson: call.qualificationData || null,
-          });
+          try {
+            const [newLead] = await db.insert(leads).values({
+              contactId: call.contactId,
+              contactName,
+              contactEmail,
+              campaignId: call.campaignId || null,
+              qaStatus: 'new',
+              notes: call.notes || null,
+              checklistJson: call.qualificationData || null,
+            }).returning();
+            
+            console.log('[LEAD CREATION] ✅ Lead created successfully:', newLead.id, {
+              contactId: call.contactId,
+              contactName,
+              campaignId: call.campaignId,
+              qaStatus: 'new'
+            });
+          } catch (leadError) {
+            console.error('[LEAD CREATION] ❌ Failed to create lead:', leadError);
+            throw leadError;
+          }
         }
+      } else if (call.disposition === 'qualified') {
+        console.warn('[LEAD CREATION] ⚠️ Qualified disposition but no contactId:', call);
       }
 
       // Update account stats for positive dispositions (qualified, callback_requested)
@@ -2170,7 +2186,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Segments
-  async getSegments(filters?: any): Promise<Segment[]>;
   async getSegments(filters?: any): Promise<Segment[]> {
     return await db.select().from(segments).orderBy(desc(segments.createdAt));
   }
@@ -2287,7 +2302,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Lists
-  async getLists(filters?: any): Promise<List[]>;
   async getLists(filters?: any): Promise<List[]> {
     return await db.select().from(lists).orderBy(desc(lists.createdAt));
   }
@@ -2444,7 +2458,6 @@ export class DatabaseStorage implements IStorage {
 
 
   // Leads
-  async getLeads(filters?: any): Promise<Lead[]>;
   async getLeads(filters?: any): Promise<Lead[]> {
     return await db.select().from(leads).orderBy(desc(leads.createdAt));
   }
@@ -2496,7 +2509,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Suppressions
-  async getEmailSuppressions(): Promise<SuppressionEmail[]>;
   async getEmailSuppressions(): Promise<SuppressionEmail[]> {
     return await db.select().from(suppressionEmails).orderBy(desc(suppressionEmails.createdAt));
   }
@@ -2521,17 +2533,16 @@ export class DatabaseStorage implements IStorage {
 
   async checkEmailSuppressionBulk(emails: string[]): Promise<Set<string>> {
     if (emails.length === 0) return new Set();
-
+    
     const normalizedEmails = emails.map(e => e.toLowerCase());
     const suppressedRecords = await db
       .select()
       .from(suppressionEmails)
       .where(inArray(suppressionEmails.email, normalizedEmails));
-
+    
     return new Set(suppressedRecords.map(r => r.email));
   }
 
-  async getPhoneSuppressions(): Promise<SuppressionPhone[]>;
   async getPhoneSuppressions(): Promise<SuppressionPhone[]>{
     return await db.select().from(suppressionPhones).orderBy(desc(suppressionPhones.createdAt));
   }
@@ -2556,17 +2567,16 @@ export class DatabaseStorage implements IStorage {
 
   async checkPhoneSuppressionBulk(phonesE164: string[]): Promise<Set<string>> {
     if (phonesE164.length === 0) return new Set();
-
+    
     const suppressedRecords = await db
       .select()
       .from(suppressionPhones)
       .where(inArray(suppressionPhones.phoneE164, phonesE164));
-
+    
     return new Set(suppressedRecords.map(r => r.phoneE164));
   }
 
   // Campaign Orders
-  async getCampaignOrders(filters?: any): Promise<CampaignOrder[]>;
   async getCampaignOrders(filters?: any): Promise<CampaignOrder[]> {
     return await db.select().from(campaignOrders).orderBy(desc(campaignOrders.createdAt));
   }
@@ -2609,7 +2619,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Bulk Imports
-  async getBulkImports(): Promise<BulkImport[]>;
   async getBulkImports(): Promise<BulkImport[]> {
     return await db.select().from(bulkImports).orderBy(desc(bulkImports.createdAt));
   }
@@ -2667,13 +2676,11 @@ export class DatabaseStorage implements IStorage {
     return log;
   }
 
-  async getAuditLogs(filters?: any): Promise<AuditLog[]>;
   async getAuditLogs(filters?: any): Promise<AuditLog[]> {
     return await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
   }
 
   // Saved Filters
-  async getSavedFilters(userId: string, entityType?: string): Promise<SavedFilter[]>;
   async getSavedFilters(userId: string, entityType?: string): Promise<SavedFilter[]> {
     let query = db.select().from(savedFilters).where(eq(savedFilters.userId, userId));
 
@@ -2753,7 +2760,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Filter Fields Registry
-  async getFilterFields(category?: string): Promise<FilterField[]>;
   async getFilterFields(category?: string): Promise<FilterField[]> {
     let query = db
       .select()
@@ -3187,7 +3193,6 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== CONTENT STUDIO ====================
 
-  async getContentAssets(): Promise<ContentAsset[]>;
   async getContentAssets(): Promise<ContentAsset[]> {
     return await db.select().from(contentAssets).orderBy(contentAssets.updatedAt);
   }
@@ -3217,7 +3222,6 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== SOCIAL POSTS ====================
 
-  async getSocialPosts(): Promise<SocialPost[]>;
   async getSocialPosts(): Promise<SocialPost[]> {
     return await db.select().from(socialPosts).orderBy(socialPosts.createdAt);
   }
@@ -3252,7 +3256,6 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getAIContentGenerations(userId?: string): Promise<AIContentGeneration[]>;
   async getAIContentGenerations(userId?: string): Promise<AIContentGeneration[]> {
     if (userId) {
       return await db.select().from(aiContentGenerations)
@@ -3299,7 +3302,6 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== EVENTS ====================
 
-  async getEvents(): Promise<Event[]>;
   async getEvents(): Promise<Event[]> {
     return await db.select().from(events).orderBy(desc(events.createdAt));
   }
@@ -3334,7 +3336,6 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== RESOURCES ====================
 
-  async getResources(): Promise<Resource[]>;
   async getResources(): Promise<Resource[]> {
     return await db.select().from(resources).orderBy(desc(resources.createdAt));
   }
@@ -3369,7 +3370,6 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== NEWS ====================
 
-  async getNews(): Promise<News[]>;
   async getNews(): Promise<News[]> {
     return await db.select().from(news).orderBy(desc(news.createdAt));
   }
@@ -3405,7 +3405,6 @@ export class DatabaseStorage implements IStorage {
   // ==================== EMAIL INFRASTRUCTURE (Phase 26) ====================
 
   // Sender Profiles
-  async getSenderProfiles(): Promise<SenderProfile[]>;
   async getSenderProfiles(): Promise<SenderProfile[]> {
     return await db.select().from(senderProfiles).orderBy(desc(senderProfiles.createdAt));
   }
@@ -3433,7 +3432,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Domain Authentication
-  async getDomainAuths(): Promise<DomainAuth[]>;
   async getDomainAuths(): Promise<DomainAuth[]> {
     return await db.select().from(domainAuth).orderBy(desc(domainAuth.createdAt));
   }
@@ -3475,7 +3473,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Tracking Domains
-  async getTrackingDomains(): Promise<TrackingDomain[]>;
   async getTrackingDomains(): Promise<TrackingDomain[]> {
     return await db.select().from(trackingDomains).orderBy(desc(trackingDomains.createdAt));
   }
@@ -3503,7 +3500,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // IP Pools
-  async getIpPools(): Promise<IpPool[]>;
   async getIpPools(): Promise<IpPool[]> {
     return await db.select().from(ipPools).orderBy(desc(ipPools.createdAt));
   }
@@ -3531,7 +3527,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Send Policies
-  async getSendPolicies(): Promise<SendPolicy[]>;
   async getSendPolicies(): Promise<SendPolicy[]> {
     return await db.select().from(sendPolicies).orderBy(desc(sendPolicies.createdAt));
   }
@@ -3556,18 +3551,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSendPolicy(id: number): Promise<void> {
     await db.delete(sendPolicies).where(eq(sendPolicies.id, id));
-  }
-
-  // Auto Dialer Queues (New Method)
-  async getAllAutoDialerQueues(activeOnly: boolean = true): Promise<any[]> {
-    if (activeOnly) {
-      return await db.select().from(autoDialerQueues).where(eq(autoDialerQueues.isActive, true));
-    }
-    return await db.select().from(autoDialerQueues);
-  }
-
-  async toggleAutoDialerQueue(campaignId: string, isActive: boolean): Promise<void> {
-    await db.update(autoDialerQueues).set({ isActive }).where(eq(autoDialerQueues.campaignId, campaignId));
   }
 }
 
