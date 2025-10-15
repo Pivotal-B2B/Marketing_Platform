@@ -6,6 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Table,
   TableBody,
@@ -46,6 +63,22 @@ export default function AccountDetailPage() {
   const [selectedPrimary, setSelectedPrimary] = useState<string | null>(null);
   const [selectedSecondary, setSelectedSecondary] = useState<string[]>([]);
   const [selectedReject, setSelectedReject] = useState<string[]>([]);
+  
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    domain: "",
+    industryStandardized: "",
+    employeesSizeRange: "",
+    annualRevenue: "",
+    hqCity: "",
+    hqState: "",
+    hqCountry: "",
+    mainPhone: "",
+    linkedinUrl: "",
+    description: "",
+    yearFounded: "",
+  });
 
   const { data: account, isLoading: accountLoading } = useQuery<Account>({
     queryKey: [`/api/accounts/${id}`],
@@ -79,6 +112,56 @@ export default function AccountDetailPage() {
       });
     },
   });
+
+  const updateAccountMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest('PATCH', `/api/accounts/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/accounts/${id}`] });
+      setEditDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Account updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const handleEditClick = () => {
+    if (account) {
+      setEditForm({
+        name: account.name || "",
+        domain: account.domain || "",
+        industryStandardized: account.industryStandardized || "",
+        employeesSizeRange: account.employeesSizeRange || "",
+        annualRevenue: account.annualRevenue || "",
+        hqCity: account.hqCity || "",
+        hqState: account.hqState || "",
+        hqCountry: account.hqCountry || "",
+        mainPhone: account.mainPhone || "",
+        linkedinUrl: account.linkedinUrl || "",
+        description: account.description || "",
+        yearFounded: account.yearFounded?.toString() || "",
+      });
+      setEditDialogOpen(true);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    const updateData: any = { ...editForm };
+    if (editForm.yearFounded) {
+      updateData.yearFounded = parseInt(editForm.yearFounded);
+    }
+    updateAccountMutation.mutate(updateData);
+  };
 
   if (accountLoading) {
     return (
@@ -180,7 +263,7 @@ export default function AccountDetailPage() {
               title="Overview"
               icon={Building2}
               action={
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={handleEditClick}>
                   Edit Details
                 </Button>
               }
@@ -510,15 +593,47 @@ export default function AccountDetailPage() {
             {/* Quick Actions */}
             <SectionCard title="Quick Actions" icon={Briefcase}>
               <div className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" size="sm">
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  Add to Campaign
-                </Button>
-                <Button variant="outline" className="w-full justify-start" size="sm">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start" size="sm">
+                      <TrendingUp className="mr-2 h-4 w-4" />
+                      Add to Campaign
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => setLocation('/campaigns')}>
+                      Email Campaign
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLocation('/telemarketing')}>
+                      Telemarketing Campaign
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  size="sm"
+                  onClick={() => {
+                    toast({
+                      title: "Coming Soon",
+                      description: "Add to List functionality will be available soon",
+                    });
+                  }}
+                >
                   <List className="mr-2 h-4 w-4" />
                   Add to List
                 </Button>
-                <Button variant="outline" className="w-full justify-start" size="sm">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  size="sm"
+                  onClick={() => {
+                    toast({
+                      title: "Coming Soon",
+                      description: "Notes functionality will be available soon",
+                    });
+                  }}
+                >
                   <FileText className="mr-2 h-4 w-4" />
                   Create Note
                 </Button>
@@ -567,6 +682,134 @@ export default function AccountDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Account Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Account Details</DialogTitle>
+            <DialogDescription>Update account information below.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Account Name *</Label>
+                <Input
+                  id="name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="domain">Domain</Label>
+                <Input
+                  id="domain"
+                  value={editForm.domain}
+                  onChange={(e) => setEditForm({ ...editForm, domain: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="industry">Industry</Label>
+                <Input
+                  id="industry"
+                  value={editForm.industryStandardized}
+                  onChange={(e) => setEditForm({ ...editForm, industryStandardized: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="employees">Employee Size</Label>
+                <Input
+                  id="employees"
+                  value={editForm.employeesSizeRange}
+                  onChange={(e) => setEditForm({ ...editForm, employeesSizeRange: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="revenue">Annual Revenue</Label>
+                <Input
+                  id="revenue"
+                  value={editForm.annualRevenue}
+                  onChange={(e) => setEditForm({ ...editForm, annualRevenue: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="yearFounded">Year Founded</Label>
+                <Input
+                  id="yearFounded"
+                  type="number"
+                  value={editForm.yearFounded}
+                  onChange={(e) => setEditForm({ ...editForm, yearFounded: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  value={editForm.hqCity}
+                  onChange={(e) => setEditForm({ ...editForm, hqCity: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  value={editForm.hqState}
+                  onChange={(e) => setEditForm({ ...editForm, hqState: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Input
+                  id="country"
+                  value={editForm.hqCountry}
+                  onChange={(e) => setEditForm({ ...editForm, hqCountry: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Main Phone</Label>
+                <Input
+                  id="phone"
+                  value={editForm.mainPhone}
+                  onChange={(e) => setEditForm({ ...editForm, mainPhone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="linkedin">LinkedIn URL</Label>
+                <Input
+                  id="linkedin"
+                  value={editForm.linkedinUrl}
+                  onChange={(e) => setEditForm({ ...editForm, linkedinUrl: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={updateAccountMutation.isPending}>
+              {updateAccountMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

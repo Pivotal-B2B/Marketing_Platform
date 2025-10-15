@@ -1,8 +1,27 @@
 import { useParams, useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   User, 
   ChevronLeft,
@@ -27,6 +46,18 @@ import { SectionCard } from "@/components/shared/section-card";
 export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    directPhone: "",
+    jobTitle: "",
+    department: "",
+    seniorityLevel: "",
+  });
 
   const { data: contact, isLoading: contactLoading } = useQuery<Contact>({
     queryKey: [`/api/contacts/${id}`],
@@ -45,6 +76,48 @@ export default function ContactDetailPage() {
   const currentIndex = contacts.findIndex(c => c.id === id);
   const prevContact = currentIndex > 0 ? contacts[currentIndex - 1] : null;
   const nextContact = currentIndex < contacts.length - 1 ? contacts[currentIndex + 1] : null;
+
+  const updateContactMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest('PATCH', `/api/contacts/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/contacts/${id}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+      setEditDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Contact updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const handleEditClick = () => {
+    if (contact) {
+      setEditForm({
+        firstName: contact.firstName || "",
+        lastName: contact.lastName || "",
+        email: contact.email || "",
+        directPhone: contact.directPhone || "",
+        jobTitle: contact.jobTitle || "",
+        department: contact.department || "",
+        seniorityLevel: contact.seniorityLevel || "",
+      });
+      setEditDialogOpen(true);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    updateContactMutation.mutate(editForm);
+  };
 
   if (contactLoading) {
     return (
@@ -177,7 +250,7 @@ export default function ContactDetailPage() {
               title="Contact Information"
               icon={User}
               action={
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={handleEditClick}>
                   Edit Details
                 </Button>
               }
@@ -328,15 +401,45 @@ export default function ContactDetailPage() {
             {/* Quick Actions */}
             <SectionCard title="Quick Actions" icon={TrendingUp}>
               <div className="space-y-2">
-                <Button variant="outline" className="w-full justify-start" size="sm">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  size="sm"
+                  onClick={() => {
+                    toast({
+                      title: "Coming Soon",
+                      description: "Add to List functionality will be available soon",
+                    });
+                  }}
+                >
                   <List className="mr-2 h-4 w-4" />
                   Add to List
                 </Button>
-                <Button variant="outline" className="w-full justify-start" size="sm">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  size="sm"
+                  onClick={() => {
+                    toast({
+                      title: "Coming Soon",
+                      description: "Notes functionality will be available soon",
+                    });
+                  }}
+                >
                   <FileText className="mr-2 h-4 w-4" />
                   Create Note
                 </Button>
-                <Button variant="outline" className="w-full justify-start" size="sm">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start" 
+                  size="sm"
+                  onClick={() => {
+                    toast({
+                      title: "Coming Soon",
+                      description: "Task scheduling will be available soon",
+                    });
+                  }}
+                >
                   <Calendar className="mr-2 h-4 w-4" />
                   Schedule Task
                 </Button>
@@ -394,6 +497,89 @@ export default function ContactDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Contact Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Contact Details</DialogTitle>
+            <DialogDescription>Update contact information below.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="directPhone">Direct Phone</Label>
+                <Input
+                  id="directPhone"
+                  value={editForm.directPhone}
+                  onChange={(e) => setEditForm({ ...editForm, directPhone: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="jobTitle">Job Title</Label>
+                <Input
+                  id="jobTitle"
+                  value={editForm.jobTitle}
+                  onChange={(e) => setEditForm({ ...editForm, jobTitle: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="department">Department</Label>
+                <Input
+                  id="department"
+                  value={editForm.department}
+                  onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="seniorityLevel">Seniority Level</Label>
+              <Input
+                id="seniorityLevel"
+                value={editForm.seniorityLevel}
+                onChange={(e) => setEditForm({ ...editForm, seniorityLevel: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={updateContactMutation.isPending}>
+              {updateContactMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
