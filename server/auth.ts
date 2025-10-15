@@ -39,6 +39,13 @@ export function verifyToken(token: string): JWTPayload | null {
   try {
     return jwt.verify(token, JWT_SECRET) as JWTPayload;
   } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      console.error('[AUTH] Token expired:', error.message);
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      console.error('[AUTH] Invalid token (possibly signed with different secret):', error.message);
+    } else {
+      console.error('[AUTH] Token verification failed:', error);
+    }
     return null;
   }
 }
