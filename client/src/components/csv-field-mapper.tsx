@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
+import type { CustomFieldDefinition } from "@shared/schema";
 
 interface FieldMapping {
   csvColumn: string;
@@ -25,8 +27,8 @@ interface CSVFieldMapperProps {
   onCancel: () => void;
 }
 
-// Define available fields for Contact and Account
-const CONTACT_FIELDS = [
+// Define base/standard fields for Contact and Account
+const BASE_CONTACT_FIELDS = [
   { value: "firstName", label: "First Name" },
   { value: "lastName", label: "Last Name" },
   { value: "fullName", label: "Full Name" },
@@ -44,7 +46,7 @@ const CONTACT_FIELDS = [
   { value: "phoneStatus", label: "Phone Status" },
 ];
 
-const ACCOUNT_FIELDS = [
+const BASE_ACCOUNT_FIELDS = [
   { value: "name", label: "Account Name" },
   { value: "domain", label: "Domain" },
   { value: "industryStandardized", label: "Industry" },
@@ -64,69 +66,6 @@ const ACCOUNT_FIELDS = [
   { value: "mainPhoneExtension", label: "Main Phone Extension" },
 ];
 
-// Auto-mapping logic based on column name similarity
-function autoMapColumn(csvColumn: string): FieldMapping {
-  const normalized = csvColumn.toLowerCase().replace(/[_\s-]/g, "");
-  
-  // Check for account fields (account_ prefix)
-  if (csvColumn.toLowerCase().startsWith("account_")) {
-    const fieldName = csvColumn.substring(8); // Remove "account_" prefix
-    const normalizedField = fieldName.toLowerCase().replace(/[_\s-]/g, "");
-    
-    for (const field of ACCOUNT_FIELDS) {
-      const fieldNormalized = field.value.toLowerCase();
-      if (normalizedField === fieldNormalized || normalizedField.includes(fieldNormalized) || fieldNormalized.includes(normalizedField)) {
-        return {
-          csvColumn,
-          targetField: field.value,
-          targetEntity: "account",
-        };
-      }
-    }
-  }
-  
-  // Check for contact fields
-  for (const field of CONTACT_FIELDS) {
-    const fieldNormalized = field.value.toLowerCase();
-    if (normalized === fieldNormalized || normalized.includes(fieldNormalized) || fieldNormalized.includes(normalized)) {
-      return {
-        csvColumn,
-        targetField: field.value,
-        targetEntity: "contact",
-      };
-    }
-  }
-  
-  // Special case mappings
-  const specialMappings: Record<string, FieldMapping> = {
-    "name": { csvColumn, targetField: "fullName", targetEntity: "contact" },
-    "company": { csvColumn, targetField: "name", targetEntity: "account" },
-    "companyname": { csvColumn, targetField: "name", targetEntity: "account" },
-    "organization": { csvColumn, targetField: "name", targetEntity: "account" },
-    "phone": { csvColumn, targetField: "directPhone", targetEntity: "contact" },
-    "mobile": { csvColumn, targetField: "directPhone", targetEntity: "contact" },
-    "cell": { csvColumn, targetField: "directPhone", targetEntity: "contact" },
-    "title": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
-    "position": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
-    "role": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
-    "city": { csvColumn, targetField: "hqCity", targetEntity: "account" },
-    "state": { csvColumn, targetField: "hqState", targetEntity: "account" },
-    "country": { csvColumn, targetField: "hqCountry", targetEntity: "account" },
-    "website": { csvColumn, targetField: "domain", targetEntity: "account" },
-    "url": { csvColumn, targetField: "domain", targetEntity: "account" },
-  };
-  
-  if (specialMappings[normalized]) {
-    return specialMappings[normalized];
-  }
-  
-  return {
-    csvColumn,
-    targetField: null,
-    targetEntity: null,
-  };
-}
-
 export function CSVFieldMapper({
   csvHeaders,
   sampleData,
@@ -136,15 +75,102 @@ export function CSVFieldMapper({
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
   const [autoMapped, setAutoMapped] = useState(false);
 
-  useEffect(() => {
-    // Auto-map on initial load
-    const initialMappings = csvHeaders.map(autoMapColumn);
-    setMappings(initialMappings);
+  // Fetch custom fields
+  const { data: customFields } = useQuery<CustomFieldDefinition[]>({
+    queryKey: ['/api/custom-fields'],
+  });
+
+  // Build complete field lists with custom fields
+  const CONTACT_FIELDS = [
+    ...BASE_CONTACT_FIELDS,
+    ...(customFields?.filter(f => f.entityType === 'contact' && f.active).map(f => ({
+      value: `custom_${f.fieldKey}`,
+      label: `${f.displayLabel} (Custom)`,
+    })) || []),
+  ];
+
+  const ACCOUNT_FIELDS = [
+    ...BASE_ACCOUNT_FIELDS,
+    ...(customFields?.filter(f => f.entityType === 'account' && f.active).map(f => ({
+      value: `custom_${f.fieldKey}`,
+      label: `${f.displayLabel} (Custom)`,
+    })) || []),
+  ];
+
+  // Auto-mapping logic based on column name similarity
+  const autoMapColumn = (csvColumn: string): FieldMapping => {
+    const normalized = csvColumn.toLowerCase().replace(/[_\s-]/g, "");
     
-    // Check if any were auto-mapped
-    const hasAutoMapped = initialMappings.some(m => m.targetField !== null);
-    setAutoMapped(hasAutoMapped);
-  }, [csvHeaders]);
+    // Check for account fields (account_ prefix)
+    if (csvColumn.toLowerCase().startsWith("account_")) {
+      const fieldName = csvColumn.substring(8); // Remove "account_" prefix
+      const normalizedField = fieldName.toLowerCase().replace(/[_\s-]/g, "");
+      
+      for (const field of ACCOUNT_FIELDS) {
+        const fieldNormalized = field.value.toLowerCase();
+        if (normalizedField === fieldNormalized || normalizedField.includes(fieldNormalized) || fieldNormalized.includes(normalizedField)) {
+          return {
+            csvColumn,
+            targetField: field.value,
+            targetEntity: "account",
+          };
+        }
+      }
+    }
+    
+    // Check for contact fields
+    for (const field of CONTACT_FIELDS) {
+      const fieldNormalized = field.value.toLowerCase();
+      if (normalized === fieldNormalized || normalized.includes(fieldNormalized) || fieldNormalized.includes(normalized)) {
+        return {
+          csvColumn,
+          targetField: field.value,
+          targetEntity: "contact",
+        };
+      }
+    }
+    
+    // Special case mappings
+    const specialMappings: Record<string, FieldMapping> = {
+      "name": { csvColumn, targetField: "fullName", targetEntity: "contact" },
+      "company": { csvColumn, targetField: "name", targetEntity: "account" },
+      "companyname": { csvColumn, targetField: "name", targetEntity: "account" },
+      "organization": { csvColumn, targetField: "name", targetEntity: "account" },
+      "phone": { csvColumn, targetField: "directPhone", targetEntity: "contact" },
+      "mobile": { csvColumn, targetField: "directPhone", targetEntity: "contact" },
+      "cell": { csvColumn, targetField: "directPhone", targetEntity: "contact" },
+      "title": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
+      "position": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
+      "role": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
+      "city": { csvColumn, targetField: "hqCity", targetEntity: "account" },
+      "state": { csvColumn, targetField: "hqState", targetEntity: "account" },
+      "country": { csvColumn, targetField: "hqCountry", targetEntity: "account" },
+      "website": { csvColumn, targetField: "domain", targetEntity: "account" },
+      "url": { csvColumn, targetField: "domain", targetEntity: "account" },
+    };
+    
+    if (specialMappings[normalized]) {
+      return specialMappings[normalized];
+    }
+    
+    return {
+      csvColumn,
+      targetField: null,
+      targetEntity: null,
+    };
+  };
+
+  useEffect(() => {
+    // Auto-map on initial load - only when custom fields are loaded
+    if (customFields !== undefined) {
+      const initialMappings = csvHeaders.map(autoMapColumn);
+      setMappings(initialMappings);
+      
+      // Check if any were auto-mapped
+      const hasAutoMapped = initialMappings.some(m => m.targetField !== null);
+      setAutoMapped(hasAutoMapped);
+    }
+  }, [csvHeaders, customFields]);
 
   const updateMapping = (csvColumn: string, targetField: string | null, targetEntity: "contact" | "account" | null) => {
     setMappings(prev =>
