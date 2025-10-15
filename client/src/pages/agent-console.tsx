@@ -7,30 +7,22 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { 
   Phone, 
   PhoneOff, 
   Mic, 
-  MicOff, 
-  Volume2, 
-  VolumeX,
-  PhoneForwarded,
+  MicOff,
   Settings,
   Clock,
   User,
   Building2,
   FileText,
   RefreshCw,
-  ChevronRight
+  ChevronRight,
+  ChevronLeft,
+  Mail,
+  Briefcase
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -39,6 +31,18 @@ import type { CallState } from "@/hooks/useTelnyxWebRTC";
 
 // Backwards compatibility type alias
 type CallStatus = CallState | 'wrap-up';
+
+// Contact type with additional fields
+type Contact = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string;
+  email: string;
+  directPhone: string | null;
+  jobTitle: string | null;
+  accountId: string | null;
+};
 
 // Queue item type
 type QueueItem = {
@@ -66,9 +70,8 @@ type Campaign = {
 export default function AgentConsolePage() {
   const { toast } = useToast();
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('all');
-  const [selectedContact, setSelectedContact] = useState<QueueItem | null>(null);
-  const [showDispositionModal, setShowDispositionModal] = useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
+  const [currentContactIndex, setCurrentContactIndex] = useState(0);
   
   // Disposition form state
   const [disposition, setDisposition] = useState<string>('');
@@ -95,7 +98,6 @@ export default function AgentConsolePage() {
     sipPassword: sipConfig?.sipPassword,
     sipDomain: sipConfig?.sipDomain || 'sip.telnyx.com',
     onCallStateChange: (state) => {
-      // Map Telnyx call states to our UI states
       if (state === 'hangup') {
         setCallStatus('wrap-up');
       } else {
@@ -103,16 +105,23 @@ export default function AgentConsolePage() {
       }
     },
     onCallEnd: () => {
-      // Call ended, show inline disposition
       setCallStatus('wrap-up');
     },
   });
 
-  // Fetch agent queue data
+  // Fetch agent queue data - only for selected campaign
   const { data: queueData = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery<QueueItem[]>({
-    queryKey: selectedCampaignId === 'all' 
-      ? ['/api/agents/me/queue?status=queued']
-      : [`/api/agents/me/queue?campaignId=${selectedCampaignId}&status=queued`],
+    queryKey: selectedCampaignId 
+      ? [`/api/agents/me/queue?campaignId=${selectedCampaignId}&status=queued`]
+      : ['/api/agents/me/queue?status=queued'],
+    enabled: !!selectedCampaignId,
+  });
+
+  // Fetch contact details for current contact
+  const currentQueueItem = queueData[currentContactIndex];
+  const { data: contactDetails } = useQuery<Contact>({
+    queryKey: currentQueueItem ? [`/api/contacts/${currentQueueItem.contactId}`] : [],
+    enabled: !!currentQueueItem?.contactId,
   });
 
   // Extract unique campaigns from queue data
@@ -120,12 +129,17 @@ export default function AgentConsolePage() {
     new Map(queueData.map(item => [item.campaignId, { id: item.campaignId, name: item.campaignName }])).values()
   );
 
-  // Auto-select first contact when queue loads
+  // Auto-select first campaign when campaigns load
   useEffect(() => {
-    if (queueData.length > 0 && !selectedContact) {
-      setSelectedContact(queueData[0]);
+    if (campaigns.length > 0 && !selectedCampaignId) {
+      setSelectedCampaignId(campaigns[0].id);
     }
-  }, [queueData, selectedContact]);
+  }, [campaigns, selectedCampaignId]);
+
+  // Reset index when queue data changes
+  useEffect(() => {
+    setCurrentContactIndex(0);
+  }, [queueData]);
 
   // Mutation for saving disposition
   const saveDispositionMutation = useMutation({
@@ -145,12 +159,7 @@ export default function AgentConsolePage() {
       setCallStatus('idle');
       
       // Move to next contact
-      const currentIndex = queueData.findIndex(c => c.id === selectedContact?.id);
-      if (currentIndex < queueData.length - 1) {
-        setSelectedContact(queueData[currentIndex + 1]);
-      } else if (queueData.length > 0) {
-        setSelectedContact(queueData[0]);
-      }
+      handleNextContact();
       
       // Refetch queue to get updated status
       refetchQueue();
@@ -165,7 +174,7 @@ export default function AgentConsolePage() {
   });
 
   const handleDial = () => {
-    if (!selectedContact?.contactPhone) {
+    if (!currentQueueItem?.contactPhone) {
       toast({
         title: "No phone number",
         description: "This contact doesn't have a phone number",
@@ -183,8 +192,7 @@ export default function AgentConsolePage() {
       return;
     }
 
-    // Use real Telnyx calling
-    makeCall(selectedContact.contactPhone);
+    makeCall(currentQueueItem.contactPhone);
   };
 
   const handleHangup = () => {
@@ -201,7 +209,7 @@ export default function AgentConsolePage() {
       return;
     }
 
-    if (!selectedContact) {
+    if (!currentQueueItem) {
       toast({
         title: "Error",
         description: "No contact selected",
@@ -211,15 +219,27 @@ export default function AgentConsolePage() {
     }
 
     saveDispositionMutation.mutate({
-      queueItemId: selectedContact.id,
-      campaignId: selectedContact.campaignId,
-      contactId: selectedContact.contactId,
+      queueItemId: currentQueueItem.id,
+      campaignId: currentQueueItem.campaignId,
+      contactId: currentQueueItem.contactId,
       disposition,
       duration: callDuration,
       notes,
       qualificationData: Object.keys(qualificationData).length > 0 ? qualificationData : null,
       callbackRequested: disposition === 'callback_requested',
     });
+  };
+
+  const handleNextContact = () => {
+    if (currentContactIndex < queueData.length - 1) {
+      setCurrentContactIndex(currentContactIndex + 1);
+    }
+  };
+
+  const handlePreviousContact = () => {
+    if (currentContactIndex > 0) {
+      setCurrentContactIndex(currentContactIndex - 1);
+    }
   };
 
   const isCallActive = ['connecting', 'ringing', 'active'].includes(callStatus);
@@ -258,11 +278,10 @@ export default function AgentConsolePage() {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
-              <SelectTrigger className="w-[200px]" data-testid="select-campaign">
+              <SelectTrigger className="w-[250px]" data-testid="select-campaign">
                 <SelectValue placeholder="Select campaign" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Campaigns</SelectItem>
                 {campaigns.map(campaign => (
                   <SelectItem key={campaign.id} value={campaign.id}>
                     {campaign.name}
@@ -283,144 +302,210 @@ export default function AgentConsolePage() {
         </div>
       </div>
 
-      {/* Two-Column Layout: Sidebar + Main Area */}
+      {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* LEFT SIDEBAR: Queue + Softphone */}
-        <div className="w-72 border-r bg-card flex flex-col">
-          {/* Softphone Controls */}
+        {/* LEFT SIDEBAR: Contact Card & Softphone */}
+        <div className="w-80 border-r bg-card flex flex-col">
+          {/* Contact Navigation */}
           <div className="p-4 border-b">
-            <div className="space-y-3">
-              <div className="text-center space-y-2">
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                  <User className="h-6 w-6 text-primary" />
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-sm">Current Contact</h2>
+              <Badge variant="outline" className="text-xs">
+                {currentContactIndex + 1} of {queueData.length}
+              </Badge>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreviousContact}
+                disabled={currentContactIndex === 0 || queueData.length === 0}
+                className="flex-1"
+                data-testid="button-previous-contact"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextContact}
+                disabled={currentContactIndex >= queueData.length - 1 || queueData.length === 0}
+                className="flex-1"
+                data-testid="button-next-contact"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Contact Details Card */}
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-4">
+              {queueLoading ? (
+                <div className="text-center py-8">
+                  <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Loading queue...</p>
                 </div>
-                <h3 className="font-semibold text-sm truncate" data-testid="text-current-contact">
-                  {selectedContact?.contactName || 'No Contact'}
-                </h3>
-                <p className="text-xs text-muted-foreground truncate" data-testid="text-current-account">
-                  {selectedContact?.accountName || '-'}
-                </p>
-                <p className="text-xs font-mono text-muted-foreground" data-testid="text-current-phone">
-                  {selectedContact?.contactPhone || 'No phone'}
-                </p>
-              </div>
-
-              {/* Call Duration */}
-              {callStatus === 'active' && (
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-mono text-sm" data-testid="text-call-duration">
-                      {formatDuration()}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Call Controls */}
-              <div className="flex justify-center gap-2">
-                {!isCallActive && callStatus !== 'wrap-up' && (
-                  <Button
-                    size="lg"
-                    className="h-12 w-12 rounded-full"
-                    onClick={handleDial}
-                    disabled={!selectedContact}
-                    data-testid="button-dial"
-                  >
-                    <Phone className="h-5 w-5" />
-                  </Button>
-                )}
-
-                {isCallActive && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={toggleMute}
-                      data-testid="button-mute"
-                    >
-                      {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                    </Button>
-
-                    <Button
-                      size="lg"
-                      variant="destructive"
-                      className="h-12 w-12 rounded-full"
-                      onClick={handleHangup}
-                      data-testid="button-hangup"
-                    >
-                      <PhoneOff className="h-5 w-5" />
-                    </Button>
-                  </>
-                )}
-              </div>
-
-              {callStatus === 'wrap-up' && (
-                <div className="text-center py-2">
-                  <p className="text-xs text-muted-foreground">
-                    Complete disposition below
+              ) : !currentQueueItem ? (
+                <div className="text-center py-8">
+                  <Phone className="h-12 w-12 mx-auto mb-3 opacity-50 text-muted-foreground" />
+                  <p className="font-medium text-sm">No contacts in queue</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select a campaign with assigned contacts
                   </p>
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Call Queue */}
-          <div className="flex-1 flex flex-col">
-            <div className="p-3 border-b">
-              <h2 className="font-semibold text-sm flex items-center gap-2" data-testid="text-queue-title">
-                <Phone className="h-3.5 w-3.5" />
-                Queue ({queueData.length})
-              </h2>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1">
-                {queueLoading ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-1" />
-                    <p className="text-xs">Loading...</p>
-                  </div>
-                ) : queueData.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    <Phone className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-xs font-medium">No contacts</p>
-                  </div>
-                ) : (
-                  queueData.map((contact) => (
-                    <div
-                      key={contact.id}
-                      className={`p-2 rounded-md cursor-pointer hover-elevate border ${
-                        selectedContact?.id === contact.id ? 'border-primary bg-primary/5' : 'border-transparent'
-                      }`}
-                      onClick={() => setSelectedContact(contact)}
-                      data-testid={`card-queue-contact-${contact.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-1">
+              ) : (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                      <User className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle className="text-center text-base" data-testid="text-contact-name">
+                      {currentQueueItem.contactName || 'Unknown Contact'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    {/* Job Title */}
+                    {contactDetails?.jobTitle && (
+                      <div className="flex items-start gap-2">
+                        <Briefcase className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-xs truncate" data-testid={`text-contact-name-${contact.id}`}>
-                            {contact.contactName || 'Unknown'}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {contact.accountName || 'No account'}
-                          </p>
-                          <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                            {contact.contactPhone || 'No phone'}
+                          <p className="text-xs text-muted-foreground">Title</p>
+                          <p className="font-medium truncate" data-testid="text-contact-title">
+                            {contactDetails.jobTitle}
                           </p>
                         </div>
-                        <Badge
-                          variant={contact.priority >= 3 ? 'destructive' : contact.priority >= 2 ? 'default' : 'secondary'}
-                          className="text-xs h-5 px-1.5"
-                          data-testid={`badge-priority-${contact.id}`}
-                        >
-                          P{contact.priority}
-                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Email */}
+                    <div className="flex items-start gap-2">
+                      <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <p className="font-medium truncate" data-testid="text-contact-email">
+                          {currentQueueItem.contactEmail || contactDetails?.email || 'No email'}
+                        </p>
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
+
+                    {/* Phone */}
+                    <div className="flex items-start gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                        <p className="font-medium font-mono" data-testid="text-contact-phone">
+                          {currentQueueItem.contactPhone || 'No phone'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Company/Account */}
+                    <div className="flex items-start gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Company</p>
+                        <p className="font-medium" data-testid="text-contact-company">
+                          {currentQueueItem.accountName || 'No company'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Campaign Info */}
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Campaign</p>
+                      <Badge variant="outline" className="text-xs">
+                        {currentQueueItem.campaignName}
+                      </Badge>
+                    </div>
+
+                    {/* Priority */}
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Priority</p>
+                      <Badge
+                        variant={currentQueueItem.priority >= 3 ? 'destructive' : currentQueueItem.priority >= 2 ? 'default' : 'secondary'}
+                        className="text-xs"
+                      >
+                        Priority {currentQueueItem.priority}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Softphone Controls */}
+              {currentQueueItem && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Softphone</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Call Duration */}
+                    {callStatus === 'active' && (
+                      <div className="text-center py-2">
+                        <div className="flex items-center justify-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-mono text-base" data-testid="text-call-duration">
+                            {formatDuration()}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Call Controls */}
+                    <div className="flex justify-center gap-2">
+                      {!isCallActive && callStatus !== 'wrap-up' && (
+                        <Button
+                          size="lg"
+                          className="h-12 w-12 rounded-full"
+                          onClick={handleDial}
+                          disabled={!currentQueueItem}
+                          data-testid="button-dial"
+                        >
+                          <Phone className="h-5 w-5" />
+                        </Button>
+                      )}
+
+                      {isCallActive && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={toggleMute}
+                            data-testid="button-mute"
+                          >
+                            {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                          </Button>
+
+                          <Button
+                            size="lg"
+                            variant="destructive"
+                            className="h-12 w-12 rounded-full"
+                            onClick={handleHangup}
+                            data-testid="button-hangup"
+                          >
+                            <PhoneOff className="h-5 w-5" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+
+                    {callStatus === 'wrap-up' && (
+                      <div className="text-center py-2">
+                        <p className="text-xs text-muted-foreground">
+                          Complete disposition below
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </ScrollArea>
         </div>
 
         {/* MAIN AREA: Script + Dispositions */}
@@ -435,11 +520,6 @@ export default function AgentConsolePage() {
                       <FileText className="h-5 w-5" />
                       Call Script
                     </CardTitle>
-                    {selectedContact && (
-                      <Badge variant="outline" className="text-xs">
-                        {selectedContact.campaignName}
-                      </Badge>
-                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -447,7 +527,7 @@ export default function AgentConsolePage() {
                     <p className="text-base leading-relaxed">
                       "Hello, this is [Your Name] calling from Pivotal CRM. May I speak with{' '}
                       <span className="font-semibold text-primary">
-                        {selectedContact?.contactName || '[Contact Name]'}
+                        {currentQueueItem?.contactName || '[Contact Name]'}
                       </span>?"
                     </p>
                   </div>
@@ -456,7 +536,7 @@ export default function AgentConsolePage() {
                     <p className="text-base leading-relaxed">
                       "I'm calling to discuss how our B2B solutions can help{' '}
                       <span className="font-semibold text-primary">
-                        {selectedContact?.accountName || '[Company Name]'}
+                        {currentQueueItem?.accountName || '[Company Name]'}
                       </span>{' '}
                       streamline their customer engagement and drive growth..."
                     </p>
@@ -575,7 +655,7 @@ export default function AgentConsolePage() {
                     <div className="flex justify-end pt-2">
                       <Button
                         onClick={handleSaveDisposition}
-                        disabled={!disposition || saveDispositionMutation.isPending}
+                        disabled={!disposition || saveDispositionMutation.isPending || !currentQueueItem}
                         size="lg"
                         data-testid="button-save-disposition"
                       >
