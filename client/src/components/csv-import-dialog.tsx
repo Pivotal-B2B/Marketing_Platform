@@ -182,9 +182,14 @@ export function CSVImportDialog({
     let failedCount = 0;
 
     try {
+      console.log('[CSV-IMPORT] Starting import with', csvData.length, 'rows');
+      console.log('[CSV-IMPORT] Field mappings:', fieldMappings);
+
       // Check if we have account fields in the mapping
       const hasAccountFields = fieldMappings.some(m => m.targetEntity === "account");
       const isUnifiedFormat = hasAccountFields;
+
+      console.log('[CSV-IMPORT] Is unified format:', isUnifiedFormat);
 
       // Process in batches for better performance with large files
       const BATCH_SIZE = 50;
@@ -194,6 +199,8 @@ export function CSVImportDialog({
         const start = batchIndex * BATCH_SIZE;
         const end = Math.min(start + BATCH_SIZE, csvData.length);
         const batchRows = csvData.slice(start, end);
+
+        console.log(`[CSV-IMPORT] Processing batch ${batchIndex + 1}/${totalBatches} (${batchRows.length} rows)`);
 
         try {
           if (isUnifiedFormat) {
@@ -224,6 +231,8 @@ export function CSVImportDialog({
                 return true;
               });
 
+            console.log('[CSV-IMPORT] Filtered records:', records.length);
+
             if (records.length > 0) {
               const response = await apiRequest(
                 "POST",
@@ -236,6 +245,8 @@ export function CSVImportDialog({
                 failed: number;
                 errors: Array<{ index: number; error: string }>;
               };
+              
+              console.log('[CSV-IMPORT] Batch result:', result);
               
               successCount += result.success;
               failedCount += result.failed;
@@ -258,6 +269,8 @@ export function CSVImportDialog({
               };
             });
 
+            console.log('[CSV-IMPORT] Contacts to import:', contacts.length);
+
             for (const contact of contacts) {
               try {
                 // Skip contacts with empty or invalid email
@@ -267,6 +280,7 @@ export function CSVImportDialog({
                   continue;
                 }
                 
+                console.log(`[CSV-IMPORT] Importing contact at row ${contact.rowIndex}:`, contact.data.email);
                 await apiRequest("POST", "/api/contacts", contact.data);
                 successCount++;
               } catch (error) {
@@ -282,6 +296,8 @@ export function CSVImportDialog({
 
         setImportProgress(Math.round(((end) / csvData.length) * 100));
       }
+
+      console.log('[CSV-IMPORT] Import complete - Success:', successCount, 'Failed:', failedCount);
 
       setImportResults({ success: successCount, failed: failedCount });
       setStage("complete");

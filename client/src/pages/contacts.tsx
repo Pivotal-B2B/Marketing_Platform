@@ -102,6 +102,12 @@ export default function ContactsPage() {
       if (!response.ok) throw new Error('Failed to fetch contacts');
       return response.json();
     },
+    onSuccess: (data) => {
+      console.log('[CONTACTS] Loaded contacts:', data.length);
+    },
+    onError: (error) => {
+      console.error('[CONTACTS] Error loading contacts:', error);
+    }
   });
 
   const { data: accounts } = useQuery<Account[]>({
