@@ -76,7 +76,7 @@ const getNavStructure = (): NavItem[] => [
     items: [
       { title: "All Accounts", url: "/accounts", roles: ["admin", "campaign_manager", "data_ops"] },
       { title: "Segments & Lists", url: "/segments?entity=account", roles: ["admin", "campaign_manager", "data_ops"] },
-      { title: "Accounts List (TAL)", url: "/accounts-list", roles: ["admin", "data_ops"] }, // Changed from "Domain Sets"
+      { title: "Accounts List (TAL)", url: "/domain-sets", roles: ["admin", "data_ops"] }, // Changed from "Domain Sets"
     ],
   },
   {
