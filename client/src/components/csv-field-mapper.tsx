@@ -124,12 +124,12 @@ export function CSVFieldMapper({
   // Auto-mapping logic based on column name similarity
   const autoMapColumn = (csvColumn: string): FieldMapping => {
     const normalized = csvColumn.toLowerCase().replace(/[_\s-]/g, "");
-    
+
     // Check for account fields (account_ prefix)
     if (csvColumn.toLowerCase().startsWith("account_")) {
       const fieldName = csvColumn.substring(8); // Remove "account_" prefix
       const normalizedField = fieldName.toLowerCase().replace(/[_\s-]/g, "");
-      
+
       for (const field of ACCOUNT_FIELDS) {
         const fieldNormalized = field.value.toLowerCase();
         if (normalizedField === fieldNormalized || normalizedField.includes(fieldNormalized) || fieldNormalized.includes(normalizedField)) {
@@ -141,7 +141,7 @@ export function CSVFieldMapper({
         }
       }
     }
-    
+
     // Check for contact fields
     for (const field of CONTACT_FIELDS) {
       const fieldNormalized = field.value.toLowerCase();
@@ -153,14 +153,17 @@ export function CSVFieldMapper({
         };
       }
     }
-    
+
     // Special case mappings for Pivotal B2B Standard Template + Common variations
     const specialMappings: Record<string, FieldMapping> = {
       // Contact Pivotal Template Exact Matches
       "researchdate": { csvColumn, targetField: "researchDate", targetEntity: "contact" },
       "contactfullname": { csvColumn, targetField: "fullName", targetEntity: "contact" },
+      "firstname": { csvColumn, targetField: "firstName", targetEntity: "contact" },
+      "lastname": { csvColumn, targetField: "lastName", targetEntity: "contact" },
       "contactliprofileurl": { csvColumn, targetField: "linkedinUrl", targetEntity: "contact" },
       "email1": { csvColumn, targetField: "email", targetEntity: "contact" },
+      "email": { csvColumn, targetField: "email", targetEntity: "contact" },
       "email1validation": { csvColumn, targetField: "emailVerificationStatus", targetEntity: "contact" },
       "email1totalai": { csvColumn, targetField: "emailAiConfidence", targetEntity: "contact" },
       "contactphone1": { csvColumn, targetField: "directPhone", targetEntity: "contact" },
@@ -175,9 +178,15 @@ export function CSVFieldMapper({
       "formerposition": { csvColumn, targetField: "formerPosition", targetEntity: "contact" },
       "timeincurrentposition": { csvColumn, targetField: "timeInCurrentPosition", targetEntity: "contact" },
       "timeincurrentcompany": { csvColumn, targetField: "timeInCurrentCompany", targetEntity: "contact" },
-      
+      "title": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
+      "jobtitle": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
+      "department": { csvColumn, targetField: "department", targetEntity: "contact" },
+      "seniority": { csvColumn, targetField: "seniorityLevel", targetEntity: "contact" },
+
       // Account Pivotal Template Exact Matches
       "companynamecleaned": { csvColumn, targetField: "name", targetEntity: "account" },
+      "companyname": { csvColumn, targetField: "name", targetEntity: "account" },
+      "company": { csvColumn, targetField: "name", targetEntity: "account" },
       "companylocation": { csvColumn, targetField: "companyLocation", targetEntity: "account" },
       "companystreet1": { csvColumn, targetField: "hqStreet1", targetEntity: "account" },
       "companystreet2": { csvColumn, targetField: "hqStreet2", targetEntity: "account" },
@@ -190,6 +199,7 @@ export function CSVFieldMapper({
       "companyannualrevenue": { csvColumn, targetField: "annualRevenue", targetEntity: "account" },
       "companyrevenuerange": { csvColumn, targetField: "revenueRange", targetEntity: "account" },
       "companystaffcountrange": { csvColumn, targetField: "employeesSizeRange", targetEntity: "account" },
+      "staffcount": { csvColumn, targetField: "staffCount", targetEntity: "account" },
       "companydescription": { csvColumn, targetField: "description", targetEntity: "account" },
       "companywebsitedomain": { csvColumn, targetField: "domain", targetEntity: "account" },
       "companyfoundeddate": { csvColumn, targetField: "yearFounded", targetEntity: "account" },
@@ -197,16 +207,16 @@ export function CSVFieldMapper({
       "companyliprofileurl": { csvColumn, targetField: "linkedinUrl", targetEntity: "account" },
       "companylinkedinid": { csvColumn, targetField: "linkedinId", targetEntity: "account" },
       "webtechnologies": { csvColumn, targetField: "techStack", targetEntity: "account" },
-      
+      "mainphone": { csvColumn, targetField: "mainPhone", targetEntity: "account" },
+      "siccode": { csvColumn, targetField: "sicCode", targetEntity: "account" },
+      "naicscode": { csvColumn, targetField: "naicsCode", targetEntity: "account" },
+
       // Generic fallbacks
       "name": { csvColumn, targetField: "fullName", targetEntity: "contact" },
-      "company": { csvColumn, targetField: "name", targetEntity: "account" },
-      "companyname": { csvColumn, targetField: "name", targetEntity: "account" },
       "organization": { csvColumn, targetField: "name", targetEntity: "account" },
       "phone": { csvColumn, targetField: "directPhone", targetEntity: "contact" },
       "mobile": { csvColumn, targetField: "mobilePhone", targetEntity: "contact" },
       "cell": { csvColumn, targetField: "mobilePhone", targetEntity: "contact" },
-      "title": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
       "position": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
       "role": { csvColumn, targetField: "jobTitle", targetEntity: "contact" },
       "city": { csvColumn, targetField: "city", targetEntity: "contact" },
@@ -216,11 +226,11 @@ export function CSVFieldMapper({
       "url": { csvColumn, targetField: "domain", targetEntity: "account" },
       "domain": { csvColumn, targetField: "domain", targetEntity: "account" },
     };
-    
+
     if (specialMappings[normalized]) {
       return specialMappings[normalized];
     }
-    
+
     return {
       csvColumn,
       targetField: null,
@@ -233,7 +243,7 @@ export function CSVFieldMapper({
     if (customFields !== undefined) {
       const initialMappings = csvHeaders.map(autoMapColumn);
       setMappings(initialMappings);
-      
+
       // Check if any were auto-mapped
       const hasAutoMapped = initialMappings.some(m => m.targetField !== null);
       setAutoMapped(hasAutoMapped);
@@ -311,10 +321,10 @@ export function CSVFieldMapper({
                     </span>
                   )}
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  
+
                   <Select
                     value={mapping.targetEntity || ""}
                     onValueChange={(value) => {
@@ -367,7 +377,7 @@ export function CSVFieldMapper({
         <Button variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button 
+        <Button
           onClick={handleApplyMapping}
           disabled={mappedCount === 0}
           data-testid="button-apply-mapping"
