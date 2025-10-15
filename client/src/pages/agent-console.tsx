@@ -28,9 +28,27 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTelnyxWebRTC } from "@/hooks/useTelnyxWebRTC";
 import type { CallState } from "@/hooks/useTelnyxWebRTC";
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 // Backwards compatibility type alias
 type CallStatus = CallState | 'wrap-up';
+
+// Helper function to validate and normalize phone number to E.164
+function normalizePhoneToE164(phone: string | null, country: string = 'US'): string | null {
+  if (!phone) return null;
+  
+  // Try to parse with libphonenumber-js
+  try {
+    const phoneNumber = parsePhoneNumberFromString(phone, country as any);
+    if (phoneNumber && phoneNumber.isValid()) {
+      return phoneNumber.number; // Returns E.164 format
+    }
+  } catch (error) {
+    console.error('Phone normalization error:', error);
+  }
+  
+  return null;
+}
 
 // Contact type with additional fields
 type Contact = {
@@ -136,6 +154,49 @@ export default function AgentConsolePage() {
     enabled: !!currentQueueItem?.contactId,
   });
 
+  // Compute valid phone options
+  const validPhoneOptions = useMemo(() => {
+    if (!contactDetails) return [];
+    
+    const options: Array<{ type: 'direct' | 'mobile' | 'company'; number: string; label: string }> = [];
+    
+    // Check direct phone
+    if (contactDetails.directPhone && normalizePhoneToE164(contactDetails.directPhone)) {
+      options.push({
+        type: 'direct',
+        number: contactDetails.directPhone,
+        label: `Direct: ${contactDetails.directPhone}`
+      });
+    }
+    
+    // Check mobile phone
+    if (contactDetails.mobilePhone && normalizePhoneToE164(contactDetails.mobilePhone)) {
+      options.push({
+        type: 'mobile',
+        number: contactDetails.mobilePhone,
+        label: `Mobile: ${contactDetails.mobilePhone}`
+      });
+    }
+    
+    // Check company phone
+    if (contactDetails.account?.mainPhone && normalizePhoneToE164(contactDetails.account.mainPhone)) {
+      options.push({
+        type: 'company',
+        number: contactDetails.account.mainPhone,
+        label: `Company: ${contactDetails.account.mainPhone}`
+      });
+    }
+    
+    return options;
+  }, [contactDetails]);
+
+  // Auto-select first valid phone number when contact changes
+  useEffect(() => {
+    if (validPhoneOptions.length > 0) {
+      setSelectedPhoneType(validPhoneOptions[0].type);
+    }
+  }, [validPhoneOptions]);
+
   // Fetch campaign details for qualification questions
   const { data: campaignDetails } = useQuery<{
     id: string;
@@ -236,21 +297,16 @@ export default function AgentConsolePage() {
       return;
     }
 
-    // Normalize phone number to E.164 format
-    // Remove all non-digit characters
-    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    // Validate and normalize phone number to E.164 format
+    const e164Phone = normalizePhoneToE164(phoneNumber);
     
-    // Add + and country code if needed
-    let e164Phone = digitsOnly;
-    if (digitsOnly.length === 10) {
-      // Assume US number, add +1
-      e164Phone = `+1${digitsOnly}`;
-    } else if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
-      // Already has country code, just add +
-      e164Phone = `+${digitsOnly}`;
-    } else if (!digitsOnly.startsWith('+')) {
-      // Add + to other formats
-      e164Phone = `+${digitsOnly}`;
+    if (!e164Phone) {
+      toast({
+        title: "Invalid phone number",
+        description: `${phoneLabel} "${phoneNumber}" is not a valid phone number`,
+        variant: "destructive",
+      });
+      return;
     }
 
     console.log(`Calling ${phoneLabel}: ${phoneNumber} → ${e164Phone}`);
@@ -497,23 +553,17 @@ export default function AgentConsolePage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {contactDetails?.directPhone && (
-                            <SelectItem value="direct" data-testid="option-direct-phone">
-                              Direct: {contactDetails.directPhone}
+                          {validPhoneOptions.map((option) => (
+                            <SelectItem 
+                              key={option.type} 
+                              value={option.type} 
+                              data-testid={`option-${option.type}-phone`}
+                            >
+                              {option.label}
                             </SelectItem>
-                          )}
-                          {contactDetails?.mobilePhone && (
-                            <SelectItem value="mobile" data-testid="option-mobile-phone">
-                              Mobile: {contactDetails.mobilePhone}
-                            </SelectItem>
-                          )}
-                          {contactDetails?.account?.mainPhone && (
-                            <SelectItem value="company" data-testid="option-company-phone">
-                              Company: {contactDetails.account.mainPhone}
-                            </SelectItem>
-                          )}
-                          {!contactDetails?.directPhone && !contactDetails?.mobilePhone && !contactDetails?.account?.mainPhone && (
-                            <SelectItem value="direct" disabled>No phone numbers available</SelectItem>
+                          ))}
+                          {validPhoneOptions.length === 0 && (
+                            <SelectItem value="none" disabled>No valid phone numbers available</SelectItem>
                           )}
                         </SelectContent>
                       </Select>
