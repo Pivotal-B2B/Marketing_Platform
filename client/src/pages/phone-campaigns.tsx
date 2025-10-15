@@ -10,18 +10,22 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function PhoneCampaignsPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { token } = useAuth();
 
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
     queryKey: ["/api/campaigns", { type: "telemarketing" }],
     queryFn: async () => {
       const response = await fetch("/api/campaigns?type=telemarketing", {
-        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
       if (!response.ok) {
         if (response.status === 401) {
@@ -32,6 +36,7 @@ export default function PhoneCampaignsPage() {
       }
       return response.json();
     },
+    enabled: !!token,
   });
 
   const launchMutation = useMutation({

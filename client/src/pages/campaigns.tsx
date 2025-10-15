@@ -1,20 +1,22 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Phone, Plus, BarChart, Settings, Play, Pause, StopCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function CampaignsPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [, setLocation] = useLocation();
+  const { getToken } = useAuth(); // Use the getToken function from useAuth
 
   const { data: campaigns = [], isLoading } = useQuery({
     queryKey: ["/api/campaigns"],
     queryFn: async () => {
-      const token = localStorage.getItem('authToken');
+      const token = getToken(); // Retrieve token using getToken
       const response = await fetch("/api/campaigns", {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
