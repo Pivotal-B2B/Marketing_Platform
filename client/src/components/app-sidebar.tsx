@@ -96,7 +96,7 @@ const getNavStructure = (): NavItem[] => [
     items: [
       { title: "All Campaigns", url: "/campaigns", roles: ["admin", "campaign_manager"] },
       { title: "Email Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
-      { title: "Phone Campaigns", url: "/campaigns/telemarketing", roles: ["admin", "campaign_manager", "agent"] },
+      { title: "Phone Campaigns", url: "/campaigns/phone", roles: ["admin", "campaign_manager", "agent"] },
       { title: "Campaign Configuration", url: "/campaigns/config", roles: ["admin", "campaign_manager"] },
     ],
   },

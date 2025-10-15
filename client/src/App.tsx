@@ -26,6 +26,7 @@ import EmailCampaignsPage from "@/pages/email-campaigns";
 import EmailCampaignCreatePage from "@/pages/email-campaign-create";
 import TelemarketingPage from "@/pages/telemarketing";
 import TelemarketingCreatePage from "@/pages/telemarketing-create";
+import PhoneCampaignsPage from "@/pages/phone-campaigns";
 import CampaignConfigPage from "@/pages/campaign-config";
 import LeadsPage from "@/pages/leads";
 import ContentStudioPage from "@/pages/content-studio";
@@ -74,6 +75,7 @@ function AuthenticatedApp() {
               <Route path="/campaigns/email/create" component={EmailCampaignCreatePage} />
               <Route path="/campaigns/email" component={EmailCampaignsPage} />
               <Route path="/campaigns/telemarketing/create" component={TelemarketingCreatePage} />
+              <Route path="/campaigns/phone" component={PhoneCampaignsPage} />
               <Route path="/campaigns/telemarketing" component={TelemarketingPage} />
               <Route path="/campaigns/config" component={CampaignConfigPage} />
               <Route path="/leads" component={LeadsPage} />
