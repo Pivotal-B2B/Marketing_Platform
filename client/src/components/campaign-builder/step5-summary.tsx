@@ -68,19 +68,66 @@ export function Step5Summary({ data, onNext, campaignType }: Step5Props) {
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Source</span>
-            <span className="font-medium capitalize">{data.audience?.source || "Advanced Filters"}</span>
+            <span className="font-medium capitalize">{data.audience?.source?.replace('_', ' ') || "Advanced Filters"}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Total Contacts</span>
-            <span className="font-medium text-primary text-lg">2,847</span>
+          
+          {data.audience?.selectedSegments && data.audience.selectedSegments.length > 0 && (
+            <div>
+              <span className="text-sm text-muted-foreground">Selected Segments</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {data.audience.selectedSegments.map((id: string, idx: number) => (
+                  <Badge key={id} variant="secondary">Segment {idx + 1}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.audience?.selectedLists && data.audience.selectedLists.length > 0 && (
+            <div>
+              <span className="text-sm text-muted-foreground">Selected Lists</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {data.audience.selectedLists.map((id: string, idx: number) => (
+                  <Badge key={id} variant="secondary">List {idx + 1}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {data.audience?.filterGroup && data.audience.filterGroup.conditions.length > 0 && (
+            <div>
+              <span className="text-sm text-muted-foreground">Additional Filters</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                <Badge variant="outline">{data.audience.filterGroup.conditions.length} condition(s)</Badge>
+                <Badge variant="outline">{data.audience.filterGroup.logic}</Badge>
+              </div>
+            </div>
+          )}
+
+          {(data.audience?.excludedSegments?.length > 0 || data.audience?.excludedLists?.length > 0) && (
+            <div>
+              <span className="text-sm text-muted-foreground">Exclusions</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {data.audience.excludedSegments?.map((id: string, idx: number) => (
+                  <Badge key={id} variant="destructive">Segment {idx + 1}</Badge>
+                ))}
+                {data.audience.excludedLists?.map((id: string, idx: number) => (
+                  <Badge key={id} variant="destructive">List {idx + 1}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2 border-t">
+            <span className="text-muted-foreground">Estimated Contacts</span>
+            <span className="font-medium text-primary text-lg">{data.audience?.estimatedCount?.toLocaleString() || '0'}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">After Suppression</span>
-            <span className="font-medium">2,704</span>
+            <span className="font-medium">{Math.floor((data.audience?.estimatedCount || 0) * 0.95).toLocaleString()}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Excluded (Invalid)</span>
-            <span className="font-medium text-red-500">143</span>
+            <span className="font-medium text-red-500">{Math.floor((data.audience?.estimatedCount || 0) * 0.05).toLocaleString()}</span>
           </div>
         </CardContent>
       </Card>

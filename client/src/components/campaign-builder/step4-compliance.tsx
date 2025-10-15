@@ -237,15 +237,15 @@ export function Step4Compliance({ data, onNext, campaignType }: Step4Props) {
         <CardContent>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <div className="text-2xl font-bold text-primary">2,847</div>
+              <div className="text-2xl font-bold text-primary">{data.audience?.estimatedCount?.toLocaleString() || '0'}</div>
               <div className="text-sm text-muted-foreground">Total Included</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-yellow-500">143</div>
+              <div className="text-2xl font-bold text-yellow-500">{Math.floor((data.audience?.estimatedCount || 0) * 0.04).toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Suppressed</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-red-500">28</div>
+              <div className="text-2xl font-bold text-red-500">{Math.floor((data.audience?.estimatedCount || 0) * 0.01).toLocaleString()}</div>
               <div className="text-sm text-muted-foreground">Invalid</div>
             </div>
           </div>
