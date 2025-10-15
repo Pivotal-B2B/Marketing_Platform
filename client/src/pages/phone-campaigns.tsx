@@ -81,7 +81,7 @@ export default function PhoneCampaignsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest({ url: `/api/campaigns/${id}`, method: 'DELETE' });
+      return await apiRequest('DELETE', `/api/campaigns/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns", { type: "phone" }] });
@@ -101,11 +101,7 @@ export default function PhoneCampaignsPage() {
 
   const populateQueueMutation = useMutation({
     mutationFn: async ({ campaignId, contactIds, agentIds }: any) => {
-      return await apiRequest({
-        url: `/api/campaigns/${campaignId}/queue/populate`,
-        method: 'POST',
-        data: { contactIds, agentIds, priority: 1 }
-      });
+      return await apiRequest('POST', `/api/campaigns/${campaignId}/queue/populate`, { contactIds, agentIds, priority: 1 });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
@@ -132,10 +128,11 @@ export default function PhoneCampaignsPage() {
 
     try {
       // Get sample contacts (in production, this would be filtered by campaign audience)
-      const contactsRes = await apiRequest({
-        url: `/api/contacts?limit=${contactCount}`,
-        method: 'GET'
-      });
+      const contactsRes = await fetch(`/api/contacts?limit=${contactCount}`, {
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}` 
+        }
+      }).then(r => r.json());
       const contacts = contactsRes.contacts || [];
       const contactIds = contacts.map((c: any) => c.id);
 
@@ -154,10 +151,11 @@ export default function PhoneCampaignsPage() {
       // Get agent IDs from emails
       const agentIds: string[] = [];
       for (const email of agentEmailList) {
-        const userRes = await apiRequest({
-          url: `/api/users?email=${email}`,
-          method: 'GET'
-        });
+        const userRes = await fetch(`/api/users?email=${email}`, {
+          headers: { 
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}` 
+          }
+        }).then(r => r.json());
         if (userRes && userRes.id) {
           agentIds.push(userRes.id);
         }

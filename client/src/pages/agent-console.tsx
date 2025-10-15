@@ -131,11 +131,7 @@ export default function AgentConsolePage() {
   // Mutation for saving disposition
   const saveDispositionMutation = useMutation({
     mutationFn: async (dispositionData: any) => {
-      return await apiRequest({
-        url: '/api/calls/disposition',
-        method: 'POST',
-        data: dispositionData,
-      });
+      return await apiRequest('POST', '/api/calls/disposition', dispositionData);
     },
     onSuccess: () => {
       toast({
