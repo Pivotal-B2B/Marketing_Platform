@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, CheckCircle, XCircle, Clock, Download, Loader2 } from "lucide-react";
+import { Search, CheckCircle, XCircle, Clock, Download, Loader2, Phone, Play } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
 import type { FilterGroup } from "@shared/filter-types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -187,6 +187,7 @@ export default function LeadsPage() {
               )}
               <TableHead>Contact</TableHead>
               <TableHead>Campaign</TableHead>
+              <TableHead>Call Recording</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Submitted</TableHead>
               {showActions && <TableHead className="w-[200px]">Actions</TableHead>}
@@ -224,6 +225,32 @@ export default function LeadsPage() {
                   </TableCell>
                   <TableCell data-testid={`text-campaign-${lead.id}`}>
                     {lead.campaignId || '-'}
+                  </TableCell>
+                  <TableCell>
+                    {lead.recordingUrl ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => window.open(lead.recordingUrl!, '_blank')}
+                          data-testid={`button-play-recording-${lead.id}`}
+                        >
+                          <Play className="h-4 w-4" />
+                        </Button>
+                        {lead.callDuration && (
+                          <span className="text-sm text-muted-foreground font-mono">
+                            {Math.floor(lead.callDuration / 60)}:{(lead.callDuration % 60).toString().padStart(2, '0')}
+                          </span>
+                        )}
+                        <Badge variant="outline" className="text-xs">
+                          <Phone className="mr-1 h-3 w-3" />
+                          Call
+                        </Badge>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
                   </TableCell>
                   <TableCell>{getStatusBadge(lead.qaStatus)}</TableCell>
                   <TableCell className="text-muted-foreground" data-testid={`text-submitted-${lead.id}`}>
