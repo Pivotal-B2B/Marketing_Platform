@@ -386,16 +386,23 @@ export const contacts = pgTable("contacts", {
   email: text("email").notNull(),
   emailNormalized: text("email_normalized"),
   emailVerificationStatus: emailVerificationStatusEnum("email_verification_status").default('unknown'),
+  emailAiConfidence: numeric("email_ai_confidence", { precision: 5, scale: 2 }), // AI confidence score (0-100%)
   directPhone: text("direct_phone"),
   directPhoneE164: text("direct_phone_e164"),
   phoneExtension: text("phone_extension"),
   phoneVerifiedAt: timestamp("phone_verified_at"),
+  phoneAiConfidence: numeric("phone_ai_confidence", { precision: 5, scale: 2 }), // AI confidence score (0-100%)
   mobilePhone: text("mobile_phone"),
   mobilePhoneE164: text("mobile_phone_e164"),
   seniorityLevel: text("seniority_level"),
   department: text("department"),
   address: text("address"),
   linkedinUrl: text("linkedin_url"),
+  
+  // Career & Tenure fields (Pivotal B2B Standard Template)
+  formerPosition: text("former_position"),
+  timeInCurrentPosition: text("time_in_current_position"), // e.g., "2 years"
+  timeInCurrentCompany: text("time_in_current_company"), // e.g., "4 years"
   intentTopics: text("intent_topics").array(),
   tags: text("tags").array(),
   consentBasis: text("consent_basis"),
@@ -409,11 +416,18 @@ export const contacts = pgTable("contacts", {
   sourceRecordId: text("source_record_id"),
   sourceUpdatedAt: timestamp("source_updated_at"),
   
+  // Pivotal B2B Standard Template fields
+  researchDate: timestamp("research_date"), // Explicit research/enrichment date
+  list: text("list"), // Source list identifier (e.g., "InFynd", "ZoomInfo")
+  
   // Timezone & Business Hours fields
   timezone: text("timezone"), // IANA timezone (e.g., 'America/New_York')
   city: text("city"),
   state: text("state"),
+  stateAbbr: text("state_abbr"), // State abbreviation (e.g., "NC", "CA")
+  postalCode: text("postal_code"), // Postal/ZIP code
   country: text("country"),
+  contactLocation: text("contact_location"), // Formatted location string (e.g., "Raleigh, NC 27607, USA")
   
   // Data Quality fields
   isInvalid: boolean("is_invalid").notNull().default(false),
