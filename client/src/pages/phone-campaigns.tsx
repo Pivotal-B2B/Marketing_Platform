@@ -34,7 +34,9 @@ export default function PhoneCampaignsPage() {
         }
         throw new Error("Failed to fetch campaigns");
       }
-      return response.json();
+      const data = await response.json();
+      console.log('Phone campaigns data:', data);
+      return data;
     },
     enabled: !!token,
   });
@@ -103,7 +105,7 @@ export default function PhoneCampaignsPage() {
             <Skeleton key={i} className="h-48 w-full" />
           ))}
         </div>
-      ) : filteredCampaigns.length > 0 ? (
+      ) : filteredCampaigns && filteredCampaigns.length > 0 ? (
         <div className="grid gap-4">
           {filteredCampaigns.map((campaign: any) => (
             <Card key={campaign.id} className="hover-elevate" data-testid={`card-campaign-${campaign.id}`}>
