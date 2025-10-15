@@ -278,6 +278,7 @@ export function registerRoutes(app: Express) {
       const contacts = await storage.getContacts(filters);
       res.json(contacts);
     } catch (error) {
+      console.error("Error fetching contacts:", error);
       res.status(500).json({ message: "Failed to fetch contacts" });
     }
   });
@@ -1758,7 +1759,11 @@ export function registerRoutes(app: Express) {
         leadsThisMonth
       });
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+      console.error("Dashboard stats error:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch dashboard stats",
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   });
 
