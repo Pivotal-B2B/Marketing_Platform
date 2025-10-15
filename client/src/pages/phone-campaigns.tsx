@@ -209,7 +209,7 @@ export default function PhoneCampaignsPage() {
             Create, manage, and track your outbound dialing campaigns
           </p>
         </div>
-        <Button onClick={() => setLocation("/campaigns/telemarketing/create")} data-testid="button-create-phone-campaign">
+        <Button onClick={() => setLocation("/campaigns/phone/create")} data-testid="button-create-phone-campaign">
           <Plus className="mr-2 h-4 w-4" />
           Create Campaign
         </Button>
@@ -361,7 +361,7 @@ export default function PhoneCampaignsPage() {
             <p className="text-muted-foreground mb-4">
               {searchQuery ? "No campaigns match your search" : "Get started by creating your first dialer campaign"}
             </p>
-            <Button onClick={() => setLocation("/campaigns/telemarketing/create")}>
+            <Button onClick={() => setLocation("/campaigns/phone/create")}>
               <Plus className="mr-2 h-4 w-4" />
               Create Dialer Campaign
             </Button>
