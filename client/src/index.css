@@ -226,15 +226,16 @@
 @layer base {
   * {
     @apply border-border;
+    font-family: var(--font-sans);
   }
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
 
-  /* Ensure all text elements use Inter font */
-  input, textarea, select, button {
-    font-family: var(--font-sans);
+  /* Ensure all interactive elements use Inter font */
+  input, textarea, select, button, a, label, span, p, div {
+    font-family: var(--font-sans) !important;
   }
 
   /* Email content styling - ensure Inter font is used */
@@ -249,8 +250,23 @@
 
   /* Ensure headings use proper font */
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-sans);
+    font-family: var(--font-sans) !important;
     font-weight: 600;
+  }
+
+  /* Table elements */
+  table, th, td {
+    font-family: var(--font-sans) !important;
+  }
+
+  /* List elements */
+  li, ul, ol {
+    font-family: var(--font-sans) !important;
+  }
+
+  /* Form elements */
+  fieldset, legend {
+    font-family: var(--font-sans) !important;
   }
 }
 
