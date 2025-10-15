@@ -24,11 +24,10 @@ import { z } from "zod";
 // Enums
 export const userRoleEnum = pgEnum('user_role', [
   'admin', 
-  'campaign_manager', 
-  'data_ops', 
-  'qa_analyst', 
-  'agent', 
-  'client_user'
+  'agent',
+  'quality_analyst',
+  'content_creator',
+  'campaign_manager'
 ]);
 
 export const campaignTypeEnum = pgEnum('campaign_type', ['email', 'call', 'combo']);
@@ -196,7 +195,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: userRoleEnum("role").notNull().default('agent'),
+  role: userRoleEnum("role").notNull().default('agent'), // Deprecated - use user_roles table instead
   firstName: text("first_name"),
   lastName: text("last_name"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -204,6 +203,18 @@ export const users = pgTable("users", {
 }, (table) => ({
   emailIdx: index("users_email_idx").on(table.email),
   usernameIdx: index("users_username_idx").on(table.username),
+}));
+
+// User Roles junction table (many-to-many: users can have multiple roles)
+export const userRoles = pgTable("user_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: userRoleEnum("role").notNull(),
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  assignedBy: varchar("assigned_by").references(() => users.id, { onDelete: 'set null' }),
+}, (table) => ({
+  userRoleIdx: uniqueIndex("user_roles_user_role_idx").on(table.userId, table.role), // Prevent duplicate role assignments
+  userIdIdx: index("user_roles_user_id_idx").on(table.userId),
 }));
 
 // Custom Field Definitions table
@@ -1091,6 +1102,11 @@ export const insertUserSchema = createInsertSchema(users).omit({
   updatedAt: true,
 });
 
+export const insertUserRoleSchema = createInsertSchema(userRoles).omit({
+  id: true,
+  assignedAt: true,
+});
+
 export const insertCustomFieldDefinitionSchema = createInsertSchema(customFieldDefinitions).omit({
   id: true,
   createdAt: true,
@@ -1383,6 +1399,9 @@ export const insertRevenueRangeReferenceSchema = createInsertSchema(revenueRange
 // Inferred Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type UserRole = typeof userRoles.$inferSelect;
+export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
 
 export type CustomFieldDefinition = typeof customFieldDefinitions.$inferSelect;
 export type InsertCustomFieldDefinition = z.infer<typeof insertCustomFieldDefinitionSchema>;
