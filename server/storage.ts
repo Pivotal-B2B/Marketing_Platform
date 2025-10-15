@@ -1755,20 +1755,34 @@ export class DatabaseStorage implements IStorage {
       if (call.disposition === 'qualified' && call.contactId) {
         console.log('[LEAD CREATION] Qualified disposition detected for contact:', call.contactId);
         
-        // Get contact and campaign info
+        // Get contact info
         const contact = await this.getContact(call.contactId);
         
         if (!contact) {
-          console.error('[LEAD CREATION] Contact not found:', call.contactId);
+          console.error('[LEAD CREATION] ❌ Contact not found:', call.contactId);
         } else {
-          console.log('[LEAD CREATION] Contact found:', contact.id, contact.email);
+          console.log('[LEAD CREATION] Contact found:', {
+            id: contact.id,
+            email: contact.email,
+            fullName: contact.fullName,
+            firstName: contact.firstName,
+            lastName: contact.lastName
+          });
           
-          // Get contact name for the lead
+          // Get contact name for the lead (prioritize fullName)
           const contactName = contact.fullName || 
-            `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 
-            contact.email;
+            (contact.firstName && contact.lastName ? `${contact.firstName} ${contact.lastName}` : 
+             contact.firstName || contact.lastName || contact.email);
           
           const contactEmail = contact.email;
+
+          console.log('[LEAD CREATION] Creating lead with:', {
+            contactId: call.contactId,
+            contactName,
+            contactEmail,
+            campaignId: call.campaignId,
+            qaStatus: 'new'
+          });
 
           // Create the lead
           try {
@@ -1782,11 +1796,13 @@ export class DatabaseStorage implements IStorage {
               checklistJson: call.qualificationData || null,
             }).returning();
             
-            console.log('[LEAD CREATION] ✅ Lead created successfully:', newLead.id, {
+            console.log('[LEAD CREATION] ✅ Lead created successfully:', {
+              leadId: newLead.id,
               contactId: call.contactId,
-              contactName,
+              contactName: newLead.contactName,
+              contactEmail: newLead.contactEmail,
               campaignId: call.campaignId,
-              qaStatus: 'new'
+              qaStatus: newLead.qaStatus
             });
           } catch (leadError) {
             console.error('[LEAD CREATION] ❌ Failed to create lead:', leadError);

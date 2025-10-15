@@ -840,6 +840,8 @@ export const calls = pgTable("calls", {
 export const leads = pgTable("leads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }),
   qaStatus: qaStatusEnum("qa_status").notNull().default('new'),
   checklistJson: jsonb("checklist_json"),
