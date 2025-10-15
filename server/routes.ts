@@ -1610,7 +1610,13 @@ export function registerRoutes(app: Express) {
       // Now assign agents to the new campaign
       await storage.assignAgentsToCampaign(req.params.id, agentIds, userId);
       
-      res.status(201).json({ message: "Agents assigned successfully" });
+      // Automatically assign any existing queue items to the newly assigned agents
+      const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
+      
+      res.status(201).json({ 
+        message: "Agents assigned successfully",
+        queueItemsAssigned: assignResult.assigned
+      });
     } catch (error) {
       console.error('Agent assignment error:', error);
       res.status(400).json({ 
@@ -1748,10 +1754,22 @@ export function registerRoutes(app: Express) {
         }
       }
 
+      // Get agents assigned to this campaign
+      const campaignAgents = await storage.getCampaignAgents(req.params.id);
+      const agentIds = campaignAgents.map(a => a.agentId);
+      
+      // Automatically assign queue items to agents if agents are assigned
+      let assignResult = { assigned: 0 };
+      if (agentIds.length > 0) {
+        assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
+      }
+      
       res.json({
-        message: `Successfully enqueued ${enqueued.length} contacts`,
+        message: `Successfully enqueued ${enqueued.length} contacts${skippedCount > 0 ? ` (${skippedCount} skipped without account)` : ''}`,
         enqueuedCount: enqueued.length,
-        totalContacts: uniqueContacts.length
+        totalContacts: uniqueContacts.length,
+        skippedCount,
+        queueItemsAssigned: assignResult.assigned,
       });
     } catch (error) {
       console.error('Queue population error:', error);

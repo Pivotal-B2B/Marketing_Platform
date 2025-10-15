@@ -79,7 +79,9 @@ export function requireRole(...allowedRoles: string[]) {
 
     // Check if user has any of the allowed roles
     const userRoles = req.user.roles || [req.user.role]; // Support both new and legacy format
-    const hasPermission = userRoles.some(role => allowedRoles.includes(role));
+    
+    // Admins have access to everything
+    const hasPermission = userRoles.includes('admin') || userRoles.some(role => allowedRoles.includes(role));
 
     if (!hasPermission) {
       return res.status(403).json({ message: "Insufficient permissions" });

@@ -112,8 +112,8 @@ export default function AgentConsolePage() {
   // Fetch agent queue data
   const { data: queueData = [], isLoading: queueLoading, refetch: refetchQueue } = useQuery<QueueItem[]>({
     queryKey: selectedCampaignId === 'all' 
-      ? ['/api/agents/me/queue', { status: 'queued' }]
-      : ['/api/agents/me/queue', { campaignId: selectedCampaignId, status: 'queued' }],
+      ? ['/api/agents/me/queue?status=queued']
+      : [`/api/agents/me/queue?campaignId=${selectedCampaignId}&status=queued`],
   });
 
   // Extract unique campaigns from queue data

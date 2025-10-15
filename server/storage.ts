@@ -1216,8 +1216,9 @@ export class DatabaseStorage implements IStorage {
   async getCampaignAgents(campaignId: string): Promise<any[]> {
     const assignments = await db
       .select({
-        agentId: campaignAgents.agentId,
-        assignedAt: campaignAgents.assignedAt,
+        agentId: campaignAgentAssignments.agentId,
+        assignedAt: campaignAgentAssignments.assignedAt,
+        isActive: campaignAgentAssignments.isActive,
         agent: {
           id: users.id,
           username: users.username,
@@ -1226,9 +1227,14 @@ export class DatabaseStorage implements IStorage {
           email: users.email,
         }
       })
-      .from(campaignAgents)
-      .leftJoin(users, eq(campaignAgents.agentId, users.id))
-      .where(eq(campaignAgents.campaignId, campaignId));
+      .from(campaignAgentAssignments)
+      .leftJoin(users, eq(campaignAgentAssignments.agentId, users.id))
+      .where(
+        and(
+          eq(campaignAgentAssignments.campaignId, campaignId),
+          eq(campaignAgentAssignments.isActive, true)
+        )
+      );
 
     return assignments;
   }
