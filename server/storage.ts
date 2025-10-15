@@ -267,6 +267,7 @@ export interface IStorage {
   getLeads(filters?: any): Promise<Lead[]>;
   getLead(id: string): Promise<Lead | undefined>;
   createLead(lead: InsertLead): Promise<Lead>;
+  createLeadFromCallAttempt(callAttemptId: string): Promise<Lead | undefined>;
   updateLead(id: string, lead: Partial<InsertLead>): Promise<Lead | undefined>;
   approveLead(id: string, approvedById: string): Promise<Lead | undefined>;
   rejectLead(id: string, reason: string): Promise<Lead | undefined>;
@@ -2486,6 +2487,77 @@ export class DatabaseStorage implements IStorage {
   async createLead(insertLead: InsertLead): Promise<Lead> {
     const [lead] = await db.insert(leads).values(insertLead).returning();
     return lead;
+  }
+
+  async createLeadFromCallAttempt(callAttemptId: string): Promise<Lead | undefined> {
+    console.log('[LEAD CREATION] Creating lead from call attempt:', callAttemptId);
+    
+    // Get the call attempt
+    const attempt = await this.getCallAttempt(callAttemptId);
+    if (!attempt) {
+      console.error('[LEAD CREATION] ❌ Call attempt not found:', callAttemptId);
+      return undefined;
+    }
+
+    // Only create leads for qualified dispositions
+    if (attempt.disposition !== 'qualified') {
+      console.log('[LEAD CREATION] ⏭️ Skipping - disposition is not qualified:', attempt.disposition);
+      return undefined;
+    }
+
+    // Get contact info
+    const contact = await this.getContact(attempt.contactId);
+    if (!contact) {
+      console.error('[LEAD CREATION] ❌ Contact not found:', attempt.contactId);
+      return undefined;
+    }
+
+    console.log('[LEAD CREATION] Contact found:', {
+      id: contact.id,
+      email: contact.email,
+      fullName: contact.fullName,
+    });
+
+    // Get contact name for the lead (prioritize fullName)
+    const contactName = contact.fullName || 
+      (contact.firstName && contact.lastName ? `${contact.firstName} ${contact.lastName}` : 
+       contact.firstName || contact.lastName || contact.email);
+
+    // Check if lead already exists for this call attempt
+    const existingLeads = await db
+      .select()
+      .from(leads)
+      .where(eq(leads.callAttemptId, callAttemptId))
+      .limit(1);
+
+    if (existingLeads.length > 0) {
+      console.log('[LEAD CREATION] ✓ Lead already exists for this call attempt:', existingLeads[0].id);
+      return existingLeads[0];
+    }
+
+    // Create the lead with call recording details
+    const leadData: InsertLead = {
+      contactId: contact.id,
+      contactName: contactName || undefined,
+      contactEmail: contact.email || undefined,
+      campaignId: attempt.campaignId,
+      callAttemptId: callAttemptId,
+      recordingUrl: attempt.recordingUrl || undefined,
+      callDuration: attempt.duration || undefined,
+      agentId: attempt.agentId,
+      qaStatus: 'new',
+    };
+
+    const [newLead] = await db.insert(leads).values(leadData).returning();
+    
+    console.log('[LEAD CREATION] ✅ Lead created successfully:', {
+      leadId: newLead.id,
+      contactName: newLead.contactName,
+      campaignId: newLead.campaignId,
+      hasRecording: !!newLead.recordingUrl
+    });
+
+    return newLead;
   }
 
   async updateLead(id: string, updateData: Partial<InsertLead>): Promise<Lead | undefined> {

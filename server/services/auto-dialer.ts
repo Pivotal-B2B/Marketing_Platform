@@ -365,6 +365,17 @@ export class AutoDialerService {
         disposition: disposition as any, // Cast to enum type
       });
 
+      // Auto-create Lead for qualified dispositions
+      if (disposition === 'qualified') {
+        console.log(`[AutoDialer] Creating lead for qualified disposition: ${callAttemptId}`);
+        const lead = await storage.createLeadFromCallAttempt(callAttemptId);
+        if (lead) {
+          console.log(`[AutoDialer] ✅ Lead created: ${lead.id} for contact ${lead.contactName}`);
+        } else {
+          console.warn(`[AutoDialer] ⚠️ Failed to create lead for call attempt ${callAttemptId}`);
+        }
+      }
+
       // Update agent status to 'after_call_work'
       await storage.updateAgentStatus(attempt.agentId, {
         status: 'after_call_work',
