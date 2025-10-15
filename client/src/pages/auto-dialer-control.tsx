@@ -8,10 +8,12 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Play, Pause, Settings, Users, Phone, Clock, Activity } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Campaign } from "@shared/schema";
+import BusinessHoursConfigComponent, { DEFAULT_BUSINESS_HOURS, type BusinessHoursConfig } from "@/components/business-hours-config";
 
 interface AutoDialerQueue {
   campaignId: string;
@@ -314,6 +316,7 @@ function AutoDialerConfigDialog({
   onSave,
   isPending,
 }: AutoDialerConfigDialogProps) {
+  const { toast } = useToast();
   const [settings, setSettings] = useState({
     dialingMode: queue?.dialingMode || 'progressive',
     maxConcurrentCalls: queue?.maxConcurrentCalls || 10,
@@ -325,17 +328,57 @@ function AutoDialerConfigDialog({
     targetAgentOccupancy: queue?.targetAgentOccupancy || 0.85,
   });
 
+  const [businessHours, setBusinessHours] = useState<BusinessHoursConfig>(
+    (campaign.businessHoursConfig as BusinessHoursConfig) || DEFAULT_BUSINESS_HOURS
+  );
+
+  // Mutation for updating campaign business hours
+  const updateBusinessHoursMutation = useMutation({
+    mutationFn: async (config: BusinessHoursConfig) => {
+      await apiRequest('PATCH', `/api/campaigns/${campaign.id}`, {
+        businessHoursConfig: config,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
+      toast({
+        title: "Business Hours Updated",
+        description: "Business hours configuration has been saved successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update business hours",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveAll = async () => {
+    // Save both auto-dialer settings and business hours
+    await onSave(settings);
+    await updateBusinessHoursMutation.mutateAsync(businessHours);
+    onOpenChange(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Auto-Dialer Settings</DialogTitle>
+          <DialogTitle>Campaign Configuration</DialogTitle>
           <DialogDescription>
-            Configure auto-dialer settings for {campaign.name}
+            Configure auto-dialer and business hours settings for {campaign.name}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <Tabs defaultValue="dialer" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="dialer" data-testid="tab-dialer">Auto-Dialer Settings</TabsTrigger>
+            <TabsTrigger value="hours" data-testid="tab-business-hours">Business Hours</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="dialer" className="space-y-6 py-4">
           {/* Dialing Mode */}
           <div className="space-y-2">
             <Label>Dialing Mode</Label>
@@ -461,9 +504,17 @@ function AutoDialerConfigDialog({
               Desired percentage of agent talk time (85% recommended)
             </p>
           </div>
-        </div>
+          </TabsContent>
 
-        <DialogFooter>
+          <TabsContent value="hours" className="space-y-6 py-4">
+            <BusinessHoursConfigComponent
+              value={businessHours}
+              onChange={setBusinessHours}
+            />
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter className="mt-6">
           <Button
             data-testid="button-cancel"
             variant="outline"
@@ -473,10 +524,10 @@ function AutoDialerConfigDialog({
           </Button>
           <Button
             data-testid="button-save-settings"
-            onClick={() => onSave(settings)}
-            disabled={isPending}
+            onClick={handleSaveAll}
+            disabled={isPending || updateBusinessHoursMutation.isPending}
           >
-            {isPending ? "Saving..." : "Save Settings"}
+            {(isPending || updateBusinessHoursMutation.isPending) ? "Saving..." : "Save All Settings"}
           </Button>
         </DialogFooter>
       </DialogContent>
