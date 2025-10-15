@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Download, Upload, Building2, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Download, Upload, Building2, Trash2, LayoutGrid, List } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
 import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar";
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
@@ -41,6 +41,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertAccountSchema, type InsertAccount, type Account } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { CSVImportAccountsDialog } from "@/components/csv-import-accounts-dialog";
+import { AccountCardPremium } from "@/components/accounts/account-card-premium";
+import { AdvancedFilterBar } from "@/components/filter-bar-advanced";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function AccountsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -49,6 +53,7 @@ export default function AccountsPage() {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [bulkUpdateDialogOpen, setBulkUpdateDialogOpen] = useState(false);
   const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(() => {
     // Check if there's a filter in sessionStorage
     const savedFilter = sessionStorage.getItem('accountsFilter');
@@ -429,16 +434,24 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
+      <div className="flex items-center gap-3 mb-4">
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "table" | "cards")} className="flex-shrink-0">
+          <TabsList className="grid grid-cols-2 w-[160px] bg-muted/50 rounded-xl">
+            <TabsTrigger value="cards" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" data-testid="view-cards">
+              <LayoutGrid className="size-4 mr-1.5" />
+              Cards
+            </TabsTrigger>
+            <TabsTrigger value="table" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" data-testid="view-table">
+              <List className="size-4 mr-1.5" />
+              Table
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex-1">
+          <AdvancedFilterBar
             placeholder="Search by name, domain, industry..."
-            className="pl-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            data-testid="input-search-accounts"
+            onSearch={(query) => setSearchQuery(query)}
+            activeFilters={[]}
           />
         </div>
         <FilterBuilder
@@ -492,40 +505,74 @@ export default function AccountsPage() {
       )}
 
       {isLoading ? (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Skeleton className="h-4 w-4" />
-                </TableHead>
-                <TableHead>Account Name</TableHead>
-                <TableHead>Domain</TableHead>
-                <TableHead>Industry</TableHead>
-                <TableHead>Employees</TableHead>
-                <TableHead>Revenue</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[1, 2, 3].map((i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                  <TableCell><Skeleton className="h-8 w-48" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-8 w-16" /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : filteredAccounts.length > 0 ? (
-        <>
+        viewMode === "cards" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i} className="rounded-2xl">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="size-12 rounded-xl" />
+                    <div className="flex-1">
+                      <Skeleton className="h-4 w-32 mb-2" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
           <div className="border rounded-lg">
             <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Skeleton className="h-4 w-4" />
+                  </TableHead>
+                  <TableHead>Account Name</TableHead>
+                  <TableHead>Domain</TableHead>
+                  <TableHead>Industry</TableHead>
+                  <TableHead>Employees</TableHead>
+                  <TableHead>Revenue</TableHead>
+                  <TableHead className="w-[100px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[1, 2, 3].map((i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-16" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )
+      ) : filteredAccounts.length > 0 ? (
+        <>
+          {viewMode === "cards" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {paginatedAccounts.map((account, index) => (
+                <AccountCardPremium
+                  key={account.id}
+                  account={account}
+                  onCardClick={(id) => setLocation(`/accounts/${id}`)}
+                  index={index}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="border rounded-lg">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[50px]">
@@ -605,9 +652,10 @@ export default function AccountsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-            </TableBody>
+              </TableBody>
             </Table>
           </div>
+          )}
 
           {/* Pagination */}
           {totalPages > 1 && (
