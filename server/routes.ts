@@ -742,6 +742,64 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Get membership info for a contact or account
+  app.get("/api/:entityType/:id/membership", requireAuth, async (req, res) => {
+    try {
+      const { entityType, id } = req.params;
+      
+      if (entityType !== 'contacts' && entityType !== 'accounts') {
+        return res.status(400).json({ message: "Invalid entity type" });
+      }
+
+      const normalizedEntityType = entityType === 'contacts' ? 'contact' : 'account';
+
+      // Get all lists for this entity type that contain this ID
+      const allLists = await storage.getLists();
+      const listsContainingEntity = allLists.filter(list => 
+        list.entityType === normalizedEntityType && 
+        list.recordIds && 
+        list.recordIds.includes(id)
+      );
+
+      // Get all segments for this entity type
+      const allSegments = await storage.getSegments();
+      const relevantSegments = allSegments.filter(seg => 
+        seg.entityType === normalizedEntityType && 
+        seg.isActive
+      );
+
+      // Check which segments this entity matches
+      const segmentsContainingEntity = [];
+      for (const segment of relevantSegments) {
+        if (segment.definitionJson) {
+          const preview = await storage.previewSegment(
+            normalizedEntityType, 
+            segment.definitionJson
+          );
+          if (preview.sampleIds.includes(id)) {
+            segmentsContainingEntity.push({
+              id: segment.id,
+              name: segment.name,
+              isActive: segment.isActive || false
+            });
+          }
+        }
+      }
+
+      res.json({
+        lists: listsContainingEntity.map(list => ({
+          id: list.id,
+          name: list.name,
+          sourceType: list.sourceType || 'manual_upload'
+        })),
+        segments: segmentsContainingEntity
+      });
+    } catch (error) {
+      console.error('Get membership error:', error);
+      res.status(500).json({ message: "Failed to fetch membership info" });
+    }
+  });
+
   app.post("/api/segments", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
     try {
       const validated = insertSegmentSchema.parse(req.body);

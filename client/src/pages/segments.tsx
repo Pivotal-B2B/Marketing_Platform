@@ -452,7 +452,7 @@ export default function SegmentsPage() {
               {filteredSegments.map((segment) => (
                 <Card 
                   key={segment.id} 
-                  className="hover-elevate cursor-pointer" 
+                  className="hover-elevate cursor-pointer transition-shadow" 
                   data-testid={`card-segment-${segment.id}`}
                   onClick={() => setLocation(`/segments/${segment.id}`)}
                 >
@@ -700,7 +700,7 @@ export default function SegmentsPage() {
                   {filteredLists.map((list) => (
                     <TableRow 
                       key={list.id} 
-                      className="hover-elevate cursor-pointer" 
+                      className="hover-elevate cursor-pointer transition-colors" 
                       data-testid={`row-list-${list.id}`}
                       onClick={() => setLocation(`/segments/lists/${list.id}`)}
                     >

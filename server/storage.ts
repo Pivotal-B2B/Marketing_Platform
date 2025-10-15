@@ -199,6 +199,7 @@ export interface IStorage {
   // Segments
   getSegments(filters?: any): Promise<Segment[]>;
   getSegment(id: string): Promise<Segment | undefined>;
+  getSegmentMembers(segmentId: string): Promise<(Contact | Account)[]>;
   createSegment(segment: InsertSegment): Promise<Segment>;
   updateSegment(id: string, segment: Partial<InsertSegment>): Promise<Segment | undefined>;
   deleteSegment(id: string): Promise<void>;
@@ -208,6 +209,8 @@ export interface IStorage {
   // Lists
   getLists(filters?: any): Promise<List[]>;
   getList(id: string): Promise<List | undefined>;
+  getListById(id: string): Promise<List | undefined>;
+  getListMembers(listId: string): Promise<(Contact | Account)[]>;
   createList(list: InsertList): Promise<List>;
   updateList(id: string, list: Partial<InsertList>): Promise<List | undefined>;
   deleteList(id: string): Promise<void>;
@@ -1317,6 +1320,33 @@ export class DatabaseStorage implements IStorage {
     return segment || undefined;
   }
 
+  async getSegmentMembers(segmentId: string): Promise<(Contact | Account)[]> {
+    const segment = await this.getSegment(segmentId);
+    if (!segment) {
+      throw new Error('Segment not found');
+    }
+
+    // Get all matching records using the segment's filter definition
+    const { sampleIds } = await this.previewSegment(
+      segment.entityType || 'contact',
+      segment.definitionJson
+    );
+
+    if (segment.entityType === 'account') {
+      const accountsList = await db
+        .select()
+        .from(accounts)
+        .where(inArray(accounts.id, sampleIds));
+      return accountsList;
+    } else {
+      const contactsList = await db
+        .select()
+        .from(contacts)
+        .where(inArray(contacts.id, sampleIds));
+      return contactsList;
+    }
+  }
+
   async createSegment(insertSegment: InsertSegment): Promise<Segment> {
     const [segment] = await db.insert(segments).values(insertSegment).returning();
     return segment;
@@ -1398,6 +1428,35 @@ export class DatabaseStorage implements IStorage {
   async getList(id: string): Promise<List | undefined> {
     const [list] = await db.select().from(lists).where(eq(lists.id, id));
     return list || undefined;
+  }
+
+  async getListById(id: string): Promise<List | undefined> {
+    return this.getList(id);
+  }
+
+  async getListMembers(listId: string): Promise<(Contact | Account)[]> {
+    const list = await this.getList(listId);
+    if (!list) {
+      throw new Error('List not found');
+    }
+
+    if (!list.recordIds || list.recordIds.length === 0) {
+      return [];
+    }
+
+    if (list.entityType === 'account') {
+      const accountsList = await db
+        .select()
+        .from(accounts)
+        .where(inArray(accounts.id, list.recordIds));
+      return accountsList;
+    } else {
+      const contactsList = await db
+        .select()
+        .from(contacts)
+        .where(inArray(contacts.id, list.recordIds));
+      return contactsList;
+    }
   }
 
   async createList(insertList: InsertList): Promise<List> {
