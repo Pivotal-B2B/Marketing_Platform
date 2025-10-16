@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, CheckCircle, XCircle, Clock, Download, Loader2, Phone, Play } from "lucide-react";
+import { Search, CheckCircle, XCircle, Clock, Download, Loader2, Phone, Play, Eye, User } from "lucide-react";
 import { FilterBuilder } from "@/components/filter-builder";
 import type { FilterGroup } from "@shared/filter-types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,6 +39,8 @@ export default function LeadsPage() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingLeadId, setRejectingLeadId] = useState<string | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<LeadWithAccount | null>(null);
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(undefined);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -187,6 +189,7 @@ export default function LeadsPage() {
               )}
               <TableHead>Contact</TableHead>
               <TableHead>Campaign</TableHead>
+              <TableHead>Agent / Caller</TableHead>
               <TableHead>Call Recording</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Submitted</TableHead>
@@ -230,6 +233,29 @@ export default function LeadsPage() {
                     {lead.campaignId || '-'}
                   </TableCell>
                   <TableCell>
+                    {lead.agentFirstName || lead.agentLastName ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs">
+                            {`${lead.agentFirstName?.[0] || ''}${lead.agentLastName?.[0] || ''}`.toUpperCase() || '?'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="text-sm">
+                          <div className="font-medium" data-testid={`text-agent-name-${lead.id}`}>
+                            {`${lead.agentFirstName || ''} ${lead.agentLastName || ''}`.trim()}
+                          </div>
+                          {lead.agentEmail && (
+                            <div className="text-xs text-muted-foreground font-mono">
+                              {lead.agentEmail}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     {lead.recordingUrl ? (
                       <div className="flex items-center gap-2">
                         <Button
@@ -262,6 +288,18 @@ export default function LeadsPage() {
                   {showActions && (
                     <TableCell>
                       <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedLead(lead);
+                            setDetailDialogOpen(true);
+                          }}
+                          data-testid={`button-view-details-${lead.id}`}
+                        >
+                          <Eye className="mr-1 h-4 w-4" />
+                          Details
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -376,6 +414,180 @@ export default function LeadsPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Lead Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="dialog-lead-detail">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Lead Details: {selectedLead?.contactName}
+            </DialogTitle>
+            <DialogDescription>
+              Review complete lead information, QA checklist, and AI analysis
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedLead && (
+            <div className="space-y-6">
+              {/* Contact & Agent Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Contact Information</h3>
+                  <div className="space-y-1 text-sm">
+                    <div><span className="text-muted-foreground">Name:</span> {selectedLead.contactName}</div>
+                    <div><span className="text-muted-foreground">Email:</span> {selectedLead.contactEmail}</div>
+                    <div><span className="text-muted-foreground">Company:</span> {selectedLead.accountName || '-'}</div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Agent / Caller</h3>
+                  {selectedLead.agentFirstName || selectedLead.agentLastName ? (
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback>
+                          {`${selectedLead.agentFirstName?.[0] || ''}${selectedLead.agentLastName?.[0] || ''}`.toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium">{`${selectedLead.agentFirstName || ''} ${selectedLead.agentLastName || ''}`.trim()}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{selectedLead.agentEmail}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No agent assigned</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Call Recording & Duration */}
+              {selectedLead.recordingUrl && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Call Recording</h3>
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(selectedLead.recordingUrl!, '_blank')}
+                      data-testid="button-play-recording-detail"
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      Play Recording
+                    </Button>
+                    {selectedLead.callDuration && (
+                      <span className="text-sm text-muted-foreground">
+                        Duration: {Math.floor(selectedLead.callDuration / 60)}:{(selectedLead.callDuration % 60).toString().padStart(2, '0')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Analysis */}
+              {(selectedLead.aiScore || selectedLead.aiQualificationStatus) && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">AI Analysis</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedLead.aiScore && (
+                      <div>
+                        <span className="text-muted-foreground text-sm">AI Score:</span>
+                        <div className="text-2xl font-bold text-primary">{selectedLead.aiScore}/100</div>
+                      </div>
+                    )}
+                    {selectedLead.aiQualificationStatus && (
+                      <div>
+                        <span className="text-muted-foreground text-sm">AI Status:</span>
+                        <Badge className="mt-1">{selectedLead.aiQualificationStatus}</Badge>
+                      </div>
+                    )}
+                  </div>
+                  {selectedLead.aiAnalysis && typeof selectedLead.aiAnalysis === 'object' && (
+                    <div className="mt-2 p-3 bg-muted rounded-md">
+                      <pre className="text-xs overflow-auto">{JSON.stringify(selectedLead.aiAnalysis, null, 2)}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Transcript */}
+              {selectedLead.transcript && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Call Transcript</h3>
+                  <div className="p-3 bg-muted rounded-md max-h-40 overflow-y-auto">
+                    <p className="text-sm whitespace-pre-wrap">{selectedLead.transcript}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* QA Checklist */}
+              {selectedLead.checklistJson && typeof selectedLead.checklistJson === 'object' && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">QA Checklist</h3>
+                  <div className="space-y-2">
+                    {Object.entries(selectedLead.checklistJson as Record<string, any>).map(([key, value]) => (
+                      <div key={key} className="flex items-center gap-2">
+                        <Checkbox
+                          checked={!!value}
+                          disabled
+                          data-testid={`checkbox-qa-${key}`}
+                        />
+                        <span className="text-sm">{key}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {selectedLead.notes && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Agent Notes</h3>
+                  <div className="p-3 bg-muted rounded-md">
+                    <p className="text-sm whitespace-pre-wrap">{selectedLead.notes}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setDetailDialogOpen(false)}
+                  data-testid="button-close-detail"
+                >
+                  Close
+                </Button>
+                {selectedLead.qaStatus === 'new' && (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        handleReject(selectedLead.id);
+                        setDetailDialogOpen(false);
+                      }}
+                      data-testid="button-reject-from-detail"
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Reject
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        approveMutation.mutate(selectedLead.id);
+                        setDetailDialogOpen(false);
+                      }}
+                      disabled={approveMutation.isPending}
+                      data-testid="button-approve-from-detail"
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Approve Lead
+                    </Button>
+                  </>
+                )}
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent data-testid="dialog-reject-lead">
           <DialogHeader>

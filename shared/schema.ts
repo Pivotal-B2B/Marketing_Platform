@@ -1878,10 +1878,13 @@ export type InsertCall = z.infer<typeof insertCallSchema>;
 export type Lead = typeof leads.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 
-// Lead with joined account information for QA views
+// Lead with joined account and agent information for QA views
 export type LeadWithAccount = Lead & {
   accountName?: string | null;
   accountId?: string | null;
+  agentFirstName?: string | null;
+  agentLastName?: string | null;
+  agentEmail?: string | null;
 };
 
 export type SuppressionEmail = typeof suppressionEmails.$inferSelect;

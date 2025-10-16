@@ -1,5 +1,6 @@
 // Storage layer - referenced from blueprint:javascript_database
 import { eq, sql, and, or, isNull, isNotNull, like, ilike, gte, lte, gt, lt, desc, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "./db";
 import { buildFilterQuery, buildSuppressionFilter } from "./filter-builder";
 import type { FilterGroup } from "@shared/filter-types";
@@ -2561,7 +2562,10 @@ export class DatabaseStorage implements IStorage {
 
   // Leads
   async getLeads(filters?: FilterGroup): Promise<LeadWithAccount[]> {
-    // Join with contacts and accounts to get full details including company name
+    // Create an alias for the agent user
+    const agentUser = alias(users, 'agent');
+    
+    // Join with contacts, accounts, and users (agents) to get full details
     let query = db
       .select({
         id: leads.id,
@@ -2579,15 +2583,27 @@ export class DatabaseStorage implements IStorage {
         approvedById: leads.approvedById,
         rejectedReason: leads.rejectedReason,
         notes: leads.notes,
+        transcript: leads.transcript,
+        transcriptionStatus: leads.transcriptionStatus,
+        aiScore: leads.aiScore,
+        aiAnalysis: leads.aiAnalysis,
+        aiQualificationStatus: leads.aiQualificationStatus,
+        submittedToClient: leads.submittedToClient,
+        submittedAt: leads.submittedAt,
         createdAt: leads.createdAt,
         updatedAt: leads.updatedAt,
         // Join contact and account info
         accountName: accounts.name,
         accountId: contacts.accountId,
+        // Join agent info
+        agentFirstName: agentUser.firstName,
+        agentLastName: agentUser.lastName,
+        agentEmail: agentUser.email,
       })
       .from(leads)
       .leftJoin(contacts, eq(leads.contactId, contacts.id))
-      .leftJoin(accounts, eq(contacts.accountId, accounts.id));
+      .leftJoin(accounts, eq(contacts.accountId, accounts.id))
+      .leftJoin(agentUser, eq(leads.agentId, agentUser.id));
 
     // Apply filters if provided
     if (filters) {
