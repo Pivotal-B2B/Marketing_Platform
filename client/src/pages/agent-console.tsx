@@ -776,15 +776,15 @@ export default function AgentConsolePage() {
                 </CardContent>
               </Card>
 
-              {/* Call Notes */}
+              {/* Call Notes - Compact */}
               <Card className="shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-semibold">Call Notes</CardTitle>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Call Notes</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-3">
                   <Textarea
-                    className="min-h-[100px] resize-none text-base focus:ring-2 focus:ring-primary/20"
-                    placeholder="Enter call notes here..."
+                    className="min-h-[50px] resize-none text-sm focus:ring-2 focus:ring-primary/20"
+                    placeholder="Brief notes..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     data-testid="input-call-notes"
@@ -792,41 +792,41 @@ export default function AgentConsolePage() {
                 </CardContent>
               </Card>
 
-              {/* Disposition Section - Always Visible */}
+              {/* Disposition Section - Compact */}
               <Card className={callStatus === 'wrap-up' ? 'border-2 border-primary shadow-lg' : 'shadow-sm'}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">
-                    Call Disposition {callStatus === 'wrap-up' && <span className="text-destructive">*</span>}
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">
+                    Disposition {callStatus === 'wrap-up' && <span className="text-destructive">*</span>}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 pt-3">
                   {/* Disposition Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="disposition">Call Outcome {callStatus === 'wrap-up' && '*'}</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="disposition" className="text-xs">Outcome {callStatus === 'wrap-up' && '*'}</Label>
                     <Select value={disposition} onValueChange={setDisposition}>
-                      <SelectTrigger id="disposition" data-testid="select-disposition">
-                        <SelectValue placeholder="Select disposition..." />
+                      <SelectTrigger id="disposition" className="h-9" data-testid="select-disposition">
+                        <SelectValue placeholder="Select..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="qualified">✅ Qualified Lead</SelectItem>
-                        <SelectItem value="callback_requested">📞 Callback Requested</SelectItem>
+                        <SelectItem value="qualified">✅ Qualified</SelectItem>
+                        <SelectItem value="callback_requested">📞 Callback</SelectItem>
                         <SelectItem value="not_interested">❌ Not Interested</SelectItem>
                         <SelectItem value="voicemail">📧 Voicemail</SelectItem>
                         <SelectItem value="no_answer">📵 No Answer</SelectItem>
                         <SelectItem value="busy">⏰ Busy</SelectItem>
-                        <SelectItem value="dnc_request">🚫 DNC Request</SelectItem>
+                        <SelectItem value="dnc_request">🚫 DNC</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {/* Qualification Questions - Dynamic based on Campaign */}
+                  {/* Qualification Questions - Compact */}
                   {campaignDetails?.qualificationQuestions && campaignDetails.qualificationQuestions.length > 0 && (
-                    <div className="space-y-3">
-                      <Label className="text-sm font-semibold">Qualification Questions</Label>
-                      <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">Qualification</Label>
+                      <div className="grid grid-cols-2 gap-2">
                         {campaignDetails.qualificationQuestions.map((question) => (
-                          <div key={question.id}>
-                            <Label htmlFor={question.id} className="text-sm">
+                          <div key={question.id} className="space-y-1">
+                            <Label htmlFor={question.id} className="text-xs">
                               {question.label}
                               {question.required && <span className="text-destructive ml-1">*</span>}
                             </Label>
@@ -835,7 +835,7 @@ export default function AgentConsolePage() {
                                 value={qualificationData[question.id] || ''}
                                 onValueChange={(value) => setQualificationData({...qualificationData, [question.id]: value})}
                               >
-                                <SelectTrigger id={question.id} data-testid={`select-qual-${question.id}`}>
+                                <SelectTrigger id={question.id} className="h-8 text-xs" data-testid={`select-qual-${question.id}`}>
                                   <SelectValue placeholder="Select..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -852,7 +852,7 @@ export default function AgentConsolePage() {
                                 value={qualificationData[question.id] || ''}
                                 onChange={(e) => setQualificationData({...qualificationData, [question.id]: e.target.value})}
                                 placeholder={`Enter ${question.label.toLowerCase()}...`}
-                                className="min-h-[60px] resize-none text-sm"
+                                className="min-h-[50px] resize-none text-xs"
                                 data-testid={`input-qual-${question.id}`}
                               />
                             ) : (
@@ -862,7 +862,7 @@ export default function AgentConsolePage() {
                                 value={qualificationData[question.id] || ''}
                                 onChange={(e) => setQualificationData({...qualificationData, [question.id]: e.target.value})}
                                 placeholder={`Enter ${question.label.toLowerCase()}...`}
-                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                 data-testid={`input-qual-${question.id}`}
                               />
                             )}
