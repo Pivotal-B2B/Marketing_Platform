@@ -30,7 +30,7 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
     - **Email:** HTML editor, personalization, tracking, pre-send guards, mandatory unsubscribe.
     - **Telemarketing:** Telnyx WebRTC integration for browser-based calling, real-time SIP trunk management, call scripts, DNC handling, Agent Console with disposition workflow and live audio. Includes an Auto-Dialer System (Progressive Dialing) with agent status tracking, longest-idle distribution, and DNC compliance.
     - **Advanced Features:** Audience snapshotting, compliance guardrails, pacing/throttling, frequency caps, multi-provider email support, A/B/n testing, pre-flight checklists, and reporting.
-- **Lead QA Workflow:** Multi-stage workflow (New → Under Review → Approved/Rejected → Published) with checklist validation.
+- **Lead QA Workflow:** Multi-stage workflow (New → Under Review → Approved/Rejected → Published) with checklist validation. Includes agent insights showing which agent qualified each lead, with comprehensive lead detail view displaying agent information, call recording, transcript, AI analysis, QA checklist, and approve/reject actions.
 - **Client Portal (Bridge Model):** Allows clients to specify campaign order requirements and includes one-click client submission via configurable webhooks.
 - **Security & User Management:** JWT token generation, bcrypt password hashing, and multi-role user management system with RBAC.
 - **Content Studio & Integrations:** Unified asset library, AI content generator, multi-platform social media publishing, and secure inter-Repl communication with an external Resources Centre for content distribution and reference data sync.
