@@ -55,11 +55,11 @@ export function Stepper({
                   onClick={() => isClickable && onStepClick?.(index)}
                   disabled={!isClickable}
                   className={cn(
-                    "relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 text-xs font-medium transition-all",
+                    "relative z-10 flex items-center justify-center w-8 h-8 rounded-full border-2 text-xs font-medium transition-colors",
                     isCompleted && "bg-primary border-primary text-primary-foreground",
                     isCurrent && "bg-background border-primary text-primary ring-4 ring-primary/20",
                     isUpcoming && "bg-muted border-muted-foreground/30 text-muted-foreground",
-                    isClickable && "cursor-pointer hover:scale-110",
+                    isClickable && "cursor-pointer hover-elevate active-elevate-2",
                     !isClickable && "cursor-not-allowed"
                   )}
                   data-testid={`stepper-step-${index}`}

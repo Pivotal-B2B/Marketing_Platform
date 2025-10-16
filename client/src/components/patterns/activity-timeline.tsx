@@ -55,15 +55,15 @@ const activityIcons: Record<ActivityItem["type"], LucideIcon> = {
 };
 
 const activityColors: Record<ActivityItem["type"], string> = {
-  email: "text-blue-500",
-  call: "text-green-500",
-  note: "text-yellow-500",
-  task: "text-purple-500",
-  edit: "text-orange-500",
-  create: "text-teal-500",
-  delete: "text-red-500",
-  qa: "text-indigo-500",
-  custom: "text-gray-500",
+  email: "text-info",
+  call: "text-success",
+  note: "text-warning",
+  task: "text-primary",
+  edit: "text-accent",
+  create: "text-success",
+  delete: "text-destructive",
+  qa: "text-primary",
+  custom: "text-muted-foreground",
 };
 
 const statusColors: Record<string, string> = {
@@ -86,8 +86,13 @@ export function ActivityTimeline({
 
   if (filteredItems.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Clock className="h-12 w-12 text-muted-foreground mb-3" />
+      <div 
+        className="flex flex-col items-center justify-center py-12 text-center"
+        data-testid="activity-timeline-empty"
+        role="status"
+        aria-label="No activity"
+      >
+        <Clock className="h-12 w-12 text-muted-foreground mb-3" aria-hidden="true" />
         <p className="text-sm text-muted-foreground">No activity yet</p>
       </div>
     );
@@ -291,10 +296,10 @@ export function ActivitySummary({
   className,
 }: ActivitySummaryProps) {
   const items = [
-    { icon: Mail, count: emailCount, label: "Emails", color: "text-blue-500" },
-    { icon: Phone, count: callCount, label: "Calls", color: "text-green-500" },
-    { icon: MessageSquare, count: noteCount, label: "Notes", color: "text-yellow-500" },
-    { icon: FileText, count: taskCount, label: "Tasks", color: "text-purple-500" },
+    { icon: Mail, count: emailCount, label: "Emails", color: "text-info" },
+    { icon: Phone, count: callCount, label: "Calls", color: "text-success" },
+    { icon: MessageSquare, count: noteCount, label: "Notes", color: "text-warning" },
+    { icon: FileText, count: taskCount, label: "Tasks", color: "text-primary" },
   ].filter((item) => item.count > 0);
 
   if (items.length === 0) {
