@@ -1724,6 +1724,11 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   createdAt: true,
 });
 
+export const insertActivityLogSchema = createInsertSchema(activityLog).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertSavedFilterSchema = createInsertSchema(savedFilters).omit({
   id: true,
   createdAt: true,
@@ -1913,6 +1918,9 @@ export type InsertBulkImport = z.infer<typeof insertBulkImportSchema>;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+export type ActivityLog = typeof activityLog.$inferSelect;
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 
 export type SavedFilter = typeof savedFilters.$inferSelect;
 export type InsertSavedFilter = z.infer<typeof insertSavedFilterSchema>;

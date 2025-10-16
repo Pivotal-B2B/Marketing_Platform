@@ -7,7 +7,7 @@ import type { FilterGroup } from "@shared/filter-types";
 import {
   users, accounts, contacts, campaigns, campaignAgentAssignments, segments, lists, domainSets, domainSetItems, domainSetContactLinks,
   leads, emailMessages, calls, suppressionEmails, suppressionPhones,
-  campaignOrders, orderCampaignLinks, bulkImports, auditLogs, savedFilters,
+  campaignOrders, orderCampaignLinks, bulkImports, auditLogs, activityLog, savedFilters,
   selectionContexts, filterFieldRegistry, fieldChangeLog, industryReference,
   companySizeReference, revenueRangeReference,
   campaignAudienceSnapshots, campaignQueue, campaignAccountStats, senderProfiles, emailTemplates, emailSends, emailEvents,
@@ -38,6 +38,7 @@ import {
   type OrderCampaignLink, type InsertOrderCampaignLink,
   type BulkImport, type InsertBulkImport,
   type AuditLog, type InsertAuditLog,
+  type ActivityLog, type InsertActivityLog,
   type SavedFilter, type InsertSavedFilter,
   type SelectionContext, type InsertSelectionContext,
   type FilterField,
@@ -314,6 +315,14 @@ export interface IStorage {
   // Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(filters?: any): Promise<AuditLog[]>;
+
+  // Activity Logs
+  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  getActivityLogs(
+    entityType: 'contact' | 'account' | 'campaign' | 'call_job' | 'call_session' | 'lead' | 'user' | 'email_message',
+    entityId: string,
+    limit?: number
+  ): Promise<ActivityLog[]>;
 
   // Saved Filters
   getSavedFilters(userId: string, entityType?: string): Promise<SavedFilter[]>;
@@ -2904,6 +2913,30 @@ export class DatabaseStorage implements IStorage {
 
   async getAuditLogs(filters?: any): Promise<AuditLog[]> {
     return await db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
+  }
+
+  // Activity Logs
+  async createActivityLog(insertLog: InsertActivityLog): Promise<ActivityLog> {
+    const [log] = await db.insert(activityLog).values(insertLog).returning();
+    return log;
+  }
+
+  async getActivityLogs(
+    entityType: 'contact' | 'account' | 'campaign' | 'call_job' | 'call_session' | 'lead' | 'user' | 'email_message',
+    entityId: string,
+    limit: number = 50
+  ): Promise<ActivityLog[]> {
+    return await db
+      .select()
+      .from(activityLog)
+      .where(
+        and(
+          eq(activityLog.entityType, entityType),
+          eq(activityLog.entityId, entityId)
+        )
+      )
+      .orderBy(desc(activityLog.createdAt))
+      .limit(limit);
   }
 
   // Saved Filters

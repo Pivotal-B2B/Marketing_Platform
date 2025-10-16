@@ -43,6 +43,7 @@ import {
   insertEventSchema,
   insertResourceSchema,
   insertNewsSchema,
+  insertActivityLogSchema,
   insertSpeakerSchema,
   insertOrganizerSchema,
   insertSponsorSchema
@@ -4486,6 +4487,61 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Client submission error:', error);
       res.status(500).json({ message: "Failed to submit lead to client" });
+    }
+  });
+
+  // ==================== ACTIVITY LOGS ====================
+
+  // Get activity logs for an entity
+  app.get("/api/activity-log/:entityType/:entityId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { entityType, entityId } = req.params;
+      const limitParam = req.query.limit as string | undefined;
+      
+      // Validate params
+      const paramsSchema = z.object({
+        entityType: z.enum(['contact', 'account', 'campaign', 'call_job', 'call_session', 'lead', 'user', 'email_message']),
+        entityId: z.string().uuid(),
+        limit: z.number().int().min(1).max(100).optional().default(50),
+      });
+
+      const validatedParams = paramsSchema.parse({
+        entityType,
+        entityId,
+        limit: limitParam ? parseInt(limitParam) : 50,
+      });
+      
+      const logs = await storage.getActivityLogs(
+        validatedParams.entityType,
+        validatedParams.entityId,
+        validatedParams.limit
+      );
+      res.json(logs);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid parameters", errors: error.errors });
+      }
+      console.error('Error fetching activity logs:', error);
+      res.status(500).json({ message: "Failed to fetch activity logs" });
+    }
+  });
+
+  // Create activity log (for manual logging)
+  app.post("/api/activity-log", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertActivityLogSchema.omit({ createdBy: true }).parse(req.body);
+      
+      const log = await storage.createActivityLog({
+        ...validatedData,
+        createdBy: req.user!.userId, // Always use authenticated user - cannot be spoofed
+      });
+      res.json(log);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid activity log data", errors: error.errors });
+      }
+      console.error('Error creating activity log:', error);
+      res.status(500).json({ message: "Failed to create activity log" });
     }
   });
 
