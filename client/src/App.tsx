@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { ProtectedRoute } from "@/components/protected-route";
+import { CommandPalette } from "@/components/patterns/command-palette";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
@@ -72,6 +73,7 @@ function AuthenticatedApp() {
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
+      <CommandPalette />
       <div className="flex h-screen w-full">
         <AppSidebar userRoles={userRoles} />
         <div className="flex flex-col flex-1 overflow-hidden">
