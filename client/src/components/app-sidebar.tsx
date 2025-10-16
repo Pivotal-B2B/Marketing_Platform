@@ -125,6 +125,12 @@ const getNavSections = (): NavSection[] => [
         roles: ["admin", "campaign_manager", "agent"],
       },
       {
+        title: "Power Dialer",
+        url: "/telephony/auto-dialer",
+        icon: Zap,
+        roles: ["admin", "campaign_manager"],
+      },
+      {
         title: "QA & Leads",
         url: "/leads",
         icon: CheckCircle,
@@ -202,6 +208,7 @@ const getNavSections = (): NavSection[] => [
         icon: Phone,
         roles: ["admin"],
         items: [
+          { title: "Power Dialer", url: "/telephony/auto-dialer", roles: ["admin"] },
           { title: "SIP Trunk Configuration", url: "/telephony/sip-trunks", roles: ["admin"] },
         ],
       },
