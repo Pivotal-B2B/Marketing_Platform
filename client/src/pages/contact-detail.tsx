@@ -43,6 +43,7 @@ import type { Contact, Account } from "@shared/schema";
 import { HeaderActionBar } from "@/components/shared/header-action-bar";
 import { SectionCard } from "@/components/shared/section-card";
 import { ListSegmentMembership } from "@/components/list-segment-membership";
+import { ActivityLogTimeline } from "@/components/activity-log-timeline";
 
 export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -425,10 +426,12 @@ export default function ContactDetailPage() {
               icon={Activity}
               description="Recent interactions and events"
             >
-              <div className="py-8 text-center">
-                <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">Activity tracking coming soon</p>
-              </div>
+              <ActivityLogTimeline 
+                entityType="contact" 
+                entityId={id || ''} 
+                autoRefresh={true}
+                refreshInterval={30000}
+              />
             </SectionCard>
           </div>
 

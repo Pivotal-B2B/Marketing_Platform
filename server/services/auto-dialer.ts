@@ -301,6 +301,23 @@ export class AutoDialerService {
         },
       });
 
+      // Log activity for contact
+      await storage.createActivityLog({
+        entityType: 'contact',
+        entityId: queueItem.contactId,
+        eventType: 'call_started',
+        title: `Call initiated`,
+        description: `Agent started call attempt`,
+        metadata: {
+          campaignId: campaign.id,
+          campaignName: campaign.name,
+          agentId: agent.agentId,
+          attemptId: callAttempt.id,
+          phone: queueItem.phone,
+        },
+        createdBy: agent.agentId,
+      });
+
       // TODO: Integrate with Telnyx Call Control API to actually place the call
       // This will be implemented in the next phase using WebRTC bridge or Call Control API
       console.log(`[AutoDialer] Call attempt created: ${callAttempt.id}`);
@@ -358,6 +375,9 @@ export class AutoDialerService {
         return;
       }
 
+      // Get campaign details for activity log
+      const campaign = await storage.getCampaign(attempt.campaignId);
+
       // Update call attempt
       await storage.updateCallAttempt(callAttemptId, {
         endedAt: new Date(),
@@ -389,6 +409,24 @@ export class AutoDialerService {
         attemptId: callAttemptId,
         type: 'call_ended',
         metadata: { disposition, duration },
+      });
+
+      // Log activity for contact
+      await storage.createActivityLog({
+        entityType: 'contact',
+        entityId: attempt.contactId,
+        eventType: 'call_ended',
+        title: `Call ended: ${disposition || 'no-answer'}`,
+        description: `Call concluded with ${disposition || 'no-answer'} disposition${duration ? ` after ${Math.round(duration)}s` : ''}`,
+        metadata: {
+          campaignId: attempt.campaignId,
+          campaignName: campaign?.name || 'Unknown Campaign',
+          agentId: attempt.agentId,
+          attemptId: callAttemptId,
+          disposition,
+          duration,
+        },
+        createdBy: attempt.agentId,
       });
 
       console.log(`[AutoDialer] Call ended: ${callAttemptId} - ${disposition}`);
