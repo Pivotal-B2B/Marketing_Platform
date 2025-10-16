@@ -253,6 +253,26 @@ export function DataTable<T = any>({
     onSearch?.(query);
   };
 
+  // Reconcile selection when filtered data changes
+  useEffect(() => {
+    if (selection.selectedIds.size === 0) return;
+
+    const filteredRowIds = new Set(sortedData.map(getRowId));
+    const newSelectedIds = new Set(
+      Array.from(selection.selectedIds).filter((id) => filteredRowIds.has(id))
+    );
+
+    // If selection changed, update it
+    if (newSelectedIds.size !== selection.selectedIds.size) {
+      const newSelection: SelectionState = {
+        selectedIds: newSelectedIds,
+        allSelected: newSelectedIds.size === sortedData.length && sortedData.length > 0,
+      };
+      setSelection(newSelection);
+      onSelectionChange?.(newSelection.selectedIds, newSelection.allSelected);
+    }
+  }, [sortedData]); // Only run when sortedData changes
+
   // Get cell value
   const getCellValue = (row: T, column: DataTableColumn<T>) => {
     return column.accessorFn
@@ -281,6 +301,7 @@ export function DataTable<T = any>({
   };
 
   const hasSelection = selection.selectedIds.size > 0;
+  const totalColumns = Math.max(1, columns.length + (enableSelection ? 1 : 0));
 
   return (
     <div className={cn("space-y-4", className)} data-testid="data-table">
@@ -304,6 +325,7 @@ export function DataTable<T = any>({
                     onClick={() => handleSearch("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     aria-label="Clear search"
+                    data-testid="clear-search"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -375,39 +397,52 @@ export function DataTable<T = any>({
                   />
                 </TableHead>
               )}
-              {columns.map((column) => (
-                <TableHead
-                  key={column.id}
-                  style={{
-                    width: column.width,
-                    minWidth: column.minWidth,
-                    maxWidth: column.maxWidth,
-                    textAlign: column.align || "left",
-                  }}
-                  data-testid={`column-header-${column.id}`}
-                >
-                  {column.sortable !== false ? (
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort(column.id)}
-                      className="-ml-3 h-8 data-[state=open]:bg-accent"
-                      data-testid={`sort-${column.id}`}
-                    >
-                      {column.header}
-                      {renderSortIcon(column.id)}
-                    </Button>
-                  ) : (
-                    column.header
-                  )}
-                </TableHead>
-              ))}
+              {columns.length === 0 ? (
+                <TableHead>No columns</TableHead>
+              ) : (
+                columns.map((column) => (
+                  <TableHead
+                    key={column.id}
+                    style={{
+                      width: column.width,
+                      minWidth: column.minWidth,
+                      maxWidth: column.maxWidth,
+                      textAlign: column.align || "left",
+                    }}
+                    aria-sort={
+                      sortState?.columnId === column.id
+                        ? sortState.direction === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : column.sortable !== false
+                        ? "none"
+                        : undefined
+                    }
+                    data-testid={`column-header-${column.id}`}
+                  >
+                    {column.sortable !== false ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleSort(column.id)}
+                        className="-ml-3 h-8 data-[state=open]:bg-accent"
+                        data-testid={`sort-${column.id}`}
+                      >
+                        {column.header}
+                        {renderSortIcon(column.id)}
+                      </Button>
+                    ) : (
+                      column.header
+                    )}
+                  </TableHead>
+                ))
+              )}
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className={cn(enableVirtualization && sortedData.length > 50 && "relative")}>
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length + (enableSelection ? 1 : 0)}
+                  colSpan={totalColumns}
                   className="h-24 text-center"
                 >
                   <div className="flex items-center justify-center gap-2 text-muted-foreground">
@@ -419,7 +454,7 @@ export function DataTable<T = any>({
             ) : sortedData.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length + (enableSelection ? 1 : 0)}
+                  colSpan={totalColumns}
                   className="h-48"
                 >
                   <EmptyState
