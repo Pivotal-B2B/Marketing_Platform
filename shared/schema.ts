@@ -2904,8 +2904,11 @@ export const dvProjects = pgTable('dv_projects', {
 export const dvExclusionLists = pgTable('dv_exclusion_lists', {
   id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
   name: varchar('name').notNull(),
+  type: varchar('type').notNull(), // email, domain, phone
+  pattern: text('pattern').notNull(), // regex pattern or exact match
   scope: exclusionScopeEnum('scope').notNull(),
   clientId: varchar('client_id'),
+  isActive: boolean('is_active').default(true).notNull(),
   fields: jsonb('fields').notNull(),
   createdBy: varchar('created_by').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -2993,6 +2996,12 @@ export const dvRecords = pgTable('dv_records', {
   dedupeHash: varchar('dedupe_hash'),
   exclusionReason: varchar('exclusion_reason'),
   invalidReason: varchar('invalid_reason'),
+  // Pipeline stage timestamps
+  normalizedAt: timestamp('normalized_at'),
+  emailValidatedAt: timestamp('email_validated_at'),
+  phoneParsedAt: timestamp('phone_parsed_at'),
+  exclusionCheckedAt: timestamp('exclusion_checked_at'),
+  enqueuedAt: timestamp('enqueued_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
