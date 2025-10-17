@@ -2504,7 +2504,9 @@ export function registerRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create call disposition" });
+      console.error('[DISPOSITION ERROR]', error);
+      console.error('[DISPOSITION ERROR] Stack:', error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ message: "Failed to create call disposition", error: error instanceof Error ? error.message : String(error) });
     }
   });
 

@@ -920,7 +920,7 @@ export const emailMessages = pgTable("email_messages", {
 // Calls table
 export const calls = pgTable("calls", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  queueItemId: varchar("queue_item_id").references(() => campaignQueue.id, { onDelete: 'cascade' }),
+  queueItemId: varchar("queue_item_id"), // No FK - can reference either agent_queue or campaign_queue
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }),
   contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }),
   agentId: varchar("agent_id").references(() => users.id),
