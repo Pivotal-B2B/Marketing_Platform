@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useRoute, Link } from 'wouter';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, User, Building2, MapPin, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, XCircle, AlertTriangle, User, Building2, MapPin, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -117,6 +117,12 @@ export default function DvAgentConsole() {
         company: companyName ? 'valid' : 'missing',
       },
     });
+  };
+
+  const handleSkip = () => {
+    if (!currentRecord) return;
+    setNotes('');
+    setCurrentIndex(prev => prev + 1);
   };
 
   if (isLoading) {
@@ -274,6 +280,17 @@ export default function DvAgentConsole() {
                 data-testid="input-linkedinUrl"
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="country">Country</Label>
+              <Input
+                id="country"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                placeholder="Country"
+                data-testid="input-country"
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -384,27 +401,15 @@ export default function DvAgentConsole() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="zip">ZIP/Postal Code</Label>
-                <Input
-                  id="zip"
-                  value={zip}
-                  onChange={(e) => setZip(e.target.value)}
-                  placeholder="Postal code"
-                  data-testid="input-zip"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="country">Country</Label>
-                <Input
-                  id="country"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  placeholder="Country"
-                  data-testid="input-country"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="zip">ZIP/Postal Code</Label>
+              <Input
+                id="zip"
+                value={zip}
+                onChange={(e) => setZip(e.target.value)}
+                placeholder="Postal code"
+                data-testid="input-zip"
+              />
             </div>
           </CardContent>
         </Card>
@@ -458,6 +463,16 @@ export default function DvAgentConsole() {
             >
               <XCircle className="w-4 h-4 mr-2" />
               Invalid
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleSkip}
+              disabled={dispositionMutation.isPending}
+              className="flex-1 sm:flex-none ml-auto"
+              data-testid="button-skip"
+            >
+              Skip
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
 
