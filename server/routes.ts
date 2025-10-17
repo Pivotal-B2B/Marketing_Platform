@@ -2179,6 +2179,7 @@ export function registerRoutes(app: Express) {
         limit
       );
 
+      console.log('[Manual Queue API] Result to send:', JSON.stringify(result));
       res.json(result);
     } catch (error) {
       console.error('Manual queue add error:', error);
