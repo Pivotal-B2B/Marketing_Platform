@@ -2863,3 +2863,270 @@ export const powerDialSettingsSchema = z.object({
   max_daily_attempts_per_contact: z.number().min(1).max(20).optional(),
   amd: amdConfigurationSchema.optional(),
 });
+
+// ============================================================================
+// DATA VERIFICATION (DV) MODULE SCHEMA
+// ============================================================================
+
+// DV Enums
+export const dvProjectStatusEnum = pgEnum('dv_project_status', ['draft', 'active', 'paused', 'closed']);
+export const dedupeScopeEnum = pgEnum('dedupe_scope', ['project', 'client', 'global']);
+export const dvRecordStatusEnum = pgEnum('dv_record_status', [
+  'new', 'in_queue', 'in_progress', 'needs_fix', 'excluded', 'invalid', 'verified', 'delivered'
+]);
+export const dvRoleEnum = pgEnum('dv_role', ['verifier', 'qa', 'manager', 'viewer']);
+export const dvDispositionEnum = pgEnum('dv_disposition', [
+  'Verified', 'PartiallyVerified', 'InvalidEmail', 'NoPhone', 'Duplicate', 
+  'DoNotUse', 'ExcludedByRule', 'NeedsManualReview'
+]);
+export const exclusionScopeEnum = pgEnum('exclusion_scope', ['global', 'client', 'project']);
+export const abvStatusEnum = pgEnum('abv_status', ['new', 'in_progress', 'completed', 'cap_reached', 'paused']);
+
+// DV Project
+export const dvProjects = pgTable('dv_projects', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar('client_id').notNull(),
+  name: varchar('name').notNull(),
+  description: text('description'),
+  templateId: varchar('template_id'),
+  rulepackId: varchar('rulepack_id'),
+  status: dvProjectStatusEnum('status').default('draft').notNull(),
+  capPerCompany: integer('cap_per_company').default(0).notNull(),
+  dedupeScope: dedupeScopeEnum('dedupe_scope').default('client').notNull(),
+  abvMode: boolean('abv_mode').default(false).notNull(),
+  defaultTargetPerAccount: integer('default_target_per_account').default(0).notNull(),
+  createdBy: varchar('created_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// DV Exclusion Lists
+export const dvExclusionLists = pgTable('dv_exclusion_lists', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar('name').notNull(),
+  scope: exclusionScopeEnum('scope').notNull(),
+  clientId: varchar('client_id'),
+  fields: jsonb('fields').notNull(),
+  createdBy: varchar('created_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// DV Project Exclusions (junction table)
+export const dvProjectExclusions = pgTable('dv_project_exclusions', {
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  listId: varchar('list_id').references(() => dvExclusionLists.id, { onDelete: 'cascade' }).notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.projectId, table.listId] }),
+}));
+
+// DV Field Constraints
+export const dvFieldConstraints = pgTable('dv_field_constraints', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  fieldName: varchar('field_name').notNull(),
+  ruleType: varchar('rule_type').notNull(),
+  ruleValue: jsonb('rule_value').notNull(),
+});
+
+// DV Field Mappings
+export const dvFieldMappings = pgTable('dv_field_mappings', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  clientHeader: varchar('client_header').notNull(),
+  crmField: varchar('crm_field').notNull(),
+  confidence: real('confidence').default(0).notNull(),
+  required: boolean('required').default(false).notNull(),
+});
+
+// DV Raw Records (imported data)
+export const dvRecordsRaw = pgTable('dv_records_raw', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  payload: jsonb('payload').notNull(),
+  importedAt: timestamp('imported_at').defaultNow().notNull(),
+  sourceFile: varchar('source_file'),
+  rowNum: integer('row_num'),
+});
+
+// DV Accounts (for ABV mode)
+export const dvAccounts = pgTable('dv_accounts', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  accountName: varchar('account_name'),
+  accountDomain: varchar('account_domain').notNull(),
+  website: varchar('website'),
+  linkedinUrl: varchar('linkedin_url'),
+  targetContacts: integer('target_contacts').default(0).notNull(),
+  verifiedCount: integer('verified_count').default(0).notNull(),
+  status: abvStatusEnum('status').default('new').notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  uniqueDomain: uniqueIndex('dv_accounts_project_domain_idx').on(table.projectId, table.accountDomain),
+}));
+
+// DV Records (normalized/verified data)
+export const dvRecords = pgTable('dv_records', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar('account_id').references(() => dvAccounts.id),
+  accountName: varchar('account_name'),
+  accountDomain: varchar('account_domain'),
+  contactFullName: varchar('contact_full_name'),
+  email: varchar('email'),
+  phoneRaw: varchar('phone_raw'),
+  phoneE164: varchar('phone_e164'),
+  jobTitle: varchar('job_title'),
+  country: varchar('country'),
+  state: varchar('state'),
+  city: varchar('city'),
+  zip: varchar('zip'),
+  website: varchar('website'),
+  extras: jsonb('extras').default({}).notNull(),
+  status: dvRecordStatusEnum('status').default('new').notNull(),
+  dedupeHash: varchar('dedupe_hash'),
+  exclusionReason: varchar('exclusion_reason'),
+  invalidReason: varchar('invalid_reason'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index('dv_records_status_idx').on(table.status),
+  projectStatusIdx: index('dv_records_project_status_idx').on(table.projectId, table.status),
+  dedupeIdx: index('dv_records_dedupe_idx').on(table.dedupeHash),
+}));
+
+// DV Runs (verification actions)
+export const dvRuns = pgTable('dv_runs', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  recordId: varchar('record_id').references(() => dvRecords.id, { onDelete: 'cascade' }).notNull(),
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  agentId: varchar('agent_id'),
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+  finishedAt: timestamp('finished_at'),
+  disposition: dvDispositionEnum('disposition'),
+  notes: text('notes'),
+  checks: jsonb('checks'),
+  enrichment: jsonb('enrichment'),
+  resultStatus: dvRecordStatusEnum('result_status'),
+});
+
+// DV Project Agents (assignments)
+export const dvProjectAgents = pgTable('dv_project_agents', {
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar('user_id').notNull(),
+  role: dvRoleEnum('role').default('verifier').notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.projectId, table.userId] }),
+}));
+
+// DV Account Assignments (for ABV mode)
+export const dvAccountAssignments = pgTable('dv_account_assignments', {
+  accountId: varchar('account_id').references(() => dvAccounts.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar('user_id').notNull(),
+  role: dvRoleEnum('role').default('verifier').notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.accountId, table.userId] }),
+}));
+
+// DV Company Cap Tracking
+export const dvCompanyCaps = pgTable('dv_company_caps', {
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  accountDomain: varchar('account_domain').notNull(),
+  verifiedCount: integer('verified_count').default(0).notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.projectId, table.accountDomain] }),
+}));
+
+// DV Deliveries (exports)
+export const dvDeliveries = pgTable('dv_deliveries', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  type: varchar('type').notNull(),
+  filter: jsonb('filter'),
+  rowCount: integer('row_count'),
+  filePath: varchar('file_path'),
+  createdBy: varchar('created_by'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// DV Selection Sets (for dynamic queues)
+export const dvSelectionSets = pgTable('dv_selection_sets', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  name: varchar('name').notNull(),
+  description: text('description'),
+  filterJson: jsonb('filter_json').notNull(),
+  recordIds: jsonb('record_ids'),
+  isDefault: boolean('is_default').default(false).notNull(),
+  createdBy: varchar('created_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// DV Agent Filters (personal filters)
+export const dvAgentFilters = pgTable('dv_agent_filters', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar('project_id').references(() => dvProjects.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar('user_id').notNull(),
+  name: varchar('name').notNull(),
+  filterJson: jsonb('filter_json').notNull(),
+  isActive: boolean('is_active').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Relations
+export const dvProjectsRelations = relations(dvProjects, ({ many }) => ({
+  recordsRaw: many(dvRecordsRaw),
+  records: many(dvRecords),
+  accounts: many(dvAccounts),
+  fieldConstraints: many(dvFieldConstraints),
+  fieldMappings: many(dvFieldMappings),
+  projectAgents: many(dvProjectAgents),
+  exclusions: many(dvProjectExclusions),
+  deliveries: many(dvDeliveries),
+  runs: many(dvRuns),
+  companyCaps: many(dvCompanyCaps),
+  selectionSets: many(dvSelectionSets),
+}));
+
+export const dvRecordsRelations = relations(dvRecords, ({ one, many }) => ({
+  project: one(dvProjects, { fields: [dvRecords.projectId], references: [dvProjects.id] }),
+  account: one(dvAccounts, { fields: [dvRecords.accountId], references: [dvAccounts.id] }),
+  runs: many(dvRuns),
+}));
+
+export const dvAccountsRelations = relations(dvAccounts, ({ one, many }) => ({
+  project: one(dvProjects, { fields: [dvAccounts.projectId], references: [dvProjects.id] }),
+  records: many(dvRecords),
+  assignments: many(dvAccountAssignments),
+}));
+
+// Insert Schemas
+export const insertDvProjectSchema = createInsertSchema(dvProjects).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDvExclusionListSchema = createInsertSchema(dvExclusionLists).omit({ id: true, createdAt: true });
+export const insertDvFieldConstraintSchema = createInsertSchema(dvFieldConstraints).omit({ id: true });
+export const insertDvFieldMappingSchema = createInsertSchema(dvFieldMappings).omit({ id: true });
+export const insertDvRecordRawSchema = createInsertSchema(dvRecordsRaw).omit({ id: true, importedAt: true });
+export const insertDvRecordSchema = createInsertSchema(dvRecords).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDvAccountSchema = createInsertSchema(dvAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertDvRunSchema = createInsertSchema(dvRuns).omit({ id: true, startedAt: true });
+export const insertDvDeliverySchema = createInsertSchema(dvDeliveries).omit({ id: true, createdAt: true });
+export const insertDvSelectionSetSchema = createInsertSchema(dvSelectionSets).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Select Types
+export type DvProject = typeof dvProjects.$inferSelect;
+export type InsertDvProject = z.infer<typeof insertDvProjectSchema>;
+export type DvExclusionList = typeof dvExclusionLists.$inferSelect;
+export type InsertDvExclusionList = z.infer<typeof insertDvExclusionListSchema>;
+export type DvFieldConstraint = typeof dvFieldConstraints.$inferSelect;
+export type DvFieldMapping = typeof dvFieldMappings.$inferSelect;
+export type DvRecordRaw = typeof dvRecordsRaw.$inferSelect;
+export type DvRecord = typeof dvRecords.$inferSelect;
+export type InsertDvRecord = z.infer<typeof insertDvRecordSchema>;
+export type DvAccount = typeof dvAccounts.$inferSelect;
+export type InsertDvAccount = z.infer<typeof insertDvAccountSchema>;
+export type DvRun = typeof dvRuns.$inferSelect;
+export type InsertDvRun = z.infer<typeof insertDvRunSchema>;
+export type DvDelivery = typeof dvDeliveries.$inferSelect;
+export type DvSelectionSet = typeof dvSelectionSets.$inferSelect;
