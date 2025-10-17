@@ -1695,6 +1695,36 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Get campaigns assigned to the current agent
+  app.get("/api/campaigns/agent-assignments", requireAuth, requireRole('agent'), async (req, res) => {
+    try {
+      const agentId = req.user?.userId;
+      if (!agentId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const assignments = await db
+        .select({
+          campaignId: campaignAgentAssignments.campaignId,
+          campaignName: campaigns.name,
+          dialMode: campaigns.dialMode,
+        })
+        .from(campaignAgentAssignments)
+        .innerJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
+        .where(
+          and(
+            eq(campaignAgentAssignments.agentId, agentId),
+            eq(campaignAgentAssignments.isActive, true)
+          )
+        );
+
+      res.json(assignments);
+    } catch (error) {
+      console.error('Get agent assignments error:', error);
+      res.status(500).json({ message: "Failed to fetch agent assignments" });
+    }
+  });
+
   // Assign agents to a campaign (with automatic reassignment)
   app.post("/api/campaigns/:id/agents", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
@@ -2252,9 +2282,17 @@ export function registerRoutes(app: Express) {
 
       const { campaignId, status } = req.query;
       
+      console.log(`[AGENT QUEUE] Fetching queue for agent ${agentId}, campaign: ${campaignId}, status: ${status}`);
+      
       // If campaignId is specified, check dial mode to determine which queue to use
       if (campaignId) {
         const campaign = await storage.getCampaign(campaignId as string);
+        
+        if (!campaign) {
+          return res.status(404).json({ message: "Campaign not found" });
+        }
+
+        console.log(`[AGENT QUEUE] Campaign ${campaignId} dial mode: ${campaign.dialMode}`);
         
         if (campaign?.dialMode === 'manual') {
           // Manual dial: query agent_queue (manual pull queue)
@@ -2281,12 +2319,13 @@ export function registerRoutes(app: Express) {
             .where(
               and(
                 eq(agentQueue.agentId, agentId),
-                eq(agentQueue.campaignId, campaignId),
-                status ? eq(agentQueue.queueState, status as any) : sql`true`
+                eq(agentQueue.campaignId, campaignId as string),
+                status ? eq(agentQueue.queueState, status as any) : eq(agentQueue.queueState, 'queued')
               )
             )
             .orderBy(desc(agentQueue.priority), agentQueue.createdAt);
           
+          console.log(`[AGENT QUEUE] Manual queue returned ${manualQueue.length} items`);
           return res.json(manualQueue);
         } else if (campaign?.dialMode === 'power') {
           // Power dial: query campaign_queue (auto-assigned queue)
@@ -2313,23 +2352,20 @@ export function registerRoutes(app: Express) {
             .where(
               and(
                 eq(campaignQueue.agentId, agentId),
-                eq(campaignQueue.campaignId, campaignId),
-                status ? eq(campaignQueue.status, status as any) : sql`true`
+                eq(campaignQueue.campaignId, campaignId as string),
+                status ? eq(campaignQueue.status, status as any) : eq(campaignQueue.status, 'queued')
               )
             )
             .orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
           
+          console.log(`[AGENT QUEUE] Power queue returned ${powerQueue.length} items`);
           return res.json(powerQueue);
         }
       }
       
-      // Fallback: no campaign specified, use generic query
-      const queue = await storage.getAgentQueue(
-        agentId,
-        campaignId as string | undefined,
-        status as string | undefined
-      );
-      res.json(queue);
+      // Fallback: no campaign specified, return empty array
+      console.log(`[AGENT QUEUE] No campaign specified, returning empty array`);
+      res.json([]);
     } catch (error) {
       console.error('Agent queue fetch error:', error);
       res.status(500).json({ message: "Failed to fetch agent queue" });

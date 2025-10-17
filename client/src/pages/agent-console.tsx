@@ -161,6 +161,7 @@ export default function AgentConsolePage() {
     queryKey: selectedCampaignId 
       ? [`/api/agents/me/queue?campaignId=${selectedCampaignId}&status=queued`]
       : ['/api/agents/me/queue?status=queued'],
+    enabled: !!selectedCampaignId, // Only fetch when a campaign is selected
   });
 
   // Fetch contact details for current contact
@@ -243,10 +244,26 @@ export default function AgentConsolePage() {
   const dialMode = campaignDetails?.dialMode || 'manual';
   const amdEnabled = campaignDetails?.powerSettings?.amd?.enabled ?? false;
 
-  // Extract unique campaigns from queue data
-  const campaigns: Campaign[] = Array.from(
-    new Map(queueData.map(item => [item.campaignId, { id: item.campaignId, name: item.campaignName }])).values()
-  );
+  // Fetch campaigns where the agent is assigned
+  const { data: assignedCampaigns = [] } = useQuery<Campaign[]>({
+    queryKey: ['/api/campaigns'],
+    select: (campaigns) => {
+      // This will be filtered by the backend based on agent assignments
+      return campaigns.filter(c => c.type === 'call');
+    }
+  });
+
+  // Get agent's assigned campaigns
+  const { data: agentAssignments = [] } = useQuery<Array<{ campaignId: string; campaignName: string }>>({
+    queryKey: ['/api/campaigns/agent-assignments'],
+  });
+
+  // Use assigned campaigns if available, otherwise extract from queue data
+  const campaigns: Campaign[] = agentAssignments.length > 0 
+    ? agentAssignments.map(a => ({ id: a.campaignId, name: a.campaignName }))
+    : Array.from(
+        new Map(queueData.map(item => [item.campaignId, { id: item.campaignId, name: item.campaignName }])).values()
+      );
 
   // Auto-select first campaign when campaigns load
   useEffect(() => {
@@ -297,7 +314,13 @@ export default function AgentConsolePage() {
     mutationFn: async ({ filters, priority }: { filters: FilterGroup; priority: number }) => {
       if (!selectedCampaignId) throw new Error("No campaign selected");
       
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const agentId = user.id;
+      
+      if (!agentId) throw new Error("Agent ID not found");
+      
       return await apiRequest('POST', `/api/campaigns/${selectedCampaignId}/manual/queue/add`, {
+        agentId,
         filters,
         priority
       });
