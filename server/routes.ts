@@ -1850,37 +1850,28 @@ export function registerRoutes(app: Express) {
             }
           }
 
-          // Bulk insert in batches using raw SQL for reliable conflict handling
+          // Bulk insert in batches - simplified without conflict handling for now
           let totalAdded = 0;
-          const insertBatchSize = 1000;
+          const insertBatchSize = 500; // Smaller batches for stability
+          
+          // Clear existing queue items for these agents first
+          for (const agentId of agentIds) {
+            await db.delete(agentQueue).where(
+              and(
+                eq(agentQueue.agentId, agentId),
+                eq(agentQueue.campaignId, req.params.id)
+              )
+            );
+          }
+          
           for (let i = 0; i < queueItems.length; i += insertBatchSize) {
             const batch = queueItems.slice(i, i + insertBatchSize);
             try {
-              // Build VALUES clause for bulk insert
-              const values = batch.map((item, idx) => 
-                `(gen_random_uuid(), $${idx * 4 + 1}, $${idx * 4 + 2}, $${idx * 4 + 3}, $${idx * 4 + 4}, 'queued', 0, NOW(), NOW())`
-              ).join(',');
-              
-              const params = batch.flatMap(item => [
-                item.agentId,
-                item.campaignId,
-                item.contactId,
-                item.accountId
-              ]);
-              
-              const query = `
-                INSERT INTO agent_queue (id, agent_id, campaign_id, contact_id, account_id, queue_state, priority, created_at, updated_at)
-                VALUES ${values}
-                ON CONFLICT (agent_id, campaign_id, contact_id) DO NOTHING
-                RETURNING id
-              `;
-              
-              const result = await db.execute(sql.raw(query, params));
-              const insertedCount = Array.isArray(result) ? result.length : (result.rowCount || 0);
-              totalAdded += insertedCount;
-              console.log(`[Manual Queue] Batch ${i / insertBatchSize + 1}: ${insertedCount}/${batch.length} items inserted (${batch.length - insertedCount} skipped as conflicts)`);
+              const result = await db.insert(agentQueue).values(batch).returning({ id: agentQueue.id });
+              totalAdded += result.length;
+              console.log(`[Manual Queue] Batch ${Math.floor(i / insertBatchSize) + 1}: ${result.length} items inserted`);
             } catch (error) {
-              console.error(`Error inserting batch ${i / insertBatchSize + 1}:`, error);
+              console.error(`Error inserting batch ${Math.floor(i / insertBatchSize) + 1}:`, error);
             }
           }
 
