@@ -346,6 +346,10 @@ export default function AgentConsolePage() {
     onSuccess: (data: any) => {
       const { added = 0, skipped = 0 } = data;
       
+      // Debug: Log what we received from the API
+      console.log('[Add to Queue] API response:', data);
+      console.log('[Add to Queue] Added:', added, 'Skipped:', skipped);
+      
       // Show appropriate toast based on results
       if (added === 0 && skipped > 0) {
         toast({
