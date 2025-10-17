@@ -49,6 +49,10 @@ import SipTrunkSettingsPage from "@/pages/sip-trunk-settings";
 import AgentConsolePage from "./pages/agent-console";
 import ResourcesCentrePage from "@/pages/resources-centre";
 import CampaignQueuePage from "@/pages/campaign-queue";
+import DvProjectsPage from "@/pages/dv-projects";
+import DvProjectNewPage from "@/pages/dv-project-new";
+import DvProjectDetailPage from "@/pages/dv-project-detail";
+import DvAgentConsolePage from "@/pages/dv-agent-console";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -121,6 +125,10 @@ function AuthenticatedApp() {
               <Route path="/settings/compliance" component={SettingsPage} />
               <Route path="/settings/integrations" component={SettingsPage} />
               <Route path="/settings" component={SettingsPage} />
+              <Route path="/dv/console/:projectId" component={DvAgentConsolePage} />
+              <Route path="/dv/projects/new" component={DvProjectNewPage} />
+              <Route path="/dv/projects/:id" component={DvProjectDetailPage} />
+              <Route path="/dv/projects" component={DvProjectsPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

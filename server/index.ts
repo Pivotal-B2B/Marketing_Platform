@@ -53,6 +53,10 @@ app.use((req, res, next) => {
   const { startBackgroundJobs } = await import("./services/background-jobs");
   startBackgroundJobs();
   
+  // Start DV background job scheduler
+  const { startJobScheduler } = await import("./lib/dv-queue");
+  startJobScheduler();
+  
   registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

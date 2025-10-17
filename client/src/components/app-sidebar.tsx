@@ -21,6 +21,7 @@ import {
   Mail,
   Headphones,
   Activity, // Added Activity icon
+  Database, // Added for Data Verification
 } from "lucide-react";
 import {
   Sidebar,
@@ -186,6 +187,20 @@ const getNavSections = (): NavSection[] => [
         url: "/engagement-analytics",
         icon: Activity, // Added Activity icon
         roles: ["admin", "campaign_manager", "qa_analyst", "client_user"],
+      },
+    ],
+  },
+
+  // Data Verification Section
+  {
+    label: "Data Verification",
+    roles: ["admin", "data_ops", "qa_analyst"],
+    items: [
+      {
+        title: "DV Projects",
+        url: "/dv/projects",
+        icon: Database,
+        roles: ["admin", "data_ops", "qa_analyst"],
       },
     ],
   },
