@@ -180,6 +180,12 @@ router.post('/projects/:id/upload', async (req: Request, res: Response) => {
       } else if (lowerHeader.includes('phone') || lowerHeader.includes('mobile') || lowerHeader.includes('tel')) {
         crmField = 'phoneRaw';
         confidence = 0.9;
+      } else if (lowerHeader.includes('first') && lowerHeader.includes('name') || lowerHeader.includes('forename')) {
+        crmField = 'firstName';
+        confidence = 0.95;
+      } else if (lowerHeader.includes('last') && lowerHeader.includes('name') || lowerHeader.includes('surname')) {
+        crmField = 'lastName';
+        confidence = 0.95;
       } else if (lowerHeader.includes('full name') || lowerHeader.includes('fullname')) {
         crmField = 'contactFullName';
         confidence = 0.95;
@@ -201,17 +207,26 @@ router.post('/projects/:id/upload', async (req: Request, res: Response) => {
         crmField = 'website';
         confidence = 0.9;
       }
-      // Location fields
-      else if (lowerHeader.includes('city')) {
+      // Address fields
+      else if (lowerHeader.includes('addr1') || lowerHeader.includes('address 1') || (lowerHeader.includes('address') && lowerHeader.includes('line') && lowerHeader.includes('1'))) {
+        crmField = 'address1';
+        confidence = 0.95;
+      } else if (lowerHeader.includes('addr2') || lowerHeader.includes('address 2') || (lowerHeader.includes('address') && lowerHeader.includes('line') && lowerHeader.includes('2'))) {
+        crmField = 'address2';
+        confidence = 0.95;
+      } else if (lowerHeader.includes('addr3') || lowerHeader.includes('address 3') || (lowerHeader.includes('address') && lowerHeader.includes('line') && lowerHeader.includes('3'))) {
+        crmField = 'address3';
+        confidence = 0.95;
+      } else if (lowerHeader.includes('city') || lowerHeader.includes('town')) {
         crmField = 'city';
         confidence = 0.95;
-      } else if (lowerHeader.includes('state') || lowerHeader.includes('province')) {
+      } else if (lowerHeader.includes('state') || lowerHeader.includes('province') || lowerHeader.includes('county')) {
         crmField = 'state';
         confidence = 0.95;
       } else if (lowerHeader.includes('country')) {
         crmField = 'country';
         confidence = 0.95;
-      } else if (lowerHeader.includes('zip') || lowerHeader.includes('postal')) {
+      } else if (lowerHeader.includes('zip') || lowerHeader.includes('postal') || lowerHeader.includes('postcode')) {
         crmField = 'zip';
         confidence = 0.95;
       }
@@ -253,7 +268,19 @@ router.post('/projects/:id/mappings', async (req: Request, res: Response) => {
       required: m.required || false,
     }));
     
+    // Delete existing mappings first (allows re-mapping)
+    await db.delete(dvFieldMappings)
+      .where(eq(dvFieldMappings.projectId, req.params.id))
+      .execute();
+    
+    // Insert new mappings
     await db.insert(dvFieldMappings).values(mappingRecords).execute();
+    
+    // Auto-start processing by setting status to 'active' (required for background scheduler)
+    await db.update(dvProjects)
+      .set({ status: 'active', updatedAt: new Date() })
+      .where(eq(dvProjects.id, req.params.id))
+      .execute();
     
     res.json({ success: true, count: mappingRecords.length });
   } catch (error) {

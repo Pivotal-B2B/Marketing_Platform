@@ -220,6 +220,8 @@ export default function DvProjectDetail() {
                             </SelectTrigger>
                             <SelectContent>
                               <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Contact Fields</div>
+                              <SelectItem value="firstName">First Name</SelectItem>
+                              <SelectItem value="lastName">Last Name</SelectItem>
                               <SelectItem value="contactFullName">Full Name</SelectItem>
                               <SelectItem value="email">Email Address</SelectItem>
                               <SelectItem value="phoneRaw">Phone Number</SelectItem>
@@ -230,11 +232,14 @@ export default function DvProjectDetail() {
                               <SelectItem value="accountDomain">Company Domain</SelectItem>
                               <SelectItem value="website">Website URL</SelectItem>
                               
-                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Location Fields</div>
-                              <SelectItem value="city">City</SelectItem>
-                              <SelectItem value="state">State/Province</SelectItem>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Address Fields</div>
+                              <SelectItem value="address1">Address Line 1</SelectItem>
+                              <SelectItem value="address2">Address Line 2</SelectItem>
+                              <SelectItem value="address3">Address Line 3</SelectItem>
+                              <SelectItem value="city">City/Town</SelectItem>
+                              <SelectItem value="state">State/County</SelectItem>
+                              <SelectItem value="zip">ZIP/Postcode</SelectItem>
                               <SelectItem value="country">Country</SelectItem>
-                              <SelectItem value="zip">ZIP/Postal Code</SelectItem>
                               
                               <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Other</div>
                               <SelectItem value="extras">Custom Data (JSON)</SelectItem>
