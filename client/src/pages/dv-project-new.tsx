@@ -26,7 +26,10 @@ export default function DvProjectNew() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', '/api/dv/projects', data),
+    mutationFn: async (data: any) => {
+      const res = await apiRequest('POST', '/api/dv/projects', data);
+      return res.json();
+    },
     onSuccess: (project: any) => {
       toast({ title: 'Project created', description: 'Data verification project created successfully' });
       setLocation(`/dv/projects/${project.id}`);

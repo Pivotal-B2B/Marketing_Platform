@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { db } from '../db';
-import { dvRecords, dvRecordsRaw, dvFieldMappings, type DvRecord } from '@shared/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { dvRecords, dvRecordsRaw, dvFieldMappings, dvProjects, dvExclusionLists, type DvRecord } from '@shared/schema';
+import { eq, and, inArray, isNull } from 'drizzle-orm';
 import { generateDedupeHash } from './dv-dedupe';
 import { parsePhone } from './dv-phone';
 import { validateEmail } from './dv-email-validation';
@@ -231,11 +231,11 @@ async function applyExclusions(ctx: JobContext): Promise<void> {
   
   // Get all active exclusions for this client
   const exclusions = await db.select()
-    .from(dvExclusions)
+    .from(dvExclusionLists)
     .where(
       and(
-        eq(dvExclusions.clientId, project.clientId),
-        eq(dvExclusions.isActive, true)
+        eq(dvExclusionLists.clientId, project.clientId),
+        eq(dvExclusionLists.isActive, true)
       )
     )
     .execute();
