@@ -49,7 +49,7 @@ interface FilterFieldsResponse {
   grouped: Record<string, FilterFieldConfig[]>;
 }
 
-export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includeRelatedEntities = false }: FilterBuilderProps) {
+export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includeRelatedEntities = false, inline = false }: FilterBuilderProps & { inline?: boolean }) {
   const [filterGroup, setFilterGroup] = useState<FilterGroup>(
     initialFilter || {
       logic: 'AND',
@@ -322,13 +322,16 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
   };
 
   const handleApply = () => {
-    console.log('Applying filter group:', filterGroup); // Debug log
-    if (filterGroup.conditions.length === 0) {
-      onApplyFilter(undefined);
-    } else {
-      onApplyFilter(filterGroup);
-    }
-    setOpen(false);
+    console.log('[FilterBuilder] Applying filter group:', filterGroup);
+    
+    // Call the callback first
+    const filterToApply = filterGroup.conditions.length === 0 ? undefined : filterGroup;
+    onApplyFilter(filterToApply);
+    
+    // Then close the sheet after a brief delay to ensure callback completes
+    setTimeout(() => {
+      setOpen(false);
+    }, 0);
   };
 
   const handleClear = () => {

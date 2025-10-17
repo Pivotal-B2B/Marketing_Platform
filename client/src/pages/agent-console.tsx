@@ -121,6 +121,11 @@ export default function AgentConsolePage() {
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
   const [priorityLevel, setPriorityLevel] = useState<number>(1);
+  
+  // Debug: Log filterGroup changes
+  useEffect(() => {
+    console.log('[Agent Console] filterGroup updated:', filterGroup);
+  }, [filterGroup]);
 
   // Fetch SIP trunk credentials
   const { data: sipConfig } = useQuery<{
@@ -596,7 +601,11 @@ export default function AgentConsolePage() {
                       <Label>Filter Contacts</Label>
                       <FilterBuilder
                         entityType="contact"
-                        onApplyFilter={setFilterGroup}
+                        onApplyFilter={(filter) => {
+                          console.log('[Agent Console] onApplyFilter called with:', filter);
+                          setFilterGroup(filter);
+                          console.log('[Agent Console] filterGroup will be set to:', filter);
+                        }}
                         initialFilter={filterGroup}
                         includeRelatedEntities={true}
                       />
