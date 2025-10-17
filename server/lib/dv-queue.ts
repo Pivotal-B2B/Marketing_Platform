@@ -60,9 +60,17 @@ async function normalizeImports(ctx: JobContext): Promise<void> {
     .where(eq(dvFieldMappings.projectId, ctx.projectId))
     .execute();
   
-  const mappingMap = new Map(
-    mappings.map(m => [m.clientHeader, m.crmField])
-  );
+  // Build mapping map, prioritizing non-extras fields and higher confidence
+  const mappingMap = new Map<string, string>();
+  for (const m of mappings) {
+    const existing = mappingMap.get(m.clientHeader);
+    // Prioritize: specific field over extras, higher confidence over lower
+    if (!existing || 
+        (existing === 'extras' && m.crmField !== 'extras') ||
+        (existing === 'extras' && m.crmField === 'extras' && m.confidence > 0)) {
+      mappingMap.set(m.clientHeader, m.crmField);
+    }
+  }
   
   for (const raw of rawRecords) {
     const payload = raw.payload as any;

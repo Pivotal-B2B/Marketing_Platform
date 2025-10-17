@@ -431,7 +431,7 @@ export default function DvAgentConsole() {
 
           <div className="flex flex-wrap gap-3">
             <Button
-              onClick={() => handleDisposition('verified')}
+              onClick={() => handleDisposition('Verified')}
               disabled={dispositionMutation.isPending}
               className="flex-1 sm:flex-none"
               data-testid="button-verified"
@@ -441,7 +441,7 @@ export default function DvAgentConsole() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => handleDisposition('needs_review')}
+              onClick={() => handleDisposition('NeedsManualReview')}
               disabled={dispositionMutation.isPending}
               className="flex-1 sm:flex-none"
               data-testid="button-needs-review"
@@ -451,7 +451,7 @@ export default function DvAgentConsole() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => handleDisposition('invalid')}
+              onClick={() => handleDisposition('DoNotUse')}
               disabled={dispositionMutation.isPending}
               className="flex-1 sm:flex-none"
               data-testid="button-invalid"
