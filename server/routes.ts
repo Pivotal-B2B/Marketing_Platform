@@ -2529,6 +2529,18 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Get all agent statuses
+  app.get("/api/agent-statuses", requireAuth, requireRole('admin', 'campaign_manager', 'agent'), async (req, res) => {
+    try {
+      const { agentStatus } = await import('@shared/schema');
+      const statuses = await db.select().from(agentStatus);
+      res.json(statuses);
+    } catch (error) {
+      console.error('Failed to fetch agent statuses:', error);
+      res.status(500).json({ message: "Failed to fetch agent statuses" });
+    }
+  });
+
   // Create auto-dialer queue
   app.post("/api/auto-dialer-queue", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
