@@ -344,10 +344,32 @@ export default function AgentConsolePage() {
       });
     },
     onSuccess: (data: any) => {
-      toast({
-        title: "Contacts added to queue",
-        description: `${data.added || 0} contacts added to your queue successfully.`,
-      });
+      const { added = 0, skipped = 0 } = data;
+      
+      // Show appropriate toast based on results
+      if (added === 0 && skipped > 0) {
+        toast({
+          title: "No contacts added",
+          description: `${skipped} contact${skipped === 1 ? ' was' : 's were'} skipped (already assigned to agents or suppressed)`,
+          variant: "destructive",
+        });
+      } else if (added > 0 && skipped > 0) {
+        toast({
+          title: "Contacts added to queue",
+          description: `${added} contact${added === 1 ? '' : 's'} added. ${skipped} skipped (already assigned or suppressed)`,
+        });
+      } else if (added > 0) {
+        toast({
+          title: "Contacts added to queue",
+          description: `${added} contact${added === 1 ? '' : 's'} added to your queue successfully.`,
+        });
+      } else {
+        toast({
+          title: "No contacts found",
+          description: "No eligible contacts matched your filters.",
+          variant: "destructive",
+        });
+      }
       
       // Reset filter dialog
       setShowFilterDialog(false);
