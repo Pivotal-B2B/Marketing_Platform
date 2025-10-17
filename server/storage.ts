@@ -10,7 +10,7 @@ import {
   campaignOrders, orderCampaignLinks, bulkImports, auditLogs, activityLog, savedFilters,
   selectionContexts, filterFieldRegistry, fieldChangeLog, industryReference,
   companySizeReference, revenueRangeReference,
-  campaignAudienceSnapshots, campaignQueue, campaignAccountStats, senderProfiles, emailTemplates, emailSends, emailEvents,
+  campaignAudienceSnapshots, campaignQueue, agentQueue, campaignAccountStats, senderProfiles, emailTemplates, emailSends, emailEvents,
   callScripts, callAttempts, callEvents, qualificationResponses,
   contentAssets, socialPosts, aiContentGenerations, contentAssetPushes,
   events, resources, news,
@@ -1801,12 +1801,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getQueueItemById(id: string): Promise<any> {
-    const [queueItem] = await db
+    // Try agent_queue first (manual dial)
+    const [agentQueueItem] = await db
+      .select()
+      .from(agentQueue)
+      .where(eq(agentQueue.id, id))
+      .limit(1);
+    
+    if (agentQueueItem) {
+      return { ...agentQueueItem, _queueTable: 'agent_queue' };
+    }
+
+    // Try campaign_queue (power dial)
+    const [campaignQueueItem] = await db
       .select()
       .from(campaignQueue)
       .where(eq(campaignQueue.id, id))
       .limit(1);
-    return queueItem || null;
+    
+    if (campaignQueueItem) {
+      return { ...campaignQueueItem, _queueTable: 'campaign_queue' };
+    }
+
+    return null;
   }
 
   // Call Dispositions
@@ -1815,13 +1832,20 @@ export class DatabaseStorage implements IStorage {
 
     // If this is linked to a queue item and has a disposition, update queue status
     if (call.queueItemId && call.disposition) {
-      await db
-        .update(campaignQueue)
-        .set({ 
-          status: 'done' as any,
-          updatedAt: new Date() 
-        })
-        .where(eq(campaignQueue.id, call.queueItemId));
+      // Get queue item to determine which table to update
+      const queueItem = await this.getQueueItemById(call.queueItemId);
+      
+      if (queueItem) {
+        const queueTable = queueItem._queueTable === 'agent_queue' ? agentQueue : campaignQueue;
+        
+        await db
+          .update(queueTable)
+          .set({ 
+            status: 'done' as any,
+            updatedAt: new Date() 
+          })
+          .where(eq(queueTable.id, call.queueItemId));
+      }
 
       // Auto-create Lead for qualified dispositions
       if (call.disposition === 'qualified' && call.contactId) {
