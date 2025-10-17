@@ -1856,9 +1856,8 @@ export function registerRoutes(app: Express) {
           for (let i = 0; i < queueItems.length; i += insertBatchSize) {
             const batch = queueItems.slice(i, i + insertBatchSize);
             try {
-              const result = await db.insert(agentQueue).values(batch).onConflictDoNothing({
-                target: [agentQueue.agentId, agentQueue.campaignId, agentQueue.contactId],
-              }).returning({ id: agentQueue.id });
+              // Use onConflictDoNothing without target - will use the unique index automatically
+              const result = await db.insert(agentQueue).values(batch).onConflictDoNothing().returning({ id: agentQueue.id });
               // Count only actually inserted rows (conflicts are skipped and not returned)
               totalAdded += result.length;
               console.log(`[Manual Queue] Batch ${i / insertBatchSize + 1}: ${result.length}/${batch.length} items inserted (${batch.length - result.length} skipped as conflicts)`);
