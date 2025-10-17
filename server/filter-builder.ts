@@ -8,11 +8,11 @@ type TableType = typeof accounts | typeof contacts | typeof leads;
 const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
   accounts: {
     'industry': 'industryStandardized',
-    'companySize': 'companySize',
-    'revenue': 'revenue',
+    'companySize': 'employeesSizeRange',
+    'revenue': 'revenueRange',
   },
   contacts: {
-    // Contacts don't have direct industry field - would need to join with accounts
+    // Contact location fields map directly
   },
   leads: {
     // Leads table uses standard field names

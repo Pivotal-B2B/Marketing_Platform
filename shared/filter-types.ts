@@ -66,9 +66,13 @@ export const accountFilterFields = {
   name: { type: 'text' as const, label: 'Company Name' },
   industry: { type: 'text' as const, label: 'Industry' },
   domain: { type: 'text' as const, label: 'Domain' },
-  hqCity: { type: 'text' as const, label: 'City' },
-  hqState: { type: 'text' as const, label: 'State' },
-  hqCountry: { type: 'text' as const, label: 'Country' },
+  hqStreet1: { type: 'text' as const, label: 'HQ Street 1' },
+  hqStreet2: { type: 'text' as const, label: 'HQ Street 2' },
+  hqStreet3: { type: 'text' as const, label: 'HQ Street 3' },
+  hqCity: { type: 'text' as const, label: 'HQ City' },
+  hqState: { type: 'text' as const, label: 'HQ State' },
+  hqCountry: { type: 'text' as const, label: 'HQ Country' },
+  companyLocation: { type: 'text' as const, label: 'Company Location' },
   sicCode: { type: 'text' as const, label: 'SIC Code' },
   naicsCode: { type: 'text' as const, label: 'NAICS Code' },
   // Enum fields (dropdown only)
@@ -80,6 +84,7 @@ export const accountFilterFields = {
   // Array fields
   techStack: { type: 'array' as const, label: 'Tech Stack' },
   linkedinSpecialties: { type: 'array' as const, label: 'LinkedIn Specialties' },
+  previousNames: { type: 'array' as const, label: 'Previous Names' },
   intentTopics: { type: 'array' as const, label: 'Intent Topics' },
   tags: { type: 'array' as const, label: 'Tags' },
   // Boolean fields
@@ -97,6 +102,17 @@ export const contactFilterFields = {
   jobTitle: { type: 'text' as const, label: 'Job Title' },
   department: { type: 'text' as const, label: 'Department' },
   seniorityLevel: { type: 'text' as const, label: 'Seniority Level' },
+  formerPosition: { type: 'text' as const, label: 'Former Position' },
+  timeInCurrentPosition: { type: 'text' as const, label: 'Time in Current Position' },
+  timeInCurrentCompany: { type: 'text' as const, label: 'Time in Current Company' },
+  timezone: { type: 'text' as const, label: 'Timezone' },
+  city: { type: 'text' as const, label: 'City' },
+  state: { type: 'text' as const, label: 'State' },
+  country: { type: 'text' as const, label: 'Country' },
+  contactLocation: { type: 'text' as const, label: 'Contact Location' },
+  list: { type: 'text' as const, label: 'Source List' },
+  // Date fields
+  researchDate: { type: 'date' as const, label: 'Research Date' },
   // Array fields
   intentTopics: { type: 'array' as const, label: 'Intent Topics' },
   tags: { type: 'array' as const, label: 'Tags' },
