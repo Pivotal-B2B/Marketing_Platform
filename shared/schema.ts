@@ -752,6 +752,9 @@ export const campaigns = pgTable("campaigns", {
 
   // Dial Mode (Manual vs Power)
   dialMode: dialModeEnum("dial_mode").notNull().default('power'),
+  
+  // Power Dialer Settings (AMD & Voicemail)
+  powerSettings: jsonb("power_settings"), // { amd: { enabled, confidenceThreshold, timeout, unknownAction }, voicemailPolicy: { enabled, action, message, campaign_daily_vm_cap, contact_vm_cap, region_blacklist } }
 
   // Retry Logic & Business Hours
   retryRules: jsonb("retry_rules"),  // { voicemail: {}, no_answer: {}, backoff: "", business_hours: {}, respect_local_tz: bool }
