@@ -337,11 +337,13 @@ export default function AgentConsolePage() {
       if (!selectedCampaignId) throw new Error("No campaign selected");
       if (!user?.id) throw new Error("Agent ID not found");
       
-      return await apiRequest('POST', `/api/campaigns/${selectedCampaignId}/manual/queue/add`, {
+      const response = await apiRequest('POST', `/api/campaigns/${selectedCampaignId}/manual/queue/add`, {
         agentId: user.id,
         filters,
         priority
       });
+      
+      return await response.json();
     },
     onSuccess: (data: any) => {
       const { added = 0, skipped = 0 } = data;
