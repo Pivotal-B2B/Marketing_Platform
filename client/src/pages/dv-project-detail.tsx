@@ -38,14 +38,9 @@ export default function DvProjectDetail() {
     },
     onSuccess: (data) => {
       setUploadedData(data);
-      // Auto-suggest mappings
-      const suggested = data.headers.map((header: string) => ({
-        clientHeader: header,
-        crmField: suggestMapping(header),
-        confidence: 0.8,
-      }));
-      setMappings(suggested);
-      toast({ title: 'CSV uploaded', description: `${data.preview.length} rows detected` });
+      // Use backend mapping suggestions
+      setMappings(data.mappingSuggestions || []);
+      toast({ title: 'CSV uploaded', description: `${data.totalCount} rows detected` });
     },
   });
 
@@ -211,7 +206,7 @@ export default function DvProjectDetail() {
                       <TableRow key={index}>
                         <TableCell className="font-medium">{mapping.clientHeader}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {uploadedData.preview[0]?.[mapping.clientHeader] || '—'}
+                          Sample data preview
                         </TableCell>
                         <TableCell>
                           <Select
@@ -258,7 +253,7 @@ export default function DvProjectDetail() {
                     disabled={confirmMappingsMutation.isPending || !mappings.some(m => m.crmField)}
                     data-testid="button-confirm-mappings"
                   >
-                    Confirm & Import ({uploadedData.totalRows} rows)
+                    Confirm & Import ({uploadedData.totalCount} rows)
                   </Button>
                   <Button
                     variant="outline"
