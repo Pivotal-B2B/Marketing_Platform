@@ -34,6 +34,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTelnyxWebRTC } from "@/hooks/useTelnyxWebRTC";
+import { useAuth } from "@/contexts/AuthContext";
 import type { CallState } from "@/hooks/useTelnyxWebRTC";
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { FilterBuilder } from "@/components/filter-builder";
@@ -103,6 +104,7 @@ type Campaign = {
 
 export default function AgentConsolePage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [callStatus, setCallStatus] = useState<CallStatus>('idle');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
   const [currentContactIndex, setCurrentContactIndex] = useState(0);
@@ -333,14 +335,10 @@ export default function AgentConsolePage() {
   const addToQueueMutation = useMutation({
     mutationFn: async ({ filters, priority }: { filters: FilterGroup; priority: number }) => {
       if (!selectedCampaignId) throw new Error("No campaign selected");
-      
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const agentId = user.id;
-      
-      if (!agentId) throw new Error("Agent ID not found");
+      if (!user?.id) throw new Error("Agent ID not found");
       
       return await apiRequest('POST', `/api/campaigns/${selectedCampaignId}/manual/queue/add`, {
-        agentId,
+        agentId: user.id,
         filters,
         priority
       });
