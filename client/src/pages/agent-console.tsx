@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   Phone, 
   PhoneOff, 
@@ -26,13 +27,17 @@ import {
   Zap,
   Volume2,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Filter,
+  Plus
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTelnyxWebRTC } from "@/hooks/useTelnyxWebRTC";
 import type { CallState } from "@/hooks/useTelnyxWebRTC";
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { FilterBuilder } from "@/components/filter-builder";
+import type { FilterGroup } from "@shared/filter-types";
 
 // Backwards compatibility type alias
 type CallStatus = CallState | 'wrap-up';
@@ -108,6 +113,11 @@ export default function AgentConsolePage() {
   const [disposition, setDisposition] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [qualificationData, setQualificationData] = useState<any>({});
+  
+  // Manual queue filter state
+  const [showFilterDialog, setShowFilterDialog] = useState(false);
+  const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
+  const [priorityLevel, setPriorityLevel] = useState<number>(1);
 
   // Fetch SIP trunk credentials
   const { data: sipConfig } = useQuery<{
@@ -282,6 +292,39 @@ export default function AgentConsolePage() {
     },
   });
 
+  // Mutation for adding contacts to manual queue
+  const addToQueueMutation = useMutation({
+    mutationFn: async ({ filters, priority }: { filters: FilterGroup; priority: number }) => {
+      if (!selectedCampaignId) throw new Error("No campaign selected");
+      
+      return await apiRequest('POST', `/api/campaigns/${selectedCampaignId}/manual/queue/add`, {
+        filters,
+        priority
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Contacts added to queue",
+        description: `${data.added || 0} contacts added to your queue successfully.`,
+      });
+      
+      // Reset filter dialog
+      setShowFilterDialog(false);
+      setFilterGroup(undefined);
+      setPriorityLevel(1);
+      
+      // Refetch queue
+      refetchQueue();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add contacts to queue",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDial = () => {
     if (!isConnected) {
       toast({
@@ -386,6 +429,22 @@ export default function AgentConsolePage() {
     });
   };
 
+  const handleAddToQueue = () => {
+    if (!filterGroup || filterGroup.conditions.length === 0) {
+      toast({
+        title: "Filters required",
+        description: "Please configure at least one filter condition.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addToQueueMutation.mutate({
+      filters: filterGroup,
+      priority: priorityLevel
+    });
+  };
+
   const handleNextContact = () => {
     if (currentContactIndex < queueData.length - 1) {
       setCurrentContactIndex(currentContactIndex + 1);
@@ -458,6 +517,80 @@ export default function AgentConsolePage() {
               </Badge>
             )}
             {getStatusBadge()}
+            
+            {/* Add to Queue button - only show for manual dial campaigns */}
+            {campaignDetails && dialMode === 'manual' && (
+              <Dialog open={showFilterDialog} onOpenChange={setShowFilterDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-add-to-queue">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Queue
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Add Contacts to Your Queue</DialogTitle>
+                    <DialogDescription>
+                      Filter contacts from the campaign audience to add to your calling queue
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Priority Level</Label>
+                      <Select value={priorityLevel.toString()} onValueChange={(v) => setPriorityLevel(parseInt(v))}>
+                        <SelectTrigger data-testid="select-priority">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Low Priority</SelectItem>
+                          <SelectItem value="2">Normal Priority</SelectItem>
+                          <SelectItem value="3">High Priority</SelectItem>
+                          <SelectItem value="4">Urgent Priority</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="space-y-2">
+                      <Label>Filter Contacts</Label>
+                      <FilterBuilder
+                        entityType="contact"
+                        onApplyFilter={setFilterGroup}
+                        initialFilter={filterGroup}
+                        includeRelatedEntities={true}
+                      />
+                    </div>
+                    
+                    {filterGroup && filterGroup.conditions.length > 0 && (
+                      <div className="border rounded-lg p-4 bg-muted/50">
+                        <p className="text-sm font-medium mb-2">Active Filters:</p>
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            Match <Badge variant="outline">{filterGroup.logic}</Badge> of {filterGroup.conditions.length} condition{filterGroup.conditions.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setShowFilterDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleAddToQueue} 
+                      disabled={!filterGroup || filterGroup.conditions.length === 0 || addToQueueMutation.isPending}
+                      data-testid="button-confirm-add-to-queue"
+                    >
+                      {addToQueueMutation.isPending ? "Adding..." : "Add to Queue"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+            
             <Button
               variant="outline"
               size="icon"
