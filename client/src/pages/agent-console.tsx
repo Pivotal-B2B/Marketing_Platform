@@ -542,20 +542,20 @@ export default function AgentConsolePage() {
             )}
             {getStatusBadge()}
             
-            {/* Add to Queue button - only show for manual dial campaigns */}
+            {/* Filter Queue button - only show for manual dial campaigns */}
             {campaignDetails && dialMode === 'manual' && (
               <Dialog open={showFilterDialog} onOpenChange={setShowFilterDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" data-testid="button-add-to-queue">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add to Queue
+                  <Button variant="outline" size="sm" data-testid="button-filter-queue">
+                    <Filter className="h-4 w-4 mr-2" />
+                    Filter Queue
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Add Contacts to Your Queue</DialogTitle>
+                    <DialogTitle>Filter Your Calling Queue</DialogTitle>
                     <DialogDescription>
-                      Filter contacts from the campaign audience to add to your calling queue
+                      Refine your queue by filtering the campaign audience. Matching contacts will be added to your queue for prioritized calling.
                     </DialogDescription>
                   </DialogHeader>
                   
@@ -712,27 +712,11 @@ export default function AgentConsolePage() {
                   <Phone className="h-12 w-12 mx-auto mb-3 opacity-50 text-muted-foreground" />
                   <div>
                     <p className="font-medium text-sm">No contacts in queue</p>
-                    {dialMode === 'manual' ? (
-                      <>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Click "Add to Queue" above to filter and add contacts from this campaign
-                        </p>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="mt-3"
-                          onClick={() => setShowFilterDialog(true)}
-                          data-testid="button-add-contacts-empty-state"
-                        >
-                          <Filter className="h-4 w-4 mr-2" />
-                          Add Contacts to Queue
-                        </Button>
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Select a campaign with assigned contacts
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {dialMode === 'manual' 
+                        ? "Your queue will be populated when agents are assigned to this campaign"
+                        : "Select a campaign with assigned contacts"}
+                    </p>
                   </div>
                 </div>
               ) : (

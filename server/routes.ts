@@ -1817,31 +1817,70 @@ export function registerRoutes(app: Express) {
         );
         const validContacts = uniqueContacts.filter(c => c.accountId);
 
-        // Enqueue all valid contacts (skip if already in queue)
-        let enqueuedCount = 0;
-        for (const contact of validContacts) {
-          try {
-            await storage.enqueueContact(
-              req.params.id,
-              contact.id,
-              contact.accountId!,
-              0
-            );
-            enqueuedCount++;
-          } catch (error) {
-            // Skip contacts that can't be enqueued (e.g., already in queue)
+        // DUAL QUEUE STRATEGY: Different behavior for manual vs power dial
+        if (campaign.dialMode === 'manual') {
+          // MANUAL DIAL: Populate agent_queue with ALL campaign contacts for each agent
+          let totalAdded = 0;
+          
+          for (const agentId of agentIds) {
+            for (const contact of validContacts) {
+              try {
+                await db.insert(agentQueue).values({
+                  id: sql`gen_random_uuid()`,
+                  agentId,
+                  campaignId: req.params.id,
+                  contactId: contact.id,
+                  accountId: contact.accountId!,
+                  queueState: 'queued',
+                  priority: 0,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                }).onConflictDoNothing({
+                  target: [agentQueue.campaignId, agentQueue.contactId],
+                  where: sql`${agentQueue.queueState} IN ('queued', 'locked', 'in_progress')`,
+                });
+                totalAdded++;
+              } catch (error) {
+                // Skip contacts that can't be added
+              }
+            }
           }
+
+          res.status(201).json({
+            message: "Agents assigned to manual dial campaign. All campaign contacts added to each agent's queue.",
+            agentsAssigned: agentIds.length,
+            contactsPerAgent: validContacts.length,
+            totalQueueItemsCreated: totalAdded,
+            mode: 'manual'
+          });
+        } else {
+          // POWER DIAL: Populate campaign_queue and assign to agents via round-robin
+          let enqueuedCount = 0;
+          for (const contact of validContacts) {
+            try {
+              await storage.enqueueContact(
+                req.params.id,
+                contact.id,
+                contact.accountId!,
+                0
+              );
+              enqueuedCount++;
+            } catch (error) {
+              // Skip contacts that can't be enqueued (e.g., already in queue)
+            }
+          }
+
+          // Assign queue items to the newly assigned agents
+          const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
+
+          res.status(201).json({
+            message: "Agents assigned to power dial campaign and queue populated successfully",
+            queueItemsAssigned: assignResult.assigned,
+            contactsEnqueued: enqueuedCount,
+            totalContactsProcessed: validContacts.length,
+            mode: 'power'
+          });
         }
-
-        // Assign queue items to the newly assigned agents
-        const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
-
-        res.status(201).json({
-          message: "Agents assigned and queue populated successfully",
-          queueItemsAssigned: assignResult.assigned,
-          contactsEnqueued: enqueuedCount,
-          totalContactsProcessed: validContacts.length
-        });
       } else {
         // No audience defined, just assign agents
         const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
