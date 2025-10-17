@@ -1830,29 +1830,41 @@ export function registerRoutes(app: Express) {
         // DUAL QUEUE STRATEGY: Different behavior for manual vs power dial
         if (campaign.dialMode === 'manual') {
           // MANUAL DIAL: Populate agent_queue with ALL campaign contacts for each agent
-          let totalAdded = 0;
+          // Build all queue items for bulk insert (much faster than individual inserts)
+          const queueItems: any[] = [];
+          const now = new Date();
           
           for (const agentId of agentIds) {
             for (const contact of validContacts) {
-              try {
-                await db.insert(agentQueue).values({
-                  id: sql`gen_random_uuid()`,
-                  agentId,
-                  campaignId: req.params.id,
-                  contactId: contact.id,
-                  accountId: contact.accountId!,
-                  queueState: 'queued',
-                  priority: 0,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                }).onConflictDoNothing({
-                  target: [agentQueue.campaignId, agentQueue.contactId],
-                  where: sql`${agentQueue.queueState} IN ('queued', 'locked', 'in_progress')`,
-                });
-                totalAdded++;
-              } catch (error) {
-                // Skip contacts that can't be added
-              }
+              queueItems.push({
+                id: sql`gen_random_uuid()`,
+                agentId,
+                campaignId: req.params.id,
+                contactId: contact.id,
+                accountId: contact.accountId!,
+                queueState: 'queued',
+                priority: 0,
+                createdAt: now,
+                updatedAt: now,
+              });
+            }
+          }
+
+          // Bulk insert in batches for optimal performance
+          let totalAdded = 0;
+          const insertBatchSize = 1000;
+          for (let i = 0; i < queueItems.length; i += insertBatchSize) {
+            const batch = queueItems.slice(i, i + insertBatchSize);
+            try {
+              const result = await db.insert(agentQueue).values(batch).onConflictDoNothing({
+                target: [agentQueue.campaignId, agentQueue.contactId],
+                where: sql`${agentQueue.queueState} IN ('queued', 'locked', 'in_progress')`,
+              }).returning({ id: agentQueue.id });
+              // Count only actually inserted rows (conflicts are skipped and not returned)
+              totalAdded += result.length;
+              console.log(`[Manual Queue] Batch ${i / insertBatchSize + 1}: ${result.length}/${batch.length} items inserted (${batch.length - result.length} skipped as conflicts)`);
+            } catch (error) {
+              console.error(`Error inserting batch ${i / insertBatchSize + 1}:`, error);
             }
           }
 
