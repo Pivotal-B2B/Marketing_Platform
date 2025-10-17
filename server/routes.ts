@@ -1990,7 +1990,7 @@ export function registerRoutes(app: Express) {
       let result;
       if (contactIds && Array.isArray(contactIds)) {
         // Add specific contacts
-        result = await manualQueueService.addContactsToQueue(
+        result = await manualQueueService.addContactsToAgentQueue(
           req.params.id,
           agentId,
           contactIds,
@@ -1998,7 +1998,7 @@ export function registerRoutes(app: Express) {
         );
       } else if (filters) {
         // Add contacts by filters
-        result = await manualQueueService.addContactsByFilters(
+        result = await manualQueueService.addContactsByAdvancedFilters(
           req.params.id,
           agentId,
           filters,

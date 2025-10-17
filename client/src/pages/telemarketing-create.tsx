@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { CampaignWizard, type CampaignWizardStep } from "@/components/campaign-builder/campaign-wizard";
 import { Step1AudienceSelection } from "@/components/campaign-builder/step1-audience-selection";
 import { Step2TelemarketingContent } from "@/components/campaign-builder/step2-telemarketing-content";
+import { Step2bDialModeConfig } from "@/components/campaign-builder/step2b-dial-mode-config";
 import { Step3Scheduling } from "@/components/campaign-builder/step3-scheduling";
 import { Step4Compliance } from "@/components/campaign-builder/step4-compliance";
 import { Step5Summary } from "@/components/campaign-builder/step5-summary";
@@ -24,6 +25,12 @@ export default function TelemarketingCreatePage() {
       title: "Call Script",
       description: "Create your call script and qualification questions",
       component: Step2TelemarketingContent,
+    },
+    {
+      id: "dial-mode",
+      title: "Dial Mode",
+      description: "Configure manual or power dial with AMD settings",
+      component: Step2bDialModeConfig,
     },
     {
       id: "scheduling",
@@ -91,6 +98,8 @@ export default function TelemarketingCreatePage() {
         audienceRefs,
         callScript: data.content?.script,
         qualificationQuestions: data.content?.qualificationFields,
+        dialMode: data.dialMode || 'power',
+        powerSettings: data.powerSettings || undefined,
         scheduleJson,
         assignedTeams: data.scheduling?.assignedAgents || [],
         throttlingConfig,
