@@ -1836,15 +1836,18 @@ export class DatabaseStorage implements IStorage {
       const queueItem = await this.getQueueItemById(call.queueItemId);
       
       if (queueItem) {
-        const queueTable = queueItem._queueTable === 'agent_queue' ? agentQueue : campaignQueue;
-        
-        await db
-          .update(queueTable)
-          .set({ 
-            status: 'done' as any,
-            updatedAt: new Date() 
-          })
-          .where(eq(queueTable.id, call.queueItemId));
+        // Update the appropriate queue table based on dial mode
+        if (queueItem._queueTable === 'agent_queue') {
+          await db
+            .update(agentQueue)
+            .set({ status: 'done' as any })
+            .where(eq(agentQueue.id, call.queueItemId));
+        } else {
+          await db
+            .update(campaignQueue)
+            .set({ status: 'done' as any })
+            .where(eq(campaignQueue.id, call.queueItemId));
+        }
       }
 
       // Auto-create Lead for qualified dispositions
