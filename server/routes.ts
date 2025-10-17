@@ -1710,20 +1710,18 @@ export function registerRoutes(app: Express) {
       let assignments;
       
       if (isAdmin) {
-        // Admins see all active call campaigns
-        assignments = await db
+        // Admins see all call campaigns (active or not)
+        const allCampaigns = await db
           .select({
             campaignId: campaigns.id,
             campaignName: campaigns.name,
             dialMode: campaigns.dialMode,
           })
           .from(campaigns)
-          .where(
-            and(
-              eq(campaigns.type, 'call'),
-              eq(campaigns.status, 'active')
-            )
-          );
+          .where(eq(campaigns.type, 'call'));
+        
+        console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - returning ${allCampaigns.length} call campaigns`);
+        assignments = allCampaigns;
       } else {
         // Agents see only their assigned campaigns
         assignments = await db
@@ -1740,6 +1738,8 @@ export function registerRoutes(app: Express) {
               eq(campaignAgentAssignments.isActive, true)
             )
           );
+        
+        console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
       }
 
       res.json(assignments);
