@@ -46,7 +46,9 @@ export default function DvProjectDetail() {
 
   const confirmMappingsMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest('POST', `/api/dv/projects/${projectId}/mappings`, { mappings });
+      // Filter out skipped fields
+      const validMappings = mappings.filter(m => m.crmField && m.crmField !== 'skip');
+      const res = await apiRequest('POST', `/api/dv/projects/${projectId}/mappings`, { mappings: validMappings });
       return res.json();
     },
     onSuccess: () => {
@@ -225,20 +227,20 @@ export default function DvProjectDetail() {
                               <SelectItem value="accountDomain">Domain</SelectItem>
                               <SelectItem value="jobTitle">Job Title</SelectItem>
                               <SelectItem value="country">Country</SelectItem>
-                              <SelectItem value="">Skip</SelectItem>
+                              <SelectItem value="skip">Skip</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableCell>
                         <TableCell>
-                          {mapping.crmField ? (
+                          {mapping.crmField && mapping.crmField !== 'skip' ? (
                             <Badge variant="default" className="gap-1">
                               <Check className="w-3 h-3" />
-                              Auto
+                              {mapping.confidence > 0.7 ? 'Auto' : 'Manual'}
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="gap-1">
                               <X className="w-3 h-3" />
-                              None
+                              Skipped
                             </Badge>
                           )}
                         </TableCell>
@@ -250,7 +252,7 @@ export default function DvProjectDetail() {
                 <div className="flex gap-2">
                   <Button
                     onClick={() => confirmMappingsMutation.mutate()}
-                    disabled={confirmMappingsMutation.isPending || !mappings.some(m => m.crmField)}
+                    disabled={confirmMappingsMutation.isPending || !mappings.some(m => m.crmField && m.crmField !== 'skip')}
                     data-testid="button-confirm-mappings"
                   >
                     Confirm & Import ({uploadedData.totalCount} rows)
