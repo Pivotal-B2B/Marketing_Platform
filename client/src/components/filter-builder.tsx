@@ -339,8 +339,14 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
       logic: 'AND',
       conditions: []
     });
+    
+    // Call the callback first
     onApplyFilter(undefined);
-    setOpen(false);
+    
+    // Then close the sheet after a brief delay to ensure callback completes
+    setTimeout(() => {
+      setOpen(false);
+    }, 0);
   };
 
   const activeFilterCount = filterGroup.conditions.length;
