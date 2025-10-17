@@ -95,12 +95,8 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
       if (filterGroup.conditions.length === 0) {
         return { count: 0 };
       }
-      const response = await apiRequest(`/api/filters/count/${entityType}`, {
-        method: 'POST',
-        body: JSON.stringify({ filterGroup }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      return response;
+      const response = await apiRequest('POST', `/api/filters/count/${entityType}`, { filterGroup });
+      return response.json();
     },
     enabled: open && filterGroup.conditions.length > 0,
     refetchOnWindowFocus: false
@@ -382,25 +378,23 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
               </Tooltip>
             </TooltipProvider>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <SheetDescription className="text-xs">
-              Build complex filters using AND/OR logic
-            </SheetDescription>
-            {filterGroup.conditions.length > 0 && (
-              <div className="flex items-center gap-1.5 ml-auto">
-                <Hash className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs font-medium">
-                  {isCountLoading ? (
-                    <span className="text-muted-foreground">Counting...</span>
-                  ) : (
-                    <span className="text-primary">
-                      {resultsCount.toLocaleString()} {resultsCount === 1 ? 'result' : 'results'}
-                    </span>
-                  )}
-                </span>
-              </div>
-            )}
-          </div>
+          <SheetDescription className="text-xs">
+            Build complex filters using AND/OR logic
+          </SheetDescription>
+          {filterGroup.conditions.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <Hash className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs font-medium">
+                {isCountLoading ? (
+                  <span className="text-muted-foreground">Counting...</span>
+                ) : (
+                  <span className="text-primary">
+                    {resultsCount.toLocaleString()} {resultsCount === 1 ? 'result' : 'results'}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
         </SheetHeader>
 
         <div className="space-y-3 py-3">
