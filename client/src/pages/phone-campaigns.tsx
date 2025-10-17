@@ -226,7 +226,7 @@ export default function PhoneCampaignsPage() {
 
   const assignAgentsMutation = useMutation({
     mutationFn: async ({ campaignId, agentIds }: { campaignId: string; agentIds: string[] }) => {
-      return await apiRequest('POST', `/api/campaigns/${campaignId}/agents/assign`, { agentIds });
+      return await apiRequest('POST', `/api/campaigns/${campaignId}/agents`, { agentIds });
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });

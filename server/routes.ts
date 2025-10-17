@@ -1,11 +1,11 @@
 import type { Express } from "express";
-import { eq, and, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, sql, desc } from "drizzle-orm";
 import { storage } from "./storage";
 import { comparePassword, generateToken, requireAuth, requireRole, hashPassword } from "./auth";
 import webhooksRouter from "./routes/webhooks";
 import { z } from "zod";
 import { db } from "./db";
-import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue } from "@shared/schema";
+import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts } from "@shared/schema";
 import {
   insertAccountSchema,
   insertContactSchema,
@@ -2188,7 +2188,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Get queue for logged-in agent
+  // Get queue for logged-in agent (mode-aware: campaign_queue for power, agent_queue for manual)
   app.get("/api/agents/me/queue", requireAuth, requireRole('agent'), async (req, res) => {
     try {
       const agentId = req.user?.userId;
@@ -2197,6 +2197,79 @@ export function registerRoutes(app: Express) {
       }
 
       const { campaignId, status } = req.query;
+      
+      // If campaignId is specified, check dial mode to determine which queue to use
+      if (campaignId) {
+        const campaign = await storage.getCampaign(campaignId as string);
+        
+        if (campaign?.dialMode === 'manual') {
+          // Manual dial: query agent_queue (manual pull queue)
+          const manualQueue = await db
+            .select({
+              id: agentQueue.id,
+              campaignId: agentQueue.campaignId,
+              campaignName: campaigns.name,
+              contactId: agentQueue.contactId,
+              contactName: sql<string>`COALESCE(${contacts.fullName}, CONCAT(${contacts.firstName}, ' ', ${contacts.lastName}))`.as('contactName'),
+              contactEmail: contacts.email,
+              contactPhone: contacts.directPhone,
+              accountId: agentQueue.accountId,
+              accountName: accounts.name,
+              priority: agentQueue.priority,
+              status: agentQueue.queueState,
+              createdAt: agentQueue.createdAt,
+              updatedAt: agentQueue.updatedAt,
+            })
+            .from(agentQueue)
+            .leftJoin(contacts, eq(agentQueue.contactId, contacts.id))
+            .leftJoin(accounts, eq(agentQueue.accountId, accounts.id))
+            .leftJoin(campaigns, eq(agentQueue.campaignId, campaigns.id))
+            .where(
+              and(
+                eq(agentQueue.agentId, agentId),
+                eq(agentQueue.campaignId, campaignId),
+                status ? eq(agentQueue.queueState, status as any) : sql`true`
+              )
+            )
+            .orderBy(desc(agentQueue.priority), agentQueue.createdAt);
+          
+          return res.json(manualQueue);
+        } else if (campaign?.dialMode === 'power') {
+          // Power dial: query campaign_queue (auto-assigned queue)
+          const powerQueue = await db
+            .select({
+              id: campaignQueue.id,
+              campaignId: campaignQueue.campaignId,
+              campaignName: campaigns.name,
+              contactId: campaignQueue.contactId,
+              contactName: sql<string>`COALESCE(${contacts.fullName}, CONCAT(${contacts.firstName}, ' ', ${contacts.lastName}))`.as('contactName'),
+              contactEmail: contacts.email,
+              contactPhone: contacts.directPhone,
+              accountId: campaignQueue.accountId,
+              accountName: accounts.name,
+              priority: campaignQueue.priority,
+              status: campaignQueue.status,
+              createdAt: campaignQueue.createdAt,
+              updatedAt: campaignQueue.updatedAt,
+            })
+            .from(campaignQueue)
+            .leftJoin(contacts, eq(campaignQueue.contactId, contacts.id))
+            .leftJoin(accounts, eq(campaignQueue.accountId, accounts.id))
+            .leftJoin(campaigns, eq(campaignQueue.campaignId, campaigns.id))
+            .where(
+              and(
+                eq(campaignQueue.agentId, agentId),
+                eq(campaignQueue.campaignId, campaignId),
+                status ? eq(campaignQueue.status, status as any) : sql`true`
+              )
+            )
+            .orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
+          
+          return res.json(powerQueue);
+        }
+      }
+      
+      // Fallback: no campaign specified, use generic query
       const queue = await storage.getAgentQueue(
         agentId,
         campaignId as string | undefined,
@@ -2204,6 +2277,7 @@ export function registerRoutes(app: Express) {
       );
       res.json(queue);
     } catch (error) {
+      console.error('Agent queue fetch error:', error);
       res.status(500).json({ message: "Failed to fetch agent queue" });
     }
   });
