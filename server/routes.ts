@@ -1723,7 +1723,9 @@ export function registerRoutes(app: Express) {
           .where(eq(campaigns.type, 'call'));
         
         console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - found ${allCampaigns.length} call campaigns:`, allCampaigns.map(c => ({ id: c.campaignId, name: c.campaignName, dialMode: c.dialMode })));
-        assignments = allCampaigns;
+        
+        // Return the campaigns array directly
+        return res.json(allCampaigns || []);
       } else {
         // Agents see only their assigned campaigns
         assignments = await db
@@ -1742,10 +1744,10 @@ export function registerRoutes(app: Express) {
           );
         
         console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
+        
+        // Return assignments array directly
+        return res.json(assignments || []);
       }
-
-      // Always return an array, even if empty
-      res.json(assignments || []);
     } catch (error) {
       console.error('[AGENT ASSIGNMENTS] Error:', error);
       res.status(500).json({ message: "Failed to fetch agent assignments" });
