@@ -98,6 +98,7 @@ type QueueItem = {
 type Campaign = {
   id: string;
   name: string;
+  type?: 'email' | 'call' | 'combo';
 };
 
 export default function AgentConsolePage() {
@@ -707,12 +708,32 @@ export default function AgentConsolePage() {
                   <p className="text-sm text-muted-foreground">Loading queue...</p>
                 </div>
               ) : !currentQueueItem ? (
-                <div className="text-center py-8">
+                <div className="text-center py-8 space-y-3">
                   <Phone className="h-12 w-12 mx-auto mb-3 opacity-50 text-muted-foreground" />
-                  <p className="font-medium text-sm">No contacts in queue</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Select a campaign with assigned contacts
-                  </p>
+                  <div>
+                    <p className="font-medium text-sm">No contacts in queue</p>
+                    {dialMode === 'manual' ? (
+                      <>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Click "Add to Queue" above to filter and add contacts from this campaign
+                        </p>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="mt-3"
+                          onClick={() => setShowFilterDialog(true)}
+                          data-testid="button-add-contacts-empty-state"
+                        >
+                          <Filter className="h-4 w-4 mr-2" />
+                          Add Contacts to Queue
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Select a campaign with assigned contacts
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <Card className="shadow-sm">

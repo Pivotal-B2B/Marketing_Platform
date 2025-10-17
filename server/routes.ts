@@ -2086,7 +2086,7 @@ export function registerRoutes(app: Express) {
   // Add contacts to manual queue (with filters)
   app.post("/api/campaigns/:id/manual/queue/add", requireAuth, requireRole('admin', 'campaign_manager', 'agent'), async (req, res) => {
     try {
-      const { agentId, filters, contactIds, priority = 0 } = req.body;
+      const { agentId, filters, contactIds, limit = 100 } = req.body;
 
       if (!agentId) {
         return res.status(400).json({ message: "agentId is required" });
@@ -2096,26 +2096,29 @@ export function registerRoutes(app: Express) {
       const { ManualQueueService } = await import('./services/manual-queue');
       const manualQueueService = new ManualQueueService();
 
-      let result;
-      if (contactIds && Array.isArray(contactIds)) {
-        // Add specific contacts
-        result = await manualQueueService.addContactsToAgentQueue(
-          req.params.id,
-          agentId,
+      let actualFilters: any;
+      
+      if (contactIds && Array.isArray(contactIds) && contactIds.length > 0) {
+        // Convert contact IDs to a filter
+        actualFilters = {
           contactIds,
-          priority
-        );
+          industries: [],
+          regions: [],
+          accountTypes: []
+        };
       } else if (filters) {
-        // Add contacts by filters
-        result = await manualQueueService.addContactsByAdvancedFilters(
-          req.params.id,
-          agentId,
-          filters,
-          priority
-        );
+        // Use provided filters directly
+        actualFilters = filters;
       } else {
         return res.status(400).json({ message: "Either contactIds or filters must be provided" });
       }
+
+      const result = await manualQueueService.addContactsToAgentQueue(
+        agentId,
+        req.params.id,
+        actualFilters,
+        limit
+      );
 
       res.json(result);
     } catch (error) {
