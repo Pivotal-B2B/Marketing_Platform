@@ -1695,28 +1695,52 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Get campaigns assigned to the current agent
-  app.get("/api/campaigns/agent-assignments", requireAuth, requireRole('agent'), async (req, res) => {
+  // Get campaigns assigned to the current agent (or all campaigns for admin)
+  app.get("/api/campaigns/agent-assignments", requireAuth, async (req, res) => {
     try {
       const agentId = req.user?.userId;
       if (!agentId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const assignments = await db
-        .select({
-          campaignId: campaignAgentAssignments.campaignId,
-          campaignName: campaigns.name,
-          dialMode: campaigns.dialMode,
-        })
-        .from(campaignAgentAssignments)
-        .innerJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
-        .where(
-          and(
-            eq(campaignAgentAssignments.agentId, agentId),
-            eq(campaignAgentAssignments.isActive, true)
-          )
-        );
+      // Check if user is admin
+      const userRoles = req.user?.roles || [req.user?.role];
+      const isAdmin = userRoles.includes('admin') || userRoles.includes('campaign_manager');
+
+      let assignments;
+      
+      if (isAdmin) {
+        // Admins see all active call campaigns
+        assignments = await db
+          .select({
+            campaignId: campaigns.id,
+            campaignName: campaigns.name,
+            dialMode: campaigns.dialMode,
+          })
+          .from(campaigns)
+          .where(
+            and(
+              eq(campaigns.type, 'call'),
+              eq(campaigns.status, 'active')
+            )
+          );
+      } else {
+        // Agents see only their assigned campaigns
+        assignments = await db
+          .select({
+            campaignId: campaignAgentAssignments.campaignId,
+            campaignName: campaigns.name,
+            dialMode: campaigns.dialMode,
+          })
+          .from(campaignAgentAssignments)
+          .innerJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
+          .where(
+            and(
+              eq(campaignAgentAssignments.agentId, agentId),
+              eq(campaignAgentAssignments.isActive, true)
+            )
+          );
+      }
 
       res.json(assignments);
     } catch (error) {
