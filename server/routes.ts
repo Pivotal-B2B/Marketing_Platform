@@ -1709,8 +1709,6 @@ export function registerRoutes(app: Express) {
 
       console.log(`[AGENT ASSIGNMENTS] User ${agentId} - isAdmin: ${isAdmin}, roles:`, userRoles);
 
-      let assignments;
-      
       if (isAdmin) {
         // Admins see all call campaigns (active or not)
         const allCampaigns = await db
@@ -1724,11 +1722,10 @@ export function registerRoutes(app: Express) {
         
         console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - found ${allCampaigns.length} call campaigns:`, allCampaigns.map(c => ({ id: c.campaignId, name: c.campaignName, dialMode: c.dialMode })));
         
-        // Return the campaigns array directly
-        return res.json(allCampaigns || []);
+        return res.json(allCampaigns);
       } else {
         // Agents see only their assigned campaigns
-        assignments = await db
+        const assignments = await db
           .select({
             campaignId: campaignAgentAssignments.campaignId,
             campaignName: campaigns.name,
@@ -1745,8 +1742,7 @@ export function registerRoutes(app: Express) {
         
         console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
         
-        // Return assignments array directly
-        return res.json(assignments || []);
+        return res.json(assignments);
       }
     } catch (error) {
       console.error('[AGENT ASSIGNMENTS] Error:', error);
