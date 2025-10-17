@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Filter, Plus, X, Search, ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
+import { Filter, Plus, X, Search, ChevronDown, ChevronRight, HelpCircle, Hash } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   FilterGroup, 
   FilterCondition, 
@@ -86,6 +87,26 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
 
   const filterFields = filterFieldsData?.fields || [];
   const groupedFields = filterFieldsData?.grouped || {};
+
+  // Fetch filter count in real-time
+  const { data: countData, isLoading: isCountLoading } = useQuery<{ count: number }>({
+    queryKey: [`/api/filters/count/${entityType}`, filterGroup],
+    queryFn: async () => {
+      if (filterGroup.conditions.length === 0) {
+        return { count: 0 };
+      }
+      const response = await apiRequest(`/api/filters/count/${entityType}`, {
+        method: 'POST',
+        body: JSON.stringify({ filterGroup }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+      return response;
+    },
+    enabled: open && filterGroup.conditions.length > 0,
+    refetchOnWindowFocus: false
+  });
+
+  const resultsCount = countData?.count ?? 0;
 
   // Filter fields by search term
   const filteredGroupedFields = Object.entries(groupedFields).reduce((acc, [category, fields]) => {
@@ -361,9 +382,25 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
               </Tooltip>
             </TooltipProvider>
           </div>
-          <SheetDescription className="text-xs">
-            Build complex filters using AND/OR logic
-          </SheetDescription>
+          <div className="flex items-center gap-2 mt-1">
+            <SheetDescription className="text-xs">
+              Build complex filters using AND/OR logic
+            </SheetDescription>
+            {filterGroup.conditions.length > 0 && (
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Hash className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs font-medium">
+                  {isCountLoading ? (
+                    <span className="text-muted-foreground">Counting...</span>
+                  ) : (
+                    <span className="text-primary">
+                      {resultsCount.toLocaleString()} {resultsCount === 1 ? 'result' : 'results'}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+          </div>
         </SheetHeader>
 
         <div className="space-y-3 py-3">

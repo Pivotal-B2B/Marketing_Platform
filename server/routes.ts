@@ -3448,6 +3448,32 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Get count of records matching filter criteria
+  app.post("/api/filters/count/:entity", async (req, res) => {
+    try {
+      const entity = req.params.entity;
+      const { filterGroup } = req.body;
+
+      if (!['contact', 'account'].includes(entity)) {
+        return res.status(400).json({ message: "Invalid entity type. Must be 'contact' or 'account'" });
+      }
+
+      let count = 0;
+      if (entity === 'contact') {
+        const contacts = await storage.getContacts(filterGroup);
+        count = contacts.length;
+      } else if (entity === 'account') {
+        const accounts = await storage.getAccounts(filterGroup);
+        count = accounts.length;
+      }
+
+      res.json({ count });
+    } catch (error) {
+      console.error('Error getting filter count:', error);
+      res.status(500).json({ message: "Failed to get filter count" });
+    }
+  });
+
   // ==================== INDUSTRY REFERENCE ====================
 
   // Get all standardized industries
