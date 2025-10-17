@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useRoute, Link } from 'wouter';
-import { ArrowLeft, Upload, Play, Download, Users, Check, X } from 'lucide-react';
+import { ArrowLeft, Upload, Play, Download, Users, Check, X, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,7 @@ export default function DvProjectDetail() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [uploadedData, setUploadedData] = useState<any>(null);
   const [mappings, setMappings] = useState<any[]>([]);
+  const [suppressionFile, setSuppressionFile] = useState<File | null>(null);
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['/api/dv/projects', projectId],
@@ -64,6 +65,39 @@ export default function DvProjectDetail() {
     onSuccess: () => {
       toast({ title: 'Processing started', description: 'Records are being normalized and queued' });
       queryClient.invalidateQueries({ queryKey: ['/api/dv/projects', projectId] });
+    },
+  });
+
+  const uploadSuppressionMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const text = await file.text();
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+      
+      // Create exclusion list for each email
+      const exclusions = lines.map(email => ({
+        name: `Suppression - ${new Date().toISOString()}`,
+        type: 'email',
+        pattern: email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), // Escape special chars for exact match
+        scope: 'client',
+        clientId: project?.clientId || 'default',
+        isActive: true,
+        fields: {},
+        createdBy: 'admin',
+      }));
+
+      // Batch create exclusions
+      for (const exclusion of exclusions) {
+        await apiRequest('POST', '/api/dv/exclusions', exclusion);
+      }
+
+      return { count: exclusions.length };
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: 'Suppressions imported', 
+        description: `${data.count} email suppressions added. Re-run processing to apply.` 
+      });
+      setSuppressionFile(null);
     },
   });
 
@@ -145,6 +179,45 @@ export default function DvProjectDetail() {
       }
     >
       <div className="grid gap-4">
+        {/* Suppression Import Section */}
+        {project && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Ban className="w-5 h-5" />
+                Email Suppression List
+              </CardTitle>
+              <CardDescription>
+                Upload a text file with one email per line to suppress from verification queue
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="file"
+                    accept=".txt,.csv"
+                    onChange={(e) => setSuppressionFile(e.target.files?.[0] || null)}
+                    data-testid="input-suppression-file"
+                  />
+                  <Button
+                    onClick={() => suppressionFile && uploadSuppressionMutation.mutate(suppressionFile)}
+                    disabled={!suppressionFile || uploadSuppressionMutation.isPending}
+                    data-testid="button-upload-suppression"
+                  >
+                    {uploadSuppressionMutation.isPending ? 'Importing...' : 'Import Suppressions'}
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <p>• Accepted formats: .txt or .csv files with one email per line</p>
+                  <p>• Emails will be excluded from verification queue</p>
+                  <p>• Already queued records won't be affected (re-process to apply)</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Upload CSV Section */}
         {!uploadedData && (
           <Card>
