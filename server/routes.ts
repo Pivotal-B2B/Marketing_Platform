@@ -1858,7 +1858,6 @@ export function registerRoutes(app: Express) {
             try {
               const result = await db.insert(agentQueue).values(batch).onConflictDoNothing({
                 target: [agentQueue.agentId, agentQueue.campaignId, agentQueue.contactId],
-                where: sql`${agentQueue.queueState} IN ('queued', 'locked', 'in_progress')`,
               }).returning({ id: agentQueue.id });
               // Count only actually inserted rows (conflicts are skipped and not returned)
               totalAdded += result.length;
