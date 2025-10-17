@@ -1951,6 +1951,174 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // ==================== DUAL-DIALER (MANUAL & POWER) ====================
+
+  // Set campaign dial mode
+  app.post("/api/campaigns/:id/dial-mode", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { dialMode } = req.body;
+      
+      if (!['manual', 'power'].includes(dialMode)) {
+        return res.status(400).json({ message: "Invalid dial mode. Must be 'manual' or 'power'" });
+      }
+
+      const campaign = await storage.updateCampaign(req.params.id, { dialMode });
+      
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      res.json(campaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update dial mode" });
+    }
+  });
+
+  // Add contacts to manual queue (with filters)
+  app.post("/api/campaigns/:id/manual/queue/add", requireAuth, requireRole('admin', 'campaign_manager', 'agent'), async (req, res) => {
+    try {
+      const { agentId, filters, contactIds, priority = 0 } = req.body;
+
+      if (!agentId) {
+        return res.status(400).json({ message: "agentId is required" });
+      }
+
+      // Use ManualQueueService
+      const { ManualQueueService } = await import('./services/manual-queue');
+      const manualQueueService = new ManualQueueService();
+
+      let result;
+      if (contactIds && Array.isArray(contactIds)) {
+        // Add specific contacts
+        result = await manualQueueService.addContactsToQueue(
+          req.params.id,
+          agentId,
+          contactIds,
+          priority
+        );
+      } else if (filters) {
+        // Add contacts by filters
+        result = await manualQueueService.addContactsByFilters(
+          req.params.id,
+          agentId,
+          filters,
+          priority
+        );
+      } else {
+        return res.status(400).json({ message: "Either contactIds or filters must be provided" });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('Manual queue add error:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to add to manual queue" });
+    }
+  });
+
+  // Configure power dial settings (AMD + voicemail)
+  app.post("/api/campaigns/:id/power/settings", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const powerSettings = req.body;
+
+      const campaign = await storage.updateCampaign(req.params.id, {
+        powerSettings: powerSettings
+      } as any);
+
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      res.json(campaign);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update power settings" });
+    }
+  });
+
+  // Get manual queue for agent
+  app.get("/api/campaigns/:id/manual/queue/:agentId", requireAuth, async (req, res) => {
+    try {
+      const { ManualQueueService } = await import('./services/manual-queue');
+      const manualQueueService = new ManualQueueService();
+
+      const queue = await manualQueueService.getAgentQueue(req.params.id, req.params.agentId);
+      res.json(queue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch manual queue" });
+    }
+  });
+
+  // Pull next contact from manual queue
+  app.post("/api/campaigns/:id/manual/queue/pull", requireAuth, requireRole('agent', 'admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const { agentId } = req.body;
+
+      if (!agentId) {
+        return res.status(400).json({ message: "agentId is required" });
+      }
+
+      const { ManualQueueService } = await import('./services/manual-queue');
+      const manualQueueService = new ManualQueueService();
+
+      const contact = await manualQueueService.pullNextContact(req.params.id, agentId);
+      
+      if (!contact) {
+        return res.status(404).json({ message: "No contacts available in queue" });
+      }
+
+      res.json(contact);
+    } catch (error) {
+      console.error('Manual queue pull error:', error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to pull contact from queue" });
+    }
+  });
+
+  // Process AMD webhook from Telnyx
+  app.post("/api/telephony/events/amd", requireAuth, async (req, res) => {
+    try {
+      const { callAttemptId, result, confidence } = req.body;
+
+      if (!callAttemptId || !result) {
+        return res.status(400).json({ message: "callAttemptId and result are required" });
+      }
+
+      const { powerDialerEngine } = await import('./services/auto-dialer');
+
+      await powerDialerEngine.processAMDResult(callAttemptId, {
+        result,
+        confidence: confidence || 0.0
+      });
+
+      res.json({ message: "AMD result processed successfully" });
+    } catch (error) {
+      console.error('AMD processing error:', error);
+      res.status(500).json({ message: "Failed to process AMD result" });
+    }
+  });
+
+  // Get pacing metrics for campaign
+  app.get("/api/campaigns/:id/pacing-metrics", requireAuth, async (req, res) => {
+    try {
+      const { powerDialerEngine } = await import('./services/auto-dialer');
+      
+      const metrics = powerDialerEngine.getPacingMetrics(req.params.id);
+      
+      if (!metrics) {
+        return res.json({
+          callsInitiated: 0,
+          callsAnswered: 0,
+          callsAbandoned: 0,
+          abandonRate: 0,
+          targetAbandonRate: 0.03,
+          currentDialRatio: 1.0
+        });
+      }
+
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch pacing metrics" });
+    }
+  });
+
   app.get("/api/campaigns/:id/account-stats", requireAuth, async (req, res) => {
     try {
       const { accountId } = req.query;

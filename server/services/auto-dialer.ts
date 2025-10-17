@@ -1,6 +1,7 @@
 import { storage } from "../storage";
 import type { AgentStatus, Campaign } from "@shared/schema";
 import { isWithinBusinessHours, type BusinessHoursConfig } from "../utils/business-hours";
+import { VoicemailPolicyExecutor } from "./voicemail-policy-executor";
 
 interface DialerConfig {
   pollingIntervalMs: number;
@@ -14,13 +15,30 @@ const DEFAULT_CONFIG: DialerConfig = {
   retryDelayMs: 5000,
 };
 
-export class AutoDialerService {
+interface AMDResult {
+  result: 'human' | 'machine' | 'unknown';
+  confidence: number; // 0.00 - 1.00
+}
+
+interface PacingMetrics {
+  callsInitiated: number;
+  callsAnswered: number;
+  callsAbandoned: number;
+  abandonRate: number;
+  targetAbandonRate: number;
+  currentDialRatio: number;
+}
+
+export class PowerDialerEngine {
   private isRunning: boolean = false;
   private pollingInterval: NodeJS.Timeout | null = null;
   private config: DialerConfig;
+  private voicemailExecutor: VoicemailPolicyExecutor;
+  private pacingMetrics: Map<string, PacingMetrics> = new Map(); // campaignId -> metrics
 
   constructor(config: Partial<DialerConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.voicemailExecutor = new VoicemailPolicyExecutor();
   }
 
   /**
@@ -100,8 +118,8 @@ export class AutoDialerService {
         return; // No agents available
       }
 
-      // Calculate how many calls to make (progressive: 1 call per agent)
-      const callsToMake = this.calculateCallsToMake(availableAgents.length, queue);
+      // Calculate how many calls to make (with pacing for predictive mode)
+      const callsToMake = this.calculateCallsToMake(availableAgents.length, queue, campaignId);
 
       // Get contacts from campaign queue
       const contacts = await this.getNextContacts(campaignId, callsToMake);
@@ -135,17 +153,18 @@ export class AutoDialerService {
   }
 
   /**
-   * Calculate how many calls to make based on dialing mode
+   * Calculate how many calls to make based on dialing mode (with pacing)
    */
-  private calculateCallsToMake(availableAgentCount: number, queue: any): number {
+  private calculateCallsToMake(availableAgentCount: number, queue: any, campaignId: string): number {
     const { dialingMode, dialRatio, maxConcurrentCalls } = queue;
 
     if (dialingMode === 'progressive') {
       // Progressive: 1 call per available agent
       return Math.min(availableAgentCount, maxConcurrentCalls || availableAgentCount);
     } else if (dialingMode === 'predictive') {
-      // Predictive: use dial ratio (e.g., 1.5 calls per agent)
-      const predictiveCalls = Math.floor(availableAgentCount * (dialRatio || 1.0));
+      // Predictive: use dynamic dial ratio with abandon-rate feedback
+      const adjustedRatio = this.calculateDynamicDialRatio(campaignId, dialRatio || 1.5);
+      const predictiveCalls = Math.floor(availableAgentCount * adjustedRatio);
       return Math.min(predictiveCalls, maxConcurrentCalls || predictiveCalls);
     } else if (dialingMode === 'preview') {
       // Preview: manual dialing, no auto-dial
@@ -153,6 +172,51 @@ export class AutoDialerService {
     }
 
     return availableAgentCount;
+  }
+
+  /**
+   * Calculate dynamic dial ratio based on abandon rate feedback
+   * Uses PID-like control to maintain target abandon rate
+   */
+  private calculateDynamicDialRatio(campaignId: string, baseRatio: number): number {
+    const metrics = this.pacingMetrics.get(campaignId);
+    
+    if (!metrics || metrics.callsAnswered + metrics.callsAbandoned < 20) {
+      // Not enough data, use base ratio
+      return baseRatio;
+    }
+
+    const { abandonRate, targetAbandonRate } = metrics;
+    const error = abandonRate - targetAbandonRate;
+
+    // Adjust dial ratio based on error
+    // If abandon rate is too high, reduce ratio
+    // If abandon rate is too low, increase ratio
+    const adjustmentFactor = 0.1; // 10% adjustment per iteration
+    let adjustedRatio = metrics.currentDialRatio;
+
+    if (error > 0.01) {
+      // Abandon rate too high, reduce dial ratio
+      adjustedRatio = Math.max(1.0, adjustedRatio - (adjustedRatio * adjustmentFactor));
+    } else if (error < -0.01) {
+      // Abandon rate too low, increase dial ratio
+      adjustedRatio = Math.min(baseRatio, adjustedRatio + (adjustedRatio * adjustmentFactor));
+    }
+
+    // Update metrics with new dial ratio
+    metrics.currentDialRatio = adjustedRatio;
+    this.pacingMetrics.set(campaignId, metrics);
+
+    console.log(`[PowerDialer] Pacing - Campaign ${campaignId}: Abandon rate ${(abandonRate * 100).toFixed(2)}%, Dial ratio ${adjustedRatio.toFixed(2)}`);
+
+    return adjustedRatio;
+  }
+
+  /**
+   * Get pacing metrics for a campaign
+   */
+  getPacingMetrics(campaignId: string): PacingMetrics | undefined {
+    return this.pacingMetrics.get(campaignId);
   }
 
   /**
@@ -261,7 +325,7 @@ export class AutoDialerService {
   }
 
   /**
-   * Initiate a call to a contact and assign to an agent
+   * Initiate a call to a contact (with AMD support for power mode)
    */
   private async initiateCall(
     queueItem: any,
@@ -270,16 +334,21 @@ export class AutoDialerService {
     queue: any
   ): Promise<void> {
     try {
-      console.log(`[AutoDialer] Initiating call: Contact ${queueItem.contactId} → Agent ${agent.agentId}`);
+      console.log(`[PowerDialer] Initiating call: Contact ${queueItem.contactId} → Agent ${agent.agentId}`);
 
       // Update queue status to 'calling'
       await storage.updateQueueStatus(queueItem.id, 'calling');
 
-      // Update agent status to 'busy'
-      await storage.updateAgentStatus(agent.agentId, {
-        status: 'busy',
-        campaignId: campaign.id,
-      });
+      // For power mode, agent stays available until human detected
+      // For manual mode, agent is immediately set to busy
+      const isPowerMode = campaign.dialMode === 'power';
+      
+      if (!isPowerMode) {
+        await storage.updateAgentStatus(agent.agentId, {
+          status: 'busy',
+          campaignId: campaign.id,
+        });
+      }
 
       // Create call attempt record
       const callAttempt = await storage.createCallAttempt({
@@ -298,6 +367,7 @@ export class AutoDialerService {
           contactId: queueItem.contactId,
           agentId: agent.agentId,
           phone: queueItem.phone,
+          dialMode: campaign.dialMode,
         },
       });
 
@@ -306,24 +376,28 @@ export class AutoDialerService {
         entityType: 'contact',
         entityId: queueItem.contactId,
         eventType: 'call_started',
-        title: `Call initiated`,
-        description: `Agent started call attempt`,
-        metadata: {
+        payload: {
+          title: `Call initiated`,
+          description: `${isPowerMode ? 'Power dialer' : 'Agent'} started call attempt`,
           campaignId: campaign.id,
           campaignName: campaign.name,
           agentId: agent.agentId,
           attemptId: callAttempt.id,
           phone: queueItem.phone,
+          dialMode: campaign.dialMode,
         },
         createdBy: agent.agentId,
       });
 
+      // Update pacing metrics
+      this.updatePacingMetrics(campaign.id, 'call_initiated');
+
       // TODO: Integrate with Telnyx Call Control API to actually place the call
-      // This will be implemented in the next phase using WebRTC bridge or Call Control API
-      console.log(`[AutoDialer] Call attempt created: ${callAttempt.id}`);
+      // In power mode, AMD will be enabled automatically
+      console.log(`[PowerDialer] Call attempt created: ${callAttempt.id} (${campaign.dialMode} mode)`);
 
     } catch (error) {
-      console.error(`[AutoDialer] Error initiating call:`, error);
+      console.error(`[PowerDialer] Error initiating call:`, error);
       
       // Rollback agent status on error
       await storage.updateAgentStatus(agent.agentId, {
@@ -333,6 +407,188 @@ export class AutoDialerService {
       // Rollback queue status
       await storage.updateQueueStatus(queueItem.id, 'pending');
     }
+  }
+
+  /**
+   * Process AMD (Answering Machine Detection) result
+   * This is called when Telnyx webhook returns AMD analysis
+   */
+  async processAMDResult(
+    callAttemptId: string,
+    amdResult: AMDResult
+  ): Promise<void> {
+    try {
+      const attempt = await storage.getCallAttempt(callAttemptId);
+      if (!attempt) {
+        console.error(`[PowerDialer] Call attempt not found: ${callAttemptId}`);
+        return;
+      }
+
+      const campaign = await storage.getCampaign(attempt.campaignId);
+      if (!campaign) {
+        console.error(`[PowerDialer] Campaign not found: ${attempt.campaignId}`);
+        return;
+      }
+
+      // Get AMD configuration from campaign power settings
+      const powerSettings = (campaign as any).powerSettings;
+      const amdConfig = powerSettings?.amd || {
+        enabled: true,
+        confidenceThreshold: 0.70,
+        timeout: 3000,
+      };
+
+      console.log(`[PowerDialer] AMD Result: ${amdResult.result} (confidence: ${amdResult.confidence})`);
+
+      // Decision pipeline based on AMD result and confidence
+      if (amdResult.result === 'human' && amdResult.confidence >= amdConfig.confidenceThreshold) {
+        // HUMAN DETECTED: Route to agent
+        await this.routeCallToAgent(callAttemptId, attempt.agentId, amdResult);
+      } else if (amdResult.result === 'machine' && amdResult.confidence >= amdConfig.confidenceThreshold) {
+        // MACHINE DETECTED: Execute voicemail policy
+        await this.routeToVoicemailPolicy(callAttemptId, attempt, amdResult);
+      } else {
+        // UNKNOWN or LOW CONFIDENCE: Default behavior based on campaign settings
+        const defaultAction = powerSettings?.amd?.unknownAction || 'route_to_agent';
+        
+        if (defaultAction === 'route_to_agent') {
+          await this.routeCallToAgent(callAttemptId, attempt.agentId, amdResult);
+        } else {
+          await this.routeToVoicemailPolicy(callAttemptId, attempt, amdResult);
+        }
+      }
+
+    } catch (error) {
+      console.error(`[PowerDialer] Error processing AMD result:`, error);
+    }
+  }
+
+  /**
+   * Route human-detected call to agent
+   */
+  private async routeCallToAgent(
+    callAttemptId: string,
+    agentId: string,
+    amdResult: AMDResult
+  ): Promise<void> {
+    try {
+      console.log(`[PowerDialer] Routing HUMAN call to agent ${agentId}`);
+
+      // Update agent status to busy (for power mode)
+      await storage.updateAgentStatus(agentId, {
+        status: 'busy',
+        campaignId: (await storage.getCallAttempt(callAttemptId))?.campaignId,
+      });
+
+      // Update call attempt with AMD result
+      await storage.updateCallAttempt(callAttemptId, {
+        amdResult: amdResult.result,
+        amdConfidence: amdResult.confidence.toString(),
+      });
+
+      // Log event
+      await storage.createCallEvent({
+        attemptId: callAttemptId,
+        type: 'amd_human_detected',
+        metadata: {
+          amdResult: amdResult.result,
+          confidence: amdResult.confidence,
+          routedToAgent: agentId,
+        },
+      });
+
+      // Update pacing metrics
+      const attempt = await storage.getCallAttempt(callAttemptId);
+      if (attempt) {
+        this.updatePacingMetrics(attempt.campaignId, 'call_answered');
+      }
+
+      // TODO: Bridge call to agent via Telnyx
+      console.log(`[PowerDialer] Call ${callAttemptId} bridged to agent ${agentId}`);
+
+    } catch (error) {
+      console.error(`[PowerDialer] Error routing call to agent:`, error);
+    }
+  }
+
+  /**
+   * Route machine-detected call to voicemail policy
+   */
+  private async routeToVoicemailPolicy(
+    callAttemptId: string,
+    attempt: any,
+    amdResult: AMDResult
+  ): Promise<void> {
+    try {
+      console.log(`[PowerDialer] Routing MACHINE call to voicemail policy`);
+
+      // Release agent back to available (for power mode)
+      await storage.updateAgentStatus(attempt.agentId, {
+        status: 'available',
+      });
+
+      // Get campaign voicemail policy
+      const campaign = await storage.getCampaign(attempt.campaignId);
+      const powerSettings = (campaign as any)?.powerSettings;
+      const vmPolicy = powerSettings?.voicemailPolicy;
+
+      if (!vmPolicy) {
+        console.log(`[PowerDialer] No voicemail policy configured, hanging up`);
+        await this.handleCallEnded(callAttemptId, 'no-answer');
+        return;
+      }
+
+      // Execute voicemail policy with AMD tracking
+      const result = await this.voicemailExecutor.executeMachinePolicy(
+        attempt.campaignId,
+        attempt.contactId,
+        callAttemptId,
+        vmPolicy as any, // Cast from JSON config
+        amdResult.result,
+        amdResult.confidence
+      );
+
+      console.log(`[PowerDialer] Voicemail policy executed: ${result.action}`);
+
+      // Update pacing metrics (count as abandoned if no agent connected)
+      this.updatePacingMetrics(attempt.campaignId, 'call_abandoned');
+
+    } catch (error) {
+      console.error(`[PowerDialer] Error routing to voicemail policy:`, error);
+    }
+  }
+
+  /**
+   * Update pacing metrics for abandon rate tracking
+   */
+  private updatePacingMetrics(
+    campaignId: string,
+    event: 'call_initiated' | 'call_answered' | 'call_abandoned'
+  ): void {
+    const metrics = this.pacingMetrics.get(campaignId) || {
+      callsInitiated: 0,
+      callsAnswered: 0,
+      callsAbandoned: 0,
+      abandonRate: 0,
+      targetAbandonRate: 0.03, // 3% target
+      currentDialRatio: 1.0,
+    };
+
+    if (event === 'call_initiated') {
+      metrics.callsInitiated++;
+    } else if (event === 'call_answered') {
+      metrics.callsAnswered++;
+    } else if (event === 'call_abandoned') {
+      metrics.callsAbandoned++;
+    }
+
+    // Calculate abandon rate
+    const totalAnswered = metrics.callsAnswered + metrics.callsAbandoned;
+    if (totalAnswered > 0) {
+      metrics.abandonRate = metrics.callsAbandoned / totalAnswered;
+    }
+
+    this.pacingMetrics.set(campaignId, metrics);
   }
 
   /**
@@ -416,9 +672,9 @@ export class AutoDialerService {
         entityType: 'contact',
         entityId: attempt.contactId,
         eventType: 'call_ended',
-        title: `Call ended: ${disposition || 'no-answer'}`,
-        description: `Call concluded with ${disposition || 'no-answer'} disposition${duration ? ` after ${Math.round(duration)}s` : ''}`,
-        metadata: {
+        payload: {
+          title: `Call ended: ${disposition || 'no-answer'}`,
+          description: `Call concluded with ${disposition || 'no-answer'} disposition${duration ? ` after ${Math.round(duration)}s` : ''}`,
           campaignId: attempt.campaignId,
           campaignName: campaign?.name || 'Unknown Campaign',
           agentId: attempt.agentId,
@@ -451,4 +707,7 @@ export class AutoDialerService {
 }
 
 // Export singleton instance
-export const autoDialerService = new AutoDialerService();
+export const powerDialerEngine = new PowerDialerEngine();
+
+// Legacy export for backward compatibility
+export const autoDialerService = powerDialerEngine;
