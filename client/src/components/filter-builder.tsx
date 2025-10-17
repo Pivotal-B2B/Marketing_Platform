@@ -338,45 +338,43 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <SheetTitle>Advanced Filters</SheetTitle>
+            <SheetTitle className="text-base">Advanced Filters</SheetTitle>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-sm">
-                  <div className="space-y-2 text-xs">
-                    <p className="font-semibold">🔍 Advanced Filter Options</p>
-                    <ul className="list-disc list-inside space-y-1">
+                  <div className="space-y-1.5 text-xs">
+                    <p className="font-semibold">Advanced Filter Options</p>
+                    <ul className="list-disc list-inside space-y-0.5">
                       <li><strong>Equals (=)</strong>: Exact match</li>
-                      <li><strong>Contains</strong>: Partial match (case-insensitive)</li>
-                      <li><strong>Begins With</strong>: Starts with text</li>
-                      <li><strong>Ends With</strong>: Ends with text</li>
-                      <li><strong>Has Value</strong>: Field is not empty</li>
-                      <li><strong>Is Empty</strong>: Field has no value</li>
+                      <li><strong>Contains</strong>: Partial match</li>
+                      <li><strong>Has Value</strong>: Not empty</li>
+                      <li><strong>Is Empty</strong>: No value</li>
                     </ul>
                   </div>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
-          <SheetDescription>
-            Build complex filters with multiple conditions using AND/OR logic
+          <SheetDescription className="text-xs">
+            Build complex filters using AND/OR logic
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-6 py-6">
+        <div className="space-y-3 py-3">
           {/* Logic Selector */}
-          <div className="flex items-center gap-4">
-            <Label>Match</Label>
+          <div className="flex items-center gap-3">
+            <Label className="text-xs">Match</Label>
             <Select
               value={filterGroup.logic}
               onValueChange={(val: 'AND' | 'OR') => setFilterGroup({ ...filterGroup, logic: val })}
             >
-              <SelectTrigger className="w-32" data-testid="select-logic">
+              <SelectTrigger className="w-28 h-8" data-testid="select-logic">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -384,28 +382,29 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
                 <SelectItem value="OR">Any (OR)</SelectItem>
               </SelectContent>
             </Select>
-            <span className="text-sm text-muted-foreground">of the following conditions</span>
+            <span className="text-xs text-muted-foreground">of the conditions</span>
           </div>
 
           {/* Conditions */}
-          <div className="space-y-4">
+          <div className="space-y-2">
             {filterGroup.conditions.map((condition, index) => {
               const fieldConfig = getFieldConfig(condition.field);
               return (
-                <div key={condition.id} className="border rounded-lg p-4 space-y-3" data-testid={`filter-condition-${condition.id}`}>
+                <div key={condition.id} className="border rounded-md p-2.5 space-y-2" data-testid={`filter-condition-${condition.id}`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Condition {index + 1}</span>
+                    <span className="text-xs font-medium">Condition {index + 1}</span>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
+                      className="h-6 w-6"
                       onClick={() => removeCondition(condition.id)}
                       data-testid={`button-remove-condition-${condition.id}`}
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3 w-3" />
                     </Button>
                   </div>
 
-                  <div className="grid gap-3">
+                  <div className="grid gap-2">
                     {/* Field Selector with Categories */}
                     <div>
                       <Label className="text-xs">Field</Label>
@@ -522,8 +521,8 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
             })}
 
             {filterGroup.conditions.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No filters added yet. Click the button below to add your first filter.
+              <div className="text-center py-4 text-xs text-muted-foreground">
+                No filters added. Click below to add your first filter.
               </div>
             )}
           </div>
@@ -532,20 +531,21 @@ export function FilterBuilder({ entityType, onApplyFilter, initialFilter, includ
           <Button
             variant="outline"
             onClick={addCondition}
-            className="w-full"
+            className="w-full h-8"
+            size="sm"
             data-testid="button-add-condition"
             disabled={filterFields.length === 0}
           >
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add Condition
           </Button>
         </div>
 
-        <SheetFooter className="gap-2">
-          <Button variant="outline" onClick={handleClear} data-testid="button-clear-filters">
+        <SheetFooter className="gap-2 pt-2">
+          <Button variant="outline" onClick={handleClear} size="sm" data-testid="button-clear-filters">
             Clear All
           </Button>
-          <Button onClick={handleApply} data-testid="button-apply-filters">
+          <Button onClick={handleApply} size="sm" data-testid="button-apply-filters">
             Apply Filters
           </Button>
         </SheetFooter>
