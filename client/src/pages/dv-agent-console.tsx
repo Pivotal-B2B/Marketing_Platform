@@ -125,6 +125,42 @@ export default function DvAgentConsole() {
     setCurrentIndex(prev => prev + 1);
   };
 
+  const handleSaveChanges = async () => {
+    if (!currentRecord) return;
+    
+    try {
+      await updateRecordMutation.mutateAsync({
+        firstName,
+        lastName,
+        email,
+        phoneRaw: phone,
+        jobTitle,
+        linkedinUrl,
+        accountName: companyName,
+        accountDomain: companyDomain,
+        website,
+        address1,
+        address2,
+        address3,
+        city,
+        state,
+        zip,
+        country,
+      });
+      
+      toast({
+        title: 'Changes saved',
+        description: 'Record updated successfully',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save changes',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-64">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" data-testid="loading-spinner"/>
@@ -435,6 +471,16 @@ export default function DvAgentConsole() {
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={handleSaveChanges}
+              disabled={updateRecordMutation.isPending}
+              variant="secondary"
+              className="flex-1 sm:flex-none"
+              data-testid="button-save"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Changes
+            </Button>
             <Button
               onClick={() => handleDisposition('Verified')}
               disabled={dispositionMutation.isPending}
