@@ -1582,6 +1582,58 @@ export function registerRoutes(app: Express) {
         });
       }
 
+      // Auto-populate queue from audience if defined
+      if (campaign.audienceRefs) {
+        const audienceRefs = campaign.audienceRefs as any;
+        let contacts: any[] = [];
+
+        // Resolve contacts from segments
+        if (audienceRefs.segments && Array.isArray(audienceRefs.segments)) {
+          for (const segmentId of audienceRefs.segments) {
+            const segment = await storage.getSegment(segmentId);
+            if (segment && segment.definitionJson) {
+              const segmentContacts = await storage.getContacts(segment.definitionJson as any);
+              contacts.push(...segmentContacts);
+            }
+          }
+        }
+
+        // Resolve contacts from lists
+        if (audienceRefs.lists && Array.isArray(audienceRefs.lists)) {
+          for (const listId of audienceRefs.lists) {
+            const list = await storage.getList(listId);
+            if (list && list.recordIds) {
+              const listContacts = await storage.getContactsByIds(list.recordIds);
+              contacts.push(...listContacts);
+            }
+          }
+        }
+
+        // Remove duplicates and filter valid contacts
+        const uniqueContacts = Array.from(
+          new Map(contacts.map(c => [c.id, c])).values()
+        );
+        const validContacts = uniqueContacts.filter(c => c.accountId);
+
+        // Enqueue all valid contacts (skip if already in queue)
+        let enqueuedCount = 0;
+        for (const contact of validContacts) {
+          try {
+            await storage.enqueueContact(
+              campaign.id,
+              contact.id,
+              contact.accountId!,
+              0
+            );
+            enqueuedCount++;
+          } catch (error) {
+            // Skip contacts that can't be enqueued (e.g., already in queue)
+          }
+        }
+
+        console.log(`[Campaign Creation] Auto-populated ${enqueuedCount} contacts to queue for campaign ${campaign.id}`);
+      }
+
       res.status(201).json(campaign);
     } catch (error) {
       console.error('Campaign creation error:', error);
@@ -1814,7 +1866,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Populate queue from campaign audience (segments/lists)
-  app.post("/api/campaigns/:id/queue/populate", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+  app.post("/api/campaigns/:id/queue/populate", requireAuth, requireRole('admin', 'campaign_manager', 'agent'), async (req, res) => {
     try {
       const campaign = await storage.getCampaign(req.params.id);
       if (!campaign) {
@@ -1872,6 +1924,7 @@ export function registerRoutes(app: Express) {
 
       // Enqueue all valid contacts
       const enqueued = [];
+      let alreadyQueued = 0;
       for (const contact of validContacts) {
         try {
           const queueItem = await storage.enqueueContact(
@@ -1882,8 +1935,8 @@ export function registerRoutes(app: Express) {
           );
           enqueued.push(queueItem);
         } catch (error) {
-          // Skip contacts that can't be enqueued (e.g., already in queue)
-          console.warn(`Failed to enqueue contact ${contact.id}:`, error);
+          // Count contacts already in queue
+          alreadyQueued++;
         }
       }
 
@@ -1893,15 +1946,16 @@ export function registerRoutes(app: Express) {
 
       // Automatically assign queue items to agents if agents are assigned
       let assignResult = { assigned: 0 };
-      if (agentIds.length > 0) {
+      if (agentIds.length > 0 && enqueued.length > 0) {
         assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
       }
 
       res.json({
-        message: `Successfully enqueued ${enqueued.length} contacts${skippedCount > 0 ? ` (${skippedCount} skipped without account)` : ''}`,
+        message: `Successfully enqueued ${enqueued.length} contacts${skippedCount > 0 ? ` (${skippedCount} skipped without account)` : ''}${alreadyQueued > 0 ? ` (${alreadyQueued} already in queue)` : ''}`,
         enqueuedCount: enqueued.length,
         totalContacts: uniqueContacts.length,
         skippedCount,
+        alreadyQueued,
         queueItemsAssigned: assignResult.assigned,
       });
     } catch (error) {
