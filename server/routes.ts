@@ -1722,7 +1722,8 @@ export function registerRoutes(app: Express) {
         
         console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - found ${allCampaigns.length} call campaigns:`, allCampaigns.map(c => ({ id: c.campaignId, name: c.campaignName, dialMode: c.dialMode })));
         
-        return res.json(allCampaigns);
+        // Return campaigns array directly
+        res.json(allCampaigns);
       } else {
         // Agents see only their assigned campaigns
         const assignments = await db
@@ -1742,7 +1743,8 @@ export function registerRoutes(app: Express) {
         
         console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
         
-        return res.json(assignments);
+        // Return assignments array directly
+        res.json(assignments);
       }
     } catch (error) {
       console.error('[AGENT ASSIGNMENTS] Error:', error);
