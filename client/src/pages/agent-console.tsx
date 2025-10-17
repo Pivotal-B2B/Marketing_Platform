@@ -114,6 +114,8 @@ export default function AgentConsolePage() {
   const [disposition, setDisposition] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [qualificationData, setQualificationData] = useState<any>({});
+  const [dispositionSaved, setDispositionSaved] = useState(false);
+  const [callMadeToContact, setCallMadeToContact] = useState(false);
   
   // Manual queue filter state
   const [showFilterDialog, setShowFilterDialog] = useState(false);
@@ -277,6 +279,15 @@ export default function AgentConsolePage() {
   useEffect(() => {
     setCurrentContactIndex(0);
   }, [queueData]);
+  
+  // Reset all contact-specific state when the active queue item changes
+  useEffect(() => {
+    setDispositionSaved(false);
+    setCallMadeToContact(false);
+    setDisposition('');
+    setNotes('');
+    setQualificationData({});
+  }, [currentQueueItem?.id]); // Key on queue item ID, not index
 
   // Mutation for saving disposition
   const saveDispositionMutation = useMutation({
@@ -288,6 +299,9 @@ export default function AgentConsolePage() {
         title: "Disposition saved",
         description: "Call disposition has been recorded successfully.",
       });
+      
+      // Mark disposition as saved BEFORE resetting form
+      setDispositionSaved(true);
       
       // Reset form
       setDisposition('');
@@ -413,6 +427,7 @@ export default function AgentConsolePage() {
     }
     
     makeCall(e164Phone, sipConfig?.callerIdNumber);
+    setCallMadeToContact(true); // Track that a call was made to this contact
   };
 
   const handleHangup = () => {
@@ -481,7 +496,7 @@ export default function AgentConsolePage() {
     }
   };
 
-  const isCallActive = ['connecting', 'ringing', 'active'].includes(callStatus);
+  const isCallActive = ['connecting', 'ringing', 'active', 'held'].includes(callStatus);
 
   const getStatusBadge = () => {
     if (!isConnected) {
@@ -689,7 +704,11 @@ export default function AgentConsolePage() {
                 variant="outline"
                 size="sm"
                 onClick={handleNextContact}
-                disabled={currentContactIndex >= queueData.length - 1 || queueData.length === 0}
+                disabled={
+                  currentContactIndex >= queueData.length - 1 || 
+                  queueData.length === 0 ||
+                  (callMadeToContact && !dispositionSaved)
+                }
                 className="flex-1"
                 data-testid="button-next-contact"
               >
@@ -1089,6 +1108,9 @@ export default function AgentConsolePage() {
           </ScrollArea>
         </div>
       </div>
+      
+      {/* Hidden audio element for remote audio stream - required by Telnyx SDK */}
+      <audio id="remoteAudio" autoPlay playsInline style={{ display: 'none' }} />
     </div>
   );
 }
