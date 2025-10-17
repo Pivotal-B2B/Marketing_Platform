@@ -1722,30 +1722,28 @@ export function registerRoutes(app: Express) {
         
         console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - found ${allCampaigns.length} call campaigns:`, allCampaigns.map(c => ({ id: c.campaignId, name: c.campaignName, dialMode: c.dialMode })));
         
-        // Return campaigns array directly
-        res.json(allCampaigns);
-      } else {
-        // Agents see only their assigned campaigns
-        const assignments = await db
-          .select({
-            campaignId: campaignAgentAssignments.campaignId,
-            campaignName: campaigns.name,
-            dialMode: campaigns.dialMode,
-          })
-          .from(campaignAgentAssignments)
-          .innerJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
-          .where(
-            and(
-              eq(campaignAgentAssignments.agentId, agentId),
-              eq(campaignAgentAssignments.isActive, true)
-            )
-          );
-        
-        console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
-        
-        // Return assignments array directly
-        res.json(assignments);
+        return res.json(allCampaigns);
       }
+      
+      // Agents see only their assigned campaigns
+      const assignments = await db
+        .select({
+          campaignId: campaignAgentAssignments.campaignId,
+          campaignName: campaigns.name,
+          dialMode: campaigns.dialMode,
+        })
+        .from(campaignAgentAssignments)
+        .innerJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
+        .where(
+          and(
+            eq(campaignAgentAssignments.agentId, agentId),
+            eq(campaignAgentAssignments.isActive, true)
+          )
+        );
+      
+      console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
+      
+      return res.json(assignments);
     } catch (error) {
       console.error('[AGENT ASSIGNMENTS] Error:', error);
       res.status(500).json({ message: "Failed to fetch agent assignments" });
