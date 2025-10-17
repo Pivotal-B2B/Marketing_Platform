@@ -1558,6 +1558,62 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Get campaigns assigned to the current agent (or all campaigns for admin)
+  // MUST come BEFORE /api/campaigns/:id to avoid route collision
+  app.get("/api/campaigns/agent-assignments", requireAuth, async (req, res) => {
+    try {
+      const agentId = req.user?.userId;
+      if (!agentId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Check if user is admin
+      const userRoles = req.user?.roles || [req.user?.role];
+      const isAdmin = userRoles.includes('admin') || userRoles.includes('campaign_manager');
+
+      console.log(`[AGENT ASSIGNMENTS] User ${agentId} - isAdmin: ${isAdmin}, roles:`, userRoles);
+
+      if (isAdmin) {
+        // Admins see all call campaigns (active or not)
+        const allCampaigns = await db
+          .select({
+            campaignId: campaigns.id,
+            campaignName: campaigns.name,
+            dialMode: campaigns.dialMode,
+          })
+          .from(campaigns)
+          .where(eq(campaigns.type, 'call'));
+        
+        console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - found ${allCampaigns.length} call campaigns:`, allCampaigns.map(c => ({ id: c.campaignId, name: c.campaignName, dialMode: c.dialMode })));
+        
+        return res.status(200).json(allCampaigns);
+      }
+      
+      // Agents see only their assigned campaigns
+      const assignments = await db
+        .select({
+          campaignId: campaignAgentAssignments.campaignId,
+          campaignName: campaigns.name,
+          dialMode: campaigns.dialMode,
+        })
+        .from(campaignAgentAssignments)
+        .innerJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
+        .where(
+          and(
+            eq(campaignAgentAssignments.agentId, agentId),
+            eq(campaignAgentAssignments.isActive, true)
+          )
+        );
+      
+      console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
+      
+      return res.status(200).json(assignments);
+    } catch (error) {
+      console.error('[AGENT ASSIGNMENTS] Error:', error);
+      return res.status(500).json({ message: "Failed to fetch agent assignments" });
+    }
+  });
+
   app.get("/api/campaigns/:id", requireAuth, async (req, res) => {
     try {
       const campaign = await storage.getCampaign(req.params.id);
@@ -1687,71 +1743,6 @@ export function registerRoutes(app: Express) {
       res.json(agents);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch agents" });
-    }
-  });
-
-  // Get agent assignments for a specific campaign
-  app.get("/api/campaigns/:id/agents", requireAuth, async (req, res) => {
-    try {
-      const assignments = await storage.getCampaignAgentAssignments(req.params.id);
-      res.json(assignments);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch campaign agent assignments" });
-    }
-  });
-
-  // Get campaigns assigned to the current agent (or all campaigns for admin)
-  app.get("/api/campaigns/agent-assignments", requireAuth, async (req, res) => {
-    try {
-      const agentId = req.user?.userId;
-      if (!agentId) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      // Check if user is admin
-      const userRoles = req.user?.roles || [req.user?.role];
-      const isAdmin = userRoles.includes('admin') || userRoles.includes('campaign_manager');
-
-      console.log(`[AGENT ASSIGNMENTS] User ${agentId} - isAdmin: ${isAdmin}, roles:`, userRoles);
-
-      if (isAdmin) {
-        // Admins see all call campaigns (active or not)
-        const allCampaigns = await db
-          .select({
-            campaignId: campaigns.id,
-            campaignName: campaigns.name,
-            dialMode: campaigns.dialMode,
-          })
-          .from(campaigns)
-          .where(eq(campaigns.type, 'call'));
-        
-        console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - found ${allCampaigns.length} call campaigns:`, allCampaigns.map(c => ({ id: c.campaignId, name: c.campaignName, dialMode: c.dialMode })));
-        
-        return res.status(200).json(allCampaigns);
-      }
-      
-      // Agents see only their assigned campaigns
-      const assignments = await db
-        .select({
-          campaignId: campaignAgentAssignments.campaignId,
-          campaignName: campaigns.name,
-          dialMode: campaigns.dialMode,
-        })
-        .from(campaignAgentAssignments)
-        .innerJoin(campaigns, eq(campaignAgentAssignments.campaignId, campaigns.id))
-        .where(
-          and(
-            eq(campaignAgentAssignments.agentId, agentId),
-            eq(campaignAgentAssignments.isActive, true)
-          )
-        );
-      
-      console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
-      
-      return res.status(200).json(assignments);
-    } catch (error) {
-      console.error('[AGENT ASSIGNMENTS] Error:', error);
-      return res.status(500).json({ message: "Failed to fetch agent assignments" });
     }
   });
 
