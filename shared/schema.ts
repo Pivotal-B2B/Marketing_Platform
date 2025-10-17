@@ -72,11 +72,33 @@ export const callDispositionEnum = pgEnum('call_disposition', [
   'no-answer',
   'busy',
   'voicemail',
+  'voicemail_left',
   'connected',
   'not-interested',
   'callback-requested',
   'qualified',
   'dnc-request'
+]);
+
+// Dual-Dialer Mode Enums
+export const dialModeEnum = pgEnum('dial_mode', ['manual', 'power']);
+
+export const amdResultEnum = pgEnum('amd_result', ['human', 'machine', 'unknown']);
+
+export const voicemailActionEnum = pgEnum('voicemail_action', [
+  'leave_voicemail',
+  'schedule_callback',
+  'drop_silent'
+]);
+
+export const voicemailMessageTypeEnum = pgEnum('voicemail_message_type', ['tts', 'audio_file']);
+
+export const manualQueueStateEnum = pgEnum('manual_queue_state', [
+  'queued',
+  'locked',
+  'in_progress',
+  'completed',
+  'removed'
 ]);
 
 export const entityTypeEnum = pgEnum('entity_type', ['account', 'contact']);
@@ -728,6 +750,9 @@ export const campaigns = pgTable("campaigns", {
   accountCapValue: integer("account_cap_value"),
   accountCapMode: accountCapModeEnum("account_cap_mode"),
 
+  // Dial Mode (Manual vs Power)
+  dialMode: dialModeEnum("dial_mode").notNull().default('power'),
+
   // Retry Logic & Business Hours
   retryRules: jsonb("retry_rules"),  // { voicemail: {}, no_answer: {}, backoff: "", business_hours: {}, respect_local_tz: bool }
   timezone: text("timezone"),  // Campaign timezone (e.g., 'America/New_York')
@@ -751,6 +776,7 @@ export const campaigns = pgTable("campaigns", {
 }, (table) => ({
   statusIdx: index("campaigns_status_idx").on(table.status),
   typeIdx: index("campaigns_type_idx").on(table.type),
+  dialModeIdx: index("campaigns_dial_mode_idx").on(table.dialMode),
 }));
 
 // Campaign Agent Assignments table (enforces one-campaign-per-agent rule)
@@ -812,6 +838,61 @@ export const campaignAccountStats = pgTable("campaign_account_stats", {
   lastEnforcedAt: timestamp("last_enforced_at"),
 }, (table) => ({
   pk: primaryKey({ columns: [table.campaignId, table.accountId] }),
+}));
+
+// Agent Queue table (for Manual Dial mode)
+export const agentQueue = pgTable("agent_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'cascade' }),
+  queueState: manualQueueStateEnum("queue_state").notNull().default('queued'),
+  lockedBy: varchar("locked_by").references(() => users.id),
+  lockedAt: timestamp("locked_at"),
+  priority: integer("priority").notNull().default(0),
+  removedReason: text("removed_reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  agentCampaignContactUniq: uniqueIndex("agent_queue_agent_campaign_contact_uniq")
+    .on(table.agentId, table.campaignId, table.contactId),
+  agentStateIdx: index("agent_queue_agent_state_idx").on(table.agentId, table.queueState),
+  campaignIdx: index("agent_queue_campaign_idx").on(table.campaignId),
+  contactIdx: index("agent_queue_contact_idx").on(table.contactId),
+}));
+
+// Voicemail Assets table (for AMD/Voicemail messages)
+export const voicemailAssets = pgTable("voicemail_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  messageType: voicemailMessageTypeEnum("message_type").notNull(),
+  ttsVoiceId: text("tts_voice_id"), // TTS provider voice ID
+  ttsTemplate: text("tts_template"), // Template with {{token}} support
+  audioFileUrl: text("audio_file_url"), // URL to uploaded audio file
+  audioFileKey: text("audio_file_key"), // Storage key for audio file
+  durationSec: integer("duration_sec"),
+  locale: text("locale").default('en-US'),
+  ownerId: varchar("owner_id").references(() => users.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  ownerIdx: index("voicemail_assets_owner_idx").on(table.ownerId),
+  activeIdx: index("voicemail_assets_active_idx").on(table.isActive),
+}));
+
+// Contact Voicemail Tracking (per-contact VM counts and cooldowns)
+export const contactVoicemailTracking = pgTable("contact_voicemail_tracking", {
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  vmCount: integer("vm_count").notNull().default(0), // Total voicemails left
+  lastVmAt: timestamp("last_vm_at"), // Last voicemail timestamp (for cooldown)
+  lastVmAssetId: varchar("last_vm_asset_id").references(() => voicemailAssets.id), // Last asset used
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.contactId, table.campaignId] }),
+  lastVmIdx: index("contact_vm_tracking_last_vm_idx").on(table.lastVmAt),
 }));
 
 // Email Messages table
@@ -1226,6 +1307,14 @@ export const callAttempts = pgTable("call_attempts", {
   endedAt: timestamp("ended_at"),
   duration: integer("duration"),
   notes: text("notes"),
+  
+  // AMD/Voicemail Tracking
+  amdResult: amdResultEnum("amd_result"), // human | machine | unknown
+  amdConfidence: numeric("amd_confidence", { precision: 3, scale: 2 }), // 0.00 - 1.00
+  vmAssetId: varchar("vm_asset_id").references(() => voicemailAssets.id), // Voicemail asset used
+  vmDelivered: boolean("vm_delivered").default(false), // Was VM successfully delivered
+  vmDurationSec: integer("vm_duration_sec"), // Duration of voicemail played
+  
   // Phase 27: Telephony enhancements
   wrapupSeconds: integer("wrapup_seconds"), // Time spent in wrap-up state
   scriptVersionId: varchar("script_version_id"), // FK to call_scripts (version tracking)
@@ -1235,6 +1324,8 @@ export const callAttempts = pgTable("call_attempts", {
   campaignIdx: index("call_attempts_campaign_idx").on(table.campaignId),
   contactIdx: index("call_attempts_contact_idx").on(table.contactId),
   agentIdx: index("call_attempts_agent_idx").on(table.agentId),
+  amdResultIdx: index("call_attempts_amd_result_idx").on(table.amdResult),
+  vmAssetIdx: index("call_attempts_vm_asset_idx").on(table.vmAssetId),
 }));
 
 // Call Events
@@ -1343,18 +1434,44 @@ export const autoDialerQueues = pgTable("auto_dialer_queues", {
   isActive: boolean("is_active").notNull().default(false),
   dialingMode: varchar("dialing_mode").notNull().default('progressive'), // 'progressive', 'predictive', 'preview'
   maxConcurrentCalls: integer("max_concurrent_calls").default(1),
+  maxConcurrentPerAgent: integer("max_concurrent_per_agent").default(1), // Max channels per agent
   dialRatio: numeric("dial_ratio").default('1.0'),
-  answeringMachineDetection: boolean("answering_machine_detection").default(false),
+  ringTimeoutSec: integer("ring_timeout_sec").default(30),
+  abandonRateTargetPct: numeric("abandon_rate_target_pct").default('3.0'), // Target abandon rate %
+  
+  // AMD/Voicemail Configuration
+  amdEnabled: boolean("amd_enabled").default(false),
+  amdConfidenceThreshold: numeric("amd_confidence_threshold").default('0.75'), // 0.0 - 1.0
+  amdDecisionTimeoutMs: integer("amd_decision_timeout_ms").default(2500), // 1500-3500ms
+  amdUncertainFallback: varchar("amd_uncertain_fallback").default('route_as_human'), // 'route_as_human' | 'voicemail_policy'
+  
+  // Voicemail Policy
+  vmAction: voicemailActionEnum("vm_action").default('drop_silent'), // leave_voicemail | schedule_callback | drop_silent
+  vmAssetId: varchar("vm_asset_id").references(() => voicemailAssets.id),
+  vmMaxPerContact: integer("vm_max_per_contact").default(1),
+  vmCooldownHours: integer("vm_cooldown_hours").default(72),
+  vmDailyCampaignCap: integer("vm_daily_campaign_cap"),
+  vmLocalTimeWindow: jsonb("vm_local_time_window"), // { start_hhmm: '09:00', end_hhmm: '17:00' }
+  vmRestrictedRegionBlock: boolean("vm_restricted_region_block").default(false),
+  
   checkDnc: boolean("check_dnc").default(true),
   priorityMode: varchar("priority_mode").default('fifo'),
   pacingStrategy: varchar("pacing_strategy").default('agent_based'),
+  distributionStrategy: varchar("distribution_strategy").default('round_robin'), // round_robin | least_recently_served | skill_based
   targetAgentOccupancy: numeric("target_agent_occupancy").default('0.85'),
+  
+  // Retry & Quiet Hours
+  retryRules: jsonb("retry_rules"),
+  quietHours: jsonb("quiet_hours"),
+  maxDailyAttemptsPerContact: integer("max_daily_attempts_per_contact").default(3),
+  
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
   campaignIdx: uniqueIndex("auto_dialer_queues_campaign_idx").on(table.campaignId),
   activeIdx: index("auto_dialer_queues_active_idx").on(table.isActive),
+  vmAssetIdx: index("auto_dialer_queues_vm_asset_idx").on(table.vmAssetId),
 }));
 
 // Bulk Imports
@@ -2587,6 +2704,23 @@ export const insertAutoDialerQueueSchema = createInsertSchema(autoDialerQueues).
   updatedAt: true,
 });
 
+// Dual-Dialer Mode Insert Schemas
+export const insertAgentQueueSchema = createInsertSchema(agentQueue).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertVoicemailAssetSchema = createInsertSchema(voicemailAssets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertContactVoicemailTrackingSchema = createInsertSchema(contactVoicemailTracking).omit({
+  updatedAt: true,
+});
+
 // Auto-Dialer Types
 export type AgentStatus = typeof agentStatus.$inferSelect;
 export type InsertAgentStatus = z.infer<typeof insertAgentStatusSchema>;
@@ -2594,7 +2728,135 @@ export type InsertAgentStatus = z.infer<typeof insertAgentStatusSchema>;
 export type AutoDialerQueue = typeof autoDialerQueues.$inferSelect;
 export type InsertAutoDialerQueue = z.infer<typeof insertAutoDialerQueueSchema>;
 
+// Dual-Dialer Mode Types
+export type AgentQueue = typeof agentQueue.$inferSelect;
+export type InsertAgentQueue = z.infer<typeof insertAgentQueueSchema>;
+
+export type VoicemailAsset = typeof voicemailAssets.$inferSelect;
+export type InsertVoicemailAsset = z.infer<typeof insertVoicemailAssetSchema>;
+
+export type ContactVoicemailTracking = typeof contactVoicemailTracking.$inferSelect;
+export type InsertContactVoicemailTracking = z.infer<typeof insertContactVoicemailTrackingSchema>;
+
 // Enum value arrays for dropdowns
 export const REVENUE_RANGE_VALUES = revenueRangeEnum.enumValues;
 export const STAFF_COUNT_RANGE_VALUES = staffCountRangeEnum.enumValues;
 export const AGENT_STATUS_VALUES = agentStatusEnum.enumValues;
+export const DIAL_MODE_VALUES = dialModeEnum.enumValues;
+export const AMD_RESULT_VALUES = amdResultEnum.enumValues;
+export const VOICEMAIL_ACTION_VALUES = voicemailActionEnum.enumValues;
+export const VOICEMAIL_MESSAGE_TYPE_VALUES = voicemailMessageTypeEnum.enumValues;
+export const MANUAL_QUEUE_STATE_VALUES = manualQueueStateEnum.enumValues;
+
+// ==================== DUAL-DIALER MODE: AMD & VOICEMAIL CONFIGURATION TYPES ====================
+
+export interface VoicemailLocalTimeWindow {
+  start_hhmm: string; // e.g., "09:00"
+  end_hhmm: string;   // e.g., "17:00"
+}
+
+export interface VoicemailMachinePolicy {
+  action: 'leave_voicemail' | 'schedule_callback' | 'drop_silent';
+  message_type?: 'tts' | 'audio_file';
+  tts_voice_id?: string;
+  audio_asset_id?: string;
+  template_id?: string;
+  message_max_sec?: number;
+  max_vm_per_contact?: number;
+  vm_cooldown_hours?: number;
+  campaign_daily_vm_cap?: number;
+  vm_local_time_window?: VoicemailLocalTimeWindow;
+  restricted_region_block?: boolean;
+}
+
+export interface AMDConfiguration {
+  enabled: boolean;
+  confidence_threshold: number; // 0.0 - 1.0
+  decision_timeout_ms: number; // e.g., 1500-3500
+  uncertain_fallback: 'route_as_human' | 'voicemail_policy';
+  machine_policy?: VoicemailMachinePolicy;
+}
+
+export interface PowerDialSettings {
+  pacing_ratio: number; // 1.0 - 3.0
+  max_concurrent_per_agent: number; // 1-3
+  ring_timeout_sec: number;
+  abandon_rate_target_pct: number;
+  distribution_strategy: 'round_robin' | 'least_recently_served' | 'skill_based';
+  retry_rules?: any;
+  quiet_hours?: any;
+  max_daily_attempts_per_contact?: number;
+  amd?: AMDConfiguration;
+}
+
+// Voicemail Token Substitution Context
+export interface VoicemailTokenContext {
+  contact: {
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
+    company?: string;
+    email?: string;
+    phone?: string;
+  };
+  company: {
+    name?: string;
+    domain?: string;
+  };
+  callback: {
+    number?: string;
+    hours?: string;
+  };
+  campaign: {
+    name?: string;
+    owner_name?: string;
+  };
+}
+
+// Manual Queue Filter Parameters
+export interface ManualQueueFilters {
+  accountIds?: string[];
+  industries?: string[];
+  regions?: string[];
+  hasEmail?: boolean;
+  hasPhone?: boolean;
+  customFilters?: any;
+}
+
+// Zod validation schemas for API requests
+export const voicemailMachinePolicySchema = z.object({
+  action: z.enum(['leave_voicemail', 'schedule_callback', 'drop_silent']),
+  message_type: z.enum(['tts', 'audio_file']).optional(),
+  tts_voice_id: z.string().optional(),
+  audio_asset_id: z.string().optional(),
+  template_id: z.string().optional(),
+  message_max_sec: z.number().min(1).max(120).optional(),
+  max_vm_per_contact: z.number().min(1).max(10).optional(),
+  vm_cooldown_hours: z.number().min(1).max(720).optional(),
+  campaign_daily_vm_cap: z.number().min(1).optional(),
+  vm_local_time_window: z.object({
+    start_hhmm: z.string().regex(/^\d{2}:\d{2}$/),
+    end_hhmm: z.string().regex(/^\d{2}:\d{2}$/),
+  }).optional(),
+  restricted_region_block: z.boolean().optional(),
+});
+
+export const amdConfigurationSchema = z.object({
+  enabled: z.boolean(),
+  confidence_threshold: z.number().min(0).max(1),
+  decision_timeout_ms: z.number().min(1000).max(5000),
+  uncertain_fallback: z.enum(['route_as_human', 'voicemail_policy']),
+  machine_policy: voicemailMachinePolicySchema.optional(),
+});
+
+export const powerDialSettingsSchema = z.object({
+  pacing_ratio: z.number().min(1.0).max(3.0),
+  max_concurrent_per_agent: z.number().min(1).max(3),
+  ring_timeout_sec: z.number().min(10).max(120),
+  abandon_rate_target_pct: z.number().min(0).max(20),
+  distribution_strategy: z.enum(['round_robin', 'least_recently_served', 'skill_based']),
+  retry_rules: z.any().optional(),
+  quiet_hours: z.any().optional(),
+  max_daily_attempts_per_contact: z.number().min(1).max(20).optional(),
+  amd: amdConfigurationSchema.optional(),
+});
