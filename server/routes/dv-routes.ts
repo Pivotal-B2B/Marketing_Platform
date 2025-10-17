@@ -195,6 +195,9 @@ router.post('/projects/:id/upload', async (req: Request, res: Response) => {
       } else if (lowerHeader.includes('title') || lowerHeader.includes('job') || lowerHeader.includes('position')) {
         crmField = 'jobTitle';
         confidence = 0.85;
+      } else if (lowerHeader.includes('linkedin') || lowerHeader.includes('li_url')) {
+        crmField = 'linkedinUrl';
+        confidence = 0.95;
       }
       // Account fields
       else if (lowerHeader.includes('company') || lowerHeader.includes('account') || lowerHeader.includes('organization')) {
@@ -331,6 +334,24 @@ router.get('/queue/:projectId', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching queue:', error);
     res.status(500).json({ error: 'Failed to fetch queue' });
+  }
+});
+
+// PATCH /api/dv/records/:id - Update record fields
+router.patch('/records/:id', async (req: Request, res: Response) => {
+  try {
+    const updates = req.body;
+    
+    const [record] = await db.update(dvRecords)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(dvRecords.id, req.params.id))
+      .returning()
+      .execute();
+    
+    res.json(record);
+  } catch (error) {
+    console.error('Error updating record:', error);
+    res.status(500).json({ error: 'Failed to update record' });
   }
 });
 

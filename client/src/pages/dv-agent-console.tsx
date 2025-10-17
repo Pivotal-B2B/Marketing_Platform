@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useRoute, Link } from 'wouter';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, ArrowRight } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, User, Building2, MapPin, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,35 +18,103 @@ export default function DvAgentConsole() {
   const { toast } = useToast();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [notes, setNotes] = useState('');
+  
+  // Editable contact fields
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
+  const [linkedinUrl, setLinkedinUrl] = useState('');
+  
+  // Editable company fields
+  const [companyName, setCompanyName] = useState('');
+  const [companyDomain, setCompanyDomain] = useState('');
+  const [website, setWebsite] = useState('');
+  const [address1, setAddress1] = useState('');
+  const [address2, setAddress2] = useState('');
+  const [address3, setAddress3] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zip, setZip] = useState('');
+  const [country, setCountry] = useState('');
 
-  const { data: queue, isLoading } = useQuery({
+  const { data: queue = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/dv/queue', projectId],
     enabled: !!projectId,
   });
 
-  const currentRecord = queue?.[currentIndex];
+  const currentRecord = queue[currentIndex];
+
+  // Load record data when current record changes
+  useEffect(() => {
+    if (currentRecord) {
+      setFirstName(currentRecord.firstName || '');
+      setLastName(currentRecord.lastName || '');
+      setEmail(currentRecord.email || '');
+      setPhone(currentRecord.phoneRaw || '');
+      setJobTitle(currentRecord.jobTitle || '');
+      setLinkedinUrl(currentRecord.linkedinUrl || '');
+      setCompanyName(currentRecord.accountName || '');
+      setCompanyDomain(currentRecord.accountDomain || '');
+      setWebsite(currentRecord.website || '');
+      setAddress1(currentRecord.address1 || '');
+      setAddress2(currentRecord.address2 || '');
+      setAddress3(currentRecord.address3 || '');
+      setCity(currentRecord.city || '');
+      setState(currentRecord.state || '');
+      setZip(currentRecord.zip || '');
+      setCountry(currentRecord.country || '');
+      setNotes('');
+    }
+  }, [currentRecord]);
+
+  const updateRecordMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('PATCH', `/api/dv/records/${currentRecord?.id}`, data),
+  });
 
   const dispositionMutation = useMutation({
     mutationFn: (data: any) => apiRequest('POST', '/api/dv/runs', data),
     onSuccess: () => {
-      toast({ title: 'Disposition saved', description: 'Record updated successfully' });
+      toast({ title: 'Record processed', description: 'Changes saved and disposition recorded' });
       queryClient.invalidateQueries({ queryKey: ['/api/dv/queue', projectId] });
       setCurrentIndex(prev => prev + 1);
-      setNotes('');
     },
   });
 
-  const handleDisposition = (disposition: string) => {
+  const handleDisposition = async (disposition: string) => {
     if (!currentRecord) return;
 
+    // First update the record with edited fields
+    await updateRecordMutation.mutateAsync({
+      firstName,
+      lastName,
+      email,
+      phoneRaw: phone,
+      jobTitle,
+      linkedinUrl,
+      accountName: companyName,
+      accountDomain: companyDomain,
+      website,
+      address1,
+      address2,
+      address3,
+      city,
+      state,
+      zip,
+      country,
+    });
+
+    // Then submit disposition
     dispositionMutation.mutate({
       recordId: currentRecord.id,
       projectId,
       disposition,
       notes,
       checks: {
-        email: currentRecord.email ? 'valid' : 'missing',
-        phone: currentRecord.phoneE164 ? 'valid' : 'missing',
+        email: email ? 'valid' : 'missing',
+        phone: phone ? 'valid' : 'missing',
+        company: companyName ? 'valid' : 'missing',
       },
     });
   };
@@ -112,7 +181,7 @@ export default function DvAgentConsole() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-6 max-w-7xl">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <Link href={`/dv/projects/${projectId}`}>
@@ -120,149 +189,286 @@ export default function DvAgentConsole() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold">Agent Console</h1>
+          <h1 className="text-2xl font-bold">Data Verification Console</h1>
         </div>
         <Badge variant="secondary" data-testid="badge-progress">
-          {currentIndex + 1} / {queue.length}
+          Record {currentIndex + 1} of {queue.length}
         </Badge>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
-        <div className="md:col-span-2 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Full Name</Label>
-                  <Input value={currentRecord?.contactFullName || ''} readOnly data-testid="input-name" />
-                </div>
-                <div>
-                  <Label>Email</Label>
-                  <Input value={currentRecord?.email || ''} readOnly data-testid="input-email" />
-                </div>
-                <div>
-                  <Label>Phone</Label>
-                  <Input value={currentRecord?.phoneRaw || currentRecord?.phoneE164 || ''} readOnly data-testid="input-phone" />
-                </div>
-                <div>
-                  <Label>Job Title</Label>
-                  <Input value={currentRecord?.jobTitle || ''} readOnly data-testid="input-title" />
-                </div>
-                <div>
-                  <Label>Company</Label>
-                  <Input value={currentRecord?.accountName || ''} readOnly data-testid="input-company" />
-                </div>
-                <div>
-                  <Label>Domain</Label>
-                  <Input value={currentRecord?.accountDomain || ''} readOnly data-testid="input-domain" />
-                </div>
-              </div>
-
-              <div>
-                <Label>Notes</Label>
-                <Textarea 
-                  value={notes} 
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add verification notes..."
-                  data-testid="textarea-notes"
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Contact Information Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Contact Information
+            </CardTitle>
+            <CardDescription>Verify and edit contact details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Enter first name"
+                  data-testid="input-firstName"
                 />
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Enter last name"
+                  data-testid="input-lastName"
+                />
+              </div>
+            </div>
 
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Verification Checks</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span>Email</span>
-                {currentRecord?.email ? (
-                  <Badge variant="default" className="bg-green-500" data-testid="badge-email-status">Valid</Badge>
-                ) : (
-                  <Badge variant="destructive" data-testid="badge-email-status">Missing</Badge>
-                )}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter email"
+                data-testid="input-email"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Enter phone"
+                data-testid="input-phone"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="jobTitle">Job Title</Label>
+              <Input
+                id="jobTitle"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="Enter job title"
+                data-testid="input-jobTitle"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="linkedinUrl">LinkedIn Profile</Label>
+              <Input
+                id="linkedinUrl"
+                value={linkedinUrl}
+                onChange={(e) => setLinkedinUrl(e.target.value)}
+                placeholder="https://linkedin.com/in/..."
+                data-testid="input-linkedinUrl"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Company Information Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              Company Information
+            </CardTitle>
+            <CardDescription>Verify and edit company details</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="companyName">Company Name</Label>
+              <Input
+                id="companyName"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Enter company name"
+                data-testid="input-companyName"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="companyDomain">Company Domain</Label>
+              <Input
+                id="companyDomain"
+                value={companyDomain}
+                onChange={(e) => setCompanyDomain(e.target.value)}
+                placeholder="company.com"
+                data-testid="input-companyDomain"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="website">Website</Label>
+              <Input
+                id="website"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://..."
+                data-testid="input-website"
+              />
+            </div>
+
+            <Separator className="my-4" />
+
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <MapPin className="w-4 h-4" />
+              <span>Company Address</span>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address1">Address Line 1</Label>
+              <Input
+                id="address1"
+                value={address1}
+                onChange={(e) => setAddress1(e.target.value)}
+                placeholder="Street address"
+                data-testid="input-address1"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="address2">Address Line 2</Label>
+                <Input
+                  id="address2"
+                  value={address2}
+                  onChange={(e) => setAddress2(e.target.value)}
+                  placeholder="Suite, floor, etc."
+                  data-testid="input-address2"
+                />
               </div>
-              <div className="flex items-center justify-between">
-                <span>Phone</span>
-                {currentRecord?.phoneE164 ? (
-                  <Badge variant="default" className="bg-green-500" data-testid="badge-phone-status">Valid</Badge>
-                ) : (
-                  <Badge variant="secondary" data-testid="badge-phone-status">Missing</Badge>
-                )}
+              <div className="space-y-2">
+                <Label htmlFor="address3">Address Line 3</Label>
+                <Input
+                  id="address3"
+                  value={address3}
+                  onChange={(e) => setAddress3(e.target.value)}
+                  placeholder="Additional info"
+                  data-testid="input-address3"
+                />
               </div>
-              <div className="flex items-center justify-between">
-                <span>Company</span>
-                {currentRecord?.accountName ? (
-                  <Badge variant="default" className="bg-green-500" data-testid="badge-company-status">Present</Badge>
-                ) : (
-                  <Badge variant="secondary" data-testid="badge-company-status">Missing</Badge>
-                )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="City"
+                  data-testid="input-city"
+                />
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State/Province</Label>
+                <Input
+                  id="state"
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  placeholder="State"
+                  data-testid="input-state"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="zip">ZIP/Postal Code</Label>
+                <Input
+                  id="zip"
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value)}
+                  placeholder="Postal code"
+                  data-testid="input-zip"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country">Country</Label>
+                <Input
+                  id="country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  placeholder="Country"
+                  data-testid="input-country"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4">
-        <div className="container mx-auto flex gap-2 justify-center">
-          <Button 
-            size="lg" 
-            variant="default" 
-            className="bg-green-600 hover:bg-green-700"
-            onClick={() => handleDisposition('Verified')}
-            disabled={dispositionMutation.isPending}
-            data-testid="button-verify"
-          >
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Verify (V)
-          </Button>
-          <Button 
-            size="lg" 
-            variant="destructive"
-            onClick={() => handleDisposition('InvalidEmail')}
-            disabled={dispositionMutation.isPending}
-            data-testid="button-invalid"
-          >
-            <XCircle className="w-4 h-4 mr-2" />
-            Invalid (I)
-          </Button>
-          <Button 
-            size="lg" 
-            variant="outline"
-            onClick={() => handleDisposition('ExcludedByRule')}
-            disabled={dispositionMutation.isPending}
-            data-testid="button-exclude"
-          >
-            <AlertTriangle className="w-4 h-4 mr-2" />
-            Exclude (X)
-          </Button>
-          <Button 
-            size="lg" 
-            variant="outline"
-            onClick={() => handleDisposition('NeedsManualReview')}
-            disabled={dispositionMutation.isPending}
-            data-testid="button-review"
-          >
-            <AlertTriangle className="w-4 h-4 mr-2" />
-            Needs Review (R)
-          </Button>
-          <Button 
-            size="lg" 
-            variant="ghost"
-            onClick={() => setCurrentIndex(prev => prev + 1)}
-            data-testid="button-skip"
-          >
-            <ArrowRight className="w-4 h-4 mr-2" />
-            Skip (N)
-          </Button>
-        </div>
-      </div>
+      {/* Notes and Actions */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Verification Notes & Disposition</CardTitle>
+          <CardDescription>Add notes and submit your disposition decision</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any verification notes or observations..."
+              rows={3}
+              data-testid="textarea-notes"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => handleDisposition('verified')}
+              disabled={dispositionMutation.isPending}
+              className="flex-1 sm:flex-none"
+              data-testid="button-verified"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Verified
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleDisposition('needs_review')}
+              disabled={dispositionMutation.isPending}
+              className="flex-1 sm:flex-none"
+              data-testid="button-needs-review"
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Needs Review
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => handleDisposition('invalid')}
+              disabled={dispositionMutation.isPending}
+              className="flex-1 sm:flex-none"
+              data-testid="button-invalid"
+            >
+              <XCircle className="w-4 h-4 mr-2" />
+              Invalid
+            </Button>
+          </div>
+
+          {updateRecordMutation.isPending && (
+            <div className="text-sm text-muted-foreground flex items-center gap-2">
+              <Save className="w-4 h-4 animate-pulse" />
+              Saving changes...
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

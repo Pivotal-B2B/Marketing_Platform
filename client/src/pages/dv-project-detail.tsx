@@ -299,6 +299,7 @@ export default function DvProjectDetail() {
                               <SelectItem value="email">Email Address</SelectItem>
                               <SelectItem value="phoneRaw">Phone Number</SelectItem>
                               <SelectItem value="jobTitle">Job Title</SelectItem>
+                              <SelectItem value="linkedinUrl">LinkedIn URL</SelectItem>
                               
                               <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Account Fields</div>
                               <SelectItem value="accountName">Company Name</SelectItem>

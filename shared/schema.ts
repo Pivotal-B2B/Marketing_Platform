@@ -2983,6 +2983,7 @@ export const dvRecords = pgTable('dv_records', {
   phoneRaw: varchar('phone_raw'),
   phoneE164: varchar('phone_e164'),
   jobTitle: varchar('job_title'),
+  linkedinUrl: varchar('linkedin_url'),
   address1: varchar('address_1'),
   address2: varchar('address_2'),
   address3: varchar('address_3'),
