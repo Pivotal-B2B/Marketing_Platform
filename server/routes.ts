@@ -1722,7 +1722,7 @@ export function registerRoutes(app: Express) {
         
         console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - found ${allCampaigns.length} call campaigns:`, allCampaigns.map(c => ({ id: c.campaignId, name: c.campaignName, dialMode: c.dialMode })));
         
-        return res.json(allCampaigns);
+        return res.status(200).json(allCampaigns);
       }
       
       // Agents see only their assigned campaigns
@@ -1743,10 +1743,10 @@ export function registerRoutes(app: Express) {
       
       console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
       
-      return res.json(assignments);
+      return res.status(200).json(assignments);
     } catch (error) {
       console.error('[AGENT ASSIGNMENTS] Error:', error);
-      res.status(500).json({ message: "Failed to fetch agent assignments" });
+      return res.status(500).json({ message: "Failed to fetch agent assignments" });
     }
   });
 
