@@ -1838,13 +1838,13 @@ export class DatabaseStorage implements IStorage {
       if (queueItem) {
         // Update the appropriate queue table based on dial mode
         if (queueItem._queueTable === 'agent_queue') {
-          // agent_queue uses 'queueState' column
+          // agent_queue uses 'queueState' column with 'completed' value
           await db
             .update(agentQueue)
-            .set({ queueState: 'done' as any })
+            .set({ queueState: 'completed' as any })
             .where(eq(agentQueue.id, call.queueItemId));
         } else {
-          // campaign_queue uses 'status' column
+          // campaign_queue uses 'status' column with 'done' value
           await db
             .update(campaignQueue)
             .set({ status: 'done' as any })
