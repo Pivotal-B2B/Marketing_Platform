@@ -219,15 +219,26 @@ export default function DvProjectDetail() {
                               <SelectValue placeholder="Select field" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="email">Email</SelectItem>
-                              <SelectItem value="firstName">First Name</SelectItem>
-                              <SelectItem value="lastName">Last Name</SelectItem>
-                              <SelectItem value="phoneRaw">Phone</SelectItem>
-                              <SelectItem value="company">Company</SelectItem>
-                              <SelectItem value="accountDomain">Domain</SelectItem>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Contact Fields</div>
+                              <SelectItem value="contactFullName">Full Name</SelectItem>
+                              <SelectItem value="email">Email Address</SelectItem>
+                              <SelectItem value="phoneRaw">Phone Number</SelectItem>
                               <SelectItem value="jobTitle">Job Title</SelectItem>
+                              
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Account Fields</div>
+                              <SelectItem value="accountName">Company Name</SelectItem>
+                              <SelectItem value="accountDomain">Company Domain</SelectItem>
+                              <SelectItem value="website">Website URL</SelectItem>
+                              
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Location Fields</div>
+                              <SelectItem value="city">City</SelectItem>
+                              <SelectItem value="state">State/Province</SelectItem>
                               <SelectItem value="country">Country</SelectItem>
-                              <SelectItem value="skip">Skip</SelectItem>
+                              <SelectItem value="zip">ZIP/Postal Code</SelectItem>
+                              
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Other</div>
+                              <SelectItem value="extras">Custom Data (JSON)</SelectItem>
+                              <SelectItem value="skip">Skip This Column</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableCell>

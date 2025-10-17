@@ -173,36 +173,47 @@ router.post('/projects/:id/upload', async (req: Request, res: Response) => {
       let crmField = 'extras';
       let confidence = 0;
       
-      if (lowerHeader.includes('email')) {
+      // Contact fields
+      if (lowerHeader.includes('email') && !lowerHeader.includes('domain')) {
         crmField = 'email';
-        confidence = 0.9;
-      } else if (lowerHeader.includes('phone')) {
+        confidence = 0.95;
+      } else if (lowerHeader.includes('phone') || lowerHeader.includes('mobile') || lowerHeader.includes('tel')) {
         crmField = 'phoneRaw';
         confidence = 0.9;
-      } else if (lowerHeader.includes('company') || lowerHeader.includes('account')) {
-        crmField = 'accountName';
-        confidence = 0.8;
-      } else if (lowerHeader.includes('domain')) {
-        crmField = 'accountDomain';
-        confidence = 0.9;
-      } else if (lowerHeader.includes('name') || lowerHeader.includes('contact')) {
+      } else if (lowerHeader.includes('full name') || lowerHeader.includes('fullname')) {
+        crmField = 'contactFullName';
+        confidence = 0.95;
+      } else if ((lowerHeader.includes('name') || lowerHeader.includes('contact')) && !lowerHeader.includes('company') && !lowerHeader.includes('account')) {
         crmField = 'contactFullName';
         confidence = 0.7;
-      } else if (lowerHeader.includes('title') || lowerHeader.includes('job')) {
+      } else if (lowerHeader.includes('title') || lowerHeader.includes('job') || lowerHeader.includes('position')) {
         crmField = 'jobTitle';
-        confidence = 0.8;
-      } else if (lowerHeader.includes('city')) {
+        confidence = 0.85;
+      }
+      // Account fields
+      else if (lowerHeader.includes('company') || lowerHeader.includes('account') || lowerHeader.includes('organization')) {
+        crmField = 'accountName';
+        confidence = 0.85;
+      } else if (lowerHeader.includes('domain') && !lowerHeader.includes('email')) {
+        crmField = 'accountDomain';
+        confidence = 0.95;
+      } else if (lowerHeader.includes('website') || lowerHeader.includes('url')) {
+        crmField = 'website';
+        confidence = 0.9;
+      }
+      // Location fields
+      else if (lowerHeader.includes('city')) {
         crmField = 'city';
-        confidence = 0.9;
-      } else if (lowerHeader.includes('state')) {
+        confidence = 0.95;
+      } else if (lowerHeader.includes('state') || lowerHeader.includes('province')) {
         crmField = 'state';
-        confidence = 0.9;
+        confidence = 0.95;
       } else if (lowerHeader.includes('country')) {
         crmField = 'country';
-        confidence = 0.9;
+        confidence = 0.95;
       } else if (lowerHeader.includes('zip') || lowerHeader.includes('postal')) {
         crmField = 'zip';
-        confidence = 0.9;
+        confidence = 0.95;
       }
       
       return {

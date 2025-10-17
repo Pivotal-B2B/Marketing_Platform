@@ -74,7 +74,12 @@ async function normalizeImports(ctx: JobContext): Promise<void> {
     // Map fields
     for (const [clientHeader, crmField] of Array.from(mappingMap.entries())) {
       if (payload[clientHeader]) {
-        normalized[crmField] = payload[clientHeader];
+        // If mapped to "extras", store in the extras JSON object
+        if (crmField === 'extras') {
+          normalized.extras[clientHeader] = payload[clientHeader];
+        } else {
+          normalized[crmField] = payload[clientHeader];
+        }
       }
     }
     
