@@ -1707,6 +1707,8 @@ export function registerRoutes(app: Express) {
       const userRoles = req.user?.roles || [req.user?.role];
       const isAdmin = userRoles.includes('admin') || userRoles.includes('campaign_manager');
 
+      console.log(`[AGENT ASSIGNMENTS] User ${agentId} - isAdmin: ${isAdmin}, roles:`, userRoles);
+
       let assignments;
       
       if (isAdmin) {
@@ -1720,7 +1722,7 @@ export function registerRoutes(app: Express) {
           .from(campaigns)
           .where(eq(campaigns.type, 'call'));
         
-        console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - returning ${allCampaigns.length} call campaigns`);
+        console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - found ${allCampaigns.length} call campaigns:`, allCampaigns.map(c => ({ id: c.campaignId, name: c.campaignName, dialMode: c.dialMode })));
         assignments = allCampaigns;
       } else {
         // Agents see only their assigned campaigns
@@ -1742,9 +1744,10 @@ export function registerRoutes(app: Express) {
         console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
       }
 
-      res.json(assignments);
+      // Always return an array, even if empty
+      res.json(assignments || []);
     } catch (error) {
-      console.error('Get agent assignments error:', error);
+      console.error('[AGENT ASSIGNMENTS] Error:', error);
       res.status(500).json({ message: "Failed to fetch agent assignments" });
     }
   });
