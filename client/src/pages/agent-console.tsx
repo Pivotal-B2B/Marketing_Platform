@@ -22,7 +22,11 @@ import {
   ChevronRight,
   ChevronLeft,
   Mail,
-  Briefcase
+  Briefcase,
+  Zap,
+  Volume2,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -199,10 +203,11 @@ export default function AgentConsolePage() {
     }
   }, [validPhoneOptions]);
 
-  // Fetch campaign details for qualification questions
+  // Fetch campaign details for qualification questions and dial mode
   const { data: campaignDetails } = useQuery<{
     id: string;
     name: string;
+    dialMode?: 'manual' | 'power';
     callScript?: string;
     qualificationQuestions?: Array<{
       id: string;
@@ -211,10 +216,22 @@ export default function AgentConsolePage() {
       options?: Array<{ value: string; label: string }>;
       required?: boolean;
     }>;
+    powerSettings?: {
+      amd?: {
+        enabled: boolean;
+        confidenceThreshold: number;
+      };
+      voicemailPolicy?: {
+        enabled: boolean;
+      };
+    };
   }>({
     queryKey: selectedCampaignId ? [`/api/campaigns/${selectedCampaignId}`] : [],
     enabled: !!selectedCampaignId,
   });
+
+  const dialMode = campaignDetails?.dialMode || 'manual';
+  const amdEnabled = campaignDetails?.powerSettings?.amd?.enabled ?? false;
 
   // Extract unique campaigns from queue data
   const campaigns: Campaign[] = Array.from(
@@ -428,6 +445,18 @@ export default function AgentConsolePage() {
                 ))}
               </SelectContent>
             </Select>
+            {campaignDetails && dialMode && (
+              <Badge variant={dialMode === 'power' ? 'default' : 'outline'} className="gap-1" data-testid="badge-dial-mode">
+                {dialMode === 'power' ? <Zap className="h-3 w-3" /> : <Phone className="h-3 w-3" />}
+                {dialMode === 'power' ? 'Power Dial' : 'Manual Dial'}
+              </Badge>
+            )}
+            {campaignDetails && dialMode === 'power' && amdEnabled && (
+              <Badge variant="outline" className="gap-1" data-testid="badge-amd-enabled">
+                <CheckCircle2 className="h-3 w-3" />
+                AMD Enabled
+              </Badge>
+            )}
             {getStatusBadge()}
             <Button
               variant="outline"

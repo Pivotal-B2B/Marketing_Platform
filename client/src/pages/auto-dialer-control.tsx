@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Pause, Settings, Users, Phone, Clock, Activity } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
+import { Play, Pause, Settings, Users, Phone, Clock, Activity, Volume2, Zap } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Campaign } from "@shared/schema";
@@ -332,6 +334,22 @@ function AutoDialerConfigDialog({
     (campaign.businessHoursConfig as BusinessHoursConfig) || DEFAULT_BUSINESS_HOURS
   );
 
+  // AMD & Voicemail Settings (from campaign.powerSettings)
+  const powerSettings = (campaign as any).powerSettings;
+  const [amdEnabled, setAmdEnabled] = useState(powerSettings?.amd?.enabled ?? true);
+  const [amdConfidence, setAmdConfidence] = useState(powerSettings?.amd?.confidenceThreshold ?? 0.70);
+  const [amdTimeout, setAmdTimeout] = useState(powerSettings?.amd?.timeout ?? 3000);
+  const [unknownAction, setUnknownAction] = useState<'route_to_agent' | 'drop_silent'>(
+    powerSettings?.amd?.unknownAction || 'route_to_agent'
+  );
+  const [vmEnabled, setVmEnabled] = useState(powerSettings?.voicemailPolicy?.enabled ?? false);
+  const [vmAction, setVmAction] = useState<'leave_message' | 'schedule_callback' | 'drop_silent'>(
+    powerSettings?.voicemailPolicy?.action || 'leave_message'
+  );
+  const [vmMessage, setVmMessage] = useState(powerSettings?.voicemailPolicy?.message || '');
+  const [vmCampaignCap, setVmCampaignCap] = useState(powerSettings?.voicemailPolicy?.campaign_daily_vm_cap || 100);
+  const [vmContactCap, setVmContactCap] = useState(powerSettings?.voicemailPolicy?.contact_vm_cap || 1);
+
   // Mutation for updating campaign business hours
   const updateBusinessHoursMutation = useMutation({
     mutationFn: async (config: BusinessHoursConfig) => {
@@ -355,10 +373,58 @@ function AutoDialerConfigDialog({
     },
   });
 
+  // Mutation for updating AMD & Voicemail settings
+  const updatePowerSettingsMutation = useMutation({
+    mutationFn: async () => {
+      const updatedPowerSettings = {
+        amd: {
+          enabled: amdEnabled,
+          confidenceThreshold: amdConfidence,
+          timeout: amdTimeout,
+          unknownAction: unknownAction,
+        },
+        voicemailPolicy: vmEnabled ? {
+          enabled: true,
+          action: vmAction,
+          message: vmMessage,
+          campaign_daily_vm_cap: vmCampaignCap,
+          contact_vm_cap: vmContactCap,
+          region_blacklist: powerSettings?.voicemailPolicy?.region_blacklist || [],
+        } : { enabled: false },
+      };
+
+      await apiRequest('PATCH', `/api/campaigns/${campaign.id}`, {
+        powerSettings: updatedPowerSettings,
+      });
+    },
+    onSuccess: () => {
+      // Invalidate both collection and detail queries so Agent Console updates immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/campaigns'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaign.id}`] });
+      toast({
+        title: "AMD & Voicemail Updated",
+        description: "Power dialer settings have been saved successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update power settings",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSaveAll = async () => {
-    // Save both auto-dialer settings and business hours
+    // Save auto-dialer settings, business hours, and AMD/voicemail settings
     await onSave(settings);
     await updateBusinessHoursMutation.mutateAsync(businessHours);
+    
+    // Only update power settings if campaign is in power dial mode
+    if ((campaign as any).dialMode === 'power') {
+      await updatePowerSettingsMutation.mutateAsync();
+    }
+    
     onOpenChange(false);
   };
 
@@ -373,8 +439,15 @@ function AutoDialerConfigDialog({
         </DialogHeader>
 
         <Tabs defaultValue="dialer" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="dialer" data-testid="tab-dialer">Auto-Dialer Settings</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="dialer" data-testid="tab-dialer">Dialer Settings</TabsTrigger>
+            <TabsTrigger 
+              value="amd" 
+              data-testid="tab-amd"
+              disabled={(campaign as any).dialMode !== 'power'}
+            >
+              AMD & Voicemail
+            </TabsTrigger>
             <TabsTrigger value="hours" data-testid="tab-business-hours">Business Hours</TabsTrigger>
           </TabsList>
 
@@ -506,6 +579,202 @@ function AutoDialerConfigDialog({
           </div>
           </TabsContent>
 
+          <TabsContent value="amd" className="space-y-6 py-4">
+            {(campaign as any).dialMode !== 'power' ? (
+              <div className="text-center py-8">
+                <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Power Dial Mode Required</h3>
+                <p className="text-muted-foreground">
+                  AMD and Voicemail settings are only available for campaigns in Power Dial mode.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* AMD Configuration */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Settings className="h-5 w-5" />
+                      Answering Machine Detection (AMD)
+                    </CardTitle>
+                    <CardDescription>
+                      Configure how the system detects and handles answering machines
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="amd-enabled" className="font-medium">Enable AMD</Label>
+                        <p className="text-sm text-muted-foreground">Automatically detect answering machines</p>
+                      </div>
+                      <Switch
+                        id="amd-enabled"
+                        checked={amdEnabled}
+                        onCheckedChange={setAmdEnabled}
+                        data-testid="switch-amd-enabled"
+                      />
+                    </div>
+
+                    {amdEnabled && (
+                      <>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label>Confidence Threshold: {(amdConfidence * 100).toFixed(0)}%</Label>
+                            <span className="text-sm text-muted-foreground">
+                              {amdConfidence >= 0.8 ? 'High' : amdConfidence >= 0.6 ? 'Medium' : 'Low'}
+                            </span>
+                          </div>
+                          <Slider
+                            value={[amdConfidence * 100]}
+                            onValueChange={([v]) => setAmdConfidence(v / 100)}
+                            min={50}
+                            max={95}
+                            step={5}
+                            className="w-full"
+                            data-testid="slider-amd-confidence"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Higher threshold = more accurate but may miss some machines. Recommended: 70%
+                          </p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Label>AMD Timeout</Label>
+                          <Select value={amdTimeout.toString()} onValueChange={(v) => setAmdTimeout(parseInt(v))}>
+                            <SelectTrigger data-testid="select-amd-timeout">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="2000">2 seconds</SelectItem>
+                              <SelectItem value="3000">3 seconds (recommended)</SelectItem>
+                              <SelectItem value="4000">4 seconds</SelectItem>
+                              <SelectItem value="5000">5 seconds</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            How long to analyze the call before making a decision
+                          </p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Label>Unknown Result Action</Label>
+                          <Select value={unknownAction} onValueChange={(v: any) => setUnknownAction(v)}>
+                            <SelectTrigger data-testid="select-unknown-action">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="route_to_agent">Route to Agent (safer)</SelectItem>
+                              <SelectItem value="drop_silent">Drop Silent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            What to do when AMD confidence is below threshold
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Voicemail Policy */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Volume2 className="h-5 w-5" />
+                      Voicemail Policy
+                    </CardTitle>
+                    <CardDescription>
+                      Configure what happens when a machine is detected
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="vm-enabled" className="font-medium">Enable Voicemail Handling</Label>
+                        <p className="text-sm text-muted-foreground">Automatically handle detected voicemail</p>
+                      </div>
+                      <Switch
+                        id="vm-enabled"
+                        checked={vmEnabled}
+                        onCheckedChange={setVmEnabled}
+                        data-testid="switch-vm-enabled"
+                      />
+                    </div>
+
+                    {vmEnabled && (
+                      <>
+                        <div className="space-y-3">
+                          <Label>Voicemail Action</Label>
+                          <Select value={vmAction} onValueChange={(v: any) => setVmAction(v)}>
+                            <SelectTrigger data-testid="select-vm-action">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="leave_message">Leave Voice Message (TTS)</SelectItem>
+                              <SelectItem value="schedule_callback">Schedule Callback</SelectItem>
+                              <SelectItem value="drop_silent">Drop Silent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {vmAction === 'leave_message' && (
+                          <div className="space-y-3">
+                            <Label>Voicemail Message</Label>
+                            <Textarea
+                              placeholder="Enter your voicemail message. Use {{firstName}}, {{lastName}}, {{companyName}} for personalization."
+                              value={vmMessage}
+                              onChange={(e) => setVmMessage(e.target.value)}
+                              rows={4}
+                              data-testid="textarea-vm-message"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              This message will be converted to speech and left as a voicemail
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="vm-campaign-cap">
+                              <Clock className="w-4 h-4 inline mr-1" />
+                              Daily Campaign Cap
+                            </Label>
+                            <Input
+                              id="vm-campaign-cap"
+                              type="number"
+                              value={vmCampaignCap}
+                              onChange={(e) => setVmCampaignCap(parseInt(e.target.value))}
+                              min={1}
+                              data-testid="input-vm-campaign-cap"
+                            />
+                            <p className="text-xs text-muted-foreground">Max VMs per day for campaign</p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="vm-contact-cap">
+                              <Clock className="w-4 h-4 inline mr-1" />
+                              Per-Contact Cap
+                            </Label>
+                            <Input
+                              id="vm-contact-cap"
+                              type="number"
+                              value={vmContactCap}
+                              onChange={(e) => setVmContactCap(parseInt(e.target.value))}
+                              min={1}
+                              max={5}
+                              data-testid="input-vm-contact-cap"
+                            />
+                            <p className="text-xs text-muted-foreground">Max VMs per contact</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </TabsContent>
+
           <TabsContent value="hours" className="space-y-6 py-4">
             <BusinessHoursConfigComponent
               value={businessHours}
@@ -525,9 +794,9 @@ function AutoDialerConfigDialog({
           <Button
             data-testid="button-save-settings"
             onClick={handleSaveAll}
-            disabled={isPending || updateBusinessHoursMutation.isPending}
+            disabled={isPending || updateBusinessHoursMutation.isPending || updatePowerSettingsMutation.isPending}
           >
-            {(isPending || updateBusinessHoursMutation.isPending) ? "Saving..." : "Save All Settings"}
+            {(isPending || updateBusinessHoursMutation.isPending || updatePowerSettingsMutation.isPending) ? "Saving..." : "Save All Settings"}
           </Button>
         </DialogFooter>
       </DialogContent>
