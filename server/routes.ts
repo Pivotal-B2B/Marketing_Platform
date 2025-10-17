@@ -1598,13 +1598,18 @@ export function registerRoutes(app: Express) {
           }
         }
 
-        // Resolve contacts from lists
+        // Resolve contacts from lists (with batching for large lists)
         if (audienceRefs.lists && Array.isArray(audienceRefs.lists)) {
           for (const listId of audienceRefs.lists) {
             const list = await storage.getList(listId);
-            if (list && list.recordIds) {
-              const listContacts = await storage.getContactsByIds(list.recordIds);
-              contacts.push(...listContacts);
+            if (list && list.recordIds && list.recordIds.length > 0) {
+              // Batch large lists to avoid SQL query limits
+              const batchSize = 1000;
+              for (let i = 0; i < list.recordIds.length; i += batchSize) {
+                const batch = list.recordIds.slice(i, i + batchSize);
+                const listContacts = await storage.getContactsByIds(batch);
+                contacts.push(...listContacts);
+              }
             }
           }
         }
@@ -1800,13 +1805,18 @@ export function registerRoutes(app: Express) {
           }
         }
 
-        // Resolve contacts from lists
+        // Resolve contacts from lists (with batching for large lists)
         if (audienceRefs.lists && Array.isArray(audienceRefs.lists)) {
           for (const listId of audienceRefs.lists) {
             const list = await storage.getList(listId);
-            if (list && list.recordIds) {
-              const listContacts = await storage.getContactsByIds(list.recordIds);
-              contacts.push(...listContacts);
+            if (list && list.recordIds && list.recordIds.length > 0) {
+              // Batch large lists to avoid SQL query limits
+              const batchSize = 1000;
+              for (let i = 0; i < list.recordIds.length; i += batchSize) {
+                const batch = list.recordIds.slice(i, i + batchSize);
+                const listContacts = await storage.getContactsByIds(batch);
+                contacts.push(...listContacts);
+              }
             }
           }
         }
