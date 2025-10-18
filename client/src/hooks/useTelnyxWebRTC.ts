@@ -129,7 +129,7 @@ export function useTelnyxWebRTC({
       });
 
       telnyxClient.on('telnyx.notification', (notification: any) => {
-        console.log('Telnyx notification:', notification);
+        console.log('Telnyx notification - Type:', notification.type, 'Call State:', notification.call?.state);
         
         if (notification.type === 'callUpdate' && notification.call) {
           const call = notification.call;
@@ -263,7 +263,7 @@ export function useTelnyxWebRTC({
         remoteElement: 'remoteAudio',
       });
 
-      console.log('Call object created:', call);
+      console.log('Call object created - ID:', call?.id, 'State:', call?.state);
 
       setActiveCall(call);
       updateCallState('connecting');
