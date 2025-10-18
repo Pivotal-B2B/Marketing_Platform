@@ -51,7 +51,6 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
 
   // State for replace queue options
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
-  const [perAccountCap, setPerAccountCap] = useState<number | ''>('');
   const [maxQueueSize, setMaxQueueSize] = useState<number | ''>('');
   const [keepInProgress, setKeepInProgress] = useState(true);
 
@@ -73,7 +72,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
         {
           agent_id: effectiveAgentId,
           filters: filterGroup && filterGroup.conditions && filterGroup.conditions.length > 0 ? filterGroup : undefined,
-          per_account_cap: perAccountCap || null,
+          per_account_cap: null,
           max_queue_size: maxQueueSize || null,
           keep_in_progress: keepInProgress,
         }
@@ -91,7 +90,6 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
       onQueueUpdated?.();
       // Reset form
       setFilterGroup(undefined);
-      setPerAccountCap('');
       setMaxQueueSize('');
       setKeepInProgress(true);
     },
