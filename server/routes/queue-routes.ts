@@ -271,6 +271,7 @@ router.post(
                 campaignId,
                 agentId: agent_id,
                 contactId: contact.id,
+                accountId: contact.accountId,
                 queueState: 'queued' as const,
                 queuedAt: new Date(),
                 createdBy: userId,
