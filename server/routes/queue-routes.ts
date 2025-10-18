@@ -231,7 +231,10 @@ router.post(
         // Step 4: Filter out contacts already assigned to other agents (collision prevention)
         const contactIds = eligibleContacts.map(c => c.id);
         
+        console.log('[queues:set] Step 4 - Eligible contacts:', contactIds.length);
+        
         if (contactIds.length === 0) {
+          console.log('[queues:set] No eligible contacts found');
           return {
             released,
             assigned: 0,
@@ -250,12 +253,18 @@ router.post(
           )
         );
 
+        console.log('[queues:set] Existing assignments in campaign:', existingAssignments.length);
+
         const assignedContactIds = new Set(existingAssignments.map(a => a.contactId));
         const availableContacts = eligibleContacts.filter(c => !assignedContactIds.has(c.id));
         const skipped = contactIds.length - availableContacts.length;
 
+        console.log('[queues:set] Available contacts after collision check:', availableContacts.length);
+        console.log('[queues:set] Skipped due to collision:', skipped);
+
         // Step 5: Assign available contacts to agent
         if (availableContacts.length > 0) {
+          console.log('[queues:set] Inserting', availableContacts.length, 'contacts for agent', agent_id);
           await tx.insert(agentQueue)
             .values(
               availableContacts.map(contact => ({
@@ -267,6 +276,7 @@ router.post(
                 createdBy: userId,
               }))
             );
+          console.log('[queues:set] Successfully inserted contacts');
         }
 
         return {
