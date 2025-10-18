@@ -51,7 +51,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
 
   // State for replace queue options
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
-  const [maxQueueSize, setMaxQueueSize] = useState<number | ''>('');
+  const [maxQueueSize, setMaxQueueSize] = useState<number | ''>(300);
 
   // Check if user has admin or manager role
   const isAdminOrManager = user?.role === 'admin' || user?.role === 'campaign_manager';
@@ -89,7 +89,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
       onQueueUpdated?.();
       // Reset form
       setFilterGroup(undefined);
-      setMaxQueueSize('');
+      setMaxQueueSize(300);
     },
     onError: (error: any) => {
       if (error.message === 'not_found') {
@@ -261,23 +261,26 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
               <Separator />
 
               <div className="space-y-2">
-                <Label htmlFor="maxQueueSize">Max Queue Size (optional)</Label>
+                <Label htmlFor="maxQueueSize">Max Queue Size</Label>
                 <Input
                   id="maxQueueSize"
                   type="number"
                   min="1"
-                  placeholder="Max total queue size"
+                  placeholder="300 (recommended daily limit)"
                   value={maxQueueSize}
-                  onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : '')}
+                  onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : 300)}
                   data-testid="input-max-queue-size"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Default: 300 contacts (typical daily call capacity per agent)
+                </p>
               </div>
 
               <div className="bg-muted p-3 rounded-md flex items-start gap-2">
                 <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
                   Contacts already assigned to other agents will be skipped to prevent collisions.
-                  Items marked as "in progress" will be preserved automatically.
+                  Remaining matches can be assigned to other agents. Items in progress are preserved automatically.
                 </p>
               </div>
             </div>
