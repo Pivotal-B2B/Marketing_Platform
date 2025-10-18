@@ -30,7 +30,7 @@ const queueSetSchema = z.object({
   filters: filterGroupSchema.optional(),
   per_account_cap: z.number().int().positive().optional().nullable(),
   max_queue_size: z.number().int().positive().optional().nullable(),
-  keep_in_progress: z.boolean().optional().default(true),
+  keep_in_progress: z.boolean().optional().default(false),
   dry_run: z.boolean().optional().default(false),
 });
 
