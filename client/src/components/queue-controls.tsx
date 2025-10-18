@@ -72,7 +72,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
         `/campaigns/${campaignId}/queues/set`,
         {
           agent_id: effectiveAgentId,
-          filters: filterGroup || {},
+          filters: filterGroup && filterGroup.conditions && filterGroup.conditions.length > 0 ? filterGroup : undefined,
           per_account_cap: perAccountCap || null,
           max_queue_size: maxQueueSize || null,
           keep_in_progress: keepInProgress,
