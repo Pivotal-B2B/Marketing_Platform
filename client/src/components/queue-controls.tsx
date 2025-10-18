@@ -264,32 +264,17 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
 
               <Separator />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="perAccountCap">Per-Account Cap (optional)</Label>
-                  <Input
-                    id="perAccountCap"
-                    type="number"
-                    min="1"
-                    placeholder="Max contacts per account"
-                    value={perAccountCap}
-                    onChange={(e) => setPerAccountCap(e.target.value ? parseInt(e.target.value) : '')}
-                    data-testid="input-per-account-cap"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="maxQueueSize">Max Queue Size (optional)</Label>
-                  <Input
-                    id="maxQueueSize"
-                    type="number"
-                    min="1"
-                    placeholder="Max total queue size"
-                    value={maxQueueSize}
-                    onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : '')}
-                    data-testid="input-max-queue-size"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxQueueSize">Max Queue Size (optional)</Label>
+                <Input
+                  id="maxQueueSize"
+                  type="number"
+                  min="1"
+                  placeholder="Max total queue size"
+                  value={maxQueueSize}
+                  onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : '')}
+                  data-testid="input-max-queue-size"
+                />
               </div>
 
               <div className="flex items-center space-x-2">
