@@ -5,7 +5,7 @@ import { requireAuth, requireRole } from '../auth';
 import { requireFeatureFlag } from '../feature-flags';
 import { z } from 'zod';
 import { buildFilterQuery } from '../filter-builder';
-import { contacts, campaigns, agentQueue } from '@shared/schema';
+import { contacts, campaigns, agentQueue, campaignAudienceSnapshots } from '@shared/schema';
 import type { FilterGroup } from '@shared/filter-types';
 
 const router = Router();
@@ -135,9 +135,28 @@ router.post(
         
         const released = releaseResult.length;
 
-        // Step 2: Query contacts based on filters
+        // Step 2: Get campaign audience snapshot to find eligible contact IDs
+        const snapshot = await tx.select({
+          contactIds: campaignAudienceSnapshots.contactIds,
+        })
+        .from(campaignAudienceSnapshots)
+        .where(eq(campaignAudienceSnapshots.campaignId, campaignId))
+        .orderBy(sql`${campaignAudienceSnapshots.createdAt} DESC`)
+        .limit(1);
+
+        const campaignContactIds = snapshot[0]?.contactIds || [];
+        
+        if (campaignContactIds.length === 0) {
+          return {
+            released,
+            assigned: 0,
+            skipped_due_to_collision: 0,
+          };
+        }
+
+        // Step 3: Query contacts based on filters
         const whereConditions = [
-          sql`${contacts.id} IN (SELECT contact_id FROM campaign_contacts WHERE campaign_id = ${campaignId})`,
+          inArray(contacts.id, campaignContactIds),
         ];
         
         if (filters && filters.conditions && filters.conditions.length > 0) {
@@ -166,7 +185,7 @@ router.post(
                     ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
                   FROM ${contacts} c
                   WHERE 
-                    c.id IN (SELECT contact_id FROM campaign_contacts WHERE campaign_id = ${campaignId})
+                    c.id = ANY(${campaignContactIds})
                     ${filterPart ? sql`AND ${filterPart}` : sql``}
                 ) t
                 WHERE rn <= ${per_account_cap}
@@ -182,7 +201,7 @@ router.post(
                     ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
                   FROM ${contacts} c
                   WHERE 
-                    c.id IN (SELECT contact_id FROM campaign_contacts WHERE campaign_id = ${campaignId})
+                    c.id = ANY(${campaignContactIds})
                     ${filterPart ? sql`AND ${filterPart}` : sql``}
                 ) t
                 WHERE rn <= ${per_account_cap}
@@ -209,7 +228,7 @@ router.post(
             : await query;
         }
 
-        // Step 3: Filter out contacts already assigned to other agents (collision prevention)
+        // Step 4: Filter out contacts already assigned to other agents (collision prevention)
         const contactIds = eligibleContacts.map(c => c.id);
         
         if (contactIds.length === 0) {
@@ -235,7 +254,7 @@ router.post(
         const availableContacts = eligibleContacts.filter(c => !assignedContactIds.has(c.id));
         const skipped = contactIds.length - availableContacts.length;
 
-        // Step 4: Assign available contacts to agent
+        // Step 5: Assign available contacts to agent
         if (availableContacts.length > 0) {
           await tx.insert(agentQueue)
             .values(
