@@ -94,7 +94,7 @@ export function useTelnyxWebRTC({
         console.error('Error Message:', errorDetail.message);
         console.error('Session ID:', errorDetail.sessionId);
         console.error('Timestamp:', errorDetail.timestamp);
-        console.error('Full Error Object:', JSON.stringify(error, null, 2));
+        console.error('Full Error Object:', error);
         console.error('SDK Version:', TelnyxRTC.prototype.constructor.name);
         console.error('===========================');
         
