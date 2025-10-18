@@ -113,7 +113,7 @@ router.post(
       }
 
       // Execute queue replacement using filter system
-      return await db.transaction(async (tx) => {
+      const result = await db.transaction(async (tx) => {
         // Step 1: Release existing queued/locked items (keep in_progress if requested)
         const releaseConditions = [
           eq(agentQueue.agentId, agent_id),
@@ -189,8 +189,8 @@ router.post(
                 ORDER BY id
               `;
           
-          const result = await tx.execute(baseQuery);
-          eligibleContacts = result.rows.map((row: any) => ({
+          const queryResult = await tx.execute(baseQuery);
+          eligibleContacts = queryResult.rows.map((row: any) => ({
             id: row.id,
             accountId: row.account_id,
           }));
@@ -213,11 +213,11 @@ router.post(
         const contactIds = eligibleContacts.map(c => c.id);
         
         if (contactIds.length === 0) {
-          return res.json({
+          return {
             released,
             assigned: 0,
             skipped_due_to_collision: 0,
-          });
+          };
         }
 
         const existingAssignments = await tx.select({
@@ -250,12 +250,14 @@ router.post(
             );
         }
 
-        return res.json({
+        return {
           released,
           assigned: availableContacts.length,
           skipped_due_to_collision: skipped,
-        });
+        };
       });
+
+      return res.json(result);
     } catch (error: any) {
       console.error('[queues:set] Error:', error);
       return res.status(500).json({ 
