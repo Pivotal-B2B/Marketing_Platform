@@ -52,7 +52,6 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
   // State for replace queue options
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
   const [maxQueueSize, setMaxQueueSize] = useState<number | ''>('');
-  const [keepInProgress, setKeepInProgress] = useState(true);
 
   // Check if user has admin or manager role
   const isAdminOrManager = user?.role === 'admin' || user?.role === 'campaign_manager';
@@ -74,7 +73,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
           filters: filterGroup && filterGroup.conditions && filterGroup.conditions.length > 0 ? filterGroup : undefined,
           per_account_cap: null,
           max_queue_size: maxQueueSize || null,
-          keep_in_progress: keepInProgress,
+          keep_in_progress: true,
         }
       );
       return response.json();
@@ -91,7 +90,6 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
       // Reset form
       setFilterGroup(undefined);
       setMaxQueueSize('');
-      setKeepInProgress(true);
     },
     onError: (error: any) => {
       if (error.message === 'not_found') {
@@ -275,25 +273,11 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  id="keepInProgress"
-                  type="checkbox"
-                  checked={keepInProgress}
-                  onChange={(e) => setKeepInProgress(e.target.checked)}
-                  className="h-4 w-4"
-                  data-testid="checkbox-keep-in-progress"
-                />
-                <Label htmlFor="keepInProgress" className="cursor-pointer">
-                  Keep items currently in progress
-                </Label>
-              </div>
-
               <div className="bg-muted p-3 rounded-md flex items-start gap-2">
                 <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
                   Contacts already assigned to other agents will be skipped to prevent collisions.
-                  Items marked as "in progress" will be preserved by default.
+                  Items marked as "in progress" will be preserved automatically.
                 </p>
               </div>
             </div>
