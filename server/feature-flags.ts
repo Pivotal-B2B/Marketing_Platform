@@ -15,7 +15,7 @@ export const FEATURE_FLAGS = {
   queue_replace_v1: {
     name: 'queue_replace_v1',
     description: 'Enable queue management system with replace, clear operations',
-    default: false
+    default: true  // Enabled for production use
   },
   // Add more feature flags here as needed
 } as const;
@@ -29,7 +29,14 @@ export type FeatureFlagName = keyof typeof FEATURE_FLAGS;
  */
 export function isFeatureEnabled(flagName: FeatureFlagName): boolean {
   const enabledFlags = process.env.FEATURE_FLAGS?.split(',').map(f => f.trim()) || [];
-  return enabledFlags.includes(flagName);
+  
+  // Check if explicitly enabled via environment variable
+  if (enabledFlags.includes(flagName)) {
+    return true;
+  }
+  
+  // Fall back to default value if not specified in environment
+  return FEATURE_FLAGS[flagName]?.default || false;
 }
 
 /**
