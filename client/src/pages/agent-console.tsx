@@ -38,6 +38,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { CallState } from "@/hooks/useTelnyxWebRTC";
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { FilterBuilder } from "@/components/filter-builder";
+import { QueueControls } from "@/components/queue-controls";
 import type { FilterGroup } from "@shared/filter-types";
 
 // Backwards compatibility type alias
@@ -710,6 +711,22 @@ export default function AgentConsolePage() {
           </div>
         )}
       </div>
+
+      {/* Queue Management Controls - Only show for manual dial campaigns */}
+      {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
+        <div className="border-b p-4 bg-muted/30">
+          <QueueControls 
+            campaignId={selectedCampaignId} 
+            onQueueUpdated={() => {
+              refetchQueue();
+              toast({
+                title: "Queue Updated",
+                description: "Your queue has been refreshed",
+              });
+            }}
+          />
+        </div>
+      )}
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
