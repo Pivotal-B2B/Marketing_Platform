@@ -98,7 +98,8 @@ export const manualQueueStateEnum = pgEnum('manual_queue_state', [
   'locked',
   'in_progress',
   'completed',
-  'removed'
+  'removed',
+  'released'
 ]);
 
 export const entityTypeEnum = pgEnum('entity_type', ['account', 'contact']);
@@ -853,6 +854,10 @@ export const agentQueue = pgTable("agent_queue", {
   queueState: manualQueueStateEnum("queue_state").notNull().default('queued'),
   lockedBy: varchar("locked_by").references(() => users.id),
   lockedAt: timestamp("locked_at"),
+  queuedAt: timestamp("queued_at"),
+  releasedAt: timestamp("released_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  releasedBy: varchar("released_by").references(() => users.id),
   priority: integer("priority").notNull().default(0),
   removedReason: text("removed_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
