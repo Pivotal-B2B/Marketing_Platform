@@ -20,6 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { Separator } from "@/components/ui/separator";
+import { FilterBuilder } from "@/components/filter-builder";
+import type { FilterGroup } from "@shared/filter-types";
 
 interface QueueControlsProps {
   campaignId: string;
@@ -48,7 +50,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
 
   // State for replace queue options
-  const [firstNameFilter, setFirstNameFilter] = useState('');
+  const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
   const [perAccountCap, setPerAccountCap] = useState<number | ''>('');
   const [maxQueueSize, setMaxQueueSize] = useState<number | ''>('');
   const [keepInProgress, setKeepInProgress] = useState(true);
@@ -65,17 +67,12 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
   // Set Queue (Replace) mutation
   const replaceQueueMutation = useMutation({
     mutationFn: async () => {
-      const filters: any = {};
-      if (firstNameFilter) {
-        filters.first_name_contains = firstNameFilter;
-      }
-
       const response = await apiRequest(
         'POST',
         `/campaigns/${campaignId}/queues/set`,
         {
           agent_id: effectiveAgentId,
-          filters,
+          filters: filterGroup || {},
           per_account_cap: perAccountCap || null,
           max_queue_size: maxQueueSize || null,
           keep_in_progress: keepInProgress,
@@ -93,7 +90,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
       setShowReplaceDialog(false);
       onQueueUpdated?.();
       // Reset form
-      setFirstNameFilter('');
+      setFilterGroup(undefined);
       setPerAccountCap('');
       setMaxQueueSize('');
       setKeepInProgress(true);
@@ -245,15 +242,27 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
 
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="firstNameFilter">First Name Contains (optional)</Label>
-                <Input
-                  id="firstNameFilter"
-                  placeholder="e.g., John"
-                  value={firstNameFilter}
-                  onChange={(e) => setFirstNameFilter(e.target.value)}
-                  data-testid="input-firstname-filter"
+                <Label>Filter Contacts (optional)</Label>
+                <FilterBuilder
+                  entityType="contact"
+                  onApplyFilter={(filter) => setFilterGroup(filter)}
+                  initialFilter={filterGroup}
+                  includeRelatedEntities={true}
                 />
               </div>
+
+              {filterGroup && filterGroup.conditions.length > 0 && (
+                <div className="border rounded-lg p-3 bg-muted/50">
+                  <p className="text-sm font-medium mb-2">Active Filters:</p>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">
+                      Match <Badge variant="outline">{filterGroup.logic}</Badge> of {filterGroup.conditions.length} condition{filterGroup.conditions.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <Separator />
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
