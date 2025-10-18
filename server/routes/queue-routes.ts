@@ -1,18 +1,33 @@
 import { Router, type Request, type Response } from 'express';
 import { db } from '../db';
-import { sql } from 'drizzle-orm';
+import { sql, and, eq, isNull, or, inArray, notInArray } from 'drizzle-orm';
 import { requireAuth, requireRole } from '../auth';
 import { requireFeatureFlag } from '../feature-flags';
 import { z } from 'zod';
+import { buildFilterQuery } from '../filter-builder';
+import { contacts, campaigns, agentQueue } from '@shared/schema';
+import type { FilterGroup } from '@shared/filter-types';
 
 const router = Router();
+
+// Schema for a single filter condition
+const filterConditionSchema = z.object({
+  id: z.string(),
+  field: z.string(),
+  operator: z.string(),
+  value: z.any(),
+});
+
+// Schema for filter group (matches FilterGroup from @shared/filter-types)
+const filterGroupSchema = z.object({
+  logic: z.enum(['AND', 'OR']),
+  conditions: z.array(filterConditionSchema),
+});
 
 // Schema for queue set request
 const queueSetSchema = z.object({
   agent_id: z.string(),
-  filters: z.object({
-    first_name_contains: z.string().optional(),
-  }).optional(),
+  filters: filterGroupSchema.optional(),
   per_account_cap: z.number().int().positive().optional().nullable(),
   max_queue_size: z.number().int().positive().optional().nullable(),
   keep_in_progress: z.boolean().optional().default(true),
@@ -66,7 +81,7 @@ router.post(
 
       const {
         agent_id,
-        filters = {},
+        filters,
         per_account_cap = null,
         max_queue_size = null,
         keep_in_progress = true,
@@ -97,22 +112,150 @@ router.post(
         });
       }
 
-      // Call the PostgreSQL function
-      const result = await db.execute(sql`
-        SELECT queue_replace(
-          ${campaignId}::varchar,
-          ${agent_id}::varchar,
-          ${userId}::varchar,
-          ${filters.first_name_contains || null},
-          ${per_account_cap}::int,
-          ${max_queue_size}::int,
-          ${keep_in_progress}::boolean
-        ) AS result
-      `);
+      // Execute queue replacement using filter system
+      return await db.transaction(async (tx) => {
+        // Step 1: Release existing queued/locked items (keep in_progress if requested)
+        const releaseConditions = [
+          eq(agentQueue.agentId, agent_id),
+          eq(agentQueue.campaignId, campaignId),
+        ];
+        
+        if (keep_in_progress) {
+          releaseConditions.push(
+            or(
+              eq(agentQueue.queueState, 'queued'),
+              eq(agentQueue.queueState, 'locked')
+            )!
+          );
+        }
 
-      const queueResult = result.rows[0]?.result;
+        const releaseResult = await tx.delete(agentQueue)
+          .where(and(...releaseConditions))
+          .returning();
+        
+        const released = releaseResult.length;
 
-      return res.json(queueResult);
+        // Step 2: Query contacts based on filters
+        const whereConditions = [
+          sql`${contacts.id} IN (SELECT contact_id FROM campaign_contacts WHERE campaign_id = ${campaignId})`,
+        ];
+        
+        if (filters && filters.conditions && filters.conditions.length > 0) {
+          const filterSQL = buildFilterQuery(filters as FilterGroup, contacts);
+          if (filterSQL) {
+            whereConditions.push(filterSQL);
+          }
+        }
+
+        let eligibleContacts;
+
+        // Apply per-account cap if specified
+        if (per_account_cap) {
+          // Use window function to limit contacts per account
+          const filterPart = filters && filters.conditions && filters.conditions.length > 0 
+            ? buildFilterQuery(filters as FilterGroup, contacts) 
+            : undefined;
+          
+          const baseQuery = max_queue_size
+            ? sql`
+                SELECT id, account_id
+                FROM (
+                  SELECT 
+                    c.id,
+                    c.account_id,
+                    ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
+                  FROM ${contacts} c
+                  WHERE 
+                    c.id IN (SELECT contact_id FROM campaign_contacts WHERE campaign_id = ${campaignId})
+                    ${filterPart ? sql`AND ${filterPart}` : sql``}
+                ) t
+                WHERE rn <= ${per_account_cap}
+                ORDER BY id
+                LIMIT ${max_queue_size}
+              `
+            : sql`
+                SELECT id, account_id
+                FROM (
+                  SELECT 
+                    c.id,
+                    c.account_id,
+                    ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
+                  FROM ${contacts} c
+                  WHERE 
+                    c.id IN (SELECT contact_id FROM campaign_contacts WHERE campaign_id = ${campaignId})
+                    ${filterPart ? sql`AND ${filterPart}` : sql``}
+                ) t
+                WHERE rn <= ${per_account_cap}
+                ORDER BY id
+              `;
+          
+          const result = await tx.execute(baseQuery);
+          eligibleContacts = result.rows.map((row: any) => ({
+            id: row.id,
+            accountId: row.account_id,
+          }));
+        } else {
+          // Simple query without per-account cap
+          let query = tx.select({
+            id: contacts.id,
+            accountId: contacts.accountId,
+          })
+          .from(contacts)
+          .where(and(...whereConditions))
+          .orderBy(contacts.id);
+
+          eligibleContacts = max_queue_size 
+            ? await query.limit(max_queue_size)
+            : await query;
+        }
+
+        // Step 3: Filter out contacts already assigned to other agents (collision prevention)
+        const contactIds = eligibleContacts.map(c => c.id);
+        
+        if (contactIds.length === 0) {
+          return res.json({
+            released,
+            assigned: 0,
+            skipped_due_to_collision: 0,
+          });
+        }
+
+        const existingAssignments = await tx.select({
+          contactId: agentQueue.contactId,
+        })
+        .from(agentQueue)
+        .where(
+          and(
+            eq(agentQueue.campaignId, campaignId),
+            inArray(agentQueue.contactId, contactIds)
+          )
+        );
+
+        const assignedContactIds = new Set(existingAssignments.map(a => a.contactId));
+        const availableContacts = eligibleContacts.filter(c => !assignedContactIds.has(c.id));
+        const skipped = contactIds.length - availableContacts.length;
+
+        // Step 4: Assign available contacts to agent
+        if (availableContacts.length > 0) {
+          await tx.insert(agentQueue)
+            .values(
+              availableContacts.map(contact => ({
+                campaignId,
+                agentId: agent_id,
+                contactId: contact.id,
+                queueState: 'queued' as const,
+                queuedAt: new Date(),
+                createdBy: userId,
+              }))
+            );
+        }
+
+        return res.json({
+          released,
+          assigned: availableContacts.length,
+          skipped_due_to_collision: skipped,
+        });
+      });
     } catch (error: any) {
       console.error('[queues:set] Error:', error);
       return res.status(500).json({ 
