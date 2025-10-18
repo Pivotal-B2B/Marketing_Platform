@@ -253,11 +253,11 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
 
               {filterGroup && filterGroup.conditions.length > 0 && (
                 <div className="border rounded-lg p-3 bg-muted/50">
-                  <p className="text-sm font-medium mb-2">Active Filters:</p>
+                  <div className="text-sm font-medium mb-2">Active Filters:</div>
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">
+                    <div className="text-sm text-muted-foreground">
                       Match <Badge variant="outline">{filterGroup.logic}</Badge> of {filterGroup.conditions.length} condition{filterGroup.conditions.length !== 1 ? 's' : ''}
-                    </p>
+                    </div>
                   </div>
                 </div>
               )}
