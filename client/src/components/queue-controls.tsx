@@ -69,7 +69,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
     mutationFn: async () => {
       const response = await apiRequest(
         'POST',
-        `/campaigns/${campaignId}/queues/set`,
+        `/api/campaigns/${campaignId}/queues/set`,
         {
           agent_id: effectiveAgentId,
           filters: filterGroup && filterGroup.conditions && filterGroup.conditions.length > 0 ? filterGroup : undefined,
@@ -117,7 +117,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
     mutationFn: async () => {
       const response = await apiRequest(
         'POST',
-        `/campaigns/${campaignId}/queues/clear`,
+        `/api/campaigns/${campaignId}/queues/clear`,
         {
           agent_id: effectiveAgentId,
         }
@@ -148,7 +148,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
     mutationFn: async () => {
       const response = await apiRequest(
         'POST',
-        `/campaigns/${campaignId}/queues/clear_all`,
+        `/api/campaigns/${campaignId}/queues/clear_all`,
         {}
       );
       return response.json();
