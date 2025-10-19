@@ -403,21 +403,23 @@ export default function ContactsPage() {
               </p>
             </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              const csv = exportContactsToCSV(filteredContacts);
-              downloadCSV(csv, `contacts_export_${new Date().toISOString().split('T')[0]}.csv`);
-              toast({
-                title: "Export Complete",
-                description: `Exported ${filteredContacts.length} contacts to CSV`,
-              });
-            }}
-            data-testid="button-export-contacts"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
+          {user?.role !== 'agent' && (
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                const csv = exportContactsToCSV(filteredContacts);
+                downloadCSV(csv, `contacts_export_${new Date().toISOString().split('T')[0]}.csv`);
+                toast({
+                  title: "Export Complete",
+                  description: `Exported ${filteredContacts.length} contacts to CSV`,
+                });
+              }}
+              data-testid="button-export-contacts"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          )}
           <Button 
             variant="outline" 
             onClick={() => setImportDialogOpen(true)}
