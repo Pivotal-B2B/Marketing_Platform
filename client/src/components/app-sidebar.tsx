@@ -201,54 +201,6 @@ const getNavSections = (): NavSection[] => [
       },
     ],
   },
-
-  // Infrastructure & Technical Section
-  {
-    label: "Infrastructure",
-    roles: ["admin"],
-    items: [
-      {
-        title: "Email Infrastructure",
-        icon: Mail,
-        roles: ["admin"],
-        items: [
-          { title: "Sender Profiles", url: "/email-infrastructure/sender-profiles", roles: ["admin"] },
-        ],
-      },
-      {
-        title: "Telephony",
-        icon: Phone,
-        roles: ["admin"],
-        items: [
-          { title: "SIP Trunk Configuration", url: "/telephony/sip-trunks", roles: ["admin"] },
-        ],
-      },
-      {
-        title: "Integrations & APIs",
-        url: "/settings/integrations",
-        icon: Zap,
-        roles: ["admin"],
-      },
-    ],
-  },
-
-  // Administration Section
-  {
-    label: "Administration",
-    roles: ["admin"],
-    items: [
-      {
-        title: "Organization",
-        icon: Settings,
-        roles: ["admin"],
-        items: [
-          { title: "User & Role Management", url: "/settings/users", roles: ["admin"] },
-          { title: "Suppression Management", url: "/suppressions", roles: ["admin"] },
-          { title: "Compliance Center", url: "/settings/compliance", roles: ["admin"] },
-        ],
-      },
-    ],
-  },
 ];
 
 // Filter sections and items based on user roles
