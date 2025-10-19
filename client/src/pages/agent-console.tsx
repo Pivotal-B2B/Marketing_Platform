@@ -689,13 +689,6 @@ export default function AgentConsolePage() {
                       data-testid="input-manual-phone"
                     />
                   )}
-                  <div className="flex items-center gap-2 text-xs">
-                    <span>Campaign:</span>
-                    <Badge variant="secondary" className="text-xs">{currentQueueItem.campaignName}</Badge>
-                    <Badge variant={currentQueueItem.priority >= 3 ? 'destructive' : 'default'} className="text-xs">
-                      Priority {currentQueueItem.priority}
-                    </Badge>
-                  </div>
                 </div>
 
                 {/* Right: Call Actions */}
