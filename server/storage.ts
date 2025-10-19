@@ -2662,8 +2662,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLeadWithDetails(id: string): Promise<any | undefined> {
-    const agentUser = aliasedTable(users, 'agentUser');
-    const approverUser = aliasedTable(users, 'approverUser');
+    const agentUser = alias(users, 'agentUser');
+    const approverUser = alias(users, 'approverUser');
     
     const [result] = await db
       .select({
@@ -2696,11 +2696,12 @@ export class DatabaseStorage implements IStorage {
         // Contact info
         contact: {
           id: contacts.id,
+          fullName: contacts.fullName,
           firstName: contacts.firstName,
           lastName: contacts.lastName,
           email: contacts.email,
-          phone: contacts.phone,
-          title: contacts.title,
+          directPhone: contacts.directPhone,
+          jobTitle: contacts.jobTitle,
           accountId: contacts.accountId,
         },
         // Account info
@@ -2708,8 +2709,8 @@ export class DatabaseStorage implements IStorage {
           id: accounts.id,
           name: accounts.name,
           domain: accounts.domain,
-          industry: accounts.industry,
-          employeeCount: accounts.employeeCount,
+          industryStandardized: accounts.industryStandardized,
+          staffCount: accounts.staffCount,
           annualRevenue: accounts.annualRevenue,
         },
         // Agent info
