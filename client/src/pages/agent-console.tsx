@@ -535,7 +535,7 @@ export default function AgentConsolePage() {
                 variant="outline"
                 size="sm"
                 onClick={handlePreviousContact}
-                disabled={currentContactIndex === 0 || queueData.length === 0}
+                disabled={currentContactIndex === 0 || queueData.length === 0 || (callMadeToContact && !dispositionSaved)}
                 className="flex-1"
                 data-testid="button-previous-contact"
               >
@@ -575,26 +575,36 @@ export default function AgentConsolePage() {
                 <div className="text-[10px] text-muted-foreground px-2 mb-2">
                   Showing {Math.min(queueData.length, 15)} of {queueData.length} contacts
                 </div>
-                {queueData.slice(0, 15).map((item, index) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setCurrentContactIndex(index)}
-                    className={`
-                      w-full text-left p-2 rounded hover-elevate active-elevate-2 transition-all
-                      ${index === currentContactIndex ? 'bg-primary/10 border border-primary/20' : 'bg-white border border-transparent'}
-                    `}
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${
-                        index === currentContactIndex ? 'bg-green-500' : 'bg-gray-300'
-                      }`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{item.contactName}</p>
-                        <p className="text-[10px] text-muted-foreground truncate">{item.accountName}</p>
+                {queueData.slice(0, 15).map((item, index) => {
+                  const isDisabled = (callMadeToContact && !dispositionSaved) && index !== currentContactIndex;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => !isDisabled && setCurrentContactIndex(index)}
+                      disabled={isDisabled}
+                      className={`
+                        w-full text-left p-2 rounded transition-all
+                        ${index === currentContactIndex 
+                          ? 'bg-primary/10 border border-primary/20' 
+                          : 'bg-white border border-transparent'}
+                        ${isDisabled 
+                          ? 'opacity-50 cursor-not-allowed' 
+                          : 'hover-elevate active-elevate-2 cursor-pointer'}
+                      `}
+                      title={isDisabled ? 'Complete disposition before switching contacts' : ''}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${
+                          index === currentContactIndex ? 'bg-green-500' : 'bg-gray-300'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{item.contactName}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{item.accountName}</p>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </>
             )}
           </div>
