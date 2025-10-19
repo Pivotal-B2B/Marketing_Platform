@@ -344,7 +344,7 @@ export const MODULE_FILTERS: Record<string, FilterField[]> = {
     "companySizes",
     "companyRevenue",
     "seniorityLevels",
-    "jobFunctions",
+    // "jobFunctions", // REMOVED: Field doesn't exist in database (only jobTitle exists)
     "departments",
     "countries",
     "states",
@@ -369,7 +369,7 @@ export const MODULE_FILTERS: Record<string, FilterField[]> = {
     "states",
     "cities",
     "technologies",
-    "departments",
+    // "departments", // REMOVED: Field doesn't exist on accounts table (only on contacts)
     "accountOwners",
     "lastActivity",
     "createdDate"
@@ -456,10 +456,10 @@ export const FILTER_RBAC: Record<UserRole, { allow: FilterField[] | "all" }> = {
       "companySizes",
       "companyRevenue",
       "technologies",
-      "departments",
+      "departments",  // Only available for contacts
       // Contact Information
       "seniorityLevels",
-      "jobFunctions",
+      // "jobFunctions", // REMOVED: Field doesn't exist in database
       "contactSource",
       // Geography
       "countries",
@@ -495,7 +495,7 @@ export const FILTER_RBAC: Record<UserRole, { allow: FilterField[] | "all" }> = {
     allow: [
       "search",
       "seniorityLevels",
-      "jobFunctions",
+      // "jobFunctions", // REMOVED: Field doesn't exist in database
       "countries",
       "states",
       "cities",
@@ -533,87 +533,88 @@ export const FILTER_CATEGORIES = [
  * 
  * Format: { filterFieldName: { tableName: 'actual_column_name' } }
  */
+/**
+ * IMPORTANT: This mapping uses camelCase property names (as used by Drizzle ORM)
+ * NOT snake_case database column names.
+ * 
+ * Example: Use 'industryStandardized' (Drizzle property), not 'industry_standardized' (DB column)
+ */
 export const FILTER_TO_DB_MAPPING: Record<string, Record<string, string>> = {
   // Company/Account fields
   industries: {
-    accounts: 'industry_standardized',
-    contacts: 'industry_standardized' // via account join
+    accounts: 'industryStandardized',
+    contacts: 'industryStandardized' // via account join
   },
   companySizes: {
-    accounts: 'employees_size_range',
-    contacts: 'employees_size_range' // via account join
+    accounts: 'employeesSizeRange',
+    contacts: 'employeesSizeRange' // via account join
   },
   companyRevenue: {
-    accounts: 'annual_revenue',
-    contacts: 'annual_revenue' // via account join
+    accounts: 'annualRevenue',
+    contacts: 'annualRevenue' // via account join
   },
   technologies: {
-    accounts: 'tech_stack',
-    contacts: 'tech_stack' // via account join
+    accounts: 'techStack',
+    contacts: 'techStack' // via account join
   },
   departments: {
-    accounts: 'department', // Note: department doesn't exist on accounts table
+    // Note: department doesn't exist on accounts table - filter should be removed
     contacts: 'department'
   },
   
   // Contact fields
   seniorityLevels: {
-    contacts: 'seniority_level'
+    contacts: 'seniorityLevel'
   },
-  jobFunctions: {
-    contacts: 'job_function' // Note: this field doesn't exist in current schema
-  },
+  // Note: jobFunctions doesn't exist in schema - filter should be removed
   
   // Geography fields (different for accounts vs contacts)
   countries: {
-    accounts: 'hq_country',
+    accounts: 'hqCountry',
     contacts: 'country'
   },
   states: {
-    accounts: 'hq_state',
+    accounts: 'hqState',
     contacts: 'state'
   },
   cities: {
-    accounts: 'hq_city',
+    accounts: 'hqCity',
     contacts: 'city'
   },
   
   // Ownership
   accountOwners: {
-    accounts: 'owner_id',
-    contacts: 'owner_id' // can be contact owner or account owner via join
+    accounts: 'ownerId',
+    contacts: 'ownerId'
   },
   
   // Contact verification
   emailStatus: {
-    contacts: 'email_verification_status'
+    contacts: 'emailVerificationStatus'
   },
   phoneStatus: {
-    contacts: 'phone_status'
+    contacts: 'phoneStatus'
   },
   verificationStatus: {
-    contacts: 'email_verification_status' // alias for emailStatus
+    contacts: 'emailVerificationStatus' // alias for emailStatus
   },
   
   // Other contact fields
   assignedAgent: {
-    contacts: 'owner_id' // assuming agent assignment uses owner_id
+    contacts: 'ownerId'
   },
   contactSource: {
-    contacts: 'source_system'
+    contacts: 'sourceSystem'
   },
   
   // Date fields
   createdDate: {
-    accounts: 'created_at',
-    contacts: 'created_at'
+    accounts: 'createdAt',
+    contacts: 'createdAt'
   },
   lastActivity: {
-    accounts: 'updated_at',
-    contacts: 'updated_at'
-  },
-  reviewedDate: {
-    contacts: 'reviewed_at' // assuming this field exists for QA
+    accounts: 'updatedAt',
+    contacts: 'updatedAt'
   }
 } as const;
 
@@ -622,22 +623,23 @@ export const FILTER_TO_DB_MAPPING: Record<string, Record<string, string>> = {
  * 
  * @param filterField - The filter field name (e.g., 'companySizes')
  * @param table - The table name ('accounts' or 'contacts')
- * @returns The actual database column name (e.g., 'employees_size_range')
+ * @returns The actual Drizzle property name (camelCase, e.g., 'employeesSizeRange')
  */
 export function getDbColumnName(filterField: string, table: 'accounts' | 'contacts'): string {
   const mapping = FILTER_TO_DB_MAPPING[filterField];
   
   if (!mapping) {
-    // No mapping exists - assume filter field name matches db column (convert to snake_case)
-    return filterField.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+    // No mapping exists - return field as-is (assume camelCase property name matches)
+    // This works for fields like 'name', 'email', 'domain' that don't need mapping
+    return filterField;
   }
   
   const dbColumn = mapping[table];
   
   if (!dbColumn) {
-    // Fallback: try to use the first available mapping or convert to snake_case
+    // Fallback: try to use the first available mapping or return as-is
     const firstMapping = Object.values(mapping)[0];
-    return firstMapping || filterField.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+    return firstMapping || filterField;
   }
   
   return dbColumn;

@@ -45,6 +45,14 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     'seniority': 'seniorityLevel',
     'departments': 'department',
     
+    // Company fields (accessed via account join)
+    'industries': 'industryStandardized',  // Note: requires join to accounts table
+    'industry': 'industryStandardized',     // Note: requires join to accounts table
+    'companySizes': 'employeesSizeRange',   // Note: requires join to accounts table
+    'companyRevenue': 'annualRevenue',      // Note: requires join to accounts table
+    'technologies': 'techStack',            // Note: requires join to accounts table
+    'techStack': 'techStack',               // Note: requires join to accounts table
+    
     // Geography fields (contacts don't use prefix)
     'countries': 'country',
     'states': 'state',
