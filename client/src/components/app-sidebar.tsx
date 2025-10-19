@@ -115,7 +115,7 @@ const getNavSections = (): NavSection[] => [
         items: [
           { title: "All Campaigns", url: "/campaigns", roles: ["admin", "campaign_manager"] },
           { title: "Email Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
-          { title: "Pipeline Dialer", url: "/campaigns/phone", roles: ["admin", "campaign_manager"] },
+          { title: "Pipeline Dialer", url: "/campaigns/telemarketing", roles: ["admin", "campaign_manager"] },
           { title: "Campaign Configuration", url: "/campaigns/config", roles: ["admin", "campaign_manager"] },
         ],
       },
@@ -124,12 +124,6 @@ const getNavSections = (): NavSection[] => [
         url: "/agent-console",
         icon: Headphones,
         roles: ["admin", "campaign_manager", "agent"],
-      },
-      {
-        title: "Power Dialer",
-        url: "/telephony/auto-dialer",
-        icon: Zap,
-        roles: ["admin", "campaign_manager"],
       },
       {
         title: "QA & Leads",
@@ -226,7 +220,6 @@ const getNavSections = (): NavSection[] => [
         icon: Phone,
         roles: ["admin"],
         items: [
-          { title: "Power Dialer", url: "/telephony/auto-dialer", roles: ["admin"] },
           { title: "SIP Trunk Configuration", url: "/telephony/sip-trunks", roles: ["admin"] },
         ],
       },

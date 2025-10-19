@@ -25,11 +25,9 @@ import AccountsListDetail from "@/pages/accounts-list-detail";
 import CampaignsPage from "@/pages/campaigns";
 import EmailCampaignsPage from "@/pages/email-campaigns";
 import EmailCampaignCreatePage from "@/pages/email-campaign-create";
-import TelemarketingPage from "@/pages/telemarketing";
 import TelemarketingCreatePage from "@/pages/telemarketing-create";
 import PhoneCampaignsPage from "@/pages/phone-campaigns";
 import CampaignConfigPage from "@/pages/campaign-config";
-import AutoDialerControlPage from "@/pages/auto-dialer-control";
 import LeadsPage from "@/pages/leads";
 import ContentStudioPage from "@/pages/content-studio";
 import AIContentGeneratorPage from "@/pages/ai-content-generator";
@@ -100,10 +98,7 @@ function AuthenticatedApp() {
               <Route path="/campaigns/email/create" component={EmailCampaignCreatePage} />
               <Route path="/campaigns/email" component={EmailCampaignsPage} />
               <Route path="/campaigns/telemarketing/create" component={TelemarketingCreatePage} />
-          <Route path="/campaigns/phone/create" component={TelemarketingCreatePage} />
-              <Route path="/campaigns/phone/:id/queue" component={CampaignQueuePage} />
-              <Route path="/campaigns/phone" component={PhoneCampaignsPage} />
-              <Route path="/campaigns/telemarketing" component={TelemarketingPage} />
+              <Route path="/campaigns/telemarketing" component={PhoneCampaignsPage} />
               <Route path="/campaigns/:id/queue" component={CampaignQueuePage} />
               <Route path="/campaigns/config" component={CampaignConfigPage} />
               <Route path="/leads" component={LeadsPage} />
@@ -117,7 +112,6 @@ function AuthenticatedApp() {
               <Route path="/resources-centre" component={ResourcesCentrePage} />
               <Route path="/agent-console" component={AgentConsolePage} />
               <Route path="/email-infrastructure/sender-profiles" component={SenderProfilesPage} />
-              <Route path="/telephony/auto-dialer" component={AutoDialerControlPage} />
               <Route path="/telephony/sip-trunks" component={SipTrunkSettingsPage} />
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />

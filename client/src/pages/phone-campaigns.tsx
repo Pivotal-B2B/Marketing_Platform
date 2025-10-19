@@ -357,7 +357,7 @@ export default function PhoneCampaignsPage() {
             Create, manage, and track your outbound dialing campaigns
           </p>
         </div>
-        <Button onClick={() => setLocation("/campaigns/phone/create")} data-testid="button-create-phone-campaign">
+        <Button onClick={() => setLocation("/campaigns/telemarketing/create")} data-testid="button-create-phone-campaign">
           <Plus className="mr-2 h-4 w-4" />
           Create Campaign
         </Button>
@@ -442,7 +442,7 @@ export default function PhoneCampaignsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setLocation(`/campaigns/phone/${campaign.id}`)}
+                      onClick={() => setLocation(`/campaigns/${campaign.id}`)}
                       data-testid={`button-view-campaign-${campaign.id}`}
                     >
                       <BarChart className="mr-2 h-4 w-4" />
@@ -497,7 +497,7 @@ export default function PhoneCampaignsPage() {
                       size="sm"
                       variant="outline"
                       className="flex-1"
-                      onClick={() => setLocation(`/campaigns/phone/${campaign.id}/queue`)}
+                      onClick={() => setLocation(`/campaigns/${campaign.id}/queue`)}
                       data-testid={`button-view-queue-${campaign.id}`}
                     >
                       <Users className="w-4 h-4 mr-2" />
