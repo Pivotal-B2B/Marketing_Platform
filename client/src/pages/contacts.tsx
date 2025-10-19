@@ -6,7 +6,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon, Link as LinkIcon, Building2 } from "lucide-react";
-import { FilterShell } from "@/components/filters/filter-shell";
+import { SidebarFilters } from "@/components/filters/sidebar-filters";
 import { FilterValues, type UserRole, convertFilterValuesToFilterGroup } from "@shared/filterConfig";
 import type { FilterGroup } from "@shared/filter-types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -387,14 +387,27 @@ export default function ContactsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-bold text-gradient">Contacts</h1>
-          <p className="text-muted-foreground mt-2 text-base">
-            Manage your contact database with advanced filtering
-          </p>
-        </div>
+    <div className="flex h-screen overflow-hidden">
+      {/* Left Sidebar - Filters */}
+      <SidebarFilters
+        entityType="contact"
+        onApplyFilter={(filter) => {
+          setFilterGroup(filter);
+          setCurrentPage(1); // Reset to first page on filter change
+        }}
+        initialFilter={filterGroup}
+      />
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto">
+        <div className="space-y-6 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gradient">Contacts</h1>
+              <p className="text-muted-foreground mt-2 text-base">
+                Manage your contact database with advanced filtering
+              </p>
+            </div>
         <div className="flex gap-2">
           <Button 
             variant="outline" 
@@ -607,13 +620,6 @@ export default function ContactsPage() {
             data-testid="input-search-contacts"
           />
         </div>
-        <FilterShell
-          module="contacts"
-          onApplyFilters={setAppliedFilters}
-          initialFilters={appliedFilters}
-          userRole={user?.role ? normalizeRole(user.role) : "Agent"}
-          data-testid="filter-shell-contacts"
-        />
         <Button variant="outline" data-testid="button-export">
           <Download className="mr-2 h-4 w-4" />
           Export
@@ -909,6 +915,8 @@ export default function ContactsPage() {
         onAddToList={(listId) => addToListMutation.mutate(listId)}
         onCreateList={(name, description) => createListMutation.mutate({ name, description })}
       />
+        </div>
+      </div>
     </div>
   );
 }
