@@ -628,80 +628,75 @@ export default function AgentConsolePage() {
                   <User className="h-7 w-7 text-white" />
                 </div>
 
-                {/* Contact Information - Organized Grid */}
-                <div className="flex-1 grid grid-cols-2 gap-x-8 gap-y-2">
-                  {/* Row 1: Name & Job Title */}
-                  <div className="col-span-2">
-                    <h2 className="text-lg font-semibold mb-1" data-testid="text-contact-name">
-                      {currentQueueItem.contactName || 'Unknown Contact'}
-                    </h2>
-                  </div>
+                {/* Contact Information - Organized Layout */}
+                <div className="flex-1 flex flex-col gap-2">
+                  {/* Contact Name */}
+                  <h2 className="text-xl font-semibold" data-testid="text-contact-name">
+                    {currentQueueItem.contactName || 'Unknown Contact'}
+                  </h2>
                   
-                  {/* Row 2: Job Title & Company */}
-                  <div className="flex items-center gap-2 text-sm text-white/90">
-                    {contactDetails?.jobTitle ? (
-                      <>
-                        <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span data-testid="text-contact-title">{contactDetails.jobTitle}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span data-testid="text-contact-company">{currentQueueItem.accountName || 'No company'}</span>
-                      </>
-                    )}
-                  </div>
-                  
-                  {contactDetails?.jobTitle && (
+                  {/* Contact Details Grid */}
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
+                    {/* Job Title & Company */}
+                    <div className="flex items-center gap-2 text-sm text-white/90">
+                      <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="truncate" data-testid="text-contact-title">
+                        {contactDetails?.jobTitle || 'No title'}
+                      </span>
+                    </div>
+                    
                     <div className="flex items-center gap-2 text-sm text-white/90">
                       <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span data-testid="text-contact-company">{currentQueueItem.accountName || 'No company'}</span>
+                      <span className="truncate" data-testid="text-contact-company">
+                        {currentQueueItem.accountName || 'No company'}
+                      </span>
                     </div>
-                  )}
-                  
-                  {/* Row 3: Email & Phone */}
-                  <div className="flex items-center gap-2 text-sm text-white/90">
-                    <Mail className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="truncate" data-testid="text-contact-email">
-                      {currentQueueItem.contactEmail || contactDetails?.email || 'No email'}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-3.5 w-3.5 flex-shrink-0 text-white/90" />
-                    <Select value={selectedPhoneType} onValueChange={(value: 'direct' | 'company' | 'manual') => {
-                      setSelectedPhoneType(value);
-                      setShowManualDial(value === 'manual');
-                    }}>
-                      <SelectTrigger className="h-8 bg-white/10 text-white border-white/20 text-sm w-[200px]" data-testid="select-phone-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {validPhoneOptions.map((option) => (
-                          <SelectItem key={option.type} value={option.type} data-testid={`option-${option.type}-phone`}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="manual" data-testid="option-manual-dial">
-                          Manual Dial
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {showManualDial && (
-                    <div className="col-span-2 flex items-center gap-2">
+                    
+                    {/* Email & Phone */}
+                    <div className="flex items-center gap-2 text-sm text-white/90">
+                      <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="truncate" data-testid="text-contact-email">
+                        {currentQueueItem.contactEmail || contactDetails?.email || 'No email'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
                       <Phone className="h-3.5 w-3.5 flex-shrink-0 text-white/90" />
-                      <input
-                        type="tel"
-                        className="h-8 px-3 rounded bg-white/10 border border-white/20 text-white text-sm placeholder:text-white/50 w-[200px]"
-                        placeholder="Enter phone number"
-                        value={manualPhoneNumber}
-                        onChange={(e) => setManualPhoneNumber(e.target.value)}
-                        data-testid="input-manual-phone"
-                      />
+                      <Select value={selectedPhoneType} onValueChange={(value: 'direct' | 'company' | 'manual') => {
+                        setSelectedPhoneType(value);
+                        setShowManualDial(value === 'manual');
+                      }}>
+                        <SelectTrigger className="h-8 bg-white/10 text-white border-white/20 text-sm w-[200px]" data-testid="select-phone-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {validPhoneOptions.map((option) => (
+                            <SelectItem key={option.type} value={option.type} data-testid={`option-${option.type}-phone`}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="manual" data-testid="option-manual-dial">
+                            Manual Dial
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
+                    
+                    {/* Manual Phone Input */}
+                    {showManualDial && (
+                      <div className="col-span-2 flex items-center gap-2">
+                        <Phone className="h-3.5 w-3.5 flex-shrink-0 text-white/90" />
+                        <input
+                          type="tel"
+                          className="h-8 px-3 rounded bg-white/10 border border-white/20 text-white text-sm placeholder:text-white/50 w-[200px]"
+                          placeholder="Enter phone number"
+                          value={manualPhoneNumber}
+                          onChange={(e) => setManualPhoneNumber(e.target.value)}
+                          data-testid="input-manual-phone"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Call Button - Right Aligned */}
