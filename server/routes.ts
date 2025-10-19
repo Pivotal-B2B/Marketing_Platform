@@ -9,6 +9,21 @@ import filterOptionsRouter from "./routes/filter-options-routes";
 import reportingRoutes from './routes/reporting-routes';
 import campaignSuppressionRouter from './routes/campaign-suppression-routes';
 import { z } from "zod";
+import { 
+  apiLimiter, 
+  authLimiter, 
+  writeLimiter, 
+  expensiveOperationLimiter,
+  validate 
+} from "./middleware/security";
+import { 
+  loginSchema,
+  createUserSchema,
+  updateUserSchema,
+  assignRoleSchema,
+  uuidParamSchema,
+  userIdSchema
+} from "./validation/schemas";
 import { db } from "./db";
 import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts } from "@shared/schema";
 import {
@@ -130,6 +145,9 @@ function convertFilterValuesToFilterGroup(filterValues: FilterValues): FilterGro
 }
 
 export function registerRoutes(app: Express) {
+  // Apply general rate limiting to all API routes (100 req/15min)
+  app.use('/api/', apiLimiter);
+
   // ==================== AUTH ====================
 
   // ==================== USERS (Admin Only) ====================
@@ -170,9 +188,10 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/users", requireAuth, requireRole('admin'), async (req, res) => {
+  // Apply write rate limiting to user creation (30 req/10min)
+  app.post("/api/users", requireAuth, requireRole('admin'), writeLimiter, validate({ body: createUserSchema }), async (req, res) => {
     try {
-      const validated = insertUserSchema.parse(req.body);
+      const validated = req.body;
 
       // Hash password before storing
       const hashedPassword = await hashPassword(validated.password);
@@ -225,14 +244,10 @@ export function registerRoutes(app: Express) {
   });
 
   // Assign a single role to a user
-  app.post("/api/users/:userId/roles", requireAuth, requireRole('admin'), async (req, res) => {
+  app.post("/api/users/:userId/roles", requireAuth, requireRole('admin'), writeLimiter, validate({ params: userIdSchema, body: assignRoleSchema }), async (req, res) => {
     try {
       const { userId } = req.params;
       const { role } = req.body;
-
-      if (!role) {
-        return res.status(400).json({ message: "Role is required" });
-      }
 
       await storage.assignUserRole(userId, role, req.user!.userId);
       const roles = await storage.getUserRoles(userId);
@@ -286,14 +301,11 @@ export function registerRoutes(app: Express) {
 
   // ==================== AUTH ====================
 
-  app.post("/api/auth/login", async (req, res) => {
+  // Apply strict rate limiting to login endpoint (5 attempts per 15 minutes)
+  app.post("/api/auth/login", authLimiter, validate({ body: loginSchema }), async (req, res) => {
     try {
       const { username, password } = req.body;
       console.log('[LOGIN DEBUG] Received username:', username);
-
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password required" });
-      }
 
       const user = await storage.getUserByUsername(username);
       console.log('[LOGIN DEBUG] User found:', user ? 'YES' : 'NO');

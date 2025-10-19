@@ -4,10 +4,30 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./db-init";
 import { autoDialerService } from "./services/auto-dialer";
+import { 
+  apiLimiter, 
+  securityHeaders, 
+  captureClientIP,
+  sanitizeBody,
+  PAYLOAD_LIMITS 
+} from "./middleware/security";
 
 const app = express();
-app.use(express.json({ limit: '50gb' }));
-app.use(express.urlencoded({ extended: false, limit: '50gb' }));
+
+// Trust Replit proxy for accurate client IP detection (required for rate limiting)
+// Replit runs behind a reverse proxy that sets X-Forwarded-For header
+app.set('trust proxy', 1);
+
+// Apply security middleware early in the stack
+app.use(securityHeaders); // Set security headers on all responses
+app.use(captureClientIP); // Capture client IP for audit logging
+
+// Payload size limits (防止 DOS attacks)
+app.use(express.json({ limit: PAYLOAD_LIMITS.json }));
+app.use(express.urlencoded({ extended: false, limit: PAYLOAD_LIMITS.urlencoded }));
+
+// Sanitize all incoming request bodies (BEFORE validation)
+app.use(sanitizeBody); // Remove HTML/SQL injection patterns
 
 app.use((req, res, next) => {
   const start = Date.now();
