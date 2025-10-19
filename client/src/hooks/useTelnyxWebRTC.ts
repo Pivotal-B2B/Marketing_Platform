@@ -173,16 +173,22 @@ export function useTelnyxWebRTC({
         updateCallState('idle');
       });
 
-      // Connect to Telnyx
-      telnyxClient.connect().catch((error: any) => {
-        console.error('Telnyx connection failed:', error);
-        setIsConnected(false);
-        toast({
-          variant: "destructive",
-          title: "Connection Failed",
-          description: error.message || "Failed to connect to Telnyx server",
-        });
+      // Connect to Telnyx with timeout protection
+      const connectPromise = telnyxClient.connect();
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000);
       });
+
+      Promise.race([connectPromise, timeoutPromise])
+        .catch((error: any) => {
+          console.error('Telnyx connection failed:', error);
+          setIsConnected(false);
+          toast({
+            variant: "destructive",
+            title: "Connection Failed",
+            description: error.message || "Failed to connect to Telnyx server",
+          });
+        });
       
       setClient(telnyxClient);
 
