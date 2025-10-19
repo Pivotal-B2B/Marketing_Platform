@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon, Link as LinkIcon, Building2 } from "lucide-react";
 import { FilterShell } from "@/components/filters/filter-shell";
-import { FilterValues, type UserRole } from "@shared/filterConfig";
+import { FilterValues, type UserRole, convertFilterValuesToFilterGroup } from "@shared/filterConfig";
 import type { FilterGroup } from "@shared/filter-types";
 import { useAuth } from "@/contexts/AuthContext";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
@@ -102,12 +102,17 @@ export default function ContactsPage() {
       }
 
       const params = new URLSearchParams();
-      // Prefer new filter format, fallback to legacy
+      
+      // Convert operator-based FilterValues to FilterGroup format for backend
       if (Object.keys(appliedFilters).length > 0) {
-        params.set('filterValues', JSON.stringify(appliedFilters));
+        const convertedFilterGroup = convertFilterValuesToFilterGroup(appliedFilters, 'contacts');
+        if (convertedFilterGroup) {
+          params.set('filters', JSON.stringify(convertedFilterGroup));
+        }
       } else if (filterGroup) {
         params.set('filters', JSON.stringify(filterGroup));
       }
+      
       const response = await fetch(`/api/contacts?${params.toString()}`, {
         headers,
         credentials: 'include',

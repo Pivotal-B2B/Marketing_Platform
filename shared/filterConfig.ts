@@ -855,3 +855,136 @@ export function getFieldsByCategory(
   
   return grouped;
 }
+
+/**
+ * Map frontend Operator types to backend filter-types operators
+ */
+function mapOperatorToBackend(operator: Operator): string {
+  const mapping: Record<Operator, string> = {
+    "EQUALS": "equals",
+    "NOT_EQUALS": "notEquals",
+    "INCLUDES_ANY": "containsAny",
+    "INCLUDES_ALL": "containsAll",
+    "EXCLUDES_ANY": "notEquals", // Map to notEquals for now
+    "CONTAINS": "contains",
+    "NOT_CONTAINS": "doesNotContain",
+    "BEGINS_WITH": "startsWith",
+    "ENDS_WITH": "endsWith",
+    "HAS_ANY_VALUE": "isNotEmpty",
+    "IS_EMPTY": "isEmpty"
+  };
+  return mapping[operator] || "equals";
+}
+
+/**
+ * Convert FilterValues (with FieldRule arrays) to FilterGroup format for backend
+ * 
+ * This is critical for making filters work - it converts the operator-based
+ * filter UI format to the backend API format.
+ */
+export function convertFilterValuesToFilterGroup(
+  filterValues: FilterValues,
+  table: 'accounts' | 'contacts' = 'contacts'
+): { logic: 'AND' | 'OR'; conditions: any[] } | undefined {
+  const conditions: any[] = [];
+  
+  for (const [filterField, value] of Object.entries(filterValues)) {
+    if (!value) continue;
+    
+    // Map filter field to database column name
+    const dbField = getDbColumnName(filterField, table);
+    
+    // Handle FieldRule arrays (operator-based filters)
+    if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && 'operator' in value[0]) {
+      const rules = value as FieldRule[];
+      
+      rules.forEach((rule, index) => {
+        const backendOperator = mapOperatorToBackend(rule.operator);
+        
+        // Handle value-based operators (chip selections)
+        if (rule.values && rule.values.length > 0) {
+          conditions.push({
+            id: `${filterField}-${index}`,
+            field: dbField,
+            operator: backendOperator,
+            value: backendOperator === 'containsAny' || backendOperator === 'containsAll' 
+              ? rule.values  // Array for containsAny/containsAll
+              : rule.values[0]  // Single value for equals/notEquals
+          });
+        }
+        
+        // Handle text operators (query-based)
+        if (rule.query) {
+          conditions.push({
+            id: `${filterField}-${index}`,
+            field: dbField,
+            operator: backendOperator,
+            value: rule.query
+          });
+        }
+        
+        // Handle null-check operators (no value needed)
+        if (isNullCheckOperator(rule.operator)) {
+          conditions.push({
+            id: `${filterField}-${index}`,
+            field: dbField,
+            operator: backendOperator
+          });
+        }
+      });
+    }
+    // Handle simple string array (legacy multi-select format)
+    else if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'string') {
+      conditions.push({
+        id: filterField,
+        field: dbField,
+        operator: 'containsAny',
+        value: value
+      });
+    }
+    // Handle date range objects
+    else if (value && typeof value === 'object' && ('from' in value || 'to' in value)) {
+      const dateRange = value as { from?: string; to?: string };
+      if (dateRange.from && dateRange.to) {
+        conditions.push({
+          id: filterField,
+          field: dbField,
+          operator: 'between',
+          value: { from: dateRange.from, to: dateRange.to }
+        });
+      } else if (dateRange.from) {
+        conditions.push({
+          id: filterField,
+          field: dbField,
+          operator: 'after',
+          value: dateRange.from
+        });
+      } else if (dateRange.to) {
+        conditions.push({
+          id: filterField,
+          field: dbField,
+          operator: 'before',
+          value: dateRange.to
+        });
+      }
+    }
+    // Handle search string
+    else if (filterField === 'search' && typeof value === 'string') {
+      conditions.push({
+        id: 'search',
+        field: 'name',  // or whatever field should be searched
+        operator: 'contains',
+        value: value
+      });
+    }
+  }
+  
+  if (conditions.length === 0) {
+    return undefined;
+  }
+  
+  return {
+    logic: 'AND',
+    conditions
+  };
+}
