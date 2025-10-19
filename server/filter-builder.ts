@@ -22,6 +22,15 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     'revenueRange': 'annualRevenue',
     'technologies': 'techStack',
     'techStack': 'techStack',
+    'domain': 'domain',
+    'accountMainPhone': 'mainPhone',
+    'accountLinkedinUrl': 'linkedinUrl',
+    'accountDescription': 'description',
+    'accountTags': 'tags',
+    'tags': 'tags',
+    'yearFounded': 'yearFounded',
+    'sicCode': 'sicCode',
+    'naicsCode': 'naicsCode',
     
     // Geography fields (accounts use hq_ prefix)
     'countries': 'hqCountry',
@@ -44,6 +53,15 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     'seniorityLevels': 'seniorityLevel',
     'seniority': 'seniorityLevel',
     'departments': 'department',
+    'jobTitle': 'jobTitle',
+    'directPhone': 'directPhone',
+    'mobilePhone': 'mobilePhone',
+    'contactTags': 'tags',
+    'tags': 'tags',
+    'consentBasis': 'consentBasis',
+    'consentSource': 'consentSource',
+    'contactLinkedinUrl': 'linkedinUrl',
+    'list': 'list',
     
     // Company fields (accessed via account join)
     'industries': 'industryStandardized',  // Note: requires join to accounts table
@@ -52,6 +70,8 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     'companyRevenue': 'annualRevenue',      // Note: requires join to accounts table
     'technologies': 'techStack',            // Note: requires join to accounts table
     'techStack': 'techStack',               // Note: requires join to accounts table
+    'accountName': 'name',                  // Note: requires join to accounts table
+    'accountDomain': 'domain',              // Note: requires join to accounts table
     
     // Geography fields (contacts don't use prefix)
     'countries': 'country',
@@ -60,7 +80,6 @@ const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
     
     // Verification fields
     'emailStatus': 'emailVerificationStatus',
-    'verificationStatus': 'emailVerificationStatus',
     'phoneStatus': 'phoneStatus',
     
     // Ownership

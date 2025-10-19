@@ -71,7 +71,7 @@ export type OperatorSupport =
 export type FilterField =
   | "industries" | "companySizes" | "companyRevenue" | "seniorityLevels"
   | "countries" | "states" | "cities"
-  | "technologies" | "jobFunctions" | "departments"
+  | "technologies" | "departments"
   | "accountOwners" | "createdDate" | "lastActivity" | "search"
   // Campaign-related filters
   | "campaignName" | "campaignType" | "campaignStatus" | "campaignOwner" | "dialMode"
@@ -80,7 +80,12 @@ export type FilterField =
   // List/Segment-related filters
   | "listName" | "segmentName" | "segmentOwner"
   // Contact-specific filters
-  | "emailStatus" | "phoneStatus" | "verificationStatus" | "assignedAgent" | "contactSource";
+  | "emailStatus" | "phoneStatus" | "assignedAgent" | "contactSource"
+  | "jobTitle" | "directPhone" | "mobilePhone" | "contactTags" | "consentBasis" 
+  | "consentSource" | "contactLinkedinUrl" | "list" | "accountName" | "accountDomain"
+  // Account-specific filters
+  | "domain" | "accountMainPhone" | "accountLinkedinUrl" | "accountDescription" 
+  | "accountTags" | "yearFounded" | "sicCode" | "naicsCode";
 
 export interface FilterFieldConfig {
   type: FilterFieldType;
@@ -146,14 +151,6 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
     max: 10,
     source: "technologies",
     category: "Company Information",
-    operatorSupport: "text-taxonomy"  // Supports all 5 operators
-  },
-  jobFunctions: {
-    type: "multi",
-    label: "Job Function",
-    max: 10,
-    source: "job-functions",
-    category: "Contact Information",
     operatorSupport: "text-taxonomy"  // Supports all 5 operators
   },
   departments: {
@@ -309,13 +306,6 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
     source: "phone-status",
     category: "Verification"
   },
-  verificationStatus: {
-    type: "multi",
-    label: "Verification Status",
-    max: 4,
-    source: "email-verification-status",
-    category: "Verification"
-  },
   assignedAgent: {
     type: "multi",
     label: "Assigned Agent",
@@ -329,6 +319,130 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
     max: 10,
     source: "contact-sources",
     category: "Contact Information"
+  },
+  
+  // NEW CONTACT FILTERS
+  jobTitle: {
+    type: "typeahead",
+    label: "Job Title",
+    max: 10,
+    source: "job-titles",
+    category: "Contact Information",
+    operatorSupport: "text-taxonomy"
+  },
+  directPhone: {
+    type: "text",
+    label: "Direct Phone",
+    placeholder: "Enter phone number...",
+    category: "Contact Information"
+  },
+  mobilePhone: {
+    type: "text",
+    label: "Mobile Phone",
+    placeholder: "Enter mobile number...",
+    category: "Contact Information"
+  },
+  contactTags: {
+    type: "typeahead",
+    label: "Contact Tags",
+    max: 10,
+    source: "contact-tags",
+    category: "Contact Information",
+    operatorSupport: "text-taxonomy"
+  },
+  consentBasis: {
+    type: "multi",
+    label: "Consent Basis",
+    max: 5,
+    source: "consent-basis",
+    category: "Compliance"
+  },
+  consentSource: {
+    type: "typeahead",
+    label: "Consent Source",
+    max: 10,
+    source: "consent-sources",
+    category: "Compliance"
+  },
+  contactLinkedinUrl: {
+    type: "text",
+    label: "Contact LinkedIn URL",
+    placeholder: "Enter LinkedIn URL...",
+    category: "Contact Information"
+  },
+  list: {
+    type: "typeahead",
+    label: "Source List",
+    max: 10,
+    source: "source-lists",
+    category: "Lists & Segments"
+  },
+  accountName: {
+    type: "typeahead",
+    label: "Account Name",
+    max: 10,
+    source: "account-names",
+    category: "Company Information"
+  },
+  accountDomain: {
+    type: "typeahead",
+    label: "Account Domain",
+    max: 10,
+    source: "account-domains",
+    category: "Company Information"
+  },
+  
+  // NEW ACCOUNT FILTERS
+  domain: {
+    type: "typeahead",
+    label: "Company Domain",
+    max: 10,
+    source: "domains",
+    category: "Company Information"
+  },
+  accountMainPhone: {
+    type: "text",
+    label: "Company Phone",
+    placeholder: "Enter company phone...",
+    category: "Company Information"
+  },
+  accountLinkedinUrl: {
+    type: "text",
+    label: "Company LinkedIn URL",
+    placeholder: "Enter LinkedIn URL...",
+    category: "Company Information"
+  },
+  accountDescription: {
+    type: "text",
+    label: "Company Description",
+    placeholder: "Search in descriptions...",
+    category: "Company Information"
+  },
+  accountTags: {
+    type: "typeahead",
+    label: "Account Tags",
+    max: 10,
+    source: "account-tags",
+    category: "Company Information",
+    operatorSupport: "text-taxonomy"
+  },
+  yearFounded: {
+    type: "number",
+    label: "Year Founded",
+    placeholder: "Enter year...",
+    category: "Company Information"
+  },
+  sicCode: {
+    type: "text",
+    label: "SIC Code",
+    placeholder: "Enter SIC code...",
+    category: "Company Information"
+  },
+  naicsCode: {
+    type: "text",
+    label: "NAICS Code",
+    placeholder: "Enter NAICS code...",
+    category: "Company Information"
   }
 } as const;
 
@@ -345,32 +459,57 @@ export const MODULE_FILTERS: Record<string, FilterField[]> = {
     "companySizes", 
     "companyRevenue",
     "technologies",
+    "accountName",
+    "accountDomain",
     // Contact-specific filters
+    "jobTitle",
     "seniorityLevels",
     "departments",
+    "directPhone",
+    "mobilePhone",
+    "contactLinkedinUrl",
+    "contactTags",
+    // Geography
     "countries",
     "states",
     "cities",
+    // Verification & Status
     "emailStatus",
     "phoneStatus",
-    "verificationStatus",
+    // Compliance
+    "consentBasis",
+    "consentSource",
+    // Ownership & Lists
     "assignedAgent",
-    "contactSource",
-    "listName",
     "accountOwners",
+    "contactSource",
+    "list",
+    "listName",
+    // Dates
     "lastActivity",
     "createdDate"
   ],
   accounts: [
     "search",
+    // Company Information
+    "domain",
     "industries",
     "companySizes",
     "companyRevenue",
+    "technologies",
+    "accountDescription",
+    "accountTags",
+    "accountMainPhone",
+    "accountLinkedinUrl",
+    // Firmographic Data
+    "yearFounded",
+    "sicCode",
+    "naicsCode",
+    // Geography
     "countries",
     "states",
     "cities",
-    "technologies",
-    // "departments", // REMOVED: Field doesn't exist on accounts table (only on contacts)
+    // Ownership & Dates
     "accountOwners",
     "lastActivity",
     "createdDate"
@@ -460,8 +599,13 @@ export const FILTER_RBAC: Record<UserRole, { allow: FilterField[] | "all" }> = {
       "departments",  // Only available for contacts
       // Contact Information
       "seniorityLevels",
-      // "jobFunctions", // REMOVED: Field doesn't exist in database
+      "jobTitle",
       "contactSource",
+      "directPhone",
+      "mobilePhone",
+      "contactTags",
+      "contactLinkedinUrl",
+      "list",
       // Geography
       "countries",
       "states",
@@ -480,11 +624,23 @@ export const FILTER_RBAC: Record<UserRole, { allow: FilterField[] | "all" }> = {
       "listName",
       "segmentName",
       "segmentOwner",
-      // Verification filters
+      // Verification & Compliance filters
       "emailStatus",
       "phoneStatus",
-      "verificationStatus",
+      "consentBasis",
+      "consentSource",
       "assignedAgent",
+      // Account filters
+      "domain",
+      "accountName",
+      "accountDomain",
+      "accountDescription",
+      "accountTags",
+      "accountMainPhone",
+      "accountLinkedinUrl",
+      "yearFounded",
+      "sicCode",
+      "naicsCode",
       // Ownership & Dates
       "accountOwners",
       "lastActivity",
@@ -496,12 +652,13 @@ export const FILTER_RBAC: Record<UserRole, { allow: FilterField[] | "all" }> = {
     allow: [
       "search",
       "seniorityLevels",
-      // "jobFunctions", // REMOVED: Field doesn't exist in database
+      "jobTitle",
       "countries",
       "states",
       "cities",
       "campaignName",
       "listName",
+      "list",
       "lastActivity"
     ]
   }
@@ -520,6 +677,7 @@ export const FILTER_CATEGORIES = [
   "Campaign",
   "QA & Verification",
   "Verification",
+  "Compliance",
   "Lists & Segments",
   "Ownership",
   "Dates"
@@ -559,7 +717,6 @@ export const FILTER_TO_DB_MAPPING: Record<string, Record<string, string>> = {
     contacts: 'techStack' // via account join
   },
   departments: {
-    // Note: department doesn't exist on accounts table - filter should be removed
     contacts: 'department'
   },
   
@@ -567,7 +724,62 @@ export const FILTER_TO_DB_MAPPING: Record<string, Record<string, string>> = {
   seniorityLevels: {
     contacts: 'seniorityLevel'
   },
-  // Note: jobFunctions doesn't exist in schema - filter should be removed
+  jobTitle: {
+    contacts: 'jobTitle'
+  },
+  directPhone: {
+    contacts: 'directPhone'
+  },
+  mobilePhone: {
+    contacts: 'mobilePhone'
+  },
+  contactTags: {
+    contacts: 'tags'
+  },
+  consentBasis: {
+    contacts: 'consentBasis'
+  },
+  consentSource: {
+    contacts: 'consentSource'
+  },
+  contactLinkedinUrl: {
+    contacts: 'linkedinUrl'
+  },
+  list: {
+    contacts: 'list'
+  },
+  accountName: {
+    contacts: 'name' // via account join
+  },
+  accountDomain: {
+    contacts: 'domain' // via account join
+  },
+  
+  // Account-specific fields
+  domain: {
+    accounts: 'domain'
+  },
+  accountMainPhone: {
+    accounts: 'mainPhone'
+  },
+  accountLinkedinUrl: {
+    accounts: 'linkedinUrl'
+  },
+  accountDescription: {
+    accounts: 'description'
+  },
+  accountTags: {
+    accounts: 'tags'
+  },
+  yearFounded: {
+    accounts: 'yearFounded'
+  },
+  sicCode: {
+    accounts: 'sicCode'
+  },
+  naicsCode: {
+    accounts: 'naicsCode'
+  },
   
   // Geography fields (different for accounts vs contacts)
   countries: {
@@ -595,9 +807,6 @@ export const FILTER_TO_DB_MAPPING: Record<string, Record<string, string>> = {
   },
   phoneStatus: {
     contacts: 'phoneStatus'
-  },
-  verificationStatus: {
-    contacts: 'emailVerificationStatus' // alias for emailStatus
   },
   
   // Other contact fields
@@ -674,8 +883,10 @@ export interface FilterValues {
   industries?: FieldRule[];
   seniorityLevels?: FieldRule[];
   technologies?: FieldRule[];
-  jobFunctions?: FieldRule[];
   departments?: FieldRule[];
+  jobTitle?: FieldRule[];
+  contactTags?: FieldRule[];
+  accountTags?: FieldRule[];
   
   // Categorical fields (support include/exclude only)
   companySizes?: FieldRule[];
@@ -688,6 +899,7 @@ export interface FilterValues {
   
   // Ownership (simple multi-select)
   accountOwners?: string[];
+  assignedAgent?: string[];
   
   // Date ranges (no operators)
   createdDate?: { from?: string; to?: string };
@@ -710,13 +922,28 @@ export interface FilterValues {
   listName?: string[];
   segmentName?: string[];
   segmentOwner?: string[];
+  list?: string[];
   
-  // Contact filters (simple multi-select)
+  // Contact filters (simple multi-select or text)
   emailStatus?: string[];
   phoneStatus?: string[];
-  verificationStatus?: string[];
-  assignedAgent?: string[];
   contactSource?: string[];
+  directPhone?: string;
+  mobilePhone?: string;
+  contactLinkedinUrl?: string;
+  consentBasis?: string[];
+  consentSource?: string[];
+  accountName?: string[];
+  accountDomain?: string[];
+  
+  // Account filters (text or multi-select)
+  domain?: string[];
+  accountMainPhone?: string;
+  accountLinkedinUrl?: string;
+  accountDescription?: string;
+  yearFounded?: number;
+  sicCode?: string;
+  naicsCode?: string;
 }
 
 /**
