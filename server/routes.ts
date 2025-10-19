@@ -2598,6 +2598,31 @@ export function registerRoutes(app: Express) {
       });
 
       const call = await storage.createCallDisposition(validated);
+      
+      // SHARED QUEUE: Remove contact from ALL agents' queues after disposition
+      if (req.body.contactId && req.body.campaignId) {
+        try {
+          console.log(`[DISPOSITION] Removing contact ${req.body.contactId} from ALL agents' queues in campaign ${req.body.campaignId}`);
+          
+          // Remove from ALL agents' queues (contact is now "claimed" by the agent who disposed it)
+          const removed = await db.delete(agentQueue)
+            .where(
+              and(
+                eq(agentQueue.contactId, req.body.contactId),
+                eq(agentQueue.campaignId, req.body.campaignId)
+              )
+            )
+            .returning({ agentId: agentQueue.agentId, queueState: agentQueue.queueState });
+          
+          if (removed.length > 0) {
+            console.log(`[DISPOSITION] Removed contact from ${removed.length} agents' queues:`, removed.map(r => `${r.agentId} (${r.queueState})`));
+          }
+        } catch (error) {
+          console.error('[DISPOSITION] Error removing contact from queues:', error);
+          // Don't fail the disposition if this fails
+        }
+      }
+      
       res.status(201).json(call);
     } catch (error) {
       if (error instanceof z.ZodError) {
