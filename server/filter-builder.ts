@@ -112,7 +112,7 @@ const TEXT_FIELDS = [
 ];
 
 const NUMERIC_FIELDS = ['yearFounded', 'staffCount'];
-const ENUM_FIELDS = ['employeesSizeRange', 'annualRevenue', 'revenueRange'];
+const ENUM_FIELDS = ['employeesSizeRange', 'revenueRange', 'annualRevenue'];
 
 /**
  * Build SQL query from filter group
@@ -220,27 +220,36 @@ function buildCompanyFieldCondition(
   switch (operator) {
     case 'equals':
       // Multi-value OR: equals ANY of the values
+      // Cast enum fields to text for comparison
+      const isEnumField = ENUM_FIELDS.includes(accountColumnName);
+      const compareColumn = isEnumField ? sql`${accountColumn}::text` : accountColumn;
+      
       if (values.length === 1) {
-        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${values[0]})`;
+        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${compareColumn} = ${values[0]})`;
       }
-      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ANY(${values}))`;
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${compareColumn} = ANY(${values}))`;
     
     case 'not_equals':
       // Multi-value AND: not equals ALL of the values
       // IMPORTANT: Include contacts with no account or account with NULL field (and empty string for text fields)
+      const isEnumFieldNotEq = ENUM_FIELDS.includes(accountColumnName);
+      const compareColumnNotEq = isEnumFieldNotEq ? sql`${accountColumn}::text` : accountColumn;
+      
       if (values.length === 1) {
         const nullCheck = isTextField 
-          ? or(sql`${accountColumn} != ${values[0]}`, isNull(accountColumn), eq(accountColumn, ''))
-          : or(sql`${accountColumn} != ${values[0]}`, isNull(accountColumn));
+          ? or(sql`${compareColumnNotEq} != ${values[0]}`, isNull(accountColumn), eq(accountColumn, ''))
+          : or(sql`${compareColumnNotEq} != ${values[0]}`, isNull(accountColumn));
         return or(
           isNull(contacts.accountId),
           sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${nullCheck}))`
         );
       }
-      // Multi-value: use type-safe notInArray helper
-      const nullCheckMulti = isTextField
-        ? or(notInArray(accountColumn, values), isNull(accountColumn), eq(accountColumn, ''))
-        : or(notInArray(accountColumn, values), isNull(accountColumn));
+      // Multi-value: For enum fields, use NOT IN with text cast
+      const nullCheckMulti = isEnumFieldNotEq
+        ? or(sql`${compareColumnNotEq} != ALL(${values})`, isNull(accountColumn))
+        : isTextField
+          ? or(notInArray(accountColumn, values), isNull(accountColumn), eq(accountColumn, ''))
+          : or(notInArray(accountColumn, values), isNull(accountColumn));
       return or(
         isNull(contacts.accountId),
         sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${nullCheckMulti}))`
@@ -248,18 +257,24 @@ function buildCompanyFieldCondition(
     
     case 'contains':
       // Multi-value OR: contains ANY of the values
+      const isEnumFieldContains = ENUM_FIELDS.includes(accountColumnName);
+      const compareColumnContains = isEnumFieldContains ? sql`${accountColumn}::text` : accountColumn;
+      
       if (isArrayField) {
         // For array fields, use array overlap operator
         return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)})`;
       } else {
-        // For text fields, use ILIKE with OR
-        const orConditions = values.map(v => sql`${accountColumn} ILIKE ${'%' + String(v) + '%'}`);
+        // For text/enum fields, use ILIKE with OR
+        const orConditions = values.map(v => sql`${compareColumnContains} ILIKE ${'%' + String(v) + '%'}`);
         return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${or(...orConditions)}))`;
       }
     
     case 'not_contains':
       // Multi-value AND: does not contain ALL of the values
       // IMPORTANT: Include contacts with no account or account with NULL field (and empty for arrays/text fields)
+      const isEnumFieldNotContains = ENUM_FIELDS.includes(accountColumnName);
+      const compareColumnNotContains = isEnumFieldNotContains ? sql`${accountColumn}::text` : accountColumn;
+      
       if (isArrayField) {
         // For array fields, include NULL and empty arrays
         return or(
@@ -267,8 +282,8 @@ function buildCompanyFieldCondition(
           sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (NOT (${accountColumn} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)}) OR ${accountColumn} IS NULL OR ${accountColumn} = '{}'))`
         );
       } else {
-        // For text fields, include NULL (and empty strings only for text fields)
-        const andConditions = values.map(v => sql`${accountColumn} NOT ILIKE ${'%' + String(v) + '%'}`);
+        // For text/enum fields, include NULL (and empty strings only for text fields)
+        const andConditions = values.map(v => sql`${compareColumnNotContains} NOT ILIKE ${'%' + String(v) + '%'}`);
         const nullCheck = isTextField
           ? sql`((${and(...andConditions)}) OR ${accountColumn} IS NULL OR ${accountColumn} = '')`
           : sql`((${and(...andConditions)}) OR ${accountColumn} IS NULL)`;
@@ -280,12 +295,16 @@ function buildCompanyFieldCondition(
     
     case 'begins_with':
       // Multi-value OR: begins with ANY of the values
-      const startsOrConditions = values.map(v => sql`${accountColumn} ILIKE ${String(v) + '%'}`);
+      const isEnumFieldBegins = ENUM_FIELDS.includes(accountColumnName);
+      const compareColumnBegins = isEnumFieldBegins ? sql`${accountColumn}::text` : accountColumn;
+      const startsOrConditions = values.map(v => sql`${compareColumnBegins} ILIKE ${String(v) + '%'}`);
       return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${or(...startsOrConditions)}))`;
     
     case 'ends_with':
       // Multi-value OR: ends with ANY of the values
-      const endsOrConditions = values.map(v => sql`${accountColumn} ILIKE ${'%' + String(v)}`);
+      const isEnumFieldEnds = ENUM_FIELDS.includes(accountColumnName);
+      const compareColumnEnds = isEnumFieldEnds ? sql`${accountColumn}::text` : accountColumn;
+      const endsOrConditions = values.map(v => sql`${compareColumnEnds} ILIKE ${'%' + String(v)}`);
       return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${or(...endsOrConditions)}))`;
     
     default:
@@ -346,26 +365,32 @@ function buildRegularFieldCondition(
   }
 
   // Build condition based on operator
+  // Cast enum fields to text for full operator support
+  const isEnumField = ENUM_FIELDS.includes(columnName);
+  const compareColumn = isEnumField ? sql`${column}::text` : column;
+  
   switch (operator) {
     case 'equals':
       // Multi-value OR: equals ANY of the values
       if (values.length === 1) {
-        return eq(column, values[0]);
+        return isEnumField ? sql`${compareColumn} = ${values[0]}` : eq(column, values[0]);
       }
-      return inArray(column, values);
+      return isEnumField ? sql`${compareColumn} = ANY(${values})` : inArray(column, values);
     
     case 'not_equals':
       // Multi-value AND: not equals ALL of the values
       // IMPORTANT: Include NULL values (and empty strings for text fields)
       if (values.length === 1) {
-        const nullConditions = [sql`${column} != ${values[0]}`, isNull(column)];
+        const nullConditions = [sql`${compareColumn} != ${values[0]}`, isNull(column)];
         if (isTextField) {
           nullConditions.push(eq(column, ''));
         }
         return or(...nullConditions);
       }
-      const nullConditionsMulti = [notInArray(column, values), isNull(column)];
-      if (isTextField) {
+      const nullConditionsMulti = isEnumField 
+        ? [sql`${compareColumn} != ALL(${values})`, isNull(column)]
+        : [notInArray(column, values), isNull(column)];
+      if (isTextField && !isEnumField) {
         nullConditionsMulti.push(eq(column, ''));
       }
       return or(...nullConditionsMulti);
@@ -376,8 +401,8 @@ function buildRegularFieldCondition(
         // For array fields, use array overlap operator
         return sql`${column} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)}`;
       } else {
-        // For text fields, use ILIKE with OR
-        const orConditions = values.map(v => ilike(column, `%${String(v)}%`));
+        // For text/enum fields, use ILIKE with OR
+        const orConditions = values.map(v => sql`${compareColumn} ILIKE ${'%' + String(v) + '%'}`);
         return or(...orConditions);
       }
     
@@ -392,8 +417,8 @@ function buildRegularFieldCondition(
           sql`${column} = '{}'`
         );
       } else {
-        // For text fields, include NULL (and empty strings for text fields)
-        const andConditions = values.map(v => sql`${column} NOT ILIKE ${'%' + String(v) + '%'}`);
+        // For text/enum fields, include NULL (and empty strings for text fields)
+        const andConditions = values.map(v => sql`${compareColumn} NOT ILIKE ${'%' + String(v) + '%'}`);
         const nullConditionsNotContains = [and(...andConditions), isNull(column)];
         if (isTextField) {
           nullConditionsNotContains.push(eq(column, ''));
@@ -403,12 +428,12 @@ function buildRegularFieldCondition(
     
     case 'begins_with':
       // Multi-value OR: begins with ANY of the values
-      const startsOrConditions = values.map(v => ilike(column, `${String(v)}%`));
+      const startsOrConditions = values.map(v => sql`${compareColumn} ILIKE ${String(v) + '%'}`);
       return or(...startsOrConditions);
     
     case 'ends_with':
       // Multi-value OR: ends with ANY of the values
-      const endsOrConditions = values.map(v => ilike(column, `%${String(v)}`));
+      const endsOrConditions = values.map(v => sql`${compareColumn} ILIKE ${'%' + String(v)}`);
       return or(...endsOrConditions);
     
     default:
