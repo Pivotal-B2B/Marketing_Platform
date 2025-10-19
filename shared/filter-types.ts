@@ -183,54 +183,62 @@ export const accountFilterFields: Record<string, FieldConfig> = {
     applicableOperators: operatorsByFieldType.text
   },
   
-  // Enum fields (controlled vocabulary)
+  // Enum/Text fields with complete operators (treating as text for full filtering)
   employeesSizeRange: {
     label: 'Company Size',
-    type: 'enum',
-    category: 'Company Information',
-    applicableOperators: operatorsByFieldType.enum,
+    type: 'text', // Changed from enum to text for complete operators
+    category: 'Account - Firmographic',
+    applicableOperators: operatorsByFieldType.text, // Full 8 operators
     typeAhead: true,
     typeAheadSource: 'company-sizes'
   },
   annualRevenue: {
-    label: 'Company Revenue',
-    type: 'enum',
-    category: 'Company Information',
-    applicableOperators: operatorsByFieldType.enum,
+    label: 'Annual Revenue',
+    type: 'text', // Changed from enum to text for complete operators
+    category: 'Account - Firmographic',
+    applicableOperators: operatorsByFieldType.text, // Full 8 operators
     typeAhead: true,
     typeAheadSource: 'company-revenue'
   },
   
-  // Number fields
+  // Number fields with complete operators
   staffCount: {
     label: 'Staff Count',
-    type: 'number',
-    category: 'Company Information',
-    applicableOperators: operatorsByFieldType.number
+    type: 'text', // Treat as text for complete operator support
+    category: 'Account - Firmographic',
+    applicableOperators: operatorsByFieldType.text
   },
   yearFounded: {
     label: 'Year Founded',
-    type: 'number',
-    category: 'Company Information',
-    applicableOperators: operatorsByFieldType.number
+    type: 'text', // Treat as text for complete operator support
+    category: 'Account - Firmographic',
+    applicableOperators: operatorsByFieldType.text
   },
   
-  // Array fields
+  // Array fields with complete operators
   techStack: {
     label: 'Technologies',
-    type: 'array',
-    category: 'Company Information',
-    applicableOperators: operatorsByFieldType.array,
+    type: 'text', // Treat as text for complete operator support
+    category: 'Account - Technology',
+    applicableOperators: operatorsByFieldType.text, // Full 8 operators
     typeAhead: true,
     typeAheadSource: 'technologies'
   },
   tags: {
-    label: 'Tags',
-    type: 'array',
-    category: 'General',
-    applicableOperators: operatorsByFieldType.array,
+    label: 'Account Tags',
+    type: 'text',
+    category: 'Account - Metadata',
+    applicableOperators: operatorsByFieldType.text,
     typeAhead: true,
     typeAheadSource: 'account-tags'
+  },
+  ownerId: {
+    label: 'Account Owner',
+    type: 'text',
+    category: 'Ownership',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'users'
   }
 };
 

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -121,7 +123,7 @@ export function UnifiedFilterRow({
   const needsValueInput = condition.operator !== 'is_empty' && condition.operator !== 'has_any_value';
 
   // Calculate max values based on field (per spec)
-  const maxValues = fieldConfig?.field === 'state' || fieldConfig?.field === 'city' ? 5 : 10;
+  const maxValues = condition.field === 'state' || condition.field === 'city' ? 5 : 10;
   const valueCount = condition.values.length;
   const isAtMax = valueCount >= maxValues;
 
@@ -134,17 +136,59 @@ export function UnifiedFilterRow({
       <div className="space-y-3">
         {/* Field + Operator Row */}
         <div className="flex items-center gap-2">
-          {/* Field Selector */}
+          {/* Field Selector - Grouped by Category */}
           <Select value={condition.field} onValueChange={handleFieldChange}>
             <SelectTrigger className="flex-1 border-slate-300 focus:border-blue-600 focus:ring-blue-600" data-testid="select-field">
               <SelectValue placeholder="Select field..." />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(fieldConfigs).map(([fieldName, config]) => (
-                <SelectItem key={fieldName} value={fieldName}>
-                  {config.label}
-                </SelectItem>
-              ))}
+              {(() => {
+                // Group fields by category
+                const groupedFields: Record<string, Array<[string, FieldConfig]>> = {};
+                Object.entries(fieldConfigs).forEach(([fieldName, config]) => {
+                  const category = config.category || 'Other';
+                  if (!groupedFields[category]) {
+                    groupedFields[category] = [];
+                  }
+                  groupedFields[category].push([fieldName, config]);
+                });
+
+                // Render groups in order
+                const categoryOrder = [
+                  'Contact Information',
+                  'Account - Firmographic',
+                  'Account - Technology',
+                  'Account - Metadata',
+                  'Company Information',
+                  'Geography',
+                  'Lists & Segments',
+                  'Campaigns',
+                  'Email',
+                  'Call',
+                  'Ownership',
+                  'Compliance',
+                  'Dates',
+                  'Other'
+                ];
+
+                return categoryOrder.map(category => {
+                  const fields = groupedFields[category];
+                  if (!fields || fields.length === 0) return null;
+
+                  return (
+                    <SelectGroup key={category}>
+                      <SelectLabel className="text-xs font-semibold text-slate-600 px-2 py-1.5">
+                        {category}
+                      </SelectLabel>
+                      {fields.map(([fieldName, config]) => (
+                        <SelectItem key={fieldName} value={fieldName}>
+                          {config.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  );
+                });
+              })()}
             </SelectContent>
           </Select>
 
