@@ -345,21 +345,32 @@ export default function AccountDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Headquarters</p>
+                  <p className="text-sm text-muted-foreground mb-1">HQ City</p>
                   <p className="font-medium flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
-                    {[account.hqCity, account.hqState, account.hqCountry]
-                      .filter(Boolean)
-                      .join(", ") || "-"}
+                    {account.hqCity || "-"}
                   </p>
                 </div>
 
-                {account.yearFounded && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Year Founded</p>
-                    <p className="font-medium">{account.yearFounded}</p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">HQ State</p>
+                  <p className="font-medium">{account.hqState || "-"}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">HQ Postal Code</p>
+                  <p className="font-medium">{account.hqPostalCode || "-"}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">HQ Country</p>
+                  <p className="font-medium">{account.hqCountry || "-"}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Year Founded</p>
+                  <p className="font-medium">{account.yearFounded || "-"}</p>
+                </div>
 
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Main HQ Phone</p>
@@ -381,41 +392,32 @@ export default function AccountDetailPage() {
                 )}
               </div>
 
-              {/* HQ Address Information */}
-              {(account.hqStreet1 || account.hqStreet2 || account.hqStreet3 || account.hqPostalCode || account.companyLocation) && (
+              {/* Street Address Details */}
+              {(account.hqStreet1 || account.hqStreet2 || account.hqStreet3 || account.companyLocation) && (
                 <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm font-medium mb-3 flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Headquarters Address
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <p className="text-sm font-medium mb-3">Street Address Details</p>
+                  <div className="space-y-3">
                     {account.hqStreet1 && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Street Address 1</p>
+                        <p className="text-sm text-muted-foreground mb-1">Street Address Line 1</p>
                         <p className="font-medium">{account.hqStreet1}</p>
                       </div>
                     )}
                     {account.hqStreet2 && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Street Address 2</p>
+                        <p className="text-sm text-muted-foreground mb-1">Street Address Line 2</p>
                         <p className="font-medium">{account.hqStreet2}</p>
                       </div>
                     )}
                     {account.hqStreet3 && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Street Address 3</p>
+                        <p className="text-sm text-muted-foreground mb-1">Street Address Line 3</p>
                         <p className="font-medium">{account.hqStreet3}</p>
                       </div>
                     )}
-                    {account.hqPostalCode && (
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Postal Code</p>
-                        <p className="font-medium">{account.hqPostalCode}</p>
-                      </div>
-                    )}
                     {account.companyLocation && (
-                      <div className="col-span-2">
-                        <p className="text-sm text-muted-foreground mb-1">Full Address</p>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Full Address String</p>
                         <p className="font-medium text-sm">{account.companyLocation}</p>
                       </div>
                     )}

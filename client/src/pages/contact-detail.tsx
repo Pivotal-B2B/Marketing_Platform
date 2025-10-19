@@ -324,49 +324,50 @@ export default function ContactDetailPage() {
                     {contact.emailVerificationStatus || 'unknown'}
                   </Badge>
                 </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">City</p>
+                  <p className="font-medium flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                    {contact.city || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">State</p>
+                  <p className="font-medium">{contact.state || "-"}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">County</p>
+                  <p className="font-medium">{contact.county || "-"}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Postal Code</p>
+                  <p className="font-medium">{contact.postalCode || "-"}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Country</p>
+                  <p className="font-medium">{contact.country || "-"}</p>
+                </div>
               </div>
 
-              {/* Location Information */}
-              {(contact.city || contact.state || contact.county || contact.postalCode || contact.country || contact.contactLocation) && (
+              {/* Additional Address Information */}
+              {(contact.address || contact.contactLocation) && (
                 <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm font-medium mb-3 flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Location
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    {contact.city && (
+                  <p className="text-sm font-medium mb-3">Additional Address Details</p>
+                  <div className="space-y-3">
+                    {contact.address && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">City</p>
-                        <p className="font-medium">{contact.city}</p>
-                      </div>
-                    )}
-                    {contact.state && (
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">State</p>
-                        <p className="font-medium">{contact.state}</p>
-                      </div>
-                    )}
-                    {contact.county && (
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">County</p>
-                        <p className="font-medium">{contact.county}</p>
-                      </div>
-                    )}
-                    {contact.postalCode && (
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Postal Code</p>
-                        <p className="font-medium">{contact.postalCode}</p>
-                      </div>
-                    )}
-                    {contact.country && (
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Country</p>
-                        <p className="font-medium">{contact.country}</p>
+                        <p className="text-sm text-muted-foreground mb-1">Street Address</p>
+                        <p className="font-medium text-sm">{contact.address}</p>
                       </div>
                     )}
                     {contact.contactLocation && (
-                      <div className="col-span-2">
-                        <p className="text-sm text-muted-foreground mb-1">Full Location</p>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Full Location String</p>
                         <p className="font-medium text-sm">{contact.contactLocation}</p>
                       </div>
                     )}
