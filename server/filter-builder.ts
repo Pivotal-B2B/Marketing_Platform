@@ -4,15 +4,69 @@ import { accounts, contacts, leads } from "@shared/schema";
 
 type TableType = typeof accounts | typeof contacts | typeof leads;
 
-// Map filter field names to actual database column names
+/**
+ * Map filter field names to actual database column names
+ * 
+ * This ensures the filter UI can use user-friendly field names while
+ * the backend queries use the correct database column names.
+ */
 const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
   accounts: {
+    // Company/Account fields
+    'industries': 'industryStandardized',
     'industry': 'industryStandardized',
+    'companySizes': 'employeesSizeRange',
     'companySize': 'employeesSizeRange',
-    'revenue': 'revenueRange',
+    'companyRevenue': 'annualRevenue',
+    'revenue': 'annualRevenue',
+    'revenueRange': 'annualRevenue',
+    'technologies': 'techStack',
+    'techStack': 'techStack',
+    
+    // Geography fields (accounts use hq_ prefix)
+    'countries': 'hqCountry',
+    'country': 'hqCountry',
+    'states': 'hqState',
+    'state': 'hqState',
+    'cities': 'hqCity',
+    'city': 'hqCity',
+    
+    // Ownership
+    'accountOwners': 'ownerId',
+    'owner': 'ownerId',
+    
+    // Date fields
+    'createdDate': 'createdAt',
+    'lastActivity': 'updatedAt'
   },
   contacts: {
-    // Contact location fields map directly
+    // Contact fields
+    'seniorityLevels': 'seniorityLevel',
+    'seniority': 'seniorityLevel',
+    'departments': 'department',
+    
+    // Geography fields (contacts don't use prefix)
+    'countries': 'country',
+    'states': 'state',
+    'cities': 'city',
+    
+    // Verification fields
+    'emailStatus': 'emailVerificationStatus',
+    'verificationStatus': 'emailVerificationStatus',
+    'phoneStatus': 'phoneStatus',
+    
+    // Ownership
+    'accountOwners': 'ownerId',
+    'assignedAgent': 'ownerId',
+    'owner': 'ownerId',
+    
+    // Source
+    'contactSource': 'sourceSystem',
+    
+    // Date fields
+    'createdDate': 'createdAt',
+    'lastActivity': 'updatedAt',
+    'reviewedDate': 'reviewedAt'
   },
   leads: {
     // Leads table uses standard field names
