@@ -59,7 +59,7 @@ function AuthenticatedApp() {
 
   // Custom sidebar width for enterprise CRM
   const style = {
-    "--sidebar-width": "16rem",       // 256px for better navigation
+    "--sidebar-width": "12rem",       // 192px compact sidebar
     "--sidebar-width-icon": "4rem",   // default icon width
   };
 
