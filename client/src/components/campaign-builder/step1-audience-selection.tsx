@@ -42,11 +42,19 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
   const [excludedSegments, setExcludedSegments] = useState<string[]>(data.audience?.excludedSegments || []);
   const [excludedLists, setExcludedLists] = useState<string[]>(data.audience?.excludedLists || []);
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(data.audience?.filterGroup);
+  const [appliedFilterGroup, setAppliedFilterGroup] = useState<FilterGroup | undefined>(data.audience?.filterGroup);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch segments
   const { data: segments = [] } = useQuery<Segment[]>({
     queryKey: ['/api/segments'],
+  });
+  
+  // Fetch real-time count for applied filters
+  const { data: filterCountData } = useQuery<{ count: number }>({
+    queryKey: [`/api/filters/count/contact`, JSON.stringify(appliedFilterGroup)],
+    enabled: audienceSource === "filters" && !!appliedFilterGroup && (appliedFilterGroup.conditions?.length ?? 0) > 0,
+    refetchOnWindowFocus: false,
   });
 
   // Fetch lists
@@ -79,9 +87,9 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
   };
 
   const calculateEstimatedCount = () => {
-    // Placeholder logic - in production, this would call an API endpoint
-    if (audienceSource === "filters" && filterGroup?.conditions.length) {
-      return 2847;
+    // Use real-time filtered count from API
+    if (audienceSource === "filters") {
+      return filterCountData?.count ?? 0;
     }
     if (audienceSource === "segment" && selectedSegments.length) {
       const totalCount = selectedSegments.reduce((sum, id) => {
@@ -98,7 +106,7 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
       return totalCount;
     }
     if (audienceSource === "domain_set" && selectedDomainSets.length) {
-      return 543; // Placeholder
+      return 543; // Placeholder - would need API endpoint for domain set counts
     }
     return 0;
   };
@@ -147,6 +155,12 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
     searchQuery === "" ||
     ds.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  
+  // Handle filter application - sets both editing and applied filter groups
+  const handleApplyFilter = (newFilterGroup: FilterGroup | undefined) => {
+    setFilterGroup(newFilterGroup);
+    setAppliedFilterGroup(newFilterGroup);
+  };
 
   return (
     <div className="space-y-6">
@@ -183,7 +197,7 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
                 <div className="flex-1">
                   <SidebarFilters
                     entityType="contact"
-                    onApplyFilter={setFilterGroup}
+                    onApplyFilter={handleApplyFilter}
                     initialFilter={filterGroup}
                   />
                 </div>
@@ -298,7 +312,7 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
                     <p className="text-sm text-muted-foreground mb-3">Apply additional filters to refine the selected segments</p>
                     <SidebarFilters
                       entityType="contact"
-                      onApplyFilter={setFilterGroup}
+                      onApplyFilter={handleApplyFilter}
                       initialFilter={filterGroup}
                     />
                   </div>
@@ -411,7 +425,7 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
                     <p className="text-sm text-muted-foreground mb-3">Apply additional filters to refine the selected lists</p>
                     <SidebarFilters
                       entityType="contact"
-                      onApplyFilter={setFilterGroup}
+                      onApplyFilter={handleApplyFilter}
                       initialFilter={filterGroup}
                     />
                   </div>
