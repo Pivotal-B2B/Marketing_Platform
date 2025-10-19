@@ -135,25 +135,25 @@ export const accountFilterFields: Record<string, FieldConfig> = {
     applicableOperators: operatorsByFieldType.text
   },
   hqCity: {
-    label: 'City',
+    label: 'HQ City',
     type: 'text',
-    category: 'Geography',
+    category: 'Account Geography',
     applicableOperators: operatorsByFieldType.text,
     typeAhead: true,
     typeAheadSource: 'cities'
   },
   hqState: {
-    label: 'State / Province',
+    label: 'HQ State / Province',
     type: 'text',
-    category: 'Geography',
+    category: 'Account Geography',
     applicableOperators: operatorsByFieldType.text,
     typeAhead: true,
     typeAheadSource: 'states'
   },
   hqCountry: {
-    label: 'Country',
+    label: 'HQ Country',
     type: 'text',
-    category: 'Geography',
+    category: 'Account Geography',
     applicableOperators: operatorsByFieldType.text,
     typeAhead: true,
     typeAheadSource: 'countries'
@@ -312,25 +312,25 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     applicableOperators: operatorsByFieldType.text
   },
   city: {
-    label: 'City',
+    label: 'Contact City',
     type: 'text',
-    category: 'Geography',
+    category: 'Contact Geography',
     applicableOperators: operatorsByFieldType.text,
     typeAhead: true,
     typeAheadSource: 'cities'
   },
   state: {
-    label: 'State / Province',
+    label: 'Contact State / Province',
     type: 'text',
-    category: 'Geography',
+    category: 'Contact Geography',
     applicableOperators: operatorsByFieldType.text,
     typeAhead: true,
     typeAheadSource: 'states'
   },
   country: {
-    label: 'Country',
+    label: 'Contact Country',
     type: 'text',
-    category: 'Geography',
+    category: 'Contact Geography',
     applicableOperators: operatorsByFieldType.text,
     typeAhead: true,
     typeAheadSource: 'countries'
@@ -354,8 +354,34 @@ export const contactFilterFields: Record<string, FieldConfig> = {
   list: {
     label: 'Source List',
     type: 'text',
-    category: 'General',
+    category: 'Lists & Segments',
     applicableOperators: operatorsByFieldType.text
+  },
+  
+  // Lists & Segments
+  listName: {
+    label: 'Static List',
+    type: 'text',
+    category: 'Lists & Segments',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'lists'
+  },
+  segmentName: {
+    label: 'Dynamic Segment',
+    type: 'text',
+    category: 'Lists & Segments',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'segments'
+  },
+  domainSetName: {
+    label: 'Domain Set',
+    type: 'text',
+    category: 'Lists & Segments',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'domain-sets'
   },
   
   // Array fields

@@ -70,15 +70,18 @@ export type OperatorSupport =
 
 export type FilterField =
   | "industries" | "companySizes" | "companyRevenue" | "seniorityLevels"
-  | "countries" | "states" | "cities"
   | "technologies" | "departments"
   | "accountOwners" | "createdDate" | "lastActivity" | "search"
+  // Geography - Contact
+  | "contactCountry" | "contactState" | "contactCity"
+  // Geography - Account
+  | "accountCountry" | "accountState" | "accountCity"
   // Campaign-related filters
   | "campaignName" | "campaignType" | "campaignStatus" | "campaignOwner" | "dialMode"
   // QA-related filters
   | "qaStatus" | "qaReviewer" | "qaOutcome" | "reviewedDate"
-  // List/Segment-related filters
-  | "listName" | "segmentName" | "segmentOwner"
+  // List/Segment/Domain Set filters
+  | "listName" | "segmentName" | "segmentOwner" | "domainSetName" | "accountListName"
   // Contact-specific filters
   | "emailStatus" | "phoneStatus" | "assignedAgent" | "contactSource"
   | "jobTitle" | "directPhone" | "mobilePhone" | "contactTags" | "consentBasis" 
@@ -169,29 +172,54 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
     category: "Ownership"
   },
   
-  // Async type-ahead with scoped dependencies (Country → State → City)
-  countries: {
+  // Geography - Contact (scoped dependencies: Country → State → City)
+  contactCountry: {
     type: "typeahead",
-    label: "Country",
+    label: "Contact Country",
     max: 10,
     source: "countries",
-    category: "Geography"
+    category: "Contact Geography"
   },
-  states: {
+  contactState: {
     type: "typeahead",
-    label: "State / Province",
+    label: "Contact State / Province",
     max: 5,
     source: "states",
-    parents: ["countries"],
-    category: "Geography"
+    parents: ["contactCountry"],
+    category: "Contact Geography"
   },
-  cities: {
+  contactCity: {
     type: "typeahead",
-    label: "City",
+    label: "Contact City",
     max: 5,
     source: "cities",
-    parents: ["countries", "states"],
-    category: "Geography"
+    parents: ["contactCountry", "contactState"],
+    category: "Contact Geography"
+  },
+  
+  // Geography - Account (scoped dependencies: Country → State → City)
+  accountCountry: {
+    type: "typeahead",
+    label: "Account HQ Country",
+    max: 10,
+    source: "countries",
+    category: "Account Geography"
+  },
+  accountState: {
+    type: "typeahead",
+    label: "Account HQ State / Province",
+    max: 5,
+    source: "states",
+    parents: ["accountCountry"],
+    category: "Account Geography"
+  },
+  accountCity: {
+    type: "typeahead",
+    label: "Account HQ City",
+    max: 5,
+    source: "cities",
+    parents: ["accountCountry", "accountState"],
+    category: "Account Geography"
   },
   
   // Date ranges
@@ -270,18 +298,22 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
     category: "QA & Verification"
   },
   
-  // List/Segment-related filters
+  // List/Segment/Domain Set/Account List filters
   listName: {
     type: "typeahead",
-    label: "List Name",
+    label: "Static List",
+    max: 10,
     source: "lists",
-    category: "Lists & Segments"
+    category: "Lists & Segments",
+    operatorSupport: "text-taxonomy"
   },
   segmentName: {
     type: "typeahead",
-    label: "Segment Name",
+    label: "Dynamic Segment",
+    max: 10,
     source: "segments",
-    category: "Lists & Segments"
+    category: "Lists & Segments",
+    operatorSupport: "text-taxonomy"
   },
   segmentOwner: {
     type: "multi",
@@ -289,6 +321,22 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
     max: 10,
     source: "users",
     category: "Lists & Segments"
+  },
+  domainSetName: {
+    type: "typeahead",
+    label: "Domain Set",
+    max: 10,
+    source: "domain-sets",
+    category: "Lists & Segments",
+    operatorSupport: "text-taxonomy"
+  },
+  accountListName: {
+    type: "typeahead",
+    label: "Target Account List (TAL)",
+    max: 10,
+    source: "account-lists",
+    category: "Lists & Segments",
+    operatorSupport: "text-taxonomy"
   },
   
   // Contact-specific filters
@@ -673,7 +721,8 @@ export const FILTER_CATEGORIES = [
   "General",
   "Company Information",
   "Contact Information",
-  "Geography",
+  "Contact Geography",
+  "Account Geography",
   "Campaign",
   "QA & Verification",
   "Verification",
@@ -781,18 +830,29 @@ export const FILTER_TO_DB_MAPPING: Record<string, Record<string, string>> = {
     accounts: 'naicsCode'
   },
   
-  // Geography fields (different for accounts vs contacts)
-  countries: {
-    accounts: 'hqCountry',
+  // Geography - Contact fields
+  contactCountry: {
     contacts: 'country'
   },
-  states: {
-    accounts: 'hqState',
+  contactState: {
     contacts: 'state'
   },
-  cities: {
-    accounts: 'hqCity',
+  contactCity: {
     contacts: 'city'
+  },
+  
+  // Geography - Account fields
+  accountCountry: {
+    accounts: 'hqCountry',
+    contacts: 'hqCountry' // via account join
+  },
+  accountState: {
+    accounts: 'hqState',
+    contacts: 'hqState' // via account join
+  },
+  accountCity: {
+    accounts: 'hqCity',
+    contacts: 'hqCity' // via account join
   },
   
   // Ownership
@@ -807,6 +867,27 @@ export const FILTER_TO_DB_MAPPING: Record<string, Record<string, string>> = {
   },
   phoneStatus: {
     contacts: 'phoneStatus'
+  },
+  
+  // Lists & Segments & Domain Sets
+  listName: {
+    // Note: This requires special handling - contacts can belong to multiple lists
+    // Filter by checking if contact ID exists in the list's recordIds array
+    contacts: 'list' // Special handling required
+  },
+  segmentName: {
+    // Note: This requires special handling - dynamic segment membership
+    // Filter by evaluating segment criteria against contact
+    contacts: 'segment' // Special handling required
+  },
+  domainSetName: {
+    // Note: This requires special handling via domain_set_contact_links table
+    contacts: 'domainSet' // Special handling required
+  },
+  accountListName: {
+    // Note: This is for Target Account Lists (TAL)
+    // Filter accounts by checking if they belong to specific account lists
+    accounts: 'accountList' // Special handling required
   },
   
   // Other contact fields

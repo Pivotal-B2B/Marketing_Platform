@@ -156,18 +156,22 @@ export function UnifiedFilterRow({
                 // Render groups in order
                 const categoryOrder = [
                   'Contact Information',
+                  'Contact Geography',
                   'Account - Firmographic',
                   'Account - Technology',
                   'Account - Metadata',
+                  'Account Geography',
                   'Company Information',
-                  'Geography',
                   'Lists & Segments',
                   'Campaigns',
+                  'Campaign',
                   'Email',
                   'Call',
                   'Ownership',
                   'Compliance',
                   'Dates',
+                  'QA & Verification',
+                  'Verification',
                   'Other'
                 ];
 
