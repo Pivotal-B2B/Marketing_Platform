@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { Separator } from "@/components/ui/separator";
-import { FilterBuilder } from "@/components/filter-builder";
+import { SidebarFilters } from "@/components/filters/sidebar-filters";
 import type { FilterGroup } from "@shared/filter-types";
 
 interface QueueControlsProps {
@@ -259,11 +259,10 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Filter Contacts (optional)</Label>
-                <FilterBuilder
+                <SidebarFilters
                   entityType="contact"
                   onApplyFilter={(filter) => setFilterGroup(filter)}
                   initialFilter={filterGroup}
-                  includeRelatedEntities={true}
                 />
               </div>
 
@@ -440,11 +439,10 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Filter Contacts (optional)</Label>
-                <FilterBuilder
+                <SidebarFilters
                   entityType="contact"
                   onApplyFilter={(filter) => setFilterGroup(filter)}
                   initialFilter={filterGroup}
-                  includeRelatedEntities={true}
                 />
               </div>
 
