@@ -436,10 +436,23 @@ export default function AgentConsolePage() {
       {/* TOP FIXED HEADER */}
       <div className="h-20 border-b shadow-sm" style={{ background: 'linear-gradient(to right, #0a2540, #1a4d7a, #2f6feb)' }}>
         <div className="h-full px-6 flex items-center justify-between">
-          {/* Left: Logo & Title */}
+          {/* Left: Queue Management & Title */}
           <div className="flex items-center gap-4">
-            <div className="text-white font-bold text-xl">Pivotal B2B</div>
-            <Separator orientation="vertical" className="h-8 bg-white/20" />
+            {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
+              <>
+                <QueueControls 
+                  campaignId={selectedCampaignId} 
+                  onQueueUpdated={() => {
+                    refetchQueue();
+                    toast({
+                      title: "Queue Updated",
+                      description: "Your queue has been refreshed",
+                    });
+                  }}
+                />
+                <Separator orientation="vertical" className="h-8 bg-white/20" />
+              </>
+            )}
             <div>
               <h1 className="text-white font-semibold text-lg" data-testid="text-page-title">Agent Console</h1>
               <p className="text-white/70 text-xs">
@@ -583,22 +596,6 @@ export default function AgentConsolePage() {
               </>
             )}
           </div>
-
-          {/* Queue Controls for Manual Dial */}
-          {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
-            <div className="p-3 border-t bg-white">
-              <QueueControls 
-                campaignId={selectedCampaignId} 
-                onQueueUpdated={() => {
-                  refetchQueue();
-                  toast({
-                    title: "Queue Updated",
-                    description: "Your queue has been refreshed",
-                  });
-                }}
-              />
-            </div>
-          )}
 
           {/* Device Controls */}
           <div className="p-3 border-t bg-white space-y-2">
