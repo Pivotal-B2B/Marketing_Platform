@@ -106,11 +106,11 @@ export function CSVImportAccountsDialog({
         try {
           const accounts = batchRows.map((row) => csvRowToAccount(row, headers));
 
-          const result = await apiRequest(
+          const result = (await apiRequest(
             "POST",
             "/api/accounts/batch-import",
             { accounts }
-          ) as {
+          )) as unknown as {
             success: number;
             created: number;
             updated: number;
