@@ -30,45 +30,47 @@ const router = Router();
 /**
  * GET /api/filters/options/industries
  * 
- * Fetch industry options with optional search
+ * Fetch industry options from actual account data
  */
 router.get('/industries', async (req: Request, res: Response) => {
   try {
-    const { query = '', page = '1', limit = '50' } = req.query;
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const offset = (pageNum - 1) * limitNum;
+    const { query = '' } = req.query;
+    const { sql } = await import('drizzle-orm');
     
-    let conditions = [eq(industryReference.isActive, true)];
-    
+    // Build SQL query with parameters
+    let sqlQuery;
     if (query && typeof query === 'string' && query.trim()) {
-      conditions.push(ilike(industryReference.name, `%${query.trim()}%`));
+      sqlQuery = sql`
+        SELECT DISTINCT industry_standardized as industry
+        FROM accounts
+        WHERE industry_standardized IS NOT NULL
+          AND industry_standardized != ''
+          AND industry_standardized ILIKE ${`%${query.trim()}%`}
+        ORDER BY industry_standardized ASC
+        LIMIT 100
+      `;
+    } else {
+      sqlQuery = sql`
+        SELECT DISTINCT industry_standardized as industry
+        FROM accounts
+        WHERE industry_standardized IS NOT NULL
+          AND industry_standardized != ''
+        ORDER BY industry_standardized ASC
+        LIMIT 100
+      `;
     }
     
-    const results = await db
-      .select({
-        id: industryReference.id,
-        name: industryReference.name,
-        naicsCode: industryReference.naicsCode
-      })
-      .from(industryReference)
-      .where(and(...conditions))
-      .orderBy(asc(industryReference.name))
-      .limit(limitNum)
-      .offset(offset);
+    const results = await db.execute<{ industry: string }>(sqlQuery);
     
-    // Set cache headers (5 minutes for filtered results, 15 minutes for full list)
+    // Format results
+    const formatted = results.rows
+      .filter(r => r.industry)
+      .map(r => ({ id: r.industry, name: r.industry }));
+    
     const cacheMaxAge = query ? 300 : 900;
     res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
     
-    res.json({
-      data: results,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        hasMore: results.length === limitNum
-      }
-    });
+    res.json({ data: formatted });
   } catch (error) {
     console.error('Error fetching industries:', error);
     res.status(500).json({ error: 'Failed to fetch industries' });
@@ -78,26 +80,34 @@ router.get('/industries', async (req: Request, res: Response) => {
 /**
  * GET /api/filters/options/company-sizes
  * 
- * Fetch company size options (no search needed - small dataset)
+ * Fetch company size options from actual account data
  */
 router.get('/company-sizes', async (req: Request, res: Response) => {
   try {
-    const results = await db
-      .select({
-        id: companySizeReference.id,
-        code: companySizeReference.code,
-        label: companySizeReference.label,
-        minEmployees: companySizeReference.minEmployees,
-        maxEmployees: companySizeReference.maxEmployees
-      })
-      .from(companySizeReference)
-      .where(eq(companySizeReference.isActive, true))
-      .orderBy(asc(companySizeReference.sortOrder));
+    const { sql } = await import('drizzle-orm');
     
-    // Cache for 15 minutes (static data)
+    // Use text cast in SELECT to avoid enum validation issues
+    const sqlQuery = sql`
+      SELECT DISTINCT 
+        CASE 
+          WHEN employees_size_range IS NOT NULL THEN employees_size_range::text 
+          ELSE NULL 
+        END as size_range
+      FROM accounts
+      WHERE employees_size_range IS NOT NULL
+      ORDER BY size_range ASC
+      LIMIT 100
+    `;
+    
+    const results = await db.execute<{ size_range: string | null }>(sqlQuery);
+    
+    // Format results - filter out empty strings and null values
+    const formatted = results.rows
+      .filter(r => r.size_range && r.size_range.trim() !== '')
+      .map(r => ({ id: r.size_range!, name: r.size_range! }));
+    
     res.set('Cache-Control', 'public, max-age=900');
-    
-    res.json({ data: results });
+    res.json({ data: formatted });
   } catch (error) {
     console.error('Error fetching company sizes:', error);
     res.status(500).json({ error: 'Failed to fetch company sizes' });
@@ -107,26 +117,30 @@ router.get('/company-sizes', async (req: Request, res: Response) => {
 /**
  * GET /api/filters/options/company-revenue
  * 
- * Fetch company revenue options (no search needed - small dataset)
+ * Fetch company revenue options from actual account data
  */
 router.get('/company-revenue', async (req: Request, res: Response) => {
   try {
-    const results = await db
-      .select({
-        id: revenueRangeReference.id,
-        label: revenueRangeReference.label,
-        description: revenueRangeReference.description,
-        minRevenue: revenueRangeReference.minRevenue,
-        maxRevenue: revenueRangeReference.maxRevenue
-      })
-      .from(revenueRangeReference)
-      .where(eq(revenueRangeReference.isActive, true))
-      .orderBy(asc(revenueRangeReference.sortOrder));
+    const { sql } = await import('drizzle-orm');
     
-    // Cache for 15 minutes (static data)
+    const sqlQuery = sql`
+      SELECT DISTINCT annual_revenue as revenue
+      FROM accounts
+      WHERE annual_revenue IS NOT NULL
+        AND annual_revenue != ''
+      ORDER BY annual_revenue ASC
+      LIMIT 100
+    `;
+    
+    const results = await db.execute<{ revenue: string }>(sqlQuery);
+    
+    // Format results
+    const formatted = results.rows
+      .filter(r => r.revenue)
+      .map(r => ({ id: r.revenue, name: r.revenue }));
+    
     res.set('Cache-Control', 'public, max-age=900');
-    
-    res.json({ data: results });
+    res.json({ data: formatted });
   } catch (error) {
     console.error('Error fetching revenue ranges:', error);
     res.status(500).json({ error: 'Failed to fetch revenue ranges' });

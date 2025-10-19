@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Filter, Save, FolderOpen, X } from "lucide-react";
+import { Filter, Save, FolderOpen, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,12 +20,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -204,11 +203,25 @@ export function FilterShell({
     saveMutation.mutate({ name: segmentName, filters });
   };
 
-  // Count active filters
+  // Count active filters (total)
   const activeFilterCount = useMemo(() => {
     let count = 0;
     Object.entries(filters).forEach(([key, value]) => {
       if (key === 'search' && value) count++;
+      if (Array.isArray(value) && value.length > 0) count += value.length;
+      if (value && typeof value === 'object' && 'from' in value) {
+        if (value.from || value.to) count++;
+      }
+    });
+    return count;
+  }, [filters]);
+
+  // Count active filters per category
+  const getActiveCategoryCount = useCallback((categoryFields: (keyof FilterValues)[]) => {
+    let count = 0;
+    categoryFields.forEach(field => {
+      const value = filters[field];
+      if (field === 'search' && value) count++;
       if (Array.isArray(value) && value.length > 0) count += value.length;
       if (value && typeof value === 'object' && 'from' in value) {
         if (value.from || value.to) count++;
@@ -320,17 +333,37 @@ export function FilterShell({
               </SheetDescription>
             </SheetHeader>
 
-            <div className="py-6 space-y-6">
-              {/* Render filters grouped by category */}
-              {Object.entries(fieldsByCategory).map(([category, fields]) => (
-                <div key={category} className="space-y-4">
-                  <h3 className="text-sm font-semibold text-muted-foreground">{category}</h3>
-                  <div className="space-y-4">
-                    {fields.map(field => renderFilterField(field))}
-                  </div>
-                  <Separator />
-                </div>
-              ))}
+            <div className="py-6">
+              {/* Render filters in collapsible accordion categories */}
+              <Accordion 
+                type="multiple" 
+                defaultValue={Object.keys(fieldsByCategory)}
+                className="space-y-2"
+              >
+                {Object.entries(fieldsByCategory).map(([category, fields]) => {
+                  const activeCategoryCount = getActiveCategoryCount(fields);
+                  
+                  return (
+                    <AccordionItem key={category} value={category} className="border rounded-md px-4">
+                      <AccordionTrigger className="hover:no-underline py-3">
+                        <div className="flex items-center justify-between w-full pr-2">
+                          <span className="text-sm font-medium">{category}</span>
+                          {activeCategoryCount > 0 && (
+                            <Badge variant="secondary" className="ml-2">
+                              {activeCategoryCount}
+                            </Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-4 pt-2">
+                        <div className="space-y-4">
+                          {fields.map(field => renderFilterField(field))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
             </div>
 
             <SheetFooter className="flex flex-row items-center justify-between gap-2">
