@@ -71,14 +71,14 @@ const getNavSections = (): NavSection[] => [
   // Core CRM Section
   {
     label: "CRM",
-    roles: ["admin", "campaign_manager", "data_ops", "qa_analyst", "agent", "client_user"],
+    roles: ["admin", "campaign_manager", "data_ops", "quality_analyst", "agent", "client_user"],
     items: [
       // Dashboard is visible to all authenticated users
       {
         title: "Dashboard",
         url: "/",
         icon: LayoutDashboard,
-        roles: ["admin", "campaign_manager", "data_ops", "qa_analyst", "agent", "client_user", "content_creator"],
+        roles: ["admin", "campaign_manager", "data_ops", "quality_analyst", "agent", "client_user", "content_creator"],
       },
       {
         title: "Accounts",
@@ -129,7 +129,7 @@ const getNavSections = (): NavSection[] => [
         title: "QA & Leads",
         url: "/leads",
         icon: CheckCircle,
-        roles: ["admin", "campaign_manager", "qa_analyst"],
+        roles: ["admin", "campaign_manager", "quality_analyst"],
       },
     ],
   },
@@ -161,7 +161,7 @@ const getNavSections = (): NavSection[] => [
   // Analytics & Reporting Section
   {
     label: "Analytics & Reporting",
-    roles: ["admin", "campaign_manager", "qa_analyst", "client_user"],
+    roles: ["admin", "campaign_manager", "quality_analyst", "client_user"],
     items: [
       {
         title: "Reports",
@@ -183,7 +183,7 @@ const getNavSections = (): NavSection[] => [
         title: "Engagement Analytics",
         url: "/engagement-analytics",
         icon: Activity, // Added Activity icon
-        roles: ["admin", "campaign_manager", "qa_analyst", "client_user"],
+        roles: ["admin", "campaign_manager", "quality_analyst", "client_user"],
       },
     ],
   },
@@ -191,13 +191,13 @@ const getNavSections = (): NavSection[] => [
   // Data Verification Section
   {
     label: "Data Verification",
-    roles: ["admin", "data_ops", "qa_analyst"],
+    roles: ["admin", "data_ops", "quality_analyst"],
     items: [
       {
         title: "DV Projects",
         url: "/dv/projects",
         icon: Database,
-        roles: ["admin", "data_ops", "qa_analyst"],
+        roles: ["admin", "data_ops", "quality_analyst"],
       },
     ],
   },

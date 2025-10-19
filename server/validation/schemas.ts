@@ -26,7 +26,7 @@ export const createUserSchema = z.object({
   password: z.string().min(8),
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
-  role: z.enum(['admin', 'campaign_manager', 'qa_analyst', 'agent']),
+  role: z.enum(['admin', 'campaign_manager', 'quality_analyst', 'agent']),
 });
 
 export const updateUserSchema = z.object({
@@ -35,13 +35,13 @@ export const updateUserSchema = z.object({
   password: z.string().min(8).optional(),
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
-  role: z.enum(['admin', 'campaign_manager', 'qa_analyst', 'agent']).optional(),
+  role: z.enum(['admin', 'campaign_manager', 'quality_analyst', 'agent']).optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'At least one field must be provided for update',
 });
 
 export const assignRoleSchema = z.object({
-  role: z.enum(['admin', 'campaign_manager', 'qa_analyst', 'agent']),
+  role: z.enum(['admin', 'campaign_manager', 'quality_analyst', 'agent']),
 });
 
 // Contact schemas

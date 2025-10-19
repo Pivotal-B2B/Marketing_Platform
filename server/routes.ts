@@ -3245,7 +3245,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/leads/:id/approve", requireAuth, requireRole('admin', 'qa_analyst'), async (req, res) => {
+  app.post("/api/leads/:id/approve", requireAuth, requireRole('admin', 'quality_analyst'), async (req, res) => {
     try {
       const { approvedById } = req.body;
       if (!approvedById) {
@@ -3263,7 +3263,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/leads/:id/reject", requireAuth, requireRole('admin', 'qa_analyst'), async (req, res) => {
+  app.post("/api/leads/:id/reject", requireAuth, requireRole('admin', 'quality_analyst'), async (req, res) => {
     try {
       const { reason } = req.body;
       if (!reason) {

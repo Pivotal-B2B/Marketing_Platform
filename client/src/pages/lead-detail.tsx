@@ -183,9 +183,9 @@ export default function LeadDetailPage() {
     );
   }
 
-  // Check if user has admin or qa_analyst role (support multi-role system)
+  // Check if user has admin or quality_analyst role (support multi-role system)
   const userRoles = (user as any)?.roles || [user?.role || 'agent'];
-  const canApprove = userRoles.includes('admin') || userRoles.includes('qa_analyst');
+  const canApprove = userRoles.includes('admin') || userRoles.includes('quality_analyst');
 
   return (
     <div className="space-y-6">
