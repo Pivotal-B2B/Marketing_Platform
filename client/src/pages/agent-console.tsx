@@ -528,7 +528,7 @@ export default function AgentConsolePage() {
       <div className="flex-1 flex overflow-hidden">
         {/* LEFT SIDEBAR: Queue (18% width) */}
         <div className="w-[18%] border-r bg-[#f9fbfd] flex flex-col">
-          <div className="p-4 border-b bg-white">
+          <div className="p-4 border-b bg-[#ccabf7]">
             <h2 className="font-semibold text-sm mb-3">Queue</h2>
             <div className="flex gap-2">
               <Button
