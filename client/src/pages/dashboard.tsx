@@ -195,65 +195,65 @@ export default function Dashboard() {
             ) : (
               <>
                 <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setLocation('/accounts')}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/accounts')}
-              className="cursor-pointer group"
-              data-testid="stat-card-link-accounts"
-            >
-              <StatCard
-                title="Total Accounts"
-                value={stats?.totalAccounts.toLocaleString() || "0"}
-                icon={Building2}
-                delay={0}
-              />
-            </div>
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setLocation('/contacts')}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/contacts')}
-              className="cursor-pointer group"
-              data-testid="stat-card-link-contacts"
-            >
-              <StatCard
-                title="Total Contacts"
-                value={stats?.totalContacts.toLocaleString() || "0"}
-                icon={Users}
-                delay={100}
-              />
-            </div>
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setLocation('/campaigns')}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/campaigns')}
-              className="cursor-pointer group"
-              data-testid="stat-card-link-campaigns"
-            >
-              <StatCard
-                title="Active Campaigns"
-                value={stats?.activeCampaigns.toString() || "0"}
-                icon={Mail}
-                description={`${stats?.activeCampaignsBreakdown.email || 0} email, ${stats?.activeCampaignsBreakdown.telemarketing || 0} telemarketing`}
-                delay={200}
-              />
-            </div>
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setLocation('/leads')}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/leads')}
-              className="cursor-pointer group"
-              data-testid="stat-card-link-leads"
-            >
-              <StatCard
-                title="Leads This Month"
-                value={stats?.leadsThisMonth.toLocaleString() || "0"}
-                icon={CheckCircle}
-                delay={300}
-              />
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setLocation('/accounts')}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/accounts')}
+                  className="cursor-pointer group"
+                  data-testid="stat-card-link-accounts"
+                >
+                  <StatCard
+                    title="Total Accounts"
+                    value={stats?.totalAccounts.toLocaleString() || "0"}
+                    icon={Building2}
+                    delay={0}
+                  />
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setLocation('/contacts')}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/contacts')}
+                  className="cursor-pointer group"
+                  data-testid="stat-card-link-contacts"
+                >
+                  <StatCard
+                    title="Total Contacts"
+                    value={stats?.totalContacts.toLocaleString() || "0"}
+                    icon={Users}
+                    delay={100}
+                  />
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setLocation('/campaigns')}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/campaigns')}
+                  className="cursor-pointer group"
+                  data-testid="stat-card-link-campaigns"
+                >
+                  <StatCard
+                    title="Active Campaigns"
+                    value={stats?.activeCampaigns.toString() || "0"}
+                    icon={Mail}
+                    description={`${stats?.activeCampaignsBreakdown.email || 0} email, ${stats?.activeCampaignsBreakdown.telemarketing || 0} telemarketing`}
+                    delay={200}
+                  />
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setLocation('/leads')}
+                  onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/leads')}
+                  className="cursor-pointer group"
+                  data-testid="stat-card-link-leads"
+                >
+                  <StatCard
+                    title="Leads This Month"
+                    value={stats?.leadsThisMonth.toLocaleString() || "0"}
+                    icon={CheckCircle}
+                    delay={300}
+                  />
                 </div>
               </>
             )}
