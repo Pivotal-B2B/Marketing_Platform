@@ -606,25 +606,33 @@ export function csvRowToContact(
     data[header] = row[index] || "";
   });
 
+  // Helper to get value from multiple possible column names
+  const getValue = (...keys: string[]) => {
+    for (const key of keys) {
+      if (data[key]) return data[key];
+    }
+    return undefined;
+  };
+
   const contact: any = {
-    firstName: data.firstName || "",
-    lastName: data.lastName || "",
-    fullName: data.fullName || `${data.firstName} ${data.lastName}`.trim(),
-    email: normalizeEmail(data.email),
-    directPhone: formatPhoneNumber(data.directPhone, data.country), // Format with country
-    mobilePhone: formatPhoneNumber(data.mobilePhone, data.country), // Format with country
-    jobTitle: data.jobTitle || undefined,
-    department: data.department || undefined,
-    seniorityLevel: data.seniorityLevel || undefined,
-    city: data.city || undefined,
-    state: data.state || undefined,
-    county: data.county || undefined,
-    postalCode: data.postalCode || undefined,
-    country: data.country || undefined,
-    contactLocation: data.contactLocation || undefined,
-    linkedinUrl: data.linkedinUrl || undefined,
-    consentBasis: data.consentBasis || undefined,
-    consentSource: data.consentSource || undefined,
+    firstName: getValue('firstName', 'First Name', 'first_name') || "",
+    lastName: getValue('lastName', 'Last Name', 'last_name') || "",
+    fullName: getValue('fullName', 'Full Name', 'full_name') || `${getValue('firstName', 'First Name', 'first_name')} ${getValue('lastName', 'Last Name', 'last_name')}`.trim(),
+    email: normalizeEmail(getValue('email', 'Email', 'Email Address') || ''),
+    directPhone: formatPhoneNumber(getValue('directPhone', 'Direct Phone', 'direct_phone', 'Phone') || '', getValue('country', 'Country')),
+    mobilePhone: formatPhoneNumber(getValue('mobilePhone', 'Mobile Phone', 'mobile_phone', 'Mobile') || '', getValue('country', 'Country')),
+    jobTitle: getValue('jobTitle', 'Job Title', 'job_title', 'Title'),
+    department: getValue('department', 'Department'),
+    seniorityLevel: getValue('seniorityLevel', 'Seniority Level', 'seniority_level', 'Seniority'),
+    city: getValue('city', 'City'),
+    state: getValue('state', 'State'),
+    county: getValue('county', 'County'),
+    postalCode: getValue('postalCode', 'Postal Code', 'postal_code', 'Zip', 'ZIP Code'),
+    country: getValue('country', 'Country'),
+    contactLocation: getValue('contactLocation', 'Contact Location', 'contact_location', 'Location'),
+    linkedinUrl: getValue('linkedinUrl', 'LinkedIn URL', 'linkedin_url', 'LinkedIn'),
+    consentBasis: getValue('consentBasis', 'Consent Basis', 'consent_basis'),
+    consentSource: getValue('consentSource', 'Consent Source', 'consent_source'),
   };
 
   // Parse tags
@@ -786,25 +794,39 @@ export function csvRowToContactFromUnified(
     data[header] = row[index] || "";
   });
 
+  // Helper to get value from multiple possible column names
+  const getValue = (...keys: string[]) => {
+    for (const key of keys) {
+      if (data[key]) return data[key];
+    }
+    return undefined;
+  };
+
   const contact: any = {
-    firstName: data.firstName || "",
-    lastName: data.lastName || "",
-    fullName: data.fullName || `${data.firstName} ${data.lastName}`.trim(),
-    email: normalizeEmail(data.email),
-    directPhone: formatPhoneNumber(data.directPhone, data.country || data.account_country), // Use contact or account country
-    mobilePhone: formatPhoneNumber(data.mobilePhone, data.country || data.account_country), // Use contact or account country
-    jobTitle: data.jobTitle || undefined,
-    department: data.department || undefined,
-    seniorityLevel: data.seniorityLevel || undefined,
-    city: data.city || undefined,
-    state: data.state || undefined,
-    county: data.county || undefined,
-    postalCode: data.postalCode || undefined,
-    country: data.country || undefined,
-    contactLocation: data.contactLocation || undefined,
-    linkedinUrl: data.linkedinUrl || undefined,
-    consentBasis: data.consentBasis || undefined,
-    consentSource: data.consentSource || undefined,
+    firstName: getValue('firstName', 'First Name', 'first_name') || "",
+    lastName: getValue('lastName', 'Last Name', 'last_name') || "",
+    fullName: getValue('fullName', 'Full Name', 'full_name') || `${getValue('firstName', 'First Name', 'first_name')} ${getValue('lastName', 'Last Name', 'last_name')}`.trim(),
+    email: normalizeEmail(getValue('email', 'Email', 'Email Address') || ''),
+    directPhone: formatPhoneNumber(
+      getValue('directPhone', 'Direct Phone', 'direct_phone', 'Phone') || '', 
+      getValue('country', 'Country') || getValue('account_country', 'account_hqCountry')
+    ),
+    mobilePhone: formatPhoneNumber(
+      getValue('mobilePhone', 'Mobile Phone', 'mobile_phone', 'Mobile') || '', 
+      getValue('country', 'Country') || getValue('account_country', 'account_hqCountry')
+    ),
+    jobTitle: getValue('jobTitle', 'Job Title', 'job_title', 'Title'),
+    department: getValue('department', 'Department'),
+    seniorityLevel: getValue('seniorityLevel', 'Seniority Level', 'seniority_level', 'Seniority'),
+    city: getValue('city', 'City'),
+    state: getValue('state', 'State'),
+    county: getValue('county', 'County'),
+    postalCode: getValue('postalCode', 'Postal Code', 'postal_code', 'Zip', 'ZIP Code'),
+    country: getValue('country', 'Country'),
+    contactLocation: getValue('contactLocation', 'Contact Location', 'contact_location', 'Location'),
+    linkedinUrl: getValue('linkedinUrl', 'LinkedIn URL', 'linkedin_url', 'LinkedIn'),
+    consentBasis: getValue('consentBasis', 'Consent Basis', 'consent_basis'),
+    consentSource: getValue('consentSource', 'Consent Source', 'consent_source'),
   };
 
   // Parse tags
