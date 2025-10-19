@@ -1729,13 +1729,21 @@ export function registerRoutes(app: Express) {
       }
 
       // Auto-populate queue from audience if defined
-      if (campaign.audienceRefs) {
+      if (campaign.audienceRefs && campaign.type === 'call') {
         const audienceRefs = campaign.audienceRefs as any;
         let contacts: any[] = [];
 
+        // Resolve contacts from filterGroup (Advanced Filters)
+        if (audienceRefs.filterGroup) {
+          console.log(`[Campaign Creation] Resolving contacts from filterGroup for campaign ${campaign.id}`);
+          const filterContacts = await storage.getContacts(audienceRefs.filterGroup);
+          contacts.push(...filterContacts);
+          console.log(`[Campaign Creation] Found ${filterContacts.length} contacts from filterGroup`);
+        }
+
         // Resolve contacts from segments
-        if (audienceRefs.segments && Array.isArray(audienceRefs.segments)) {
-          for (const segmentId of audienceRefs.segments) {
+        if (audienceRefs.selectedSegments && Array.isArray(audienceRefs.selectedSegments)) {
+          for (const segmentId of audienceRefs.selectedSegments) {
             const segment = await storage.getSegment(segmentId);
             if (segment && segment.definitionJson) {
               const segmentContacts = await storage.getContacts(segment.definitionJson as any);
@@ -1745,8 +1753,8 @@ export function registerRoutes(app: Express) {
         }
 
         // Resolve contacts from lists (with batching for large lists)
-        if (audienceRefs.lists && Array.isArray(audienceRefs.lists)) {
-          for (const listId of audienceRefs.lists) {
+        if (audienceRefs.selectedLists && Array.isArray(audienceRefs.selectedLists)) {
+          for (const listId of audienceRefs.selectedLists) {
             const list = await storage.getList(listId);
             if (list && list.recordIds && list.recordIds.length > 0) {
               // Batch large lists to avoid SQL query limits
