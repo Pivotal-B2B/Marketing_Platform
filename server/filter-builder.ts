@@ -230,19 +230,20 @@ function buildCompanyFieldCondition(
       // IMPORTANT: Include contacts with no account or account with NULL field (and empty string for text fields)
       if (values.length === 1) {
         const nullCheck = isTextField 
-          ? sql`(${accountColumn} != ${values[0]} OR ${accountColumn} IS NULL OR ${accountColumn} = '')`
-          : sql`(${accountColumn} != ${values[0]} OR ${accountColumn} IS NULL)`;
+          ? or(sql`${accountColumn} != ${values[0]}`, isNull(accountColumn), eq(accountColumn, ''))
+          : or(sql`${accountColumn} != ${values[0]}`, isNull(accountColumn));
         return or(
           isNull(contacts.accountId),
-          sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${nullCheck})`
+          sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${nullCheck}))`
         );
       }
+      // Multi-value: use type-safe notInArray helper
       const nullCheckMulti = isTextField
-        ? sql`(${accountColumn} NOT IN (SELECT unnest(${values}::text[])) OR ${accountColumn} IS NULL OR ${accountColumn} = '')`
-        : sql`(${accountColumn} NOT IN (SELECT unnest(${values}::text[])) OR ${accountColumn} IS NULL)`;
+        ? or(notInArray(accountColumn, values), isNull(accountColumn), eq(accountColumn, ''))
+        : or(notInArray(accountColumn, values), isNull(accountColumn));
       return or(
         isNull(contacts.accountId),
-        sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${nullCheckMulti})`
+        sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${nullCheckMulti}))`
       );
     
     case 'contains':
