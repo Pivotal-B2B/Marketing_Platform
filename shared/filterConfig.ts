@@ -396,7 +396,7 @@ export const MODULE_FILTERS: Record<string, FilterField[]> = {
     "industries",
     "companySizes",
     "seniorityLevels",
-    "jobFunctions",
+    // "jobFunctions", // REMOVED: Field doesn't exist in database
     "countries",
     "states",
     "cities",
@@ -414,7 +414,7 @@ export const MODULE_FILTERS: Record<string, FilterField[]> = {
     "industries",
     "companySizes",
     "seniorityLevels",
-    "jobFunctions",
+    // "jobFunctions", // REMOVED: Field doesn't exist in database
     "countries",
     "states",
     "cities",
