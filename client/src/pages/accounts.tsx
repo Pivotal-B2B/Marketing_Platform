@@ -6,7 +6,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Download, Upload, Building2, Trash2, LayoutGrid, List } from "lucide-react";
-import { FilterBuilder } from "@/components/filter-builder";
+import { SidebarFilters } from "@/components/filters/sidebar-filters";
 import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar";
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
 import { AddToListDialog } from "@/components/add-to-list-dialog";
@@ -485,7 +485,7 @@ export default function AccountsPage() {
               </div>
             )}
           </div>
-          <FilterBuilder
+          <SidebarFilters
             entityType="account"
             onApplyFilter={setFilterGroup}
             initialFilter={filterGroup}

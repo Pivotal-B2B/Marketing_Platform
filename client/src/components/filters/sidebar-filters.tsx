@@ -246,7 +246,7 @@ export function SidebarFilters({
       </div>
 
       {/* Body - Filter Conditions */}
-      <ScrollArea className="flex-1 px-3 py-3">
+      <ScrollArea className="flex-1 px-3 pb-2 pt-3">
         <div className="space-y-2">
           <AnimatePresence mode="popLayout">
             {filterGroup.conditions.map((condition) => (
@@ -299,7 +299,7 @@ export function SidebarFilters({
       </ScrollArea>
 
       {/* Footer - Actions */}
-      <div className="p-4 border-t border-slate-200 bg-slate-50">
+      <div className="p-3 border-t border-slate-200 bg-slate-50">
         <div className="flex items-center justify-between gap-3">
           <Button
             variant="ghost"

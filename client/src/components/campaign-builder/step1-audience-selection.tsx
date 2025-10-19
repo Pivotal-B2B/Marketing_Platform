@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Filter, List, Globe, Eye, Save, ChevronRight, X, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FilterBuilder } from "@/components/filter-builder";
+import { SidebarFilters } from "@/components/filters/sidebar-filters";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery } from "@tanstack/react-query";
 import type { FilterGroup, FilterDefinition } from "@shared/filter-types"; // Corrected import for FilterDefinition
@@ -181,11 +181,10 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex-1">
-                  <FilterBuilder
+                  <SidebarFilters
                     entityType="contact"
                     onApplyFilter={setFilterGroup}
                     initialFilter={filterGroup}
-                    includeRelatedEntities={true}
                   />
                 </div>
               </div>
@@ -297,11 +296,10 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
                   <div className="border-t pt-4 mt-4">
                     <Label className="text-sm font-medium mb-2 block">Additional Filters (Optional)</Label>
                     <p className="text-sm text-muted-foreground mb-3">Apply additional filters to refine the selected segments</p>
-                    <FilterBuilder
+                    <SidebarFilters
                       entityType="contact"
                       onApplyFilter={setFilterGroup}
                       initialFilter={filterGroup}
-                      includeRelatedEntities={true}
                     />
                   </div>
 
@@ -411,11 +409,10 @@ export function Step1AudienceSelection({ data, onNext }: Step1Props) {
                   <div className="border-t pt-4 mt-4">
                     <Label className="text-sm font-medium mb-2 block">Additional Filters (Optional)</Label>
                     <p className="text-sm text-muted-foreground mb-3">Apply additional filters to refine the selected lists</p>
-                    <FilterBuilder
+                    <SidebarFilters
                       entityType="contact"
                       onApplyFilter={setFilterGroup}
                       initialFilter={filterGroup}
-                      includeRelatedEntities={true}
                     />
                   </div>
 
