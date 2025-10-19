@@ -135,7 +135,7 @@ router.post(
         
         const released = releaseResult.length;
 
-        // Step 2: Get campaign audience snapshot to find eligible contact IDs
+        // Step 2: Get campaign audience snapshot (if exists)
         const snapshot = await tx.select({
           contactIds: campaignAudienceSnapshots.contactIds,
         })
@@ -145,25 +145,35 @@ router.post(
         .limit(1);
 
         const campaignContactIds = snapshot[0]?.contactIds || [];
-        
-        if (campaignContactIds.length === 0) {
-          return {
-            released,
-            assigned: 0,
-            skipped_due_to_collision: 0,
-          };
-        }
+        const hasSnapshot = campaignContactIds.length > 0;
 
         // Step 3: Query contacts based on filters
-        const whereConditions = [
-          inArray(contacts.id, campaignContactIds),
-        ];
+        const whereConditions: any[] = [];
+        
+        // If snapshot exists, constrain to snapshot contacts
+        // If no snapshot, allow filtering from all contacts (manual queue mode)
+        if (hasSnapshot) {
+          whereConditions.push(inArray(contacts.id, campaignContactIds));
+          console.log(`[queues:set] Using snapshot with ${campaignContactIds.length} contacts`);
+        } else {
+          console.log('[queues:set] No snapshot found - filtering from all contacts');
+        }
         
         if (filters && filters.conditions && filters.conditions.length > 0) {
           const filterSQL = buildFilterQuery(filters as FilterGroup, contacts);
           if (filterSQL) {
             whereConditions.push(filterSQL);
           }
+        }
+        
+        // If no filters and no snapshot, return empty (prevent queuing all contacts)
+        if (whereConditions.length === 0) {
+          console.log('[queues:set] No filters and no snapshot - returning empty');
+          return {
+            released,
+            assigned: 0,
+            skipped_due_to_collision: 0,
+          };
         }
 
         let eligibleContacts;
@@ -175,6 +185,11 @@ router.post(
             ? buildFilterQuery(filters as FilterGroup, contacts) 
             : undefined;
           
+          // Build WHERE clause for raw SQL (snapshot constraint + filters)
+          const snapshotConstraint = hasSnapshot 
+            ? sql`c.id = ANY(${campaignContactIds})`
+            : sql`1=1`; // No constraint if no snapshot
+          
           const baseQuery = max_queue_size
             ? sql`
                 SELECT id, account_id
@@ -185,7 +200,7 @@ router.post(
                     ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
                   FROM ${contacts} c
                   WHERE 
-                    c.id = ANY(${campaignContactIds})
+                    ${snapshotConstraint}
                     ${filterPart ? sql`AND ${filterPart}` : sql``}
                 ) t
                 WHERE rn <= ${per_account_cap}
@@ -201,7 +216,7 @@ router.post(
                     ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
                   FROM ${contacts} c
                   WHERE 
-                    c.id = ANY(${campaignContactIds})
+                    ${snapshotConstraint}
                     ${filterPart ? sql`AND ${filterPart}` : sql``}
                 ) t
                 WHERE rn <= ${per_account_cap}
