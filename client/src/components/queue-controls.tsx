@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,11 +57,25 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
   // Check if user has admin or manager role
   const isAdminOrManager = user?.role === 'admin' || user?.role === 'campaign_manager';
 
+  // Fetch campaign details to get audienceRefs
+  const { data: campaign } = useQuery<any>({
+    queryKey: ['/api/campaigns', campaignId],
+    enabled: !!campaignId,
+  });
+
   // Fetch queue stats
   const { data: stats, isLoading: isLoadingStats } = useQuery<QueueStats>({
     queryKey: ['/api/campaigns', campaignId, 'queues/stats', effectiveAgentId],
     enabled: !!campaignId && !!effectiveAgentId,
   });
+
+  // Initialize filter with campaign's audienceRefs.filterGroup
+  useEffect(() => {
+    if (campaign?.audienceRefs?.filterGroup && !filterGroup) {
+      console.log('[QUEUE_CONTROLS] Initializing filter from campaign:', campaign.audienceRefs.filterGroup);
+      setFilterGroup(campaign.audienceRefs.filterGroup);
+    }
+  }, [campaign, filterGroup]);
 
   // Set Queue (Replace) mutation
   const replaceQueueMutation = useMutation({
