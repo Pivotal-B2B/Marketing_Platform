@@ -699,40 +699,42 @@ router.get('/campaigns', async (req: Request, res: Response) => {
 /**
  * GET /api/filters/options/lists
  * 
- * Fetch list names for typeahead search
+ * Fetch static lists for typeahead search from lists table
  */
 router.get('/lists', async (req: Request, res: Response) => {
   try {
     const { query = '' } = req.query;
-    const { sql } = await import('drizzle-orm');
+    const { lists } = await import('../../shared/schema');
+    const { like, or, and } = await import('drizzle-orm');
     
-    let sqlQuery;
+    let results;
     if (query && typeof query === 'string' && query.trim()) {
-      sqlQuery = sql`
-        SELECT DISTINCT list
-        FROM contacts
-        WHERE list IS NOT NULL
-          AND list != ''
-          AND list ILIKE ${`%${query.trim()}%`}
-        ORDER BY list ASC
-        LIMIT 50
-      `;
+      results = await db
+        .select({
+          id: lists.id,
+          name: lists.name,
+        })
+        .from(lists)
+        .where(
+          like(lists.name, `%${query.trim()}%`)
+        )
+        .orderBy(lists.name)
+        .limit(50);
     } else {
-      sqlQuery = sql`
-        SELECT DISTINCT list
-        FROM contacts
-        WHERE list IS NOT NULL
-          AND list != ''
-        ORDER BY list ASC
-        LIMIT 50
-      `;
+      results = await db
+        .select({
+          id: lists.id,
+          name: lists.name,
+        })
+        .from(lists)
+        .orderBy(lists.name)
+        .limit(50);
     }
     
-    const results = await db.execute<{ list: string }>(sqlQuery);
-    
-    const formatted = results.rows
-      .filter(r => r.list)
-      .map(r => ({ id: r.list, name: r.list }));
+    const formatted = results.map(r => ({ 
+      id: r.id, 
+      name: r.name 
+    }));
     
     const cacheMaxAge = query ? 300 : 600;
     res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
@@ -746,21 +748,98 @@ router.get('/lists', async (req: Request, res: Response) => {
 /**
  * GET /api/filters/options/segments
  * 
- * Fetch segment names for typeahead search
+ * Fetch dynamic segments for typeahead search from segments table
  */
 router.get('/segments', async (req: Request, res: Response) => {
   try {
     const { query = '' } = req.query;
+    const { segments } = await import('../../shared/schema');
+    const { like } = await import('drizzle-orm');
     
-    // Check if segments table exists
-    // For now, return empty array - this can be implemented when segments table is ready
-    const segments: any[] = [];
+    let results;
+    if (query && typeof query === 'string' && query.trim()) {
+      results = await db
+        .select({
+          id: segments.id,
+          name: segments.name,
+        })
+        .from(segments)
+        .where(
+          like(segments.name, `%${query.trim()}%`)
+        )
+        .orderBy(segments.name)
+        .limit(50);
+    } else {
+      results = await db
+        .select({
+          id: segments.id,
+          name: segments.name,
+        })
+        .from(segments)
+        .orderBy(segments.name)
+        .limit(50);
+    }
     
-    res.set('Cache-Control', 'public, max-age=600');
-    res.json({ data: segments });
+    const formatted = results.map(r => ({ 
+      id: r.id, 
+      name: r.name 
+    }));
+    
+    const cacheMaxAge = query ? 300 : 600;
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+    res.json({ data: formatted });
   } catch (error) {
     console.error('Error fetching segments:', error);
     res.status(500).json({ error: 'Failed to fetch segments' });
+  }
+});
+
+/**
+ * GET /api/filters/options/domain-sets
+ * 
+ * Fetch domain sets for typeahead search from domainSets table
+ */
+router.get('/domain-sets', async (req: Request, res: Response) => {
+  try {
+    const { query = '' } = req.query;
+    const { domainSets } = await import('../../shared/schema');
+    const { like } = await import('drizzle-orm');
+    
+    let results;
+    if (query && typeof query === 'string' && query.trim()) {
+      results = await db
+        .select({
+          id: domainSets.id,
+          name: domainSets.name,
+        })
+        .from(domainSets)
+        .where(
+          like(domainSets.name, `%${query.trim()}%`)
+        )
+        .orderBy(domainSets.name)
+        .limit(50);
+    } else {
+      results = await db
+        .select({
+          id: domainSets.id,
+          name: domainSets.name,
+        })
+        .from(domainSets)
+        .orderBy(domainSets.name)
+        .limit(50);
+    }
+    
+    const formatted = results.map(r => ({ 
+      id: r.id, 
+      name: r.name 
+    }));
+    
+    const cacheMaxAge = query ? 300 : 600;
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+    res.json({ data: formatted });
+  } catch (error) {
+    console.error('Error fetching domain sets:', error);
+    res.status(500).json({ error: 'Failed to fetch domain sets' });
   }
 });
 

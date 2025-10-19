@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 interface DashboardStats {
   totalAccounts: number;
@@ -32,6 +33,7 @@ interface AgentStats {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
   const isAgent = user?.role === 'agent';
   
   const { data: stats, isLoading } = useQuery<DashboardStats>({
@@ -39,9 +41,16 @@ export default function Dashboard() {
     enabled: !isAgent,
   });
 
-  const { data: agentStats, isLoading: agentLoading } = useQuery<AgentStats>({
+  const { data: agentStats, isLoading: agentLoading, error: agentError } = useQuery<AgentStats>({
     queryKey: ['/api/dashboard/agent-stats'],
     enabled: isAgent,
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to load agent statistics",
+        description: error.message || "Please try refreshing the page",
+        variant: "destructive"
+      });
+    }
   });
   // Format duration helper
   const formatDuration = (seconds: number) => {
@@ -77,28 +86,28 @@ export default function Dashboard() {
               <>
                 <StatCard
                   title="Calls Today"
-                  value={agentStats?.callsToday.toLocaleString() || "0"}
+                  value={(agentStats?.callsToday ?? 0).toLocaleString()}
                   icon={Phone}
                   delay={0}
                   data-testid="stat-card-calls-today"
                 />
                 <StatCard
                   title="Calls This Month"
-                  value={agentStats?.callsThisMonth.toLocaleString() || "0"}
+                  value={(agentStats?.callsThisMonth ?? 0).toLocaleString()}
                   icon={TrendingUp}
                   delay={100}
                   data-testid="stat-card-calls-month"
                 />
                 <StatCard
                   title="Qualified Leads"
-                  value={agentStats?.qualified.toLocaleString() || "0"}
+                  value={(agentStats?.qualified ?? 0).toLocaleString()}
                   icon={Award}
                   delay={200}
                   data-testid="stat-card-qualified"
                 />
                 <StatCard
                   title="Avg Call Duration"
-                  value={formatDuration(agentStats?.avgDuration || 0)}
+                  value={formatDuration(agentStats?.avgDuration ?? 0)}
                   icon={Clock}
                   delay={300}
                   data-testid="stat-card-avg-duration"
@@ -117,7 +126,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-approved-leads">
-                  {agentStats?.leadsApproved || 0}
+                  {agentStats?.leadsApproved ?? 0}
                 </div>
                 <p className="text-xs text-muted-foreground">QA approved</p>
               </CardContent>
@@ -132,7 +141,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-pending-leads">
-                  {agentStats?.leadsPending || 0}
+                  {agentStats?.leadsPending ?? 0}
                 </div>
                 <p className="text-xs text-muted-foreground">Awaiting QA</p>
               </CardContent>
@@ -147,7 +156,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-active-campaigns">
-                  {agentStats?.activeCampaigns || 0}
+                  {agentStats?.activeCampaigns ?? 0}
                 </div>
                 <p className="text-xs text-muted-foreground">Assigned to you</p>
               </CardContent>
