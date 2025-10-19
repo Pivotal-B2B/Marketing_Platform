@@ -249,7 +249,13 @@ router.post(
         .where(
           and(
             eq(agentQueue.campaignId, campaignId),
-            inArray(agentQueue.contactId, contactIds)
+            inArray(agentQueue.contactId, contactIds),
+            // Only check active states - released/completed contacts can be reassigned
+            or(
+              eq(agentQueue.queueState, 'queued'),
+              eq(agentQueue.queueState, 'locked'),
+              eq(agentQueue.queueState, 'in_progress')
+            )
           )
         );
 
