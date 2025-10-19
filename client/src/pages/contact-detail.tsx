@@ -297,10 +297,15 @@ export default function ContactDetailPage() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Direct Work Phone</p>
                   {contact.directPhoneE164 ? (
-                    <a href={`tel:${contact.directPhoneE164}`} className="font-medium text-primary hover:underline flex items-center gap-2">
-                      <Phone className="w-4 h-4" />
-                      {contact.directPhone}
-                    </a>
+                    <div className="space-y-1">
+                      <a href={`tel:${contact.directPhoneE164}`} className="font-medium text-primary hover:underline flex items-center gap-2">
+                        <Phone className="w-4 h-4" />
+                        {contact.directPhone}
+                      </a>
+                      {contact.phoneExtension && (
+                        <p className="text-xs text-muted-foreground pl-5">Ext: {contact.phoneExtension}</p>
+                      )}
+                    </div>
                   ) : (
                     <p className="font-medium">-</p>
                   )}
@@ -384,6 +389,84 @@ export default function ContactDetailPage() {
                         {topic}
                       </Badge>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Professional History */}
+              {(contact.formerPosition || contact.timeInCurrentPosition || contact.timeInCurrentCompany) && (
+                <div className="mt-4 pt-4 border-t">
+                  <p className="text-sm font-medium mb-3">Professional History</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {contact.formerPosition && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Former Position</p>
+                        <p className="font-medium text-sm">{contact.formerPosition}</p>
+                      </div>
+                    )}
+                    {contact.timeInCurrentPosition && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Time in Current Position</p>
+                        <p className="font-medium text-sm">{contact.timeInCurrentPosition}</p>
+                      </div>
+                    )}
+                    {contact.timeInCurrentCompany && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Time at Company</p>
+                        <p className="font-medium text-sm">{contact.timeInCurrentCompany}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Data Quality & Source */}
+              {(contact.emailAiConfidence || contact.phoneAiConfidence || contact.sourceSystem || contact.researchDate) && (
+                <div className="mt-4 pt-4 border-t">
+                  <p className="text-sm font-medium mb-3">Data Quality & Source</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {contact.emailAiConfidence && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Email Confidence</p>
+                        <Badge variant="secondary" className="text-xs">
+                          {Math.round(parseFloat(contact.emailAiConfidence) * 100)}% confidence
+                        </Badge>
+                      </div>
+                    )}
+                    {contact.phoneAiConfidence && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Phone Confidence</p>
+                        <Badge variant="secondary" className="text-xs">
+                          {Math.round(parseFloat(contact.phoneAiConfidence) * 100)}% confidence
+                        </Badge>
+                      </div>
+                    )}
+                    {contact.sourceSystem && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Source System</p>
+                        <p className="font-medium text-sm">{contact.sourceSystem}</p>
+                      </div>
+                    )}
+                    {contact.researchDate && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Research Date</p>
+                        <p className="font-medium text-sm">
+                          {new Date(contact.researchDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                    {contact.timezone && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Timezone</p>
+                        <p className="font-medium text-sm">{contact.timezone}</p>
+                      </div>
+                    )}
+                    {contact.list && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">List</p>
+                        <p className="font-medium text-sm">{contact.list}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
