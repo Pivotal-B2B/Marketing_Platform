@@ -7,6 +7,7 @@ import dvRouter from "./routes/dv-routes";
 import queueRouter from "./routes/queue-routes";
 import filterOptionsRouter from "./routes/filter-options-routes";
 import reportingRoutes from './routes/reporting-routes';
+import campaignSuppressionRouter from './routes/campaign-suppression-routes';
 import { z } from "zod";
 import { db } from "./db";
 import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts } from "@shared/schema";
@@ -5341,4 +5342,7 @@ export function registerRoutes(app: Express) {
 
   // ==================== CALL CAMPAIGN REPORTING ROUTES ====================
   app.use('/api/reports/calls', reportingRoutes);
+
+  // ==================== CAMPAIGN SUPPRESSION LISTS ====================
+  app.use('/api/campaigns', requireAuth, campaignSuppressionRouter);
 }
