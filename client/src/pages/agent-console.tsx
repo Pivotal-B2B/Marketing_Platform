@@ -229,8 +229,123 @@ export default function AgentConsolePage() {
     enabled: !!selectedCampaignId,
   });
 
+  // Fetch full contact details for the current queue item
+  const { data: fullContactDetails } = useQuery<{
+    id: string;
+    fullName: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    directPhone: string | null;
+    jobTitle: string | null;
+    department: string | null;
+    seniorityLevel: string | null;
+    accountId: string | null;
+    account?: {
+      id: string;
+      name: string;
+      domain: string | null;
+      industryStandardized: string | null;
+      staffCount: number | null;
+      annualRevenue: string | null;
+      mainPhone: string | null;
+    } | null;
+  }>({
+    queryKey: currentQueueItem?.contactId ? [`/api/contacts/${currentQueueItem.contactId}`] : [],
+    enabled: !!currentQueueItem?.contactId,
+  });
+
   const dialMode = campaignDetails?.dialMode || 'manual';
   const amdEnabled = campaignDetails?.powerSettings?.amd?.enabled ?? false;
+
+  // Function to replace placeholders in call script with actual contact/account/agent data
+  const replacePlaceholders = (script: string): string => {
+    if (!script) return '';
+
+    let result = script;
+    
+    // Get data from full contact details or fall back to queue item
+    const contact = fullContactDetails || {
+      fullName: currentQueueItem?.contactName || '',
+      firstName: null,
+      lastName: null,
+      email: currentQueueItem?.contactEmail || '',
+      directPhone: currentQueueItem?.contactPhone || '',
+      jobTitle: null,
+      department: null,
+      seniorityLevel: null,
+    };
+
+    const account = fullContactDetails?.account || {
+      name: currentQueueItem?.accountName || '',
+      domain: null,
+      industryStandardized: null,
+      staffCount: null,
+      annualRevenue: null,
+      mainPhone: null,
+    };
+
+    const agent = {
+      firstName: user?.firstName || '',
+      lastName: user?.lastName || '',
+      fullName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || '',
+      email: user?.email || '',
+    };
+
+    const campaign = {
+      name: campaignDetails?.name || currentQueueItem?.campaignName || '',
+    };
+
+    // Replace contact placeholders - supports both {{}} and [] formats
+    result = result
+      // Contact fields - {{ }} format
+      .replace(/\{\{contact\.fullName\}\}/gi, contact.fullName)
+      .replace(/\{\{contact\.firstName\}\}/gi, contact.firstName || contact.fullName.split(' ')[0] || '')
+      .replace(/\{\{contact\.lastName\}\}/gi, contact.lastName || contact.fullName.split(' ').slice(1).join(' ') || '')
+      .replace(/\{\{contact\.email\}\}/gi, contact.email)
+      .replace(/\{\{contact\.phone\}\}/gi, contact.directPhone || '')
+      .replace(/\{\{contact\.directPhone\}\}/gi, contact.directPhone || '')
+      .replace(/\{\{contact\.jobTitle\}\}/gi, contact.jobTitle || '')
+      .replace(/\{\{contact\.title\}\}/gi, contact.jobTitle || '')
+      .replace(/\{\{contact\.department\}\}/gi, contact.department || '')
+      .replace(/\{\{contact\.seniority\}\}/gi, contact.seniorityLevel || '')
+      
+      // Account fields - {{ }} format
+      .replace(/\{\{account\.name\}\}/gi, account.name)
+      .replace(/\{\{account\.company\}\}/gi, account.name)
+      .replace(/\{\{account\.domain\}\}/gi, account.domain || '')
+      .replace(/\{\{account\.industry\}\}/gi, account.industryStandardized || '')
+      .replace(/\{\{account\.employees\}\}/gi, account.staffCount ? account.staffCount.toString() : '')
+      .replace(/\{\{account\.revenue\}\}/gi, account.annualRevenue || '')
+      .replace(/\{\{account\.phone\}\}/gi, account.mainPhone || '')
+      
+      // Agent fields - {{ }} format
+      .replace(/\{\{agent\.fullName\}\}/gi, agent.fullName)
+      .replace(/\{\{agent\.firstName\}\}/gi, agent.firstName)
+      .replace(/\{\{agent\.lastName\}\}/gi, agent.lastName)
+      .replace(/\{\{agent\.name\}\}/gi, agent.fullName)
+      .replace(/\{\{agent\.email\}\}/gi, agent.email)
+      
+      // Campaign fields - {{ }} format
+      .replace(/\{\{campaign\.name\}\}/gi, campaign.name)
+      
+      // Legacy [ ] format for backwards compatibility
+      .replace(/\[Contact Name\]/gi, contact.fullName)
+      .replace(/\[Contact First Name\]/gi, contact.firstName || contact.fullName.split(' ')[0] || '')
+      .replace(/\[Contact Email\]/gi, contact.email)
+      .replace(/\[Contact Phone\]/gi, contact.directPhone || '')
+      .replace(/\[Contact Title\]/gi, contact.jobTitle || '')
+      .replace(/\[Job Title\]/gi, contact.jobTitle || '')
+      .replace(/\[Company Name\]/gi, account.name)
+      .replace(/\[Company\]/gi, account.name)
+      .replace(/\[Account Name\]/gi, account.name)
+      .replace(/\[Industry\]/gi, account.industryStandardized || '')
+      .replace(/\[Agent Name\]/gi, agent.fullName)
+      .replace(/\[Your Name\]/gi, agent.fullName)
+      .replace(/\[Campaign Name\]/gi, campaign.name);
+
+    return result;
+  };
 
   // Get agent's assigned campaigns
   const { data: agentAssignments = [] } = useQuery<Array<{ campaignId: string; campaignName: string }>>({
@@ -797,12 +912,9 @@ export default function AgentConsolePage() {
                 </CardHeader>
                 <CardContent className="flex-1 min-h-0 pt-3">
                   {campaignDetails?.callScript ? (
-                    <div className="p-5 bg-gradient-to-br from-white to-purple-50/30 rounded-xl border-2 border-purple-100 shadow-inner h-full">
-                      <p className="text-sm leading-relaxed line-clamp-[20] text-gray-700">
-                        {campaignDetails.callScript
-                          .replace(/\[Contact Name\]/gi, currentQueueItem?.contactName || '[Contact Name]')
-                          .replace(/\[Company Name\]/gi, currentQueueItem?.accountName || '[Company Name]')
-                        }
+                    <div className="p-5 bg-gradient-to-br from-white to-purple-50/30 rounded-xl border-2 border-purple-100 shadow-inner h-full overflow-auto">
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">
+                        {replacePlaceholders(campaignDetails.callScript)}
                       </p>
                     </div>
                   ) : (
