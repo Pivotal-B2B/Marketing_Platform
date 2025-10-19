@@ -120,15 +120,32 @@ export function SidebarFilters({
   // Apply filters with animation
   const handleApply = async () => {
     setIsApplying(true);
-    const filterToApply =
-      filterGroup.conditions.length === 0 ? undefined : filterGroup;
+    
+    // Validate: Remove conditions with empty values (except is_empty/has_any_value operators)
+    const validConditions = filterGroup.conditions.filter(condition => {
+      const needsValues = condition.operator !== 'is_empty' && condition.operator !== 'has_any_value';
+      return !needsValues || condition.values.length > 0;
+    });
+    
+    const filterToApply = validConditions.length === 0 ? undefined : {
+      ...filterGroup,
+      conditions: validConditions
+    };
     
     console.log('[SIDEBAR_FILTERS] Applying filters:', {
-      conditionsCount: filterGroup.conditions.length,
+      originalCount: filterGroup.conditions.length,
+      validCount: validConditions.length,
       logic: filterGroup.logic,
-      conditions: filterGroup.conditions,
       filterToApply
     });
+    
+    // Update local state to remove invalid conditions
+    if (validConditions.length !== filterGroup.conditions.length) {
+      setFilterGroup({
+        ...filterGroup,
+        conditions: validConditions
+      });
+    }
     
     // Brief delay for visual feedback
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -148,6 +165,12 @@ export function SidebarFilters({
   };
 
   const activeFilterCount = filterGroup.conditions.length;
+  
+  // Count valid conditions (with values or using is_empty/has_any_value)
+  const validFilterCount = filterGroup.conditions.filter(condition => {
+    const needsValues = condition.operator !== 'is_empty' && condition.operator !== 'has_any_value';
+    return !needsValues || condition.values.length > 0;
+  }).length;
 
   // Sidebar Content Component (reused for both desktop and mobile)
   const SidebarContent = () => (
@@ -288,14 +311,14 @@ export function SidebarFilters({
             Clear
           </Button>
           <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: validFilterCount > 0 ? 1.02 : 1 }}
+            whileTap={{ scale: validFilterCount > 0 ? 0.98 : 1 }}
             className="flex-1"
           >
             <Button
               onClick={handleApply}
-              disabled={isApplying}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+              disabled={isApplying || validFilterCount === 0}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="button-apply-filters"
             >
               {isApplying ? (
@@ -307,6 +330,8 @@ export function SidebarFilters({
                   />
                   Applying...
                 </>
+              ) : validFilterCount === 0 && activeFilterCount > 0 ? (
+                "Add values to apply"
               ) : (
                 "Apply Filters"
               )}
