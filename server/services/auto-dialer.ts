@@ -290,12 +290,24 @@ export class PowerDialerEngine {
           }
         }
 
-        // Check DNC if enabled
+        // Check campaign-level suppressions FIRST (highest priority)
+        const isCampaignSuppressed = await this.checkCampaignSuppression(
+          contact.contactId,
+          contact.accountId,
+          campaign.id
+        );
+        if (isCampaignSuppressed) {
+          console.log(`[AutoDialer] Contact ${contact.contactId} is suppressed for campaign ${campaign.id}, skipping`);
+          await storage.updateQueueStatus(contact.id, 'removed', 'Campaign suppression');
+          continue;
+        }
+
+        // Then check global DNC if enabled
         if (queue.checkDnc) {
           const isDnc = await this.checkDnc(contact.phone);
           if (isDnc) {
-            console.log(`[AutoDialer] Contact ${contact.contactId} is on DNC list, skipping`);
-            await storage.updateQueueStatus(contact.id, 'removed', 'DNC');
+            console.log(`[AutoDialer] Contact ${contact.contactId} is on global DNC list, skipping`);
+            await storage.updateQueueStatus(contact.id, 'removed', 'Global DNC');
             continue;
           }
         }
@@ -320,6 +332,52 @@ export class PowerDialerEngine {
       return results.size > 0;
     } catch (error) {
       console.error(`[AutoDialer] Error checking DNC for ${phone}:`, error);
+      return false; // Default to allow on error
+    }
+  }
+
+  /**
+   * Check if contact or account is suppressed for a specific campaign
+   */
+  private async checkCampaignSuppression(
+    contactId: string,
+    accountId: string | null,
+    campaignId: string
+  ): Promise<boolean> {
+    try {
+      const { db } = await import('../db');
+      const { campaignSuppressionContacts, campaignSuppressionAccounts } = await import('../../shared/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      // Check if contact is suppressed for this campaign
+      const contactSuppression = await db.query.campaignSuppressionContacts.findFirst({
+        where: and(
+          eq(campaignSuppressionContacts.campaignId, campaignId),
+          eq(campaignSuppressionContacts.contactId, contactId)
+        ),
+      });
+
+      if (contactSuppression) {
+        return true;
+      }
+
+      // Check if account is suppressed for this campaign
+      if (accountId) {
+        const accountSuppression = await db.query.campaignSuppressionAccounts.findFirst({
+          where: and(
+            eq(campaignSuppressionAccounts.campaignId, campaignId),
+            eq(campaignSuppressionAccounts.accountId, accountId)
+          ),
+        });
+
+        if (accountSuppression) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error(`[AutoDialer] Error checking campaign suppression:`, error);
       return false; // Default to allow on error
     }
   }

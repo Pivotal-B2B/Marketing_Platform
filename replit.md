@@ -4,6 +4,12 @@
 Pivotal CRM is an enterprise-grade B2B customer relationship management platform designed to streamline B2B sales and marketing operations. It specializes in Account-Based Marketing (ABM), multi-channel campaign management (Email & Telemarketing), lead qualification, and includes a client portal. The platform emphasizes efficient customer engagement, robust compliance (DNC/Unsubscribe), comprehensive lead QA workflows, and features a "bridge model" for linking campaigns to orders. Its business vision is to provide a comprehensive, intelligent platform that drives sales growth and operational efficiency for B2B enterprises, capturing market share through advanced ABM and integrated campaign management.
 
 ## Recent Changes (October 2025)
+- **Campaign-Level Suppression System**: Implemented intelligent suppression list management for telemarketing campaigns with both account-level and contact-level suppression. Features include:
+  - Database tables: `campaign_suppression_accounts` and `campaign_suppression_contacts` with composite unique constraints
+  - RESTful API endpoints for adding/removing/listing suppressions with bulk operations support
+  - Automatic enforcement in both Manual and Power Dial queue builders
+  - Multi-tier suppression hierarchy: campaign-level contact > campaign-level account > global email DNC > global phone DNC
+  - Suppressed contacts and accounts are automatically skipped during queue building with detailed logging
 - **Agent-Specific Dashboard**: Implemented personalized dashboard views for agent role users showing individual performance metrics (calls today/month, qualified leads, average call duration, approved/pending leads, and active campaigns). Admin/manager users continue to see global statistics.
 - **Filter Options Fix**: Fixed filter dropdown endpoints to query actual database tables instead of showing empty results or text boxes:
   - `/api/filters/options/lists` - Now queries `lists` table to show actual Static Lists
@@ -34,7 +40,11 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
 - **AI-Powered Quality Assurance:** Integrates AssemblyAI for call transcription and Replit AI (OpenAI-compatible) for lead qualification scoring, account enrichment, and multi-factor scoring.
 - **Data Management:** Unified CSV Import/Export System, platform-wide dynamic filters with collapsible category accordions, multi-select dropdowns, async type-ahead search, and date range pickers. Filter options pull from actual database values, and RBAC enforces filter visibility.
-- **Compliance:** Real-time enforcement of global DNC and email unsubscribe lists; consent tracking.
+- **Compliance & Suppression:** Multi-tier suppression system with campaign-level and global enforcement:
+  - **Global Suppressions**: Platform-wide DNC lists for emails (unsubscribe) and phones (Do Not Call)
+  - **Campaign Suppressions**: Campaign-specific suppression lists for accounts (entire company) and contacts (individuals)
+  - **Enforcement**: Automatic checks in Manual Queue and Power Dial modes prevent suppressed contacts from being queued
+  - **API Management**: RESTful endpoints for adding/removing suppressions with bulk operations and reason tracking
 - **Campaign Management:**
     - **Email:** HTML editor, personalization, tracking, pre-send guards, mandatory unsubscribe.
     - **Telemarketing - Dual Dialer Strategy:** Supports Manual Dial Mode (agent-driven queue with collision prevention) and Power Dial Mode (automated dialing with AMD, pacing engine, and human-only agent routing). Includes AMD with confidence scoring, Voicemail Policy Executor, and campaign builder integration for dial mode configuration.

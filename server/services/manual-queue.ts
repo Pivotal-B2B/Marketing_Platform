@@ -2,7 +2,7 @@ import { storage } from "../storage";
 import type { AgentQueue, Contact, Campaign, ManualQueueFilters } from "@shared/schema";
 import { eq, and, or, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
-import { agentQueue, contacts, accounts, campaigns, suppressionEmails, suppressionPhones } from "@shared/schema";
+import { agentQueue, contacts, accounts, campaigns, suppressionEmails, suppressionPhones, campaignSuppressionAccounts, campaignSuppressionContacts } from "@shared/schema";
 
 interface QueueConfig {
   lockTimeoutSec: number; // How long a contact stays locked before auto-release
@@ -66,8 +66,13 @@ export class ManualQueueService {
             continue;
           }
 
-          // Check DNC and suppression lists
-          const isSuppressed = await this.isContactSuppressed(contact.id, contact.email);
+          // Check global DNC and campaign-level suppression lists
+          const isSuppressed = await this.isContactSuppressed(
+            contact.id, 
+            contact.accountId, 
+            campaignId, 
+            contact.email
+          );
           if (isSuppressed) {
             skipped++;
             continue;
@@ -351,18 +356,52 @@ export class ManualQueueService {
   }
 
   /**
-   * Check if contact is on suppression list
+   * Check if contact is on global or campaign-level suppression lists
    */
-  private async isContactSuppressed(contactId: string, email?: string): Promise<boolean> {
-    // Check email suppression
+  private async isContactSuppressed(
+    contactId: string, 
+    accountId: string | null, 
+    campaignId: string,
+    email?: string
+  ): Promise<boolean> {
+    // 1. Check campaign-level contact suppression (highest priority)
+    const campaignContactSuppression = await db.query.campaignSuppressionContacts.findFirst({
+      where: and(
+        eq(campaignSuppressionContacts.campaignId, campaignId),
+        eq(campaignSuppressionContacts.contactId, contactId)
+      ),
+    });
+    if (campaignContactSuppression) {
+      console.log(`[ManualQueue] Contact ${contactId} is suppressed for campaign ${campaignId}`);
+      return true;
+    }
+
+    // 2. Check campaign-level account suppression (suppresses entire account)
+    if (accountId) {
+      const campaignAccountSuppression = await db.query.campaignSuppressionAccounts.findFirst({
+        where: and(
+          eq(campaignSuppressionAccounts.campaignId, campaignId),
+          eq(campaignSuppressionAccounts.accountId, accountId)
+        ),
+      });
+      if (campaignAccountSuppression) {
+        console.log(`[ManualQueue] Account ${accountId} is suppressed for campaign ${campaignId}, skipping contact ${contactId}`);
+        return true;
+      }
+    }
+
+    // 3. Check global email suppression (DNC)
     if (email) {
       const emailSuppression = await db.query.suppressionEmails.findFirst({
         where: eq(suppressionEmails.email, email),
       });
-      if (emailSuppression) return true;
+      if (emailSuppression) {
+        console.log(`[ManualQueue] Email ${email} is on global suppression list`);
+        return true;
+      }
     }
 
-    // Check phone suppression
+    // 4. Check global phone suppression (DNC)
     const contact = await storage.getContact(contactId);
     if (contact) {
       const phonesToCheck: string[] = [];
@@ -373,7 +412,10 @@ export class ManualQueueService {
         const suppressedPhones = await db.query.suppressionPhones.findFirst({
           where: inArray(suppressionPhones.phoneE164, phonesToCheck),
         });
-        if (suppressedPhones) return true;
+        if (suppressedPhones) {
+          console.log(`[ManualQueue] Phone is on global DNC list`);
+          return true;
+        }
       }
     }
 
