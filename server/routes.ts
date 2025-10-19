@@ -1162,7 +1162,7 @@ export function registerRoutes(app: Express) {
   });
 
   // Upsert endpoints for deduplication
-  app.post("/api/contacts:upsert", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+  app.post("/api/contacts/upsert", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const { email, title, sourceSystem, sourceRecordId, sourceUpdatedAt, ...contactData } = req.body;
 
@@ -1218,7 +1218,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/accounts:upsert", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+  app.post("/api/accounts/upsert", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const { name, revenue, sourceSystem, sourceRecordId, sourceUpdatedAt, ...accountData } = req.body;
 
@@ -1257,6 +1257,86 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to upsert account", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Detect duplicate contacts by email
+  app.get("/api/contacts/duplicates", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const contacts = await storage.getContacts();
+      const emailGroups = new Map<string, any[]>();
+      
+      // Group contacts by normalized email
+      contacts.forEach(contact => {
+        if (contact.emailNormalized) {
+          const email = contact.emailNormalized.toLowerCase();
+          if (!emailGroups.has(email)) {
+            emailGroups.set(email, []);
+          }
+          emailGroups.get(email)!.push(contact);
+        }
+      });
+
+      // Find groups with duplicates
+      const duplicates = Array.from(emailGroups.entries())
+        .filter(([_, group]) => group.length > 1)
+        .map(([email, group]) => ({
+          email,
+          count: group.length,
+          contacts: group.sort((a, b) => 
+            new Date(b.updatedAt || b.createdAt || 0).getTime() - 
+            new Date(a.updatedAt || a.createdAt || 0).getTime()
+          )
+        }));
+
+      res.json({
+        totalDuplicateGroups: duplicates.length,
+        totalDuplicateContacts: duplicates.reduce((sum, d) => sum + d.count - 1, 0),
+        duplicates
+      });
+    } catch (error) {
+      console.error('Error detecting duplicate contacts:', error);
+      res.status(500).json({ message: "Failed to detect duplicate contacts" });
+    }
+  });
+
+  // Detect duplicate accounts by domain
+  app.get("/api/accounts/duplicates", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const accounts = await storage.getAccounts();
+      const domainGroups = new Map<string, any[]>();
+      
+      // Group accounts by normalized domain
+      accounts.forEach(account => {
+        if (account.domainNormalized) {
+          const domain = account.domainNormalized.toLowerCase();
+          if (!domainGroups.has(domain)) {
+            domainGroups.set(domain, []);
+          }
+          domainGroups.get(domain)!.push(account);
+        }
+      });
+
+      // Find groups with duplicates
+      const duplicates = Array.from(domainGroups.entries())
+        .filter(([_, group]) => group.length > 1)
+        .map(([domain, group]) => ({
+          domain,
+          count: group.length,
+          accounts: group.sort((a, b) => 
+            new Date(b.updatedAt || b.createdAt || 0).getTime() - 
+            new Date(a.updatedAt || a.createdAt || 0).getTime()
+          )
+        }));
+
+      res.json({
+        totalDuplicateGroups: duplicates.length,
+        totalDuplicateAccounts: duplicates.reduce((sum, d) => sum + d.count - 1, 0),
+        duplicates
+      });
+    } catch (error) {
+      console.error('Error detecting duplicate accounts:', error);
+      res.status(500).json({ message: "Failed to detect duplicate accounts" });
     }
   });
 
