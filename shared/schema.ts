@@ -638,6 +638,104 @@ export const revenueRangeReference = pgTable("revenue_range_reference", {
   sortOrderIdx: index("revenue_range_reference_sort_order_idx").on(table.sortOrder),
 }));
 
+// Seniority Level Reference - Standardized seniority/job levels
+export const seniorityLevelReference = pgTable("seniority_level_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("seniority_level_reference_name_idx").on(table.name),
+  sortOrderIdx: index("seniority_level_reference_sort_order_idx").on(table.sortOrder),
+}));
+
+// Job Function Reference - Standardized job functions
+export const jobFunctionReference = pgTable("job_function_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("job_function_reference_name_idx").on(table.name),
+  sortOrderIdx: index("job_function_reference_sort_order_idx").on(table.sortOrder),
+}));
+
+// Department Reference - Standardized department names
+export const departmentReference = pgTable("department_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("department_reference_name_idx").on(table.name),
+  sortOrderIdx: index("department_reference_sort_order_idx").on(table.sortOrder),
+}));
+
+// Technology Reference - Standardized technology/software names
+export const technologyReference = pgTable("technology_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  category: text("category"), // e.g., "CRM", "Marketing Automation", "BI Tools"
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("technology_reference_name_idx").on(table.name),
+  categoryIdx: index("technology_reference_category_idx").on(table.category),
+}));
+
+// Country Reference - Standardized countries
+export const countryReference = pgTable("country_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  code: text("code").notNull().unique(), // ISO 3166-1 alpha-2 (e.g., "US", "CA", "GB")
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("country_reference_name_idx").on(table.name),
+  codeIdx: index("country_reference_code_idx").on(table.code),
+  sortOrderIdx: index("country_reference_sort_order_idx").on(table.sortOrder),
+}));
+
+// State Reference - Standardized states/provinces with country relationship
+export const stateReference = pgTable("state_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code"), // State abbreviation (e.g., "CA", "TX", "NY")
+  countryId: varchar("country_id").references(() => countryReference.id, { onDelete: 'cascade' }).notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("state_reference_name_idx").on(table.name),
+  codeIdx: index("state_reference_code_idx").on(table.code),
+  countryIdIdx: index("state_reference_country_id_idx").on(table.countryId),
+  sortOrderIdx: index("state_reference_sort_order_idx").on(table.sortOrder),
+  uniqueNamePerCountry: index("state_reference_unique_name_country").on(table.name, table.countryId),
+}));
+
+// City Reference - Standardized cities with state/country relationship
+export const cityReference = pgTable("city_reference", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  stateId: varchar("state_id").references(() => stateReference.id, { onDelete: 'cascade' }),
+  countryId: varchar("country_id").references(() => countryReference.id, { onDelete: 'cascade' }).notNull(),
+  sortOrder: integer("sort_order").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("city_reference_name_idx").on(table.name),
+  stateIdIdx: index("city_reference_state_id_idx").on(table.stateId),
+  countryIdIdx: index("city_reference_country_id_idx").on(table.countryId),
+  sortOrderIdx: index("city_reference_sort_order_idx").on(table.sortOrder),
+}));
+
 // Segments table (dynamic filters)
 export const segments = pgTable("segments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1929,6 +2027,41 @@ export const insertRevenueRangeReferenceSchema = createInsertSchema(revenueRange
   createdAt: true,
 });
 
+export const insertSeniorityLevelReferenceSchema = createInsertSchema(seniorityLevelReference).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertJobFunctionReferenceSchema = createInsertSchema(jobFunctionReference).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDepartmentReferenceSchema = createInsertSchema(departmentReference).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTechnologyReferenceSchema = createInsertSchema(technologyReference).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCountryReferenceSchema = createInsertSchema(countryReference).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertStateReferenceSchema = createInsertSchema(stateReference).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCityReferenceSchema = createInsertSchema(cityReference).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Inferred Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -2079,6 +2212,27 @@ export type InsertCompanySizeReference = z.infer<typeof insertCompanySizeReferen
 
 export type RevenueRangeReference = typeof revenueRangeReference.$inferSelect;
 export type InsertRevenueRangeReference = z.infer<typeof insertRevenueRangeReferenceSchema>;
+
+export type SeniorityLevelReference = typeof seniorityLevelReference.$inferSelect;
+export type InsertSeniorityLevelReference = z.infer<typeof insertSeniorityLevelReferenceSchema>;
+
+export type JobFunctionReference = typeof jobFunctionReference.$inferSelect;
+export type InsertJobFunctionReference = z.infer<typeof insertJobFunctionReferenceSchema>;
+
+export type DepartmentReference = typeof departmentReference.$inferSelect;
+export type InsertDepartmentReference = z.infer<typeof insertDepartmentReferenceSchema>;
+
+export type TechnologyReference = typeof technologyReference.$inferSelect;
+export type InsertTechnologyReference = z.infer<typeof insertTechnologyReferenceSchema>;
+
+export type CountryReference = typeof countryReference.$inferSelect;
+export type InsertCountryReference = z.infer<typeof insertCountryReferenceSchema>;
+
+export type StateReference = typeof stateReference.$inferSelect;
+export type InsertStateReference = z.infer<typeof insertStateReferenceSchema>;
+
+export type CityReference = typeof cityReference.$inferSelect;
+export type InsertCityReference = z.infer<typeof insertCityReferenceSchema>;
 
 // ============================================================================
 // CONTENT STUDIO & SOCIAL MEDIA MANAGEMENT

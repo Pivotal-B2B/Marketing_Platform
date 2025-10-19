@@ -5,6 +5,7 @@ import { comparePassword, generateToken, requireAuth, requireRole, hashPassword 
 import webhooksRouter from "./routes/webhooks";
 import dvRouter from "./routes/dv-routes";
 import queueRouter from "./routes/queue-routes";
+import filterOptionsRouter from "./routes/filter-options-routes";
 import { z } from "zod";
 import { db } from "./db";
 import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts } from "@shared/schema";
@@ -5018,4 +5019,8 @@ export function registerRoutes(app: Express) {
   // ==================== QUEUE MANAGEMENT ====================
 
   app.use("/api", queueRouter);
+
+  // ==================== FILTER OPTIONS ====================
+
+  app.use("/api/filters/options", filterOptionsRouter);
 }
