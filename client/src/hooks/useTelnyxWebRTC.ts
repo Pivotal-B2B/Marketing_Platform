@@ -42,22 +42,29 @@ export function useTelnyxWebRTC({
   // Initialize Telnyx client
   useEffect(() => {
     if (!sipUsername || !sipPassword) {
+      console.warn('WebRTC initialization skipped: Missing SIP credentials');
       return;
     }
+
+    let connectionTimeout: NodeJS.Timeout;
+    let telnyxClient: TelnyxRTC | null = null;
 
     try {
       // Extract just the username if full SIP URI is provided
       // Telnyx SDK expects ONLY the username, not username@domain
       const username = sipUsername.includes('@') ? sipUsername.split('@')[0] : sipUsername;
       
-      console.log('Telnyx WebRTC - Attempting connection with:', {
+      console.log('=== TELNYX WebRTC CONNECTION START ===');
+      console.log('Connection details:', {
         login: username,
         domain: sipDomain,
         hasPassword: !!sipPassword,
+        timestamp: new Date().toISOString(),
       });
       console.log('SDK version: 2.22.18-beta.2');
+      console.log('Network requirements: WebSocket (WSS), STUN (UDP), TURN (UDP/TCP)');
       
-      const telnyxClient = new TelnyxRTC({
+      telnyxClient = new TelnyxRTC({
         login: username,
         password: sipPassword,
         ringbackFile: undefined, // Use default ringback
@@ -67,9 +74,40 @@ export function useTelnyxWebRTC({
         // - TURN: turn.telnyx.com:3478
       });
 
+      // Set connection timeout (30 seconds)
+      connectionTimeout = setTimeout(() => {
+        console.error('=== TELNYX CONNECTION TIMEOUT ===');
+        console.error('Connection failed to establish within 30 seconds');
+        console.error('Possible causes:');
+        console.error('1. Network firewall blocking WebRTC (UDP ports for STUN/TURN)');
+        console.error('2. Invalid SIP credentials');
+        console.error('3. Telnyx service unavailable');
+        console.error('4. Cloud environment restricting WebRTC protocols');
+        console.error('=====================================');
+        
+        setIsConnected(false);
+        toast({
+          variant: "destructive",
+          title: "Connection Timeout",
+          description: "Unable to connect to calling service. WebRTC may be blocked by network policies.",
+          duration: 10000,
+        });
+        
+        if (telnyxClient) {
+          try {
+            telnyxClient.disconnect();
+          } catch (e) {
+            console.error('Error disconnecting after timeout:', e);
+          }
+        }
+      }, 30000);
+
       // Event listeners
       telnyxClient.on('telnyx.ready', () => {
-        console.log('Telnyx WebRTC client ready');
+        clearTimeout(connectionTimeout);
+        console.log('=== TELNYX CONNECTION SUCCESS ===');
+        console.log('WebRTC client ready at', new Date().toISOString());
+        console.log('==================================');
         setIsConnected(true);
         toast({
           title: "Connected",
@@ -174,21 +212,33 @@ export function useTelnyxWebRTC({
       });
 
       // Connect to Telnyx
+      console.log('Initiating WebRTC connection...');
       telnyxClient.connect().catch((error: any) => {
-        console.error('Telnyx connection failed:', error);
+        clearTimeout(connectionTimeout);
+        console.error('=== TELNYX CONNECTION ERROR ===');
+        console.error('Connection rejected:', error);
+        console.error('Error type:', typeof error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        console.error('================================');
         setIsConnected(false);
         toast({
           variant: "destructive",
           title: "Connection Failed",
-          description: error.message || "Failed to connect to Telnyx server",
+          description: error.message || "Failed to connect to Telnyx server. Check network and credentials.",
+          duration: 10000,
         });
       });
       
       setClient(telnyxClient);
 
       return () => {
+        clearTimeout(connectionTimeout);
         if (telnyxClient) {
-          telnyxClient.disconnect();
+          try {
+            telnyxClient.disconnect();
+          } catch (e) {
+            console.error('Error during cleanup disconnect:', e);
+          }
         }
         stopDurationTimer();
       };
