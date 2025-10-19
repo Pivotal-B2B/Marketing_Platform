@@ -79,7 +79,7 @@ export function useTelnyxWebRTC({
             urls: 'turns:turn.telnyx.com:5349', // TLS on port 5349
           }
         ]
-      });
+      } as any); // Type assertion: SDK types don't include WebRTC config options
 
       // Set connection timeout (30 seconds)
       connectionTimeout = setTimeout(() => {
