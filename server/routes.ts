@@ -786,6 +786,10 @@ export function registerRoutes(app: Express) {
 
       for (const { validated, originalIndex } of contactsToProcess) {
         const normalizedEmail = validated.email.toLowerCase().trim();
+        
+        // CRITICAL: Populate emailNormalized field for deduplication
+        validated.emailNormalized = normalizedEmail;
+        
         const existingContact = contactsByEmail.get(normalizedEmail);
 
         if (existingContact) {
@@ -926,6 +930,9 @@ export function registerRoutes(app: Express) {
     try {
       const contactData = insertContactSchema.parse(req.body);
 
+      // Normalize email for deduplication
+      contactData.emailNormalized = contactData.email.toLowerCase().trim();
+      
       // Normalize phone numbers
       if (contactData.directPhone) {
         const normalized = normalizePhoneE164(contactData.directPhone, contactData.country || undefined);
