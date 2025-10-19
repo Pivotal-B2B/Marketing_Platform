@@ -242,7 +242,7 @@ router.post(
           };
         }
 
-        // Only check active states - released/completed contacts can be reassigned
+        // Only check active states AND exclude current agent - released/completed contacts can be reassigned
         const activeStates = ['queued', 'locked', 'in_progress'] as const;
         
         const existingAssignments = await tx.select({
@@ -253,7 +253,8 @@ router.post(
           and(
             eq(agentQueue.campaignId, campaignId),
             inArray(agentQueue.contactId, contactIds),
-            inArray(agentQueue.queueState, activeStates)
+            inArray(agentQueue.queueState, activeStates),
+            sql`${agentQueue.agentId} != ${agent_id}`
           )
         );
 
