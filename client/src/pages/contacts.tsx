@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon, Link as LinkIcon, Building2 } from "lucide-react";
+import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon, Building2 } from "lucide-react";
 import { SidebarFilters } from "@/components/filters/sidebar-filters";
 import { FilterValues, type UserRole, convertFilterValuesToFilterGroup } from "@shared/filterConfig";
 import type { FilterGroup } from "@shared/filter-types";
@@ -59,7 +59,6 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 
 export default function ContactsPage() {
-  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -83,6 +82,7 @@ export default function ContactsPage() {
   const [selectAllPages, setSelectAllPages] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const ITEMS_PER_PAGE = 250;
 
@@ -224,26 +224,6 @@ export default function ContactsPage() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message,
-      });
-    },
-  });
-
-  const autoLinkMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest('POST', '/api/contacts/auto-link', {});
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
-      toast({
-        title: "Auto-Linking Complete",
-        description: `Linked ${data?.linked || 0} contacts to accounts. ${(data?.failed || 0) > 0 ? `${data.failed} failed.` : ''}`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Auto-Link Failed",
         description: error.message,
       });
     },
@@ -423,15 +403,6 @@ export default function ContactsPage() {
               </p>
             </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => autoLinkMutation.mutate()}
-            disabled={autoLinkMutation.isPending}
-            data-testid="button-auto-link-contacts"
-          >
-            <LinkIcon className="mr-2 h-4 w-4" />
-            {autoLinkMutation.isPending ? "Linking..." : "Auto-Link"}
-          </Button>
           <Button 
             variant="outline" 
             onClick={() => {
@@ -634,12 +605,10 @@ export default function ContactsPage() {
             data-testid="input-search-contacts"
           />
         </div>
-        {user?.role !== 'agent' && (
-          <Button variant="outline" data-testid="button-export">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-        )}
+        <Button variant="outline" data-testid="button-export">
+          <Download className="mr-2 h-4 w-4" />
+          Export
+        </Button>
       </div>
 
       {selectedCount > 0 && (
@@ -663,12 +632,10 @@ export default function ContactsPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {user?.role !== 'agent' && (
-                <Button variant="outline" size="sm" onClick={handleBulkExport}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                </Button>
-              )}
+              <Button variant="outline" size="sm" onClick={handleBulkExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setBulkUpdateDialogOpen(true)}>
                 Update
               </Button>
