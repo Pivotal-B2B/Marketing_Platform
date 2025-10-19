@@ -67,11 +67,7 @@ export function useTelnyxWebRTC({
       telnyxClient = new TelnyxRTC({
         login: username,
         password: sipPassword,
-        ringbackFile: undefined, // Use default ringback
-        // Note: Telnyx SDK automatically handles:
-        // - WebSocket: wss://sip.telnyx.com:7443
-        // - STUN: stun.telnyx.com:3478
-        // - TURN: turn.telnyx.com:3478
+        ringbackFile: undefined
       });
 
       // Set connection timeout (30 seconds)
@@ -209,6 +205,12 @@ export function useTelnyxWebRTC({
         setIsConnected(false);
         setActiveCall(null);
         updateCallState('idle');
+      });
+
+      telnyxClient.on('telnyx.socket.error', (error: any) => {
+        console.error('=== TELNYX SOCKET ERROR ===');
+        console.error('Socket error:', error);
+        console.error('===========================');
       });
 
       // Connect to Telnyx
