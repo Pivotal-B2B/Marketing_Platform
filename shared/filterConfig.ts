@@ -16,7 +16,15 @@ export type FilterField =
   | "industries" | "companySizes" | "companyRevenue" | "seniorityLevels"
   | "countries" | "states" | "cities"
   | "technologies" | "jobFunctions" | "departments"
-  | "accountOwners" | "createdDate" | "lastActivity" | "search";
+  | "accountOwners" | "createdDate" | "lastActivity" | "search"
+  // Campaign-related filters
+  | "campaignName" | "campaignType" | "campaignStatus" | "campaignOwner" | "dialMode"
+  // QA-related filters
+  | "qaStatus" | "qaReviewer" | "qaOutcome" | "reviewedDate"
+  // List/Segment-related filters
+  | "listName" | "segmentName" | "segmentOwner"
+  // Contact-specific filters
+  | "emailStatus" | "phoneStatus" | "verificationStatus" | "assignedAgent" | "contactSource";
 
 export interface FilterFieldConfig {
   type: FilterFieldType;
@@ -135,6 +143,128 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
     type: "date-range",
     label: "Last Activity",
     category: "Dates"
+  },
+  reviewedDate: {
+    type: "date-range",
+    label: "Reviewed Date",
+    category: "Dates"
+  },
+  
+  // Campaign-related filters
+  campaignName: {
+    type: "typeahead",
+    label: "Campaign Name",
+    source: "campaigns",
+    category: "Campaign"
+  },
+  campaignType: {
+    type: "multi",
+    label: "Campaign Type",
+    max: 3,
+    source: "campaign-types",
+    category: "Campaign"
+  },
+  campaignStatus: {
+    type: "multi",
+    label: "Campaign Status",
+    max: 6,
+    source: "campaign-status",
+    category: "Campaign"
+  },
+  campaignOwner: {
+    type: "multi",
+    label: "Campaign Owner",
+    max: 10,
+    source: "users",
+    category: "Campaign"
+  },
+  dialMode: {
+    type: "multi",
+    label: "Dial Mode",
+    max: 2,
+    source: "dial-modes",
+    category: "Campaign"
+  },
+  
+  // QA-related filters
+  qaStatus: {
+    type: "multi",
+    label: "QA Status",
+    max: 6,
+    source: "qa-status",
+    category: "QA & Verification"
+  },
+  qaReviewer: {
+    type: "multi",
+    label: "QA Reviewer",
+    max: 10,
+    source: "users",
+    category: "QA & Verification"
+  },
+  qaOutcome: {
+    type: "multi",
+    label: "QA Outcome",
+    max: 3,
+    source: "qa-outcomes",
+    category: "QA & Verification"
+  },
+  
+  // List/Segment-related filters
+  listName: {
+    type: "typeahead",
+    label: "List Name",
+    source: "lists",
+    category: "Lists & Segments"
+  },
+  segmentName: {
+    type: "typeahead",
+    label: "Segment Name",
+    source: "segments",
+    category: "Lists & Segments"
+  },
+  segmentOwner: {
+    type: "multi",
+    label: "Segment Owner",
+    max: 10,
+    source: "users",
+    category: "Lists & Segments"
+  },
+  
+  // Contact-specific filters
+  emailStatus: {
+    type: "multi",
+    label: "Email Status",
+    max: 4,
+    source: "email-verification-status",
+    category: "Verification"
+  },
+  phoneStatus: {
+    type: "multi",
+    label: "Phone Status",
+    max: 4,
+    source: "phone-status",
+    category: "Verification"
+  },
+  verificationStatus: {
+    type: "multi",
+    label: "Verification Status",
+    max: 4,
+    source: "email-verification-status",
+    category: "Verification"
+  },
+  assignedAgent: {
+    type: "multi",
+    label: "Assigned Agent",
+    max: 10,
+    source: "users",
+    category: "Ownership"
+  },
+  contactSource: {
+    type: "multi",
+    label: "Source",
+    max: 10,
+    source: "contact-sources",
+    category: "Contact Information"
   }
 } as const;
 
@@ -150,12 +280,18 @@ export const MODULE_FILTERS: Record<string, FilterField[]> = {
     "companySizes",
     "companyRevenue",
     "seniorityLevels",
+    "jobFunctions",
+    "departments",
     "countries",
     "states",
     "cities",
     "technologies",
-    "jobFunctions",
-    "departments",
+    "emailStatus",
+    "phoneStatus",
+    "verificationStatus",
+    "assignedAgent",
+    "contactSource",
+    "listName",
     "accountOwners",
     "lastActivity",
     "createdDate"
@@ -176,38 +312,57 @@ export const MODULE_FILTERS: Record<string, FilterField[]> = {
   ],
   qa: [
     "search",
+    "qaStatus",
+    "qaReviewer",
+    "qaOutcome",
+    "campaignName",
+    "campaignType",
     "accountOwners",
     "countries",
     "states",
     "cities",
+    "reviewedDate",
     "lastActivity",
     "createdDate"
   ],
   emailCampaigns: [
     "search",
+    "campaignStatus",
+    "campaignOwner",
     "industries",
     "companySizes",
     "seniorityLevels",
+    "jobFunctions",
     "countries",
     "states",
     "cities",
+    "listName",
+    "segmentName",
     "lastActivity",
     "createdDate"
   ],
   callCampaigns: [
     "search",
+    "campaignStatus",
+    "campaignType",
+    "campaignOwner",
+    "dialMode",
     "industries",
     "companySizes",
     "seniorityLevels",
+    "jobFunctions",
     "countries",
     "states",
     "cities",
+    "listName",
+    "segmentName",
     "accountOwners",
     "lastActivity",
     "createdDate"
   ],
   agentConsole: [
     "search",
+    "campaignName",
     "industries",
     "companySizes",
     "seniorityLevels",
@@ -265,6 +420,10 @@ export const FILTER_CATEGORIES = [
   "Company Information",
   "Contact Information",
   "Geography",
+  "Campaign",
+  "QA & Verification",
+  "Verification",
+  "Lists & Segments",
   "Ownership",
   "Dates"
 ] as const;
@@ -301,6 +460,27 @@ export interface FilterValues {
   accountOwners?: string[];
   createdDate?: { from?: string; to?: string };
   lastActivity?: { from?: string; to?: string };
+  reviewedDate?: { from?: string; to?: string };
+  // Campaign filters
+  campaignName?: string[];
+  campaignType?: string[];
+  campaignStatus?: string[];
+  campaignOwner?: string[];
+  dialMode?: string[];
+  // QA filters
+  qaStatus?: string[];
+  qaReviewer?: string[];
+  qaOutcome?: string[];
+  // List/Segment filters
+  listName?: string[];
+  segmentName?: string[];
+  segmentOwner?: string[];
+  // Contact filters
+  emailStatus?: string[];
+  phoneStatus?: string[];
+  verificationStatus?: string[];
+  assignedAgent?: string[];
+  contactSource?: string[];
 }
 
 /**

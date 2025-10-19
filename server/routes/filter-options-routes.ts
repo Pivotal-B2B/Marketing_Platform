@@ -21,9 +21,23 @@ import {
   countryReference,
   stateReference,
   cityReference,
-  users
+  users,
+  campaigns,
+  leads
 } from "@shared/schema";
 import { eq, ilike, inArray, and, desc, asc } from "drizzle-orm";
+import {
+  SENIORITY_LEVELS,
+  EMPLOYEE_SIZE_BANDS,
+  REVENUE_BANDS,
+  JOB_FUNCTIONS,
+  DEPARTMENTS,
+  CAMPAIGN_STATUS_VALUES,
+  CAMPAIGN_TYPE_VALUES,
+  QA_STATUS_VALUES,
+  EMAIL_VERIFICATION_STATUS,
+  DIAL_MODE_VALUES
+} from "@shared/referenceData";
 
 const router = Router();
 
@@ -150,29 +164,23 @@ router.get('/company-revenue', async (req: Request, res: Response) => {
 /**
  * GET /api/filters/options/seniority-levels
  * 
- * Fetch seniority level options with optional search
+ * Fetch seniority level options from standardized reference data
  */
 router.get('/seniority-levels', async (req: Request, res: Response) => {
   try {
     const { query = '' } = req.query;
     
-    let conditions = [eq(seniorityLevelReference.isActive, true)];
+    let results = [...SENIORITY_LEVELS];
     
+    // Filter by search query if provided
     if (query && typeof query === 'string' && query.trim()) {
-      conditions.push(ilike(seniorityLevelReference.name, `%${query.trim()}%`));
+      const searchTerm = query.trim().toLowerCase();
+      results = results.filter(item => 
+        item.name.toLowerCase().includes(searchTerm)
+      );
     }
     
-    const results = await db
-      .select({
-        id: seniorityLevelReference.id,
-        name: seniorityLevelReference.name,
-        description: seniorityLevelReference.description
-      })
-      .from(seniorityLevelReference)
-      .where(and(...conditions))
-      .orderBy(asc(seniorityLevelReference.sortOrder));
-    
-    const cacheMaxAge = query ? 300 : 900;
+    const cacheMaxAge = query ? 300 : 3600;
     res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
     
     res.json({ data: results });
@@ -481,8 +489,7 @@ router.get('/users', async (req: Request, res: Response) => {
     // Transform results to include full name
     const results = rawResults.map(user => ({
       id: user.id,
-      username: user.username,
-      fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username,
+      name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username,
       email: user.email
     }));
     
@@ -493,6 +500,267 @@ router.get('/users', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+/**
+ * GET /api/filters/options/campaign-types
+ * 
+ * Fetch campaign type options from standardized reference data
+ */
+router.get('/campaign-types', async (req: Request, res: Response) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ data: CAMPAIGN_TYPE_VALUES });
+  } catch (error) {
+    console.error('Error fetching campaign types:', error);
+    res.status(500).json({ error: 'Failed to fetch campaign types' });
+  }
+});
+
+/**
+ * GET /api/filters/options/campaign-status
+ * 
+ * Fetch campaign status options from standardized reference data
+ */
+router.get('/campaign-status', async (req: Request, res: Response) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ data: CAMPAIGN_STATUS_VALUES });
+  } catch (error) {
+    console.error('Error fetching campaign status:', error);
+    res.status(500).json({ error: 'Failed to fetch campaign status' });
+  }
+});
+
+/**
+ * GET /api/filters/options/dial-modes
+ * 
+ * Fetch dial mode options from standardized reference data
+ */
+router.get('/dial-modes', async (req: Request, res: Response) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ data: DIAL_MODE_VALUES });
+  } catch (error) {
+    console.error('Error fetching dial modes:', error);
+    res.status(500).json({ error: 'Failed to fetch dial modes' });
+  }
+});
+
+/**
+ * GET /api/filters/options/qa-status
+ * 
+ * Fetch QA status options from standardized reference data
+ */
+router.get('/qa-status', async (req: Request, res: Response) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ data: QA_STATUS_VALUES });
+  } catch (error) {
+    console.error('Error fetching QA status:', error);
+    res.status(500).json({ error: 'Failed to fetch QA status' });
+  }
+});
+
+/**
+ * GET /api/filters/options/qa-outcomes
+ * 
+ * Fetch QA outcome options (approved, rejected, returned)
+ */
+router.get('/qa-outcomes', async (req: Request, res: Response) => {
+  try {
+    const outcomes = [
+      { id: 'approved', name: 'Approved' },
+      { id: 'rejected', name: 'Rejected' },
+      { id: 'returned', name: 'Returned' }
+    ];
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ data: outcomes });
+  } catch (error) {
+    console.error('Error fetching QA outcomes:', error);
+    res.status(500).json({ error: 'Failed to fetch QA outcomes' });
+  }
+});
+
+/**
+ * GET /api/filters/options/email-verification-status
+ * 
+ * Fetch email verification status options from standardized reference data
+ */
+router.get('/email-verification-status', async (req: Request, res: Response) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ data: EMAIL_VERIFICATION_STATUS });
+  } catch (error) {
+    console.error('Error fetching email verification status:', error);
+    res.status(500).json({ error: 'Failed to fetch email verification status' });
+  }
+});
+
+/**
+ * GET /api/filters/options/phone-status
+ * 
+ * Fetch phone status options
+ */
+router.get('/phone-status', async (req: Request, res: Response) => {
+  try {
+    const statuses = [
+      { id: 'unknown', name: 'Unknown' },
+      { id: 'valid', name: 'Valid' },
+      { id: 'invalid', name: 'Invalid' },
+      { id: 'risky', name: 'Risky' }
+    ];
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ data: statuses });
+  } catch (error) {
+    console.error('Error fetching phone status:', error);
+    res.status(500).json({ error: 'Failed to fetch phone status' });
+  }
+});
+
+/**
+ * GET /api/filters/options/contact-sources
+ * 
+ * Fetch unique contact source values from actual data
+ */
+router.get('/contact-sources', async (req: Request, res: Response) => {
+  try {
+    const { sql } = await import('drizzle-orm');
+    
+    const sqlQuery = sql`
+      SELECT DISTINCT source_system as source
+      FROM contacts
+      WHERE source_system IS NOT NULL
+        AND source_system != ''
+      ORDER BY source_system ASC
+      LIMIT 100
+    `;
+    
+    const results = await db.execute<{ source: string }>(sqlQuery);
+    
+    const formatted = results.rows
+      .filter(r => r.source)
+      .map(r => ({ id: r.source, name: r.source }));
+    
+    res.set('Cache-Control', 'public, max-age=900');
+    res.json({ data: formatted });
+  } catch (error) {
+    console.error('Error fetching contact sources:', error);
+    res.status(500).json({ error: 'Failed to fetch contact sources' });
+  }
+});
+
+/**
+ * GET /api/filters/options/campaigns
+ * 
+ * Fetch campaign names for typeahead search
+ */
+router.get('/campaigns', async (req: Request, res: Response) => {
+  try {
+    const { query = '' } = req.query;
+    const { sql } = await import('drizzle-orm');
+    
+    let sqlQuery;
+    if (query && typeof query === 'string' && query.trim()) {
+      sqlQuery = sql`
+        SELECT id, name, campaign_type
+        FROM campaigns
+        WHERE name ILIKE ${`%${query.trim()}%`}
+        ORDER BY name ASC
+        LIMIT 50
+      `;
+    } else {
+      sqlQuery = sql`
+        SELECT id, name, campaign_type
+        FROM campaigns
+        ORDER BY name ASC
+        LIMIT 50
+      `;
+    }
+    
+    const results = await db.execute<{ id: string; name: string; campaign_type: string }>(sqlQuery);
+    
+    const formatted = results.rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      type: r.campaign_type
+    }));
+    
+    const cacheMaxAge = query ? 300 : 600;
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+    res.json({ data: formatted });
+  } catch (error) {
+    console.error('Error fetching campaigns:', error);
+    res.status(500).json({ error: 'Failed to fetch campaigns' });
+  }
+});
+
+/**
+ * GET /api/filters/options/lists
+ * 
+ * Fetch list names for typeahead search
+ */
+router.get('/lists', async (req: Request, res: Response) => {
+  try {
+    const { query = '' } = req.query;
+    const { sql } = await import('drizzle-orm');
+    
+    let sqlQuery;
+    if (query && typeof query === 'string' && query.trim()) {
+      sqlQuery = sql`
+        SELECT DISTINCT list
+        FROM contacts
+        WHERE list IS NOT NULL
+          AND list != ''
+          AND list ILIKE ${`%${query.trim()}%`}
+        ORDER BY list ASC
+        LIMIT 50
+      `;
+    } else {
+      sqlQuery = sql`
+        SELECT DISTINCT list
+        FROM contacts
+        WHERE list IS NOT NULL
+          AND list != ''
+        ORDER BY list ASC
+        LIMIT 50
+      `;
+    }
+    
+    const results = await db.execute<{ list: string }>(sqlQuery);
+    
+    const formatted = results.rows
+      .filter(r => r.list)
+      .map(r => ({ id: r.list, name: r.list }));
+    
+    const cacheMaxAge = query ? 300 : 600;
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+    res.json({ data: formatted });
+  } catch (error) {
+    console.error('Error fetching lists:', error);
+    res.status(500).json({ error: 'Failed to fetch lists' });
+  }
+});
+
+/**
+ * GET /api/filters/options/segments
+ * 
+ * Fetch segment names for typeahead search
+ */
+router.get('/segments', async (req: Request, res: Response) => {
+  try {
+    const { query = '' } = req.query;
+    
+    // Check if segments table exists
+    // For now, return empty array - this can be implemented when segments table is ready
+    const segments: any[] = [];
+    
+    res.set('Cache-Control', 'public, max-age=600');
+    res.json({ data: segments });
+  } catch (error) {
+    console.error('Error fetching segments:', error);
+    res.status(500).json({ error: 'Failed to fetch segments' });
   }
 });
 
