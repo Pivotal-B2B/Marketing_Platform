@@ -130,6 +130,7 @@ export default function AgentConsolePage() {
     isMuted,
     callDuration,
     lastError,
+    telnyxCallId,
     formatDuration,
     makeCall,
     hangup,
@@ -504,6 +505,7 @@ export default function AgentConsolePage() {
       notes,
       qualificationData: Object.keys(qualificationData).length > 0 ? qualificationData : null,
       callbackRequested: disposition === 'callback_requested',
+      telnyxCallId: telnyxCallId, // Include Telnyx call ID for recording lookup
     });
   };
 

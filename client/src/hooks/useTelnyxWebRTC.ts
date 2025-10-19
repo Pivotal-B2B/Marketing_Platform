@@ -35,6 +35,7 @@ export function useTelnyxWebRTC({
   const [isMuted, setIsMuted] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [lastError, setLastError] = useState<TelnyxErrorDetail | null>(null);
+  const [telnyxCallId, setTelnyxCallId] = useState<string | null>(null);
   const { toast } = useToast();
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -261,9 +262,17 @@ export function useTelnyxWebRTC({
         video: false,
         // Automatically attach to audio element with id 'remoteAudio'
         remoteElement: 'remoteAudio',
-      });
+        // Enable call recording (stored in Telnyx)
+        record: 'record-from-answer',
+      } as any); // Type assertion needed as SDK types may not include all parameters
 
       console.log('Call object created - ID:', call?.id, 'State:', call?.state);
+
+      // Capture the Telnyx call ID for recording lookup
+      if (call?.id) {
+        setTelnyxCallId(call.id);
+        console.log('Captured Telnyx Call ID:', call.id);
+      }
 
       setActiveCall(call);
       updateCallState('connecting');
@@ -374,6 +383,7 @@ export function useTelnyxWebRTC({
     isMuted,
     callDuration,
     lastError,
+    telnyxCallId,
     formatDuration,
     makeCall,
     hangup,
