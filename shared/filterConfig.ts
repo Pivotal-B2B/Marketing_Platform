@@ -525,6 +525,125 @@ export const FILTER_CATEGORIES = [
 ] as const;
 
 /**
+ * Filter Field to Database Column Mapping
+ * 
+ * Maps user-friendly filter field names to actual database column names.
+ * This allows the filter UI to use readable names while ensuring correct
+ * database queries.
+ * 
+ * Format: { filterFieldName: { tableName: 'actual_column_name' } }
+ */
+export const FILTER_TO_DB_MAPPING: Record<string, Record<string, string>> = {
+  // Company/Account fields
+  industries: {
+    accounts: 'industry_standardized',
+    contacts: 'industry_standardized' // via account join
+  },
+  companySizes: {
+    accounts: 'employees_size_range',
+    contacts: 'employees_size_range' // via account join
+  },
+  companyRevenue: {
+    accounts: 'annual_revenue',
+    contacts: 'annual_revenue' // via account join
+  },
+  technologies: {
+    accounts: 'tech_stack',
+    contacts: 'tech_stack' // via account join
+  },
+  departments: {
+    accounts: 'department', // Note: department doesn't exist on accounts table
+    contacts: 'department'
+  },
+  
+  // Contact fields
+  seniorityLevels: {
+    contacts: 'seniority_level'
+  },
+  jobFunctions: {
+    contacts: 'job_function' // Note: this field doesn't exist in current schema
+  },
+  
+  // Geography fields (different for accounts vs contacts)
+  countries: {
+    accounts: 'hq_country',
+    contacts: 'country'
+  },
+  states: {
+    accounts: 'hq_state',
+    contacts: 'state'
+  },
+  cities: {
+    accounts: 'hq_city',
+    contacts: 'city'
+  },
+  
+  // Ownership
+  accountOwners: {
+    accounts: 'owner_id',
+    contacts: 'owner_id' // can be contact owner or account owner via join
+  },
+  
+  // Contact verification
+  emailStatus: {
+    contacts: 'email_verification_status'
+  },
+  phoneStatus: {
+    contacts: 'phone_status'
+  },
+  verificationStatus: {
+    contacts: 'email_verification_status' // alias for emailStatus
+  },
+  
+  // Other contact fields
+  assignedAgent: {
+    contacts: 'owner_id' // assuming agent assignment uses owner_id
+  },
+  contactSource: {
+    contacts: 'source_system'
+  },
+  
+  // Date fields
+  createdDate: {
+    accounts: 'created_at',
+    contacts: 'created_at'
+  },
+  lastActivity: {
+    accounts: 'updated_at',
+    contacts: 'updated_at'
+  },
+  reviewedDate: {
+    contacts: 'reviewed_at' // assuming this field exists for QA
+  }
+} as const;
+
+/**
+ * Helper function to get database column name for a filter field
+ * 
+ * @param filterField - The filter field name (e.g., 'companySizes')
+ * @param table - The table name ('accounts' or 'contacts')
+ * @returns The actual database column name (e.g., 'employees_size_range')
+ */
+export function getDbColumnName(filterField: string, table: 'accounts' | 'contacts'): string {
+  const mapping = FILTER_TO_DB_MAPPING[filterField];
+  
+  if (!mapping) {
+    // No mapping exists - assume filter field name matches db column (convert to snake_case)
+    return filterField.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+  }
+  
+  const dbColumn = mapping[table];
+  
+  if (!dbColumn) {
+    // Fallback: try to use the first available mapping or convert to snake_case
+    const firstMapping = Object.values(mapping)[0];
+    return firstMapping || filterField.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+  }
+  
+  return dbColumn;
+}
+
+/**
  * Date Range Presets
  * 
  * Quick date range selection options
