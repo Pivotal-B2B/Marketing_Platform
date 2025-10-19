@@ -72,13 +72,29 @@ export function UnifiedFilterRow({
 
   // Handle adding a value (chip)
   const handleAddValue = (value: string) => {
-    if (!value.trim()) return;
-    if (condition.values.includes(value)) return; // Avoid duplicates
+    console.log('[UNIFIED_FILTER_ROW] handleAddValue called:', {
+      value,
+      trimmed: value.trim(),
+      currentValues: condition.values,
+      conditionId: condition.id
+    });
     
-    onChange({
+    if (!value.trim()) {
+      console.log('[UNIFIED_FILTER_ROW] Value is empty after trim, returning');
+      return;
+    }
+    if (condition.values.includes(value)) {
+      console.log('[UNIFIED_FILTER_ROW] Value already exists, returning');
+      return; // Avoid duplicates
+    }
+    
+    const newCondition = {
       ...condition,
       values: [...condition.values, value.trim()]
-    });
+    };
+    
+    console.log('[UNIFIED_FILTER_ROW] Calling onChange with:', newCondition);
+    onChange(newCondition);
     setInputValue("");
     setShowTypeAhead(false);
   };
@@ -93,7 +109,9 @@ export function UnifiedFilterRow({
 
   // Handle Enter key in input
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    console.log('[UNIFIED_FILTER_ROW] Key pressed:', e.key, 'inputValue:', inputValue);
     if (e.key === 'Enter') {
+      console.log('[UNIFIED_FILTER_ROW] Enter key detected, calling handleAddValue');
       e.preventDefault();
       handleAddValue(inputValue);
     }
