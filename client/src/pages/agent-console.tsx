@@ -529,14 +529,14 @@ export default function AgentConsolePage() {
         {/* LEFT SIDEBAR: Queue (18% width) */}
         <div className="w-[18%] border-r bg-[#f9fbfd] flex flex-col">
           <div className="p-4 border-b bg-[#ccabf7]">
-            <h2 className="font-semibold text-sm mb-3">Queue</h2>
+            <h2 className="font-semibold text-sm mb-3 text-white">Queue</h2>
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handlePreviousContact}
                 disabled={currentContactIndex === 0 || queueData.length === 0 || (callMadeToContact && !dispositionSaved)}
-                className="flex-1"
+                className="flex-1 bg-white/90 hover:bg-white border-white/50 text-purple-900"
                 data-testid="button-previous-contact"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -550,7 +550,7 @@ export default function AgentConsolePage() {
                   queueData.length === 0 ||
                   (callMadeToContact && !dispositionSaved)
                 }
-                className="flex-1"
+                className="flex-1 bg-white/90 hover:bg-white border-white/50 text-purple-900"
                 data-testid="button-next-contact"
               >
                 <ChevronRight className="h-4 w-4" />
