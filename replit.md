@@ -20,6 +20,7 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Design System:** Comprehensive design system upgrade with accessible, high-performance pattern components incorporating design tokens.
 - **Advanced Filtering:** `AdvancedFilterBar` component with multi-operator support and filter chips.
 - **View Toggle System:** Dual-view architecture for Accounts (Cards/Table) with seamless state preservation.
+- **Navigation Pattern:** Enterprise-standard layout with core business features (CRM, Campaigns, Analytics, Content, DV Projects) in left sidebar, and administrative settings (Infrastructure, Organization) in top-right Settings dropdown menu (admin-only).
 
 **Technical Implementations & Features:**
 - **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
