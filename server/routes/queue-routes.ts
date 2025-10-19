@@ -32,6 +32,7 @@ const queueSetSchema = z.object({
   max_queue_size: z.number().int().positive().optional().nullable(),
   keep_in_progress: z.boolean().optional().default(false),
   dry_run: z.boolean().optional().default(false),
+  allow_sharing: z.boolean().optional().default(false), // Allow multiple agents to queue same contacts
 });
 
 // Schema for queue clear request
@@ -86,6 +87,7 @@ router.post(
         max_queue_size = null,
         keep_in_progress = true,
         dry_run = false,
+        allow_sharing = false,
       } = validation.data;
 
       // RBAC: Agents can only manage their own queue, Managers/Admins can manage any agent's queue
@@ -334,30 +336,39 @@ router.post(
           };
         }
 
-        // Only check active states from OTHER agents - released/completed contacts can be reassigned
-        const activeStates: Array<'queued' | 'locked' | 'in_progress'> = ['queued', 'locked', 'in_progress'];
-        
-        const existingAssignments = await tx.select({
-          contactId: agentQueue.contactId,
-        })
-        .from(agentQueue)
-        .where(
-          and(
-            eq(agentQueue.campaignId, campaignId),
-            inArray(agentQueue.contactId, contactIds),
-            inArray(agentQueue.queueState, activeStates),
-            sql`${agentQueue.agentId} != ${agent_id}`
-          )
-        );
+        let availableContacts = eligibleContacts;
+        let skipped = 0;
 
-        console.log('[queues:set] Existing assignments in campaign (other agents):', existingAssignments.length);
+        // Collision prevention (only if sharing is disabled)
+        if (!allow_sharing) {
+          console.log('[queues:set] Collision prevention enabled - checking for conflicts');
+          // Only check active states from OTHER agents - released/completed contacts can be reassigned
+          const activeStates: Array<'queued' | 'locked' | 'in_progress'> = ['queued', 'locked', 'in_progress'];
+          
+          const existingAssignments = await tx.select({
+            contactId: agentQueue.contactId,
+          })
+          .from(agentQueue)
+          .where(
+            and(
+              eq(agentQueue.campaignId, campaignId),
+              inArray(agentQueue.contactId, contactIds),
+              inArray(agentQueue.queueState, activeStates),
+              sql`${agentQueue.agentId} != ${agent_id}`
+            )
+          );
 
-        const assignedContactIds = new Set(existingAssignments.map(a => a.contactId));
-        const availableContacts = eligibleContacts.filter(c => !assignedContactIds.has(c.id));
-        const skipped = contactIds.length - availableContacts.length;
+          console.log('[queues:set] Existing assignments in campaign (other agents):', existingAssignments.length);
 
-        console.log('[queues:set] Available contacts after collision check:', availableContacts.length);
-        console.log('[queues:set] Skipped due to collision:', skipped);
+          const assignedContactIds = new Set(existingAssignments.map(a => a.contactId));
+          availableContacts = eligibleContacts.filter(c => !assignedContactIds.has(c.id));
+          skipped = contactIds.length - availableContacts.length;
+
+          console.log('[queues:set] Available contacts after collision check:', availableContacts.length);
+          console.log('[queues:set] Skipped due to collision:', skipped);
+        } else {
+          console.log('[queues:set] Contact sharing enabled - allowing duplicates across agents');
+        }
 
         // Step 5: Delete existing entries for this agent + contacts (to avoid unique constraint violation)
         if (availableContacts.length > 0) {

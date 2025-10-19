@@ -95,6 +95,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
           per_account_cap: null,
           max_queue_size: maxQueueSize || null,
           keep_in_progress: true,
+          allow_sharing: true, // Allow multiple agents to queue the same contacts
         }
       );
       return response.json();
