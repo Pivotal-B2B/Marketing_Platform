@@ -655,23 +655,34 @@ export function csvRowToAccount(
     data[header] = row[index] || "";
   });
 
+  // Helper to get value from multiple possible column names
+  const getValue = (...keys: string[]) => {
+    for (const key of keys) {
+      if (data[key]) return data[key];
+    }
+    return undefined;
+  };
+
   const account: any = {
-    name: data.name,
-    domain: data.domain || undefined,
-    industryStandardized: data.industryStandardized || undefined,
-    employeesSizeRange: data.employeesSizeRange || undefined,
-    annualRevenue: data.annualRevenue || undefined,
-    hqStreet1: data.hqStreet1 || undefined,
-    hqStreet2: data.hqStreet2 || undefined,
-    hqStreet3: data.hqStreet3 || undefined,
-    hqCity: data.hqCity || undefined,
-    hqState: data.hqState || undefined,
-    hqPostalCode: data.hqPostalCode || undefined,
-    hqCountry: data.hqCountry || undefined,
-    companyLocation: data.companyLocation || undefined,
-    mainPhone: formatPhoneNumber(data.mainPhone, data.hqCountry), // Format with country
-    linkedinUrl: data.linkedinUrl || undefined,
-    description: data.description || undefined,
+    name: getValue('name', 'Name'),
+    domain: getValue('domain', 'Website', 'website'),
+    industryStandardized: getValue('industryStandardized', 'Industry', 'industry'),
+    employeesSizeRange: getValue('employeesSizeRange', 'Employee Size', 'employee_size', 'employees'),
+    annualRevenue: getValue('annualRevenue', 'Annual Revenue', 'revenue'),
+    hqStreet1: getValue('hqStreet1', 'HQ Street Address 1', 'street1', 'address1'),
+    hqStreet2: getValue('hqStreet2', 'HQ Street Address 2', 'street2', 'address2'),
+    hqStreet3: getValue('hqStreet3', 'HQ Street Address 3', 'street3', 'address3'),
+    hqCity: getValue('hqCity', 'HQ City', 'city'),
+    hqState: getValue('hqState', 'HQ State', 'state'),
+    hqPostalCode: getValue('hqPostalCode', 'HQ Postal Code', 'postal_code', 'zip'),
+    hqCountry: getValue('hqCountry', 'HQ Country', 'country'),
+    companyLocation: getValue('companyLocation', 'Full Address String', 'full_address'),
+    mainPhone: formatPhoneNumber(getValue('mainPhone', 'Main HQ Phone', 'phone', 'main_phone') || '', getValue('hqCountry', 'HQ Country', 'country')),
+    linkedinUrl: getValue('linkedinUrl', 'LinkedIn URL', 'linkedin'),
+    description: getValue('description', 'Description'),
+    yearFounded: getValue('yearFounded', 'Year Founded', 'year_founded') ? parseInt(getValue('yearFounded', 'Year Founded', 'year_founded')!) : undefined,
+    sicCode: getValue('sicCode', 'SIC Code', 'sic'),
+    naicsCode: getValue('naicsCode', 'NAICS Code', 'naics'),
   };
 
   // Parse tech stack
