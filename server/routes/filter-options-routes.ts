@@ -764,4 +764,243 @@ router.get('/segments', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/filters/options/job-titles
+ * 
+ * Fetch unique job title values from actual contact data
+ */
+router.get('/job-titles', async (req: Request, res: Response) => {
+  try {
+    const { query = '' } = req.query;
+    const { sql } = await import('drizzle-orm');
+    
+    let sqlQuery;
+    if (query && typeof query === 'string' && query.trim()) {
+      sqlQuery = sql`
+        SELECT DISTINCT job_title as title
+        FROM contacts
+        WHERE job_title IS NOT NULL
+          AND job_title != ''
+          AND job_title ILIKE ${`%${query.trim()}%`}
+        ORDER BY job_title ASC
+        LIMIT 100
+      `;
+    } else {
+      sqlQuery = sql`
+        SELECT DISTINCT job_title as title
+        FROM contacts
+        WHERE job_title IS NOT NULL
+          AND job_title != ''
+        ORDER BY job_title ASC
+        LIMIT 100
+      `;
+    }
+    
+    const results = await db.execute<{ title: string }>(sqlQuery);
+    
+    const formatted = results.rows
+      .filter(r => r.title)
+      .map(r => ({ id: r.title, name: r.title }));
+    
+    const cacheMaxAge = query ? 300 : 900;
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+    res.json({ data: formatted });
+  } catch (error) {
+    console.error('Error fetching job titles:', error);
+    res.status(500).json({ error: 'Failed to fetch job titles' });
+  }
+});
+
+/**
+ * GET /api/filters/options/contact-tags
+ * 
+ * Fetch unique contact tag values from actual contact data (unnest array field)
+ */
+router.get('/contact-tags', async (req: Request, res: Response) => {
+  try {
+    const { query = '' } = req.query;
+    const { sql } = await import('drizzle-orm');
+    
+    let sqlQuery;
+    if (query && typeof query === 'string' && query.trim()) {
+      sqlQuery = sql`
+        SELECT DISTINCT t.tag
+        FROM contacts
+        CROSS JOIN LATERAL unnest(tags) AS t(tag)
+        WHERE tags IS NOT NULL
+          AND array_length(tags, 1) > 0
+          AND t.tag ILIKE ${`%${query.trim()}%`}
+        ORDER BY t.tag ASC
+        LIMIT 100
+      `;
+    } else {
+      sqlQuery = sql`
+        SELECT DISTINCT t.tag
+        FROM contacts
+        CROSS JOIN LATERAL unnest(tags) AS t(tag)
+        WHERE tags IS NOT NULL
+          AND array_length(tags, 1) > 0
+        ORDER BY t.tag ASC
+        LIMIT 100
+      `;
+    }
+    
+    const results = await db.execute<{ tag: string }>(sqlQuery);
+    
+    const formatted = results.rows
+      .filter(r => r.tag)
+      .map(r => ({ id: r.tag, name: r.tag }));
+    
+    const cacheMaxAge = query ? 300 : 900;
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+    res.json({ data: formatted });
+  } catch (error) {
+    console.error('Error fetching contact tags:', error);
+    res.status(500).json({ error: 'Failed to fetch contact tags' });
+  }
+});
+
+/**
+ * GET /api/filters/options/account-tags
+ * 
+ * Fetch unique account tag values from actual account data (unnest array field)
+ */
+router.get('/account-tags', async (req: Request, res: Response) => {
+  try {
+    const { query = '' } = req.query;
+    const { sql } = await import('drizzle-orm');
+    
+    let sqlQuery;
+    if (query && typeof query === 'string' && query.trim()) {
+      sqlQuery = sql`
+        SELECT DISTINCT t.tag
+        FROM accounts
+        CROSS JOIN LATERAL unnest(tags) AS t(tag)
+        WHERE tags IS NOT NULL
+          AND array_length(tags, 1) > 0
+          AND t.tag ILIKE ${`%${query.trim()}%`}
+        ORDER BY t.tag ASC
+        LIMIT 100
+      `;
+    } else {
+      sqlQuery = sql`
+        SELECT DISTINCT t.tag
+        FROM accounts
+        CROSS JOIN LATERAL unnest(tags) AS t(tag)
+        WHERE tags IS NOT NULL
+          AND array_length(tags, 1) > 0
+        ORDER BY t.tag ASC
+        LIMIT 100
+      `;
+    }
+    
+    const results = await db.execute<{ tag: string }>(sqlQuery);
+    
+    const formatted = results.rows
+      .filter(r => r.tag)
+      .map(r => ({ id: r.tag, name: r.tag }));
+    
+    const cacheMaxAge = query ? 300 : 900;
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+    res.json({ data: formatted });
+  } catch (error) {
+    console.error('Error fetching account tags:', error);
+    res.status(500).json({ error: 'Failed to fetch account tags' });
+  }
+});
+
+/**
+ * GET /api/filters/options/consent-basis
+ * 
+ * Fetch unique consent basis values from actual contact data
+ */
+router.get('/consent-basis', async (req: Request, res: Response) => {
+  try {
+    const { query = '' } = req.query;
+    const { sql } = await import('drizzle-orm');
+    
+    let sqlQuery;
+    if (query && typeof query === 'string' && query.trim()) {
+      sqlQuery = sql`
+        SELECT DISTINCT consent_basis as basis
+        FROM contacts
+        WHERE consent_basis IS NOT NULL
+          AND consent_basis != ''
+          AND consent_basis ILIKE ${`%${query.trim()}%`}
+        ORDER BY consent_basis ASC
+        LIMIT 50
+      `;
+    } else {
+      sqlQuery = sql`
+        SELECT DISTINCT consent_basis as basis
+        FROM contacts
+        WHERE consent_basis IS NOT NULL
+          AND consent_basis != ''
+        ORDER BY consent_basis ASC
+        LIMIT 50
+      `;
+    }
+    
+    const results = await db.execute<{ basis: string }>(sqlQuery);
+    
+    const formatted = results.rows
+      .filter(r => r.basis)
+      .map(r => ({ id: r.basis, name: r.basis }));
+    
+    const cacheMaxAge = query ? 300 : 900;
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+    res.json({ data: formatted });
+  } catch (error) {
+    console.error('Error fetching consent basis:', error);
+    res.status(500).json({ error: 'Failed to fetch consent basis' });
+  }
+});
+
+/**
+ * GET /api/filters/options/consent-source
+ * 
+ * Fetch unique consent source values from actual contact data
+ */
+router.get('/consent-source', async (req: Request, res: Response) => {
+  try {
+    const { query = '' } = req.query;
+    const { sql } = await import('drizzle-orm');
+    
+    let sqlQuery;
+    if (query && typeof query === 'string' && query.trim()) {
+      sqlQuery = sql`
+        SELECT DISTINCT consent_source as source
+        FROM contacts
+        WHERE consent_source IS NOT NULL
+          AND consent_source != ''
+          AND consent_source ILIKE ${`%${query.trim()}%`}
+        ORDER BY consent_source ASC
+        LIMIT 50
+      `;
+    } else {
+      sqlQuery = sql`
+        SELECT DISTINCT consent_source as source
+        FROM contacts
+        WHERE consent_source IS NOT NULL
+          AND consent_source != ''
+        ORDER BY consent_source ASC
+        LIMIT 50
+      `;
+    }
+    
+    const results = await db.execute<{ source: string }>(sqlQuery);
+    
+    const formatted = results.rows
+      .filter(r => r.source)
+      .map(r => ({ id: r.source, name: r.source }));
+    
+    const cacheMaxAge = query ? 300 : 900;
+    res.set('Cache-Control', `public, max-age=${cacheMaxAge}`);
+    res.json({ data: formatted });
+  } catch (error) {
+    console.error('Error fetching consent source:', error);
+    res.status(500).json({ error: 'Failed to fetch consent source' });
+  }
+});
+
 export default router;
