@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Mail, Phone, Upload, Trash2, Loader2 } from "lucide-react";
+import { Plus, Search, Mail, Phone, Upload, Trash2, Loader2, RefreshCw, TrendingUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Table,
@@ -50,29 +51,62 @@ export default function SuppressionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [phoneDialogOpen, setPhoneDialogOpen] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
   
   // Check if user has permission to manage suppressions
-  const canManageSuppressions = user?.role === 'admin' || user?.role === 'data_ops';
+  const userRoles = (user as any)?.roles || [user?.role];
+  const canManageSuppressions = userRoles.includes('admin') || userRoles.includes('data_ops');
 
-  // Fetch email suppressions
-  const { data: emailSuppressions = [], isLoading: emailLoading } = useQuery<SuppressionEmail[]>({
+  // Fetch email suppressions with auto-refresh
+  const { data: emailSuppressions = [], isLoading: emailLoading, isFetching: emailFetching, refetch: refetchEmails } = useQuery<SuppressionEmail[]>({
     queryKey: ['/api/suppressions/email'],
+    refetchInterval: autoRefresh ? 30000 : false, // Auto-refresh every 30 seconds
   });
 
-  // Fetch phone suppressions
-  const { data: phoneSuppressions = [], isLoading: phoneLoading } = useQuery<SuppressionPhone[]>({
+  // Fetch phone suppressions with auto-refresh
+  const { data: phoneSuppressions = [], isLoading: phoneLoading, isFetching: phoneFetching, refetch: refetchPhones } = useQuery<SuppressionPhone[]>({
     queryKey: ['/api/suppressions/phone'],
+    refetchInterval: autoRefresh ? 30000 : false, // Auto-refresh every 30 seconds
   });
+
+  // Calculate statistics
+  const emailStats = {
+    total: emailSuppressions.length,
+    today: emailSuppressions.filter(s => {
+      const today = new Date();
+      const created = new Date(s.createdAt);
+      return created.toDateString() === today.toDateString();
+    }).length,
+    thisWeek: emailSuppressions.filter(s => {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return new Date(s.createdAt) >= weekAgo;
+    }).length,
+  };
+
+  const phoneStats = {
+    total: phoneSuppressions.length,
+    today: phoneSuppressions.filter(s => {
+      const today = new Date();
+      const created = new Date(s.createdAt);
+      return created.toDateString() === today.toDateString();
+    }).length,
+    thisWeek: phoneSuppressions.filter(s => {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return new Date(s.createdAt) >= weekAgo;
+    }).length,
+  };
 
   // Email suppression form
   const emailForm = useForm<InsertSuppressionEmail>({
     resolver: zodResolver(insertSuppressionEmailSchema),
     defaultValues: {
       email: "",
-      reason: "",
-      source: "",
+      reason: undefined,
+      source: undefined,
     },
   });
 
@@ -81,8 +115,8 @@ export default function SuppressionsPage() {
     resolver: zodResolver(insertSuppressionPhoneSchema),
     defaultValues: {
       phoneE164: "",
-      reason: "",
-      source: "",
+      reason: undefined,
+      source: undefined,
     },
   });
 
@@ -182,15 +216,87 @@ export default function SuppressionsPage() {
     s.phoneE164.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Manual refresh
+  const handleRefresh = () => {
+    refetchEmails();
+    refetchPhones();
+    toast({
+      title: "Refreshed",
+      description: "Suppression lists updated",
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold" data-testid="heading-suppressions">Suppressions</h1>
+          <h1 className="text-3xl font-bold" data-testid="heading-suppressions">Global DNC & Unsubscribe Management</h1>
           <p className="text-muted-foreground mt-1">
-            Manage DNC lists and email unsubscribes for compliance
+            Real-time tracking and management of DNC lists and email unsubscribes for compliance
           </p>
         </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            data-testid="button-toggle-auto-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+            Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={emailFetching || phoneFetching}
+            data-testid="button-manual-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${emailFetching || phoneFetching ? 'animate-spin' : ''}`} />
+            Refresh Now
+          </Button>
+        </div>
+      </div>
+
+      {/* Real-time Statistics Dashboard */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Email Suppressions</CardTitle>
+            <Mail className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="stat-email-total">{emailStats.total}</div>
+            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <TrendingUp className="h-3 w-3 text-green-500" />
+                <span data-testid="stat-email-today">{emailStats.today} today</span>
+              </div>
+              <div>
+                <span data-testid="stat-email-week">{emailStats.thisWeek} this week</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Phone DNC List</CardTitle>
+            <Phone className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="stat-phone-total">{phoneStats.total}</div>
+            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <TrendingUp className="h-3 w-3 text-green-500" />
+                <span data-testid="stat-phone-today">{phoneStats.today} today</span>
+              </div>
+              <div>
+                <span data-testid="stat-phone-week">{phoneStats.thisWeek} this week</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="email" className="w-full">
