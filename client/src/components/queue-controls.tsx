@@ -27,6 +27,7 @@ interface QueueControlsProps {
   campaignId: string;
   agentId?: string;
   onQueueUpdated?: () => void;
+  compact?: boolean; // Compact mode for header
 }
 
 interface QueueStats {
@@ -37,7 +38,7 @@ interface QueueStats {
   released: number;
 }
 
-export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueControlsProps) {
+export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = false }: QueueControlsProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -170,6 +171,186 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated }: QueueCont
 
   const isPending = replaceQueueMutation.isPending || clearQueueMutation.isPending || clearAllQueuesMutation.isPending;
 
+  // Compact mode for header
+  if (compact) {
+    return (
+      <>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setShowReplaceDialog(true)}
+            disabled={isPending || !campaignId}
+            size="sm"
+            variant="outline"
+            className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+            data-testid="button-replace-queue"
+            title="Set Queue - Replace your current queue with contacts matching filters"
+          >
+            <Replace className="h-3 w-3 mr-1.5" />
+            Set Queue
+          </Button>
+
+          <Button
+            onClick={() => setShowClearDialog(true)}
+            disabled={isPending || !campaignId}
+            size="sm"
+            variant="outline"
+            className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+            data-testid="button-clear-queue"
+          >
+            <Trash2 className="h-3 w-3 mr-1.5" />
+            Clear Queue
+          </Button>
+
+          {isAdminOrManager && (
+            <Button
+              onClick={() => setShowClearAllDialog(true)}
+              disabled={isPending || !campaignId}
+              size="sm"
+              variant="outline"
+              className="bg-destructive/80 text-white border-white/20 hover:bg-destructive"
+              data-testid="button-clear-all-queues"
+            >
+              <Trash2 className="h-3 w-3 mr-1.5" />
+              Clear All
+            </Button>
+          )}
+          
+          {isLoadingStats ? (
+            <Loader2 className="h-4 w-4 animate-spin text-white ml-2" data-testid="loader-queue-stats" />
+          ) : stats && (
+            <Badge variant="secondary" className="bg-white/10 text-white border-white/20 ml-2" data-testid="badge-queued">
+              {stats.queued} in queue
+            </Badge>
+          )}
+        </div>
+        
+        {/* Dialogs remain the same */}
+        {/* Replace Queue Dialog */}
+        <AlertDialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
+          <AlertDialogContent className="max-w-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Set Queue (Replace)</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will clear your current queue and assign new contacts based on the filters below.
+                If no filters are applied, all available campaign contacts will be queued.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Filter Contacts (optional)</Label>
+                <FilterBuilder
+                  entityType="contact"
+                  onApplyFilter={(filter) => setFilterGroup(filter)}
+                  initialFilter={filterGroup}
+                  includeRelatedEntities={true}
+                />
+              </div>
+
+              {filterGroup && filterGroup.conditions.length > 0 && (
+                <div className="border rounded-lg p-3 bg-muted/50">
+                  <div className="text-sm font-medium mb-2">Active Filters:</div>
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">
+                      Match <Badge variant="outline">{filterGroup.logic}</Badge> of {filterGroup.conditions.length} condition{filterGroup.conditions.length !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label htmlFor="maxQueueSize">Max Queue Size</Label>
+                <Input
+                  id="maxQueueSize"
+                  type="number"
+                  min="1"
+                  placeholder="300 (recommended daily limit)"
+                  value={maxQueueSize}
+                  onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : 300)}
+                  data-testid="input-max-queue-size"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Default: 300 contacts (typical daily call capacity per agent)
+                </p>
+              </div>
+
+              <div className="bg-muted p-3 rounded-md flex items-start gap-2">
+                <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-muted-foreground">
+                  Contacts already assigned to other agents will be skipped to prevent collisions.
+                  Remaining matches can be assigned to other agents. Items in progress are preserved automatically.
+                </p>
+              </div>
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isPending} data-testid="button-cancel-replace">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => replaceQueueMutation.mutate()}
+                disabled={isPending}
+                data-testid="button-confirm-replace"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Replace Queue
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Clear My Queue Dialog */}
+        <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear My Queue</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will release all queued and locked items from your queue. Items currently in progress will not be affected.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isPending} data-testid="button-cancel-clear">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => clearQueueMutation.mutate()}
+                disabled={isPending}
+                data-testid="button-confirm-clear"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Clear Queue
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Clear All Queues Dialog (Admin Only) */}
+        <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear All Queues (Admin)</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will release all queued and locked items from ALL agent queues in this campaign. 
+                This action affects all agents and cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isPending} data-testid="button-cancel-clear-all">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => clearAllQueuesMutation.mutate()}
+                disabled={isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-clear-all"
+              >
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Clear All Queues
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
+  }
+
+  // Full Card mode for sidebar/dedicated section
   return (
     <Card>
       <CardHeader>

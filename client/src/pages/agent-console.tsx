@@ -436,12 +436,21 @@ export default function AgentConsolePage() {
       {/* TOP FIXED HEADER */}
       <div className="h-20 border-b shadow-sm" style={{ background: 'linear-gradient(to right, #0a2540, #1a4d7a, #2f6feb)' }}>
         <div className="h-full px-6 flex items-center justify-between">
-          {/* Left: Queue Management & Title */}
+          {/* Left: Title & Queue Management */}
           <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-white font-semibold text-lg" data-testid="text-page-title">Agent Console</h1>
+              <p className="text-white/70 text-xs">
+                {campaignDetails?.name || 'Select a campaign'}
+              </p>
+            </div>
+            
             {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
               <>
+                <Separator orientation="vertical" className="h-8 bg-white/20" />
                 <QueueControls 
-                  campaignId={selectedCampaignId} 
+                  campaignId={selectedCampaignId}
+                  compact={true}
                   onQueueUpdated={() => {
                     refetchQueue();
                     toast({
@@ -450,15 +459,8 @@ export default function AgentConsolePage() {
                     });
                   }}
                 />
-                <Separator orientation="vertical" className="h-8 bg-white/20" />
               </>
             )}
-            <div>
-              <h1 className="text-white font-semibold text-lg" data-testid="text-page-title">Agent Console</h1>
-              <p className="text-white/70 text-xs">
-                {campaignDetails?.name || 'Select a campaign'}
-              </p>
-            </div>
           </div>
 
           {/* Center: Queue Progress */}
