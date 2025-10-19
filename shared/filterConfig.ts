@@ -5,12 +5,53 @@
  * selection caps, and RBAC rules across all modules.
  */
 
+/**
+ * Filter Operators for Advanced Filtering
+ * 
+ * Text/Taxonomy fields (Industries, Job Titles, Seniority):
+ *  - INCLUDES_ANY: Records having any of the selected values (OR)
+ *  - INCLUDES_ALL: Records having all selected values (AND)
+ *  - EXCLUDES_ANY: Records not having any of the selected values (NOT IN)
+ *  - CONTAINS: Free-text substring match (case-insensitive)
+ *  - NOT_CONTAINS: Free-text substring negative match
+ * 
+ * Categorical Bucket fields (Company Size, Revenue, Tenure):
+ *  - INCLUDES_ANY, INCLUDES_ALL, EXCLUDES_ANY only
+ */
+export type Operator =
+  | "INCLUDES_ANY"
+  | "INCLUDES_ALL"
+  | "EXCLUDES_ANY"
+  | "CONTAINS"
+  | "NOT_CONTAINS";
+
+/**
+ * Field Rule - Represents a single filter condition with an operator
+ * 
+ * Multiple rules can be applied to the same field, combined with AND logic
+ */
+export interface FieldRule {
+  operator: Operator;
+  values?: string[];   // Template-locked chips (required for INCLUDE/EXCLUDE ops)
+  query?: string;      // Free-text for CONTAINS/NOT_CONTAINS
+}
+
 export type FilterFieldType = 
   | "multi"       // Multi-select dropdown with DB-backed options
   | "typeahead"   // Async type-ahead with search
   | "date-range"  // Date range picker with presets
   | "text"        // Text input
   | "number";     // Number input
+
+/**
+ * Operator Support by Field Type
+ * 
+ * Determines which operators are available for each field type
+ */
+export type OperatorSupport =
+  | "text-taxonomy"   // Industries, Job Titles, Seniority (all 5 operators)
+  | "categorical"     // Company Size, Revenue, Tenure (include/exclude only)
+  | "none";           // Date ranges, text search (no operators)
 
 export type FilterField =
   | "industries" | "companySizes" | "companyRevenue" | "seniorityLevels"
@@ -34,6 +75,7 @@ export interface FilterFieldConfig {
   parents?: FilterField[]; // Parent fields for scoped filtering (e.g., Country → State → City)
   placeholder?: string;   // Placeholder text
   category?: string;      // Category for grouping in UI
+  operatorSupport?: OperatorSupport; // Which operators this field supports
 }
 
 /**
@@ -56,49 +98,56 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
     label: "Industries",
     max: 10,
     source: "industries",
-    category: "Company Information"
+    category: "Company Information",
+    operatorSupport: "text-taxonomy"  // Supports all 5 operators
   },
   companySizes: {
     type: "multi",
     label: "Company Size",
     max: 10,
     source: "company-sizes",
-    category: "Company Information"
+    category: "Company Information",
+    operatorSupport: "categorical"  // Include/exclude only
   },
   companyRevenue: {
     type: "multi",
     label: "Company Revenue",
     max: 10,
     source: "company-revenue",
-    category: "Company Information"
+    category: "Company Information",
+    operatorSupport: "categorical"  // Include/exclude only
   },
   seniorityLevels: {
     type: "multi",
     label: "Seniority Level",
     max: 10,
     source: "seniority-levels",
-    category: "Contact Information"
+    category: "Contact Information",
+    operatorSupport: "text-taxonomy"  // Supports all 5 operators
   },
   technologies: {
     type: "multi",
     label: "Technologies",
     max: 10,
     source: "technologies",
-    category: "Company Information"
+    category: "Company Information",
+    operatorSupport: "text-taxonomy"  // Supports all 5 operators
   },
   jobFunctions: {
     type: "multi",
     label: "Job Function",
     max: 10,
     source: "job-functions",
-    category: "Contact Information"
+    category: "Contact Information",
+    operatorSupport: "text-taxonomy"  // Supports all 5 operators
   },
   departments: {
     type: "multi",
     label: "Department",
     max: 10,
     source: "departments",
-    category: "Contact Information"
+    category: "Contact Information",
+    operatorSupport: "text-taxonomy"  // Supports all 5 operators
   },
   accountOwners: {
     type: "multi",
@@ -476,38 +525,56 @@ export const DATE_RANGE_PRESETS = [
 
 /**
  * Filter Value Type Definitions
+ * 
+ * Supports operator-based filtering with FieldRule arrays for fields that
+ * have operator support. Fields with operators use FieldRule[], while simple
+ * fields (dates, text search) use their original types.
  */
 export interface FilterValues {
   search?: string;
-  industries?: string[];
-  companySizes?: string[];
-  companyRevenue?: string[];
-  seniorityLevels?: string[];
+  
+  // Text/Taxonomy fields (support all 5 operators)
+  industries?: FieldRule[];
+  seniorityLevels?: FieldRule[];
+  technologies?: FieldRule[];
+  jobFunctions?: FieldRule[];
+  departments?: FieldRule[];
+  
+  // Categorical fields (support include/exclude only)
+  companySizes?: FieldRule[];
+  companyRevenue?: FieldRule[];
+  
+  // Geography (simple multi-select, no operators for now)
   countries?: string[];
   states?: string[];
   cities?: string[];
-  technologies?: string[];
-  jobFunctions?: string[];
-  departments?: string[];
+  
+  // Ownership (simple multi-select)
   accountOwners?: string[];
+  
+  // Date ranges (no operators)
   createdDate?: { from?: string; to?: string };
   lastActivity?: { from?: string; to?: string };
   reviewedDate?: { from?: string; to?: string };
-  // Campaign filters
+  
+  // Campaign filters (simple multi-select for now)
   campaignName?: string[];
   campaignType?: string[];
   campaignStatus?: string[];
   campaignOwner?: string[];
   dialMode?: string[];
-  // QA filters
+  
+  // QA filters (simple multi-select)
   qaStatus?: string[];
   qaReviewer?: string[];
   qaOutcome?: string[];
-  // List/Segment filters
+  
+  // List/Segment filters (simple multi-select)
   listName?: string[];
   segmentName?: string[];
   segmentOwner?: string[];
-  // Contact filters
+  
+  // Contact filters (simple multi-select)
   emailStatus?: string[];
   phoneStatus?: string[];
   verificationStatus?: string[];
@@ -540,6 +607,51 @@ export function getAllowedFields(
  */
 export function getFieldConfig(field: FilterField): FilterFieldConfig {
   return BASE_FILTERS[field];
+}
+
+/**
+ * Get available operators for a field based on its operator support
+ */
+export function getAvailableOperators(field: FilterField): Operator[] {
+  const config = BASE_FILTERS[field];
+  const support = config.operatorSupport;
+  
+  if (!support || support === "none") {
+    return ["INCLUDES_ANY"]; // Default fallback
+  }
+  
+  if (support === "text-taxonomy") {
+    // Industries, Job Titles, Seniority, Technologies, Departments, Job Functions
+    return ["INCLUDES_ANY", "INCLUDES_ALL", "EXCLUDES_ANY", "CONTAINS", "NOT_CONTAINS"];
+  }
+  
+  if (support === "categorical") {
+    // Company Size, Revenue, Tenure buckets
+    return ["INCLUDES_ANY", "INCLUDES_ALL", "EXCLUDES_ANY"];
+  }
+  
+  return ["INCLUDES_ANY"];
+}
+
+/**
+ * Get operator label for display
+ */
+export function getOperatorLabel(operator: Operator): string {
+  const labels: Record<Operator, string> = {
+    "INCLUDES_ANY": "Includes any",
+    "INCLUDES_ALL": "Includes all",
+    "EXCLUDES_ANY": "Exclude",
+    "CONTAINS": "Contains",
+    "NOT_CONTAINS": "Doesn't contain"
+  };
+  return labels[operator];
+}
+
+/**
+ * Check if operator requires text query input (vs chip selection)
+ */
+export function isTextOperator(operator: Operator): boolean {
+  return operator === "CONTAINS" || operator === "NOT_CONTAINS";
 }
 
 /**

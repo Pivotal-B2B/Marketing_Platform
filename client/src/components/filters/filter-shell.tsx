@@ -37,11 +37,13 @@ import {
   getFieldConfig,
   getFieldsByCategory,
   UserRole,
-  MODULE_FILTERS
+  MODULE_FILTERS,
+  type FieldRule
 } from "@shared/filterConfig";
 import { MultiSelectFilter } from "./multi-select-filter";
 import { AsyncTypeaheadFilter } from "./async-typeahead-filter";
 import { DateRangeFilter } from "./date-range-filter";
+import { OperatorBasedFilter } from "./operator-based-filter";
 import { ChipsBar } from "./chips-bar";
 import type { Segment } from "@shared/schema";
 
@@ -148,12 +150,48 @@ export function FilterShell({
   // Remove specific filter value
   const removeFilterValue = (field: keyof FilterValues, value?: string) => {
     if (value && Array.isArray(filters[field])) {
-      // Remove specific item from array
-      const arr = filters[field] as string[];
-      updateFilter(field, arr.filter(v => v !== value));
+      const arr = filters[field];
+      const firstItem = arr[0];
+      
+      // Check if this is a FieldRule array
+      if (firstItem && typeof firstItem === 'object' && 'operator' in firstItem) {
+        const rules = arr as FieldRule[];
+        const newRules = rules.map(rule => {
+          // Handle value-based rules (chip selections)
+          if (rule.values && rule.values.includes(value)) {
+            return {
+              ...rule,
+              values: rule.values.filter(v => v !== value)
+            };
+          }
+          // Handle query-based rules (text operators)
+          // If the value matches the query, clear it
+          if (rule.query && rule.query === value) {
+            return {
+              ...rule,
+              query: undefined
+            };
+          }
+          return rule;
+        }).filter(rule => {
+          // Remove empty rules
+          if (rule.values && rule.values.length > 0) return true;
+          if (rule.query && rule.query.trim()) return true;
+          return false;
+        });
+        updateFilter(field, newRules.length > 0 ? newRules : []);
+      } else {
+        // Legacy string array
+        updateFilter(field, arr.filter(v => v !== value));
+      }
     } else {
       // Clear entire filter
-      updateFilter(field, field === 'search' ? '' : field.includes('Date') || field.includes('Activity') ? { from: undefined, to: undefined } : []);
+      const config = getFieldConfig(field);
+      if (config && config.operatorSupport && config.operatorSupport !== 'none') {
+        updateFilter(field, []);
+      } else {
+        updateFilter(field, field === 'search' ? '' : field.includes('Date') || field.includes('Activity') ? { from: undefined, to: undefined } : []);
+      }
     }
   };
 
@@ -165,7 +203,14 @@ export function FilterShell({
       if (config.type === 'date-range') {
         emptyFilters[field] = { from: undefined, to: undefined };
       } else if (config.type === 'multi' || config.type === 'typeahead') {
-        emptyFilters[field] = [];
+        // Check if field supports operators
+        if (config.operatorSupport && config.operatorSupport !== 'none') {
+          // Initialize as empty FieldRule array
+          emptyFilters[field] = [];
+        } else {
+          // Legacy string array
+          emptyFilters[field] = [];
+        }
       } else {
         emptyFilters[field] = '';
       }
@@ -208,7 +253,26 @@ export function FilterShell({
     let count = 0;
     Object.entries(filters).forEach(([key, value]) => {
       if (key === 'search' && value) count++;
-      if (Array.isArray(value) && value.length > 0) count += value.length;
+      
+      // Handle FieldRule arrays (operator-based filters)
+      if (Array.isArray(value) && value.length > 0) {
+        const firstItem = value[0];
+        if (firstItem && typeof firstItem === 'object' && 'operator' in firstItem) {
+          // This is a FieldRule array
+          const rules = value as FieldRule[];
+          rules.forEach(rule => {
+            if (rule.values && rule.values.length > 0) {
+              count += rule.values.length;
+            } else if (rule.query && rule.query.trim()) {
+              count++;
+            }
+          });
+        } else {
+          // Legacy string array
+          count += value.length;
+        }
+      }
+      
       if (value && typeof value === 'object' && 'from' in value) {
         if (value.from || value.to) count++;
       }
@@ -222,7 +286,26 @@ export function FilterShell({
     categoryFields.forEach(field => {
       const value = filters[field];
       if (field === 'search' && value) count++;
-      if (Array.isArray(value) && value.length > 0) count += value.length;
+      
+      // Handle FieldRule arrays (operator-based filters)
+      if (Array.isArray(value) && value.length > 0) {
+        const firstItem = value[0];
+        if (firstItem && typeof firstItem === 'object' && 'operator' in firstItem) {
+          // This is a FieldRule array
+          const rules = value as FieldRule[];
+          rules.forEach(rule => {
+            if (rule.values && rule.values.length > 0) {
+              count += rule.values.length;
+            } else if (rule.query && rule.query.trim()) {
+              count++;
+            }
+          });
+        } else {
+          // Legacy string array
+          count += value.length;
+        }
+      }
+      
       if (value && typeof value === 'object' && 'from' in value) {
         if (value.from || value.to) count++;
       }
@@ -250,6 +333,20 @@ export function FilterShell({
         );
 
       case 'multi':
+        // Check if field supports operators
+        if (config.operatorSupport && config.operatorSupport !== 'none') {
+          return (
+            <OperatorBasedFilter
+              key={field}
+              field={field}
+              rules={(filters[field] as FieldRule[]) || []}
+              onChange={(rules) => updateFilter(field, rules)}
+              onOptionsLoaded={(labels) => registerOptionLabels(field as string, labels)}
+            />
+          );
+        }
+        
+        // Legacy multi-select (no operators)
         return (
           <div key={field} className="space-y-2">
             <Label>{config.label}</Label>
