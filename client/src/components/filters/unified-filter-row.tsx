@@ -217,8 +217,8 @@ export function UnifiedFilterRow({
                   onKeyDown={handleInputKeyDown}
                   onFocus={() => setShowTypeAhead(true)}
                   onBlur={() => setTimeout(() => setShowTypeAhead(false), 200)}
-                  placeholder={condition.values.length === 0 ? "Type and press Enter..." : "Add more..."}
-                  className="flex-1 min-w-[120px] border-0 shadow-none focus-visible:ring-0 p-0 h-auto text-[15px]"
+                  placeholder={condition.values.length === 0 ? "Type value and press ↵ Enter" : "Type and press ↵ Enter to add more..."}
+                  className="flex-1 min-w-[120px] border-0 shadow-none focus-visible:ring-0 p-0 h-auto text-[15px] placeholder:text-amber-600 placeholder:font-medium"
                   data-testid="input-value"
                   disabled={isAtMax}
                 />
