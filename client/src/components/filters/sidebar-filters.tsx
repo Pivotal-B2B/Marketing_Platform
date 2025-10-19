@@ -246,8 +246,8 @@ export function SidebarFilters({
       </div>
 
       {/* Body - Filter Conditions */}
-      <ScrollArea className="flex-1 px-3 py-4">
-        <div className="space-y-3">
+      <ScrollArea className="flex-1 px-3 py-3">
+        <div className="space-y-2">
           <AnimatePresence mode="popLayout">
             {filterGroup.conditions.map((condition) => (
               <motion.div
