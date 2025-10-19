@@ -10,7 +10,7 @@ import {
   accounts
 } from "@shared/schema";
 import { eq, and, gte, lte, inArray, sql, desc } from "drizzle-orm";
-import { isAuthenticated, hasRole } from "../auth";
+import { requireAuth, requireRole } from "../auth";
 
 const router = Router();
 
@@ -19,7 +19,7 @@ const router = Router();
  * 
  * Global dashboard call statistics across all campaigns
  */
-router.get('/global', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/global', requireAuth, async (req: Request, res: Response) => {
   try {
     const { from, to, campaignId } = req.query;
     
@@ -116,7 +116,7 @@ router.get('/global', isAuthenticated, async (req: Request, res: Response) => {
  * 
  * Campaign-level call statistics
  */
-router.get('/campaign/:campaignId', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/campaign/:campaignId', requireAuth, async (req: Request, res: Response) => {
   try {
     const { campaignId } = req.params;
     const { from, to } = req.query;
@@ -226,7 +226,7 @@ router.get('/campaign/:campaignId', isAuthenticated, async (req: Request, res: R
  * 
  * Agent-level call statistics
  */
-router.get('/agent/:agentId', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/agent/:agentId', requireAuth, async (req: Request, res: Response) => {
   try {
     const { agentId } = req.params;
     const { from, to, campaignId } = req.query;
@@ -342,7 +342,7 @@ router.get('/agent/:agentId', isAuthenticated, async (req: Request, res: Respons
  * 
  * Get detailed call list with filters
  */
-router.get('/details', isAuthenticated, async (req: Request, res: Response) => {
+router.get('/details', requireAuth, async (req: Request, res: Response) => {
   try {
     const { 
       from, 
