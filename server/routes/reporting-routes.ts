@@ -2,14 +2,17 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { 
-  callSessions, 
+  callSessions,
+  callJobs,
+  callDispositions,
+  dispositions,
   campaigns, 
   users, 
   leads,
   contacts,
   accounts
 } from "@shared/schema";
-import { eq, and, gte, lte, inArray, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, sql, desc, isNotNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../auth";
 
 const router = Router();
@@ -23,39 +26,57 @@ router.get('/global', requireAuth, async (req: Request, res: Response) => {
   try {
     const { from, to, campaignId } = req.query;
     
-    // Build conditions
-    const conditions: any[] = [];
+    // Build conditions for callSessions table
+    const sessionConditions: any[] = [];
+    const jobConditions: any[] = [];
     
     if (from) {
-      conditions.push(gte(callSessions.startTime, new Date(from as string)));
+      sessionConditions.push(gte(callSessions.startedAt, new Date(from as string)));
     }
     if (to) {
-      conditions.push(lte(callSessions.startTime, new Date(to as string)));
+      sessionConditions.push(lte(callSessions.startedAt, new Date(to as string)));
     }
     if (campaignId) {
-      conditions.push(eq(callSessions.campaignId, campaignId as string));
+      jobConditions.push(eq(callJobs.campaignId, campaignId as string));
     }
     
     // Get call stats by disposition
     const dispositionStats = await db
       .select({
-        disposition: callSessions.disposition,
-        count: sql<number>`COUNT(*)::int`,
-        totalDuration: sql<number>`SUM(COALESCE(${callSessions.duration}, 0))::int`,
+        disposition: dispositions.label,
+        dispositionAction: dispositions.systemAction,
+        count: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
+        totalDuration: sql<number>`SUM(COALESCE(${callSessions.durationSec}, 0))::int`,
       })
       .from(callSessions)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .groupBy(callSessions.disposition);
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
+          jobConditions.length > 0 ? and(...jobConditions) : undefined
+        )
+      )
+      .groupBy(dispositions.label, dispositions.systemAction);
     
-    // Get QA stats
+    // Get QA stats (leads linked through contact)
     const qaStats = await db
       .select({
         qaStatus: leads.qaStatus,
-        count: sql<number>`COUNT(*)::int`,
+        count: sql<number>`COUNT(DISTINCT ${leads.id})::int`,
       })
       .from(leads)
-      .innerJoin(callSessions, eq(leads.callSessionId, callSessions.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .innerJoin(contacts, eq(leads.contactId, contacts.id))
+      .innerJoin(callJobs, eq(contacts.id, callJobs.contactId))
+      .innerJoin(callSessions, eq(callJobs.id, callSessions.callJobId))
+      .where(
+        and(
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
+          jobConditions.length > 0 ? and(...jobConditions) : undefined,
+          isNotNull(leads.qaStatus)
+        )
+      )
       .groupBy(leads.qaStatus);
     
     // Get campaign breakdown
@@ -63,32 +84,45 @@ router.get('/global', requireAuth, async (req: Request, res: Response) => {
       .select({
         campaignId: campaigns.id,
         campaignName: campaigns.name,
-        totalCalls: sql<number>`COUNT(${callSessions.id})::int`,
-        qualified: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'qualified' THEN 1 END)::int`,
-        notInterested: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'not_interested' THEN 1 END)::int`,
-        voicemail: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'voicemail' THEN 1 END)::int`,
-        noAnswer: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'no_answer' THEN 1 END)::int`,
-        dncRequest: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'dnc_request' THEN 1 END)::int`,
-        avgDuration: sql<number>`AVG(COALESCE(${callSessions.duration}, 0))::int`,
+        totalCalls: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
+        qualified: sql<number>`COUNT(DISTINCT CASE WHEN ${dispositions.systemAction} = 'converted_qualified' THEN ${callSessions.id} END)::int`,
+        avgDuration: sql<number>`AVG(COALESCE(${callSessions.durationSec}, 0))::int`,
       })
       .from(callSessions)
-      .innerJoin(campaigns, eq(callSessions.campaignId, campaigns.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .innerJoin(campaigns, eq(callJobs.campaignId, campaigns.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
+          jobConditions.length > 0 ? and(...jobConditions) : undefined
+        )
+      )
       .groupBy(campaigns.id, campaigns.name);
     
     // Get agent performance
     const agentStats = await db
       .select({
-        agentId: callSessions.agentId,
+        agentId: callJobs.agentId,
         agentName: sql<string>`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
-        totalCalls: sql<number>`COUNT(${callSessions.id})::int`,
-        qualified: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'qualified' THEN 1 END)::int`,
-        avgDuration: sql<number>`AVG(COALESCE(${callSessions.duration}, 0))::int`,
+        totalCalls: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
+        qualified: sql<number>`COUNT(DISTINCT CASE WHEN ${dispositions.systemAction} = 'converted_qualified' THEN ${callSessions.id} END)::int`,
+        avgDuration: sql<number>`AVG(COALESCE(${callSessions.durationSec}, 0))::int`,
       })
       .from(callSessions)
-      .innerJoin(users, eq(callSessions.agentId, users.id))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .groupBy(callSessions.agentId, users.firstName, users.lastName);
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .innerJoin(users, eq(callJobs.agentId, users.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
+          jobConditions.length > 0 ? and(...jobConditions) : undefined,
+          isNotNull(callJobs.agentId)
+        )
+      )
+      .groupBy(callJobs.agentId, users.firstName, users.lastName);
     
     // Calculate totals
     const totalCalls = dispositionStats.reduce((sum, stat) => sum + stat.count, 0);
@@ -122,13 +156,13 @@ router.get('/campaign/:campaignId', requireAuth, async (req: Request, res: Respo
     const { from, to } = req.query;
     
     // Build conditions
-    const conditions: any[] = [eq(callSessions.campaignId, campaignId)];
+    const sessionConditions: any[] = [];
     
     if (from) {
-      conditions.push(gte(callSessions.startTime, new Date(from as string)));
+      sessionConditions.push(gte(callSessions.startedAt, new Date(from as string)));
     }
     if (to) {
-      conditions.push(lte(callSessions.startTime, new Date(to as string)));
+      sessionConditions.push(lte(callSessions.startedAt, new Date(to as string)));
     }
     
     // Get campaign info
@@ -144,55 +178,86 @@ router.get('/campaign/:campaignId', requireAuth, async (req: Request, res: Respo
     // Get disposition breakdown
     const dispositionStats = await db
       .select({
-        disposition: callSessions.disposition,
-        count: sql<number>`COUNT(*)::int`,
-        totalDuration: sql<number>`SUM(COALESCE(${callSessions.duration}, 0))::int`,
-        avgDuration: sql<number>`AVG(COALESCE(${callSessions.duration}, 0))::int`,
+        disposition: dispositions.label,
+        dispositionAction: dispositions.systemAction,
+        count: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
+        totalDuration: sql<number>`SUM(COALESCE(${callSessions.durationSec}, 0))::int`,
+        avgDuration: sql<number>`AVG(COALESCE(${callSessions.durationSec}, 0))::int`,
       })
       .from(callSessions)
-      .where(and(...conditions))
-      .groupBy(callSessions.disposition);
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          eq(callJobs.campaignId, campaignId),
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
+        )
+      )
+      .groupBy(dispositions.label, dispositions.systemAction);
     
-    // Get QA breakdown
+    // Get QA breakdown for this campaign
     const qaStats = await db
       .select({
         qaStatus: leads.qaStatus,
-        count: sql<number>`COUNT(*)::int`,
+        count: sql<number>`COUNT(DISTINCT ${leads.id})::int`,
       })
       .from(leads)
-      .innerJoin(callSessions, eq(leads.callSessionId, callSessions.id))
-      .where(and(...conditions))
+      .innerJoin(contacts, eq(leads.contactId, contacts.id))
+      .innerJoin(callJobs, eq(contacts.id, callJobs.contactId))
+      .innerJoin(callSessions, eq(callJobs.id, callSessions.callJobId))
+      .where(
+        and(
+          eq(callJobs.campaignId, campaignId),
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
+          isNotNull(leads.qaStatus)
+        )
+      )
       .groupBy(leads.qaStatus);
     
     // Get agent performance for this campaign
     const agentStats = await db
       .select({
-        agentId: callSessions.agentId,
+        agentId: callJobs.agentId,
         agentName: sql<string>`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
-        totalCalls: sql<number>`COUNT(${callSessions.id})::int`,
-        qualified: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'qualified' THEN 1 END)::int`,
-        notInterested: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'not_interested' THEN 1 END)::int`,
-        voicemail: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'voicemail' THEN 1 END)::int`,
-        dnc: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'dnc_request' THEN 1 END)::int`,
-        avgDuration: sql<number>`AVG(COALESCE(${callSessions.duration}, 0))::int`,
-        qaApproved: sql<number>`COUNT(CASE WHEN ${leads.qaStatus} = 'approved' THEN 1 END)::int`,
-        qaRejected: sql<number>`COUNT(CASE WHEN ${leads.qaStatus} = 'rejected' THEN 1 END)::int`,
+        totalCalls: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
+        qualified: sql<number>`COUNT(DISTINCT CASE WHEN ${dispositions.systemAction} = 'converted_qualified' THEN ${callSessions.id} END)::int`,
+        avgDuration: sql<number>`AVG(COALESCE(${callSessions.durationSec}, 0))::int`,
       })
       .from(callSessions)
-      .leftJoin(leads, eq(callSessions.id, leads.callSessionId))
-      .innerJoin(users, eq(callSessions.agentId, users.id))
-      .where(and(...conditions))
-      .groupBy(callSessions.agentId, users.firstName, users.lastName);
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .innerJoin(users, eq(callJobs.agentId, users.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          eq(callJobs.campaignId, campaignId),
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
+          isNotNull(callJobs.agentId)
+        )
+      )
+      .groupBy(callJobs.agentId, users.firstName, users.lastName);
     
-    // Get hourly distribution
-    const hourlyStats = await db
+    // Get daily trend data
+    const dailyTrend = await db
       .select({
-        hour: sql<number>`EXTRACT(HOUR FROM ${callSessions.startTime})::int`,
-        count: sql<number>`COUNT(*)::int`,
+        date: sql<string>`DATE(${callSessions.startedAt})`,
+        totalCalls: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
+        qualified: sql<number>`COUNT(DISTINCT CASE WHEN ${dispositions.systemAction} = 'converted_qualified' THEN ${callSessions.id} END)::int`,
+        avgDuration: sql<number>`AVG(COALESCE(${callSessions.durationSec}, 0))::int`,
       })
       .from(callSessions)
-      .where(and(...conditions))
-      .groupBy(sql`EXTRACT(HOUR FROM ${callSessions.startTime})`);
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          eq(callJobs.campaignId, campaignId),
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
+        )
+      )
+      .groupBy(sql`DATE(${callSessions.startedAt})`)
+      .orderBy(sql`DATE(${callSessions.startedAt})`);
     
     // Calculate totals
     const totalCalls = dispositionStats.reduce((sum, stat) => sum + stat.count, 0);
@@ -213,7 +278,7 @@ router.get('/campaign/:campaignId', requireAuth, async (req: Request, res: Respo
       dispositions: dispositionStats,
       qaStats,
       agentStats,
-      hourlyDistribution: hourlyStats,
+      dailyTrend,
     });
   } catch (error) {
     console.error('Error fetching campaign call reports:', error);
@@ -232,27 +297,37 @@ router.get('/agent/:agentId', requireAuth, async (req: Request, res: Response) =
     const { from, to, campaignId } = req.query;
     const user = (req as any).user;
     
-    // Security: Agents can only see their own stats unless admin
-    if (user.role !== 'admin' && user.id !== agentId) {
-      return res.status(403).json({ error: 'Unauthorized' });
+    // RBAC: Only allow access to own stats unless admin
+    const userRoles = user?.roles || [user?.role];
+    const isAdmin = userRoles.includes('admin') || userRoles.includes('campaign_manager');
+    
+    if (!isAdmin && user?.userId !== agentId) {
+      return res.status(403).json({ error: 'You can only view your own statistics' });
     }
     
     // Build conditions
-    const conditions: any[] = [eq(callSessions.agentId, agentId)];
+    const sessionConditions: any[] = [];
+    const jobConditions: any[] = [eq(callJobs.agentId, agentId)];
     
     if (from) {
-      conditions.push(gte(callSessions.startTime, new Date(from as string)));
+      sessionConditions.push(gte(callSessions.startedAt, new Date(from as string)));
     }
     if (to) {
-      conditions.push(lte(callSessions.startTime, new Date(to as string)));
+      sessionConditions.push(lte(callSessions.startedAt, new Date(to as string)));
     }
     if (campaignId) {
-      conditions.push(eq(callSessions.campaignId, campaignId as string));
+      jobConditions.push(eq(callJobs.campaignId, campaignId as string));
     }
     
     // Get agent info
     const [agent] = await db
-      .select()
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        role: users.role,
+      })
       .from(users)
       .where(eq(users.id, agentId));
     
@@ -260,76 +335,93 @@ router.get('/agent/:agentId', requireAuth, async (req: Request, res: Response) =
       return res.status(404).json({ error: 'Agent not found' });
     }
     
-    // Get disposition breakdown
+    // Get overall stats
     const dispositionStats = await db
       .select({
-        disposition: callSessions.disposition,
-        count: sql<number>`COUNT(*)::int`,
-        totalDuration: sql<number>`SUM(COALESCE(${callSessions.duration}, 0))::int`,
-        avgDuration: sql<number>`AVG(COALESCE(${callSessions.duration}, 0))::int`,
+        disposition: dispositions.label,
+        dispositionAction: dispositions.systemAction,
+        count: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
+        totalDuration: sql<number>`SUM(COALESCE(${callSessions.durationSec}, 0))::int`,
       })
       .from(callSessions)
-      .where(and(...conditions))
-      .groupBy(callSessions.disposition);
-    
-    // Get QA breakdown
-    const qaStats = await db
-      .select({
-        qaStatus: leads.qaStatus,
-        count: sql<number>`COUNT(*)::int`,
-      })
-      .from(leads)
-      .innerJoin(callSessions, eq(leads.callSessionId, callSessions.id))
-      .where(and(...conditions))
-      .groupBy(leads.qaStatus);
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          ...jobConditions,
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
+        )
+      )
+      .groupBy(dispositions.label, dispositions.systemAction);
     
     // Get campaign breakdown for this agent
     const campaignStats = await db
       .select({
         campaignId: campaigns.id,
         campaignName: campaigns.name,
-        totalCalls: sql<number>`COUNT(${callSessions.id})::int`,
-        qualified: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'qualified' THEN 1 END)::int`,
-        avgDuration: sql<number>`AVG(COALESCE(${callSessions.duration}, 0))::int`,
+        totalCalls: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
+        qualified: sql<number>`COUNT(DISTINCT CASE WHEN ${dispositions.systemAction} = 'converted_qualified' THEN ${callSessions.id} END)::int`,
+        avgDuration: sql<number>`AVG(COALESCE(${callSessions.durationSec}, 0))::int`,
       })
       .from(callSessions)
-      .innerJoin(campaigns, eq(callSessions.campaignId, campaigns.id))
-      .where(and(...conditions))
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .innerJoin(campaigns, eq(callJobs.campaignId, campaigns.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          ...jobConditions,
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
+        )
+      )
       .groupBy(campaigns.id, campaigns.name);
     
-    // Get daily stats for trend
-    const dailyStats = await db
+    // Get daily trend
+    const dailyTrend = await db
       .select({
-        date: sql<string>`DATE(${callSessions.startTime})`,
-        count: sql<number>`COUNT(*)::int`,
-        qualified: sql<number>`COUNT(CASE WHEN ${callSessions.disposition} = 'qualified' THEN 1 END)::int`,
+        date: sql<string>`DATE(${callSessions.startedAt})`,
+        totalCalls: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
+        qualified: sql<number>`COUNT(DISTINCT CASE WHEN ${dispositions.systemAction} = 'converted_qualified' THEN ${callSessions.id} END)::int`,
+        avgDuration: sql<number>`AVG(COALESCE(${callSessions.durationSec}, 0))::int`,
       })
       .from(callSessions)
-      .where(and(...conditions))
-      .groupBy(sql`DATE(${callSessions.startTime})`)
-      .orderBy(sql`DATE(${callSessions.startTime})`);
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          ...jobConditions,
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
+        )
+      )
+      .groupBy(sql`DATE(${callSessions.startedAt})`)
+      .orderBy(sql`DATE(${callSessions.startedAt})`);
     
     // Calculate totals
     const totalCalls = dispositionStats.reduce((sum, stat) => sum + stat.count, 0);
     const totalDuration = dispositionStats.reduce((sum, stat) => sum + stat.totalDuration, 0);
-    const qualifiedCount = dispositionStats.find(s => s.disposition === 'qualified')?.count || 0;
+    const qualified = dispositionStats
+      .filter(s => s.dispositionAction === 'converted_qualified')
+      .reduce((sum, stat) => sum + stat.count, 0);
     
     res.json({
       agent: {
         id: agent.id,
         name: `${agent.firstName} ${agent.lastName}`,
         email: agent.email,
+        role: agent.role,
       },
       summary: {
         totalCalls,
         totalDuration,
         avgDuration: totalCalls > 0 ? Math.round(totalDuration / totalCalls) : 0,
-        qualificationRate: totalCalls > 0 ? Math.round((qualifiedCount / totalCalls) * 100) : 0,
+        qualifiedLeads: qualified,
+        conversionRate: totalCalls > 0 ? ((qualified / totalCalls) * 100).toFixed(2) : '0.00',
       },
       dispositions: dispositionStats,
-      qaStats,
       campaignStats,
-      dailyTrend: dailyStats,
+      dailyTrend,
     });
   } catch (error) {
     console.error('Error fetching agent call reports:', error);
@@ -349,81 +441,105 @@ router.get('/details', requireAuth, async (req: Request, res: Response) => {
       to, 
       campaignId, 
       agentId, 
-      disposition,
-      qaStatus,
-      page = '1',
-      limit = '50'
+      disposition: dispositionFilter,
+      limit = '100',
+      offset = '0'
     } = req.query;
     
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const offset = (pageNum - 1) * limitNum;
+    const user = (req as any).user;
+    const userRoles = user?.roles || [user?.role];
+    const isAdmin = userRoles.includes('admin') || userRoles.includes('campaign_manager');
     
     // Build conditions
-    const conditions: any[] = [];
+    const sessionConditions: any[] = [];
+    const jobConditions: any[] = [];
     
     if (from) {
-      conditions.push(gte(callSessions.startTime, new Date(from as string)));
+      sessionConditions.push(gte(callSessions.startedAt, new Date(from as string)));
     }
     if (to) {
-      conditions.push(lte(callSessions.startTime, new Date(to as string)));
+      sessionConditions.push(lte(callSessions.startedAt, new Date(to as string)));
     }
     if (campaignId) {
-      conditions.push(eq(callSessions.campaignId, campaignId as string));
+      jobConditions.push(eq(callJobs.campaignId, campaignId as string));
     }
     if (agentId) {
-      conditions.push(eq(callSessions.agentId, agentId as string));
-    }
-    if (disposition) {
-      conditions.push(eq(callSessions.disposition, disposition as any));
+      // RBAC: Non-admin users can only filter by their own ID
+      if (!isAdmin && user?.userId !== agentId) {
+        return res.status(403).json({ error: 'You can only view your own calls' });
+      }
+      jobConditions.push(eq(callJobs.agentId, agentId as string));
+    } else if (!isAdmin) {
+      // If no agent filter and not admin, default to their own calls
+      jobConditions.push(eq(callJobs.agentId, user?.userId));
     }
     
-    // Get calls with related data
+    // Get detailed call list
     const calls = await db
       .select({
-        id: callSessions.id,
-        campaignId: callSessions.campaignId,
+        callId: callSessions.id,
+        campaignId: campaigns.id,
         campaignName: campaigns.name,
-        agentId: callSessions.agentId,
+        agentId: callJobs.agentId,
         agentName: sql<string>`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
-        contactId: callSessions.contactId,
-        contactName: contacts.fullName,
+        contactId: contacts.id,
+        contactName: sql<string>`CONCAT(${contacts.firstName}, ' ', ${contacts.lastName})`,
+        contactEmail: contacts.email,
+        contactPhone: contacts.directPhoneE164,
+        accountId: accounts.id,
         accountName: accounts.name,
-        disposition: callSessions.disposition,
-        duration: callSessions.duration,
-        startTime: callSessions.startTime,
-        endTime: callSessions.endTime,
+        disposition: dispositions.label,
+        dispositionAction: dispositions.systemAction,
+        dispositionNotes: callDispositions.notes,
+        startedAt: callSessions.startedAt,
+        endedAt: callSessions.endedAt,
+        durationSec: callSessions.durationSec,
         recordingUrl: callSessions.recordingUrl,
-        qaStatus: leads.qaStatus,
-        qaScore: leads.qaScore,
-        notes: callSessions.notes,
+        status: callSessions.status,
       })
       .from(callSessions)
-      .leftJoin(campaigns, eq(callSessions.campaignId, campaigns.id))
-      .leftJoin(users, eq(callSessions.agentId, users.id))
-      .leftJoin(contacts, eq(callSessions.contactId, contacts.id))
-      .leftJoin(accounts, eq(contacts.accountId, accounts.id))
-      .leftJoin(leads, eq(callSessions.id, leads.callSessionId))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(callSessions.startTime))
-      .limit(limitNum)
-      .offset(offset);
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .innerJoin(campaigns, eq(callJobs.campaignId, campaigns.id))
+      .innerJoin(contacts, eq(callJobs.contactId, contacts.id))
+      .innerJoin(accounts, eq(callJobs.accountId, accounts.id))
+      .leftJoin(users, eq(callJobs.agentId, users.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
+          jobConditions.length > 0 ? and(...jobConditions) : undefined,
+          dispositionFilter ? eq(dispositions.label, dispositionFilter as string) : undefined
+        )
+      )
+      .orderBy(desc(callSessions.startedAt))
+      .limit(parseInt(limit as string))
+      .offset(parseInt(offset as string));
     
-    // Get total count
-    const [countResult] = await db
+    // Get total count for pagination
+    const [{ total }] = await db
       .select({
-        count: sql<number>`COUNT(*)::int`,
+        total: sql<number>`COUNT(DISTINCT ${callSessions.id})::int`,
       })
       .from(callSessions)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
+      .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
+      .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
+      .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+      .where(
+        and(
+          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
+          jobConditions.length > 0 ? and(...jobConditions) : undefined,
+          dispositionFilter ? eq(dispositions.label, dispositionFilter as string) : undefined
+        )
+      );
     
     res.json({
       calls,
       pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total: countResult.count,
-        totalPages: Math.ceil(countResult.count / limitNum),
+        total,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+        hasMore: parseInt(offset as string) + parseInt(limit as string) < total,
       },
     });
   } catch (error) {
