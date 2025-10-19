@@ -3447,6 +3447,112 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Agent-specific dashboard stats
+  app.get("/api/dashboard/agent-stats", requireAuth, async (req, res) => {
+    try {
+      const agentId = req.user!.userId;
+      
+      // Get today and this month dates for filtering
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const thisMonth = new Date();
+      thisMonth.setDate(1);
+      thisMonth.setHours(0, 0, 0, 0);
+
+      // Get call sessions for this agent
+      const allCallJobs = await db
+        .select()
+        .from(callJobs)
+        .where(eq(callJobs.agentId, agentId));
+
+      const callJobIds = allCallJobs.map(j => j.id);
+
+      let callSessions = [];
+      if (callJobIds.length > 0) {
+        callSessions = await db
+          .select()
+          .from(callSessions as any)
+          .where(inArray((callSessions as any).callJobId, callJobIds));
+      }
+
+      // Get disposition details for call sessions
+      const sessionIds = callSessions.map((s: any) => s.id);
+      let dispositionsData = [];
+      if (sessionIds.length > 0) {
+        dispositionsData = await db
+          .select({
+            sessionId: callDispositions.callSessionId,
+            dispositionId: callDispositions.dispositionId,
+            label: dispositions.label,
+            systemAction: dispositions.systemAction,
+          })
+          .from(callDispositions)
+          .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
+          .where(inArray(callDispositions.callSessionId, sessionIds));
+      }
+
+      // Calculate stats
+      const todaySessions = callSessions.filter((s: any) => 
+        s.startedAt && new Date(s.startedAt) >= today
+      );
+      const thisMonthSessions = callSessions.filter((s: any) => 
+        s.startedAt && new Date(s.startedAt) >= thisMonth
+      );
+
+      const totalDuration = callSessions.reduce((sum: number, s: any) => 
+        sum + (s.durationSec || 0), 0
+      );
+      const avgDuration = callSessions.length > 0 
+        ? Math.round(totalDuration / callSessions.length) 
+        : 0;
+
+      // Count qualified leads (dispositions with converted_qualified action)
+      const qualifiedCount = dispositionsData.filter(d => 
+        d.systemAction === 'converted_qualified'
+      ).length;
+
+      // Get leads created by this agent
+      const agentLeads = await db
+        .select()
+        .from(leads)
+        .where(eq(leads.agentId, agentId));
+
+      const approvedLeads = agentLeads.filter(l => l.qaStatus === 'approved').length;
+      const pendingLeads = agentLeads.filter(l => 
+        l.qaStatus === 'new' || l.qaStatus === 'under_review'
+      ).length;
+
+      // Get active campaigns assigned to this agent
+      const agentAssignments = await db
+        .select()
+        .from(campaignAgentAssignments)
+        .where(
+          and(
+            eq(campaignAgentAssignments.agentId, agentId),
+            eq(campaignAgentAssignments.isActive, true)
+          )
+        );
+
+      res.json({
+        callsToday: todaySessions.length,
+        callsThisMonth: thisMonthSessions.length,
+        totalCalls: callSessions.length,
+        avgDuration,
+        qualified: qualifiedCount,
+        leadsApproved: approvedLeads,
+        leadsPending: pendingLeads,
+        activeCampaigns: agentAssignments.length,
+      });
+    } catch (error) {
+      console.error("Agent dashboard stats error:", error);
+      res.status(500).json({
+        message: "Failed to fetch agent dashboard stats",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // ==================== SAVED FILTERS ====================
 
   app.get("/api/saved-filters", requireAuth, async (req, res) => {
