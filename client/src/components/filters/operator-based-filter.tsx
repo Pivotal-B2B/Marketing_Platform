@@ -13,6 +13,7 @@ import {
   type FilterField,
   getAvailableOperators,
   isTextOperator,
+  isNullCheckOperator,
   getFieldConfig
 } from "@shared/filterConfig";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,9 @@ export function OperatorBasedFilter({
     if (isTextOperator(rule.operator)) {
       return rule.query && rule.query.trim().length > 0;
     }
+    if (isNullCheckOperator(rule.operator)) {
+      return true; // Null-check operators are always "active"
+    }
     return rule.values && rule.values.length > 0;
   });
   
@@ -112,22 +116,46 @@ export function OperatorBasedFilter({
                 <OperatorPills
                   options={availableOperators}
                   active={rule.operator}
-                  onChange={(operator) => handleRuleChange(index, { 
-                    operator, 
-                    values: isTextOperator(operator) ? undefined : rule.values,
-                    query: isTextOperator(operator) ? rule.query : undefined
-                  })}
+                  onChange={(operator) => {
+                    // Clear values/query when switching operator types
+                    const newRule: Partial<FieldRule> = { operator };
+                    
+                    if (isTextOperator(operator)) {
+                      // Text operator: keep query, clear values
+                      newRule.query = rule.query || "";
+                      newRule.values = undefined;
+                    } else if (isNullCheckOperator(operator)) {
+                      // Null-check: clear both
+                      newRule.values = undefined;
+                      newRule.query = undefined;
+                    } else {
+                      // Value operator: keep values, clear query
+                      newRule.values = rule.values || [];
+                      newRule.query = undefined;
+                    }
+                    
+                    handleRuleChange(index, newRule);
+                  }}
                 />
               )}
               
               {/* Input based on operator type */}
               {isTextOp ? (
+                // Text operators: show text input
                 <TextQueryInput
                   value={rule.query || ""}
                   onChange={(query) => handleRuleChange(index, { query })}
                   placeholder={`Enter search text for ${config.label.toLowerCase()}...`}
                 />
+              ) : isNullCheckOperator(rule.operator) ? (
+                // Null-check operators: show descriptive message (no input needed)
+                <div className="text-sm text-muted-foreground italic px-3 py-2 bg-muted/50 rounded-md">
+                  {rule.operator === "HAS_ANY_VALUE" 
+                    ? `Will match records where ${config.label.toLowerCase()} has any value`
+                    : `Will match records where ${config.label.toLowerCase()} is empty`}
+                </div>
               ) : (
+                // Value operators: show multi-select chips
                 <MultiSelectFilter
                   label={config.label}
                   source={config.source || ""}

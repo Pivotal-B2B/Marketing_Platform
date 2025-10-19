@@ -8,22 +8,37 @@
 /**
  * Filter Operators for Advanced Filtering
  * 
- * Text/Taxonomy fields (Industries, Job Titles, Seniority):
+ * Operator Categories:
+ * 
+ * Value-based operators (require chip selection):
+ *  - EQUALS: Exact match to one value
+ *  - NOT_EQUALS: Does not match the value
  *  - INCLUDES_ANY: Records having any of the selected values (OR)
  *  - INCLUDES_ALL: Records having all selected values (AND)
  *  - EXCLUDES_ANY: Records not having any of the selected values (NOT IN)
+ * 
+ * Text-based operators (require text input):
  *  - CONTAINS: Free-text substring match (case-insensitive)
  *  - NOT_CONTAINS: Free-text substring negative match
+ *  - BEGINS_WITH: Field starts with the text
+ *  - ENDS_WITH: Field ends with the text
  * 
- * Categorical Bucket fields (Company Size, Revenue, Tenure):
- *  - INCLUDES_ANY, INCLUDES_ALL, EXCLUDES_ANY only
+ * Null-check operators (no input required):
+ *  - HAS_ANY_VALUE: Field is not null/empty
+ *  - IS_EMPTY: Field is null/empty
  */
 export type Operator =
+  | "EQUALS"
+  | "NOT_EQUALS"
   | "INCLUDES_ANY"
   | "INCLUDES_ALL"
   | "EXCLUDES_ANY"
   | "CONTAINS"
-  | "NOT_CONTAINS";
+  | "NOT_CONTAINS"
+  | "BEGINS_WITH"
+  | "ENDS_WITH"
+  | "HAS_ANY_VALUE"
+  | "IS_EMPTY";
 
 /**
  * Field Rule - Represents a single filter condition with an operator
@@ -622,12 +637,34 @@ export function getAvailableOperators(field: FilterField): Operator[] {
   
   if (support === "text-taxonomy") {
     // Industries, Job Titles, Seniority, Technologies, Departments, Job Functions
-    return ["INCLUDES_ANY", "INCLUDES_ALL", "EXCLUDES_ANY", "CONTAINS", "NOT_CONTAINS"];
+    // Full operator set: value-based, text-based, and null-checks
+    return [
+      "EQUALS",
+      "NOT_EQUALS",
+      "INCLUDES_ANY",
+      "INCLUDES_ALL",
+      "EXCLUDES_ANY",
+      "CONTAINS",
+      "NOT_CONTAINS",
+      "BEGINS_WITH",
+      "ENDS_WITH",
+      "HAS_ANY_VALUE",
+      "IS_EMPTY"
+    ];
   }
   
   if (support === "categorical") {
     // Company Size, Revenue, Tenure buckets
-    return ["INCLUDES_ANY", "INCLUDES_ALL", "EXCLUDES_ANY"];
+    // Value-based and null-checks only (no text operators)
+    return [
+      "EQUALS",
+      "NOT_EQUALS",
+      "INCLUDES_ANY",
+      "INCLUDES_ALL",
+      "EXCLUDES_ANY",
+      "HAS_ANY_VALUE",
+      "IS_EMPTY"
+    ];
   }
   
   return ["INCLUDES_ANY"];
@@ -638,11 +675,17 @@ export function getAvailableOperators(field: FilterField): Operator[] {
  */
 export function getOperatorLabel(operator: Operator): string {
   const labels: Record<Operator, string> = {
+    "EQUALS": "Equals",
+    "NOT_EQUALS": "Not equals",
     "INCLUDES_ANY": "Includes any",
     "INCLUDES_ALL": "Includes all",
     "EXCLUDES_ANY": "Exclude",
     "CONTAINS": "Contains",
-    "NOT_CONTAINS": "Doesn't contain"
+    "NOT_CONTAINS": "Doesn't contain",
+    "BEGINS_WITH": "Begins with",
+    "ENDS_WITH": "Ends with",
+    "HAS_ANY_VALUE": "Has any value",
+    "IS_EMPTY": "Is empty"
   };
   return labels[operator];
 }
@@ -651,7 +694,24 @@ export function getOperatorLabel(operator: Operator): string {
  * Check if operator requires text query input (vs chip selection)
  */
 export function isTextOperator(operator: Operator): boolean {
-  return operator === "CONTAINS" || operator === "NOT_CONTAINS";
+  return operator === "CONTAINS" 
+    || operator === "NOT_CONTAINS"
+    || operator === "BEGINS_WITH"
+    || operator === "ENDS_WITH";
+}
+
+/**
+ * Check if operator is a null-check (requires no input)
+ */
+export function isNullCheckOperator(operator: Operator): boolean {
+  return operator === "HAS_ANY_VALUE" || operator === "IS_EMPTY";
+}
+
+/**
+ * Check if operator requires value selection (chips)
+ */
+export function isValueOperator(operator: Operator): boolean {
+  return !isTextOperator(operator) && !isNullCheckOperator(operator);
 }
 
 /**

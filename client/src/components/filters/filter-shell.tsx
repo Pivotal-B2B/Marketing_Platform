@@ -38,7 +38,8 @@ import {
   getFieldsByCategory,
   UserRole,
   MODULE_FILTERS,
-  type FieldRule
+  type FieldRule,
+  isNullCheckOperator
 } from "@shared/filterConfig";
 import { MultiSelectFilter } from "./multi-select-filter";
 import { AsyncTypeaheadFilter } from "./async-typeahead-filter";
@@ -261,7 +262,10 @@ export function FilterShell({
           // This is a FieldRule array
           const rules = value as FieldRule[];
           rules.forEach(rule => {
-            if (rule.values && rule.values.length > 0) {
+            if (isNullCheckOperator(rule.operator)) {
+              // Null-check operators count as 1 active filter
+              count++;
+            } else if (rule.values && rule.values.length > 0) {
               count += rule.values.length;
             } else if (rule.query && rule.query.trim()) {
               count++;
@@ -294,7 +298,10 @@ export function FilterShell({
           // This is a FieldRule array
           const rules = value as FieldRule[];
           rules.forEach(rule => {
-            if (rule.values && rule.values.length > 0) {
+            if (isNullCheckOperator(rule.operator)) {
+              // Null-check operators count as 1 active filter
+              count++;
+            } else if (rule.values && rule.values.length > 0) {
               count += rule.values.length;
             } else if (rule.query && rule.query.trim()) {
               count++;
