@@ -7,10 +7,10 @@ import { ZodSchema, ZodError } from 'zod';
  * Protects against brute force attacks and API abuse
  */
 
-// General API rate limiter: 1000 requests per 15 minutes per IP (increased for development)
+// General API rate limiter: 10000 requests per 15 minutes per IP (very high for development/testing)
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs
+  max: 10000, // limit each IP to 10000 requests per windowMs
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   handler: (_req, res) => {
@@ -21,10 +21,10 @@ export const apiLimiter = rateLimit({
   }
 });
 
-// Strict rate limiter for authentication endpoints: 20 attempts per 15 minutes (increased)
+// Strict rate limiter for authentication endpoints: 50 attempts per 15 minutes (very generous)
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // limit each IP to 20 login requests per windowMs
+  max: 50, // limit each IP to 50 login requests per windowMs
   skipSuccessfulRequests: true, // Don't count successful logins
   standardHeaders: true,
   legacyHeaders: false,
@@ -36,10 +36,10 @@ export const authLimiter = rateLimit({
   }
 });
 
-// Medium rate limiter for write operations: 100 requests per 10 minutes (increased)
+// Medium rate limiter for write operations: 1000 requests per 10 minutes (very high for bulk operations)
 export const writeLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 100, // limit each IP to 100 write requests per windowMs
+  max: 1000, // limit each IP to 1000 write requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, res) => {
@@ -50,10 +50,10 @@ export const writeLimiter = rateLimit({
   }
 });
 
-// Strict rate limiter for expensive operations (exports, bulk actions): 20 per hour (increased)
+// Strict rate limiter for expensive operations (exports, bulk actions): 100 per hour (generous for development)
 export const expensiveOperationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20, // limit each IP to 20 expensive operations per hour
+  max: 100, // limit each IP to 100 expensive operations per hour
   standardHeaders: true,
   legacyHeaders: false,
   handler: (_req, res) => {
