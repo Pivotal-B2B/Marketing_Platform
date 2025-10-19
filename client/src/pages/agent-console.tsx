@@ -123,6 +123,17 @@ export default function AgentConsolePage() {
     queryKey: ['/api/sip-trunks/default'],
   });
 
+  // Debug SIP config
+  useEffect(() => {
+    console.log('SIP Config received:', {
+      hasSipConfig: !!sipConfig,
+      hasUsername: !!sipConfig?.sipUsername,
+      hasPassword: !!sipConfig?.sipPassword,
+      username: sipConfig?.sipUsername,
+      domain: sipConfig?.sipDomain,
+    });
+  }, [sipConfig]);
+
   // Initialize Telnyx WebRTC
   const {
     callState,
