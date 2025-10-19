@@ -503,6 +503,7 @@ export const contacts = pgTable("contacts", {
   city: text("city"),
   state: text("state"),
   stateAbbr: text("state_abbr"), // State abbreviation (e.g., "NC", "CA")
+  county: text("county"), // County/Region
   postalCode: text("postal_code"), // Postal/ZIP code
   country: text("country"),
   contactLocation: text("contact_location"), // Formatted location string (e.g., "Raleigh, NC 27607, USA")

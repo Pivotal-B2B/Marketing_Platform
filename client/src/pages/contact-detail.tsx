@@ -326,6 +326,54 @@ export default function ContactDetailPage() {
                 </div>
               </div>
 
+              {/* Location Information */}
+              {(contact.city || contact.state || contact.county || contact.postalCode || contact.country || contact.contactLocation) && (
+                <div className="mt-4 pt-4 border-t">
+                  <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Location
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {contact.city && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">City</p>
+                        <p className="font-medium">{contact.city}</p>
+                      </div>
+                    )}
+                    {contact.state && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">State</p>
+                        <p className="font-medium">{contact.state}</p>
+                      </div>
+                    )}
+                    {contact.county && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">County</p>
+                        <p className="font-medium">{contact.county}</p>
+                      </div>
+                    )}
+                    {contact.postalCode && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Postal Code</p>
+                        <p className="font-medium">{contact.postalCode}</p>
+                      </div>
+                    )}
+                    {contact.country && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Country</p>
+                        <p className="font-medium">{contact.country}</p>
+                      </div>
+                    )}
+                    {contact.contactLocation && (
+                      <div className="col-span-2">
+                        <p className="text-sm text-muted-foreground mb-1">Full Location</p>
+                        <p className="font-medium text-sm">{contact.contactLocation}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {contact.intentTopics && contact.intentTopics.length > 0 && (
                 <div className="mt-4 pt-4 border-t">
                   <p className="text-sm text-muted-foreground mb-2">Intent Signals</p>

@@ -381,6 +381,48 @@ export default function AccountDetailPage() {
                 )}
               </div>
 
+              {/* HQ Address Information */}
+              {(account.hqStreet1 || account.hqStreet2 || account.hqStreet3 || account.hqPostalCode || account.companyLocation) && (
+                <div className="mt-4 pt-4 border-t">
+                  <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Headquarters Address
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {account.hqStreet1 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Street Address 1</p>
+                        <p className="font-medium">{account.hqStreet1}</p>
+                      </div>
+                    )}
+                    {account.hqStreet2 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Street Address 2</p>
+                        <p className="font-medium">{account.hqStreet2}</p>
+                      </div>
+                    )}
+                    {account.hqStreet3 && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Street Address 3</p>
+                        <p className="font-medium">{account.hqStreet3}</p>
+                      </div>
+                    )}
+                    {account.hqPostalCode && (
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Postal Code</p>
+                        <p className="font-medium">{account.hqPostalCode}</p>
+                      </div>
+                    )}
+                    {account.companyLocation && (
+                      <div className="col-span-2">
+                        <p className="text-sm text-muted-foreground mb-1">Full Address</p>
+                        <p className="font-medium text-sm">{account.companyLocation}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Custom Fields */}
               {account.customFields && Object.keys(account.customFields).length > 0 && (
                 <div className="mt-4 pt-4 border-t">
