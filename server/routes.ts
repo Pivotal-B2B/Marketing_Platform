@@ -2748,21 +2748,21 @@ export function registerRoutes(app: Express) {
           return res.status(404).json({ message: "No default SIP trunk configured" });
         }
 
-        // Use database values (environment variables override was causing issues)
+        // Use environment variables for credentials (syncs to production automatically)
         const secureConfig = {
           ...activeConfig,
-          sipUsername: activeConfig.sipUsername,
-          sipPassword: activeConfig.sipPassword,
+          sipUsername: process.env.TELNYX_SIP_USERNAME || activeConfig.sipUsername,
+          sipPassword: process.env.TELNYX_SIP_PASSWORD || activeConfig.sipPassword,
         };
 
         return res.json(secureConfig);
       }
 
-      // Use database values (environment variables override was causing issues)
+      // Use environment variables for credentials (syncs to production automatically)
       const secureConfig = {
         ...config,
-        sipUsername: config.sipUsername,
-        sipPassword: config.sipPassword,
+        sipUsername: process.env.TELNYX_SIP_USERNAME || config.sipUsername,
+        sipPassword: process.env.TELNYX_SIP_PASSWORD || config.sipPassword,
       };
 
       res.json(secureConfig);
