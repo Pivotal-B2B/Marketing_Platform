@@ -204,9 +204,11 @@ export default function LeadDetailPage() {
             <h1 className="text-3xl font-bold" data-testid="text-lead-name">
               {lead.contact?.fullName || lead.contactName || 'Unnamed Lead'}
             </h1>
-            <p className="text-muted-foreground">
-              Lead #{lead.id.slice(0, 8)} • {getStatusBadge(lead.qaStatus)}
-            </p>
+            <div className="text-muted-foreground flex items-center gap-2">
+              <span>Lead #{lead.id.slice(0, 8)}</span>
+              <span>•</span>
+              {getStatusBadge(lead.qaStatus)}
+            </div>
           </div>
         </div>
         <div className="flex gap-2">
