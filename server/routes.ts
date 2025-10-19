@@ -442,6 +442,118 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Batch import: Process multiple accounts in one request
+  app.post("/api/accounts/batch-import", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const { accounts: accountsData } = req.body;
+
+      if (!Array.isArray(accountsData)) {
+        return res.status(400).json({ message: "Accounts must be an array" });
+      }
+
+      const results = {
+        success: 0,
+        created: 0,
+        updated: 0,
+        failed: 0,
+        errors: [] as Array<{ index: number; error: string }>,
+      };
+
+      // Step 1: Validate all accounts and collect domains
+      const accountsToProcess: Array<{ validated: any; originalIndex: number }> = [];
+      
+      for (let i = 0; i < accountsData.length; i++) {
+        try {
+          const validated = insertAccountSchema.parse(accountsData[i]);
+          accountsToProcess.push({ validated, originalIndex: i });
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            index: i,
+            error: error instanceof Error ? error.message : "Validation failed"
+          });
+        }
+      }
+
+      // Step 2: Check for existing accounts by domain and separate create vs update
+      const domainsToCheck = accountsToProcess
+        .filter(a => a.validated.domain)
+        .map(a => a.validated.domain.toLowerCase().trim());
+      
+      const existingAccounts = await storage.getAccountsByDomains(domainsToCheck);
+      const accountsByDomain = new Map(existingAccounts.map(a => [a.domain!.toLowerCase().trim(), a]));
+
+      const accountsToCreate: any[] = [];
+      const accountsToUpdate: Array<{ id: string; data: any; originalIndex: number }> = [];
+
+      for (const { validated, originalIndex } of accountsToProcess) {
+        if (validated.domain) {
+          const normalizedDomain = validated.domain.toLowerCase().trim();
+          const existingAccount = accountsByDomain.get(normalizedDomain);
+
+          if (existingAccount) {
+            // Account exists - update it
+            accountsToUpdate.push({ id: existingAccount.id, data: validated, originalIndex });
+          } else {
+            // Account doesn't exist - create it
+            accountsToCreate.push({ account: validated, originalIndex });
+          }
+        } else {
+          // No domain - always create
+          accountsToCreate.push({ account: validated, originalIndex });
+        }
+      }
+
+      // Step 3: Create new accounts in bulk
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      if (accountsToCreate.length > 0) {
+        try {
+          await storage.createAccountsBulk(accountsToCreate.map(a => a.account));
+          createdCount = accountsToCreate.length;
+        } catch (error) {
+          // If bulk insert fails, fall back to individual inserts to identify specific failures
+          for (const { account, originalIndex } of accountsToCreate) {
+            try {
+              await storage.createAccount(account);
+              createdCount++;
+            } catch (err) {
+              results.failed++;
+              results.errors.push({
+                index: originalIndex,
+                error: err instanceof Error ? err.message : "Unknown error"
+              });
+            }
+          }
+        }
+      }
+
+      // Step 4: Update existing accounts individually
+      for (const { id, data, originalIndex } of accountsToUpdate) {
+        try {
+          await storage.updateAccount(id, data);
+          updatedCount++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            index: originalIndex,
+            error: error instanceof Error ? error.message : "Unknown error"
+          });
+        }
+      }
+
+      results.success = createdCount + updatedCount;
+      results.created = createdCount;
+      results.updated = updatedCount;
+
+      res.status(200).json(results);
+    } catch (error) {
+      console.error("Batch import error:", error);
+      res.status(500).json({ message: "Failed to process batch import" });
+    }
+  });
+
   app.patch("/api/accounts/:id", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const account = await storage.updateAccount(req.params.id, req.body);

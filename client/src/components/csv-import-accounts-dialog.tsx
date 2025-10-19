@@ -44,7 +44,7 @@ export function CSVImportAccountsDialog({
   const [headers, setHeaders] = useState<string[]>([]);
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [importProgress, setImportProgress] = useState(0);
-  const [importResults, setImportResults] = useState({ success: 0, failed: 0 });
+  const [importResults, setImportResults] = useState({ success: 0, created: 0, updated: 0, failed: 0 });
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,45 +90,77 @@ export function CSVImportAccountsDialog({
     setImportProgress(0);
 
     let successCount = 0;
+    let createdCount = 0;
+    let updatedCount = 0;
     let failedCount = 0;
 
-    const BATCH_SIZE = 50;
-    const totalBatches = Math.ceil(csvData.length / BATCH_SIZE);
-    
-    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-      const start = batchIndex * BATCH_SIZE;
-      const end = Math.min(start + BATCH_SIZE, csvData.length);
-      const batchRows = csvData.slice(start, end);
+    try {
+      const BATCH_SIZE = 100;
+      const totalBatches = Math.ceil(csvData.length / BATCH_SIZE);
+      
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const start = batchIndex * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, csvData.length);
+        const batchRows = csvData.slice(start, end);
 
-      try {
-        const accounts = batchRows.map((row) => csvRowToAccount(row, headers));
+        try {
+          const accounts = batchRows.map((row) => csvRowToAccount(row, headers));
 
-        for (const accountData of accounts) {
-          try {
-            await apiRequest("POST", "/api/accounts", accountData);
-            successCount++;
-          } catch (error) {
-            failedCount++;
-            console.error("Failed to import account:", error);
+          const result = await apiRequest(
+            "POST",
+            "/api/accounts/batch-import",
+            { accounts }
+          ) as {
+            success: number;
+            created: number;
+            updated: number;
+            failed: number;
+            errors: Array<{ index: number; error: string }>;
+          };
+
+          successCount += result.success;
+          createdCount += result.created || 0;
+          updatedCount += result.updated || 0;
+          failedCount += result.failed;
+
+          if (result.errors && result.errors.length > 0) {
+            result.errors.forEach((err: { index: number; error: string }) => {
+              console.error(`Row ${start + err.index + 2}: ${err.error}`);
+            });
           }
+        } catch (error) {
+          failedCount += batchRows.length;
+          console.error(`Failed to import batch ${batchIndex + 1}:`, error);
         }
-      } catch (error) {
-        failedCount += batchRows.length;
-        console.error(`Failed to import batch ${batchIndex + 1}:`, error);
+
+        setImportProgress(Math.round(((end) / csvData.length) * 100));
       }
 
-      setImportProgress(Math.round(((end) / csvData.length) * 100));
+      setImportResults({ success: successCount, created: createdCount, updated: updatedCount, failed: failedCount });
+      setStage("complete");
+
+      const messageParts = [];
+      if (createdCount > 0) messageParts.push(`${createdCount} new account(s) created`);
+      if (updatedCount > 0) messageParts.push(`${updatedCount} existing account(s) updated`);
+      if (failedCount > 0) messageParts.push(`${failedCount} failed`);
+      
+      const message = messageParts.length > 0 ? messageParts.join(', ') : 'Import complete';
+
+      toast({
+        title: "Import Complete",
+        description: message,
+      });
+
+      onImportComplete();
+    } catch (error) {
+      console.error("Import failed:", error);
+      setStage("upload");
+      toast({
+        title: "Import Failed",
+        description: error instanceof Error ? error.message : "An error occurred during import",
+        variant: "destructive",
+      });
     }
-
-    setImportResults({ success: successCount, failed: failedCount });
-    setStage("complete");
-
-    toast({
-      title: "Import Complete",
-      description: `Successfully imported ${successCount} accounts. ${failedCount} failed.`,
-    });
-
-    onImportComplete();
   };
 
   const downloadTemplate = () => {
@@ -170,7 +202,7 @@ export function CSVImportAccountsDialog({
     setHeaders([]);
     setErrors([]);
     setImportProgress(0);
-    setImportResults({ success: 0, failed: 0 });
+    setImportResults({ success: 0, created: 0, updated: 0, failed: 0 });
     onOpenChange(false);
   };
 
@@ -323,8 +355,21 @@ export function CSVImportAccountsDialog({
               <Alert>
                 <CheckCircle2 className="h-4 w-4" />
                 <AlertDescription>
-                  Import completed! {importResults.success} account(s) imported successfully.
-                  {importResults.failed > 0 && ` ${importResults.failed} account(s) failed.`}
+                  <div className="space-y-1">
+                    <p className="font-medium">Import completed!</p>
+                    {importResults.created > 0 && (
+                      <p className="text-sm">✓ {importResults.created} new account(s) created</p>
+                    )}
+                    {importResults.updated > 0 && (
+                      <p className="text-sm">↻ {importResults.updated} existing account(s) updated</p>
+                    )}
+                    {importResults.failed > 0 && (
+                      <p className="text-sm text-destructive">✗ {importResults.failed} record(s) failed</p>
+                    )}
+                    {importResults.success === 0 && importResults.failed === 0 && (
+                      <p className="text-sm">No records processed</p>
+                    )}
+                  </div>
                 </AlertDescription>
               </Alert>
             </div>
