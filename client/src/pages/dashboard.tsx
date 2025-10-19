@@ -43,10 +43,10 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <div 
+            <div
               role="button"
               tabIndex={0}
-              onClick={() => setLocation('/accounts')} 
+              onClick={() => setLocation('/accounts')}
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/accounts')}
               className="cursor-pointer group"
               data-testid="stat-card-link-accounts"
@@ -58,10 +58,10 @@ export default function Dashboard() {
                 delay={0}
               />
             </div>
-            <div 
+            <div
               role="button"
               tabIndex={0}
-              onClick={() => setLocation('/contacts')} 
+              onClick={() => setLocation('/contacts')}
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/contacts')}
               className="cursor-pointer group"
               data-testid="stat-card-link-contacts"
@@ -73,10 +73,10 @@ export default function Dashboard() {
                 delay={100}
               />
             </div>
-            <div 
+            <div
               role="button"
               tabIndex={0}
-              onClick={() => setLocation('/campaigns')} 
+              onClick={() => setLocation('/campaigns')}
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/campaigns')}
               className="cursor-pointer group"
               data-testid="stat-card-link-campaigns"
@@ -89,10 +89,10 @@ export default function Dashboard() {
                 delay={200}
               />
             </div>
-            <div 
+            <div
               role="button"
               tabIndex={0}
-              onClick={() => setLocation('/leads')} 
+              onClick={() => setLocation('/leads')}
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/leads')}
               className="cursor-pointer group"
               data-testid="stat-card-link-leads"
@@ -109,7 +109,7 @@ export default function Dashboard() {
       </div>
 
       {/* Charts will be added later with real campaign metrics */}
-      
+
       <Card className="border-0 shadow-smooth-lg animate-fade-in" style={{ animationDelay: '400ms' }}>
         <CardHeader>
           <CardTitle className="text-xl flex items-center gap-2">
@@ -119,10 +119,10 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            <Card 
+            <Card
               role="button"
               tabIndex={0}
-              className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-blue-500/10 to-blue-600/5 group" 
+              className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-blue-500/10 to-blue-600/5 group"
               onClick={() => setLocation('/accounts')}
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/accounts')}
               data-testid="quick-action-create-account"
@@ -137,7 +137,7 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
-            <Card 
+            <Card
               role="button"
               tabIndex={0}
               className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-purple-500/10 to-purple-600/5 group"
@@ -155,28 +155,28 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
-            <Card 
+            <Card
               role="button"
               tabIndex={0}
               className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-teal-500/10 to-teal-600/5 group"
-              onClick={() => setLocation('/leads')}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/leads')}
-              data-testid="quick-action-review-leads"
+              onClick={() => setLocation('/call-reports')}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/call-reports')}
+              data-testid="quick-action-call-reports"
             >
               <CardContent className="pt-6">
                 <div className="text-center">
                   <div className="h-16 w-16 mx-auto mb-3 bg-teal-500/20 rounded-2xl flex items-center justify-center group-hover:bg-teal-500/30 transition-colors">
                     <CheckCircle className="h-8 w-8 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
                   </div>
-                  <h3 className="font-semibold text-lg">Review Leads</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Approve or reject</p>
+                  <h3 className="font-semibold text-lg">Call Reports</h3>
+                  <p className="text-sm text-muted-foreground mt-1">View performance</p>
                 </div>
               </CardContent>
             </Card>
           </div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Recent Activity</CardTitle>

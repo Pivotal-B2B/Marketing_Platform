@@ -1,7 +1,7 @@
-import { 
-  LayoutDashboard, 
-  Building2, 
-  Users, 
+import {
+  LayoutDashboard,
+  Building2,
+  Users,
   Megaphone,
   CheckCircle,
   BarChart3, // Changed from BarChart to BarChart3
@@ -171,9 +171,12 @@ const getNavSections = (): NavSection[] => [
     items: [
       {
         title: "Reports",
-        url: "/reports",
         icon: BarChart3, // Changed from BarChart to BarChart3
-        roles: ["admin", "campaign_manager", "qa_analyst", "client_user"],
+        roles: ["admin", "campaign_manager", "agent"],
+        items: [
+          { title: "Overview", url: "/reports", roles: ["admin", "campaign_manager"] },
+          { title: "Call Reports", url: "/call-reports", roles: ["admin", "campaign_manager", "agent"] },
+        ],
       },
       {
         title: "Projects Management",
@@ -330,8 +333,8 @@ export function AppSidebar({ userRoles = ["admin"] }: { userRoles?: string[] }) 
                     if (!item.items || item.items.length === 0) {
                       return (
                         <SidebarMenuItem key={item.title}>
-                          <SidebarMenuButton 
-                            asChild 
+                          <SidebarMenuButton
+                            asChild
                             isActive={isActive(item.url)}
                             data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                           >
@@ -390,9 +393,9 @@ export function AppSidebar({ userRoles = ["admin"] }: { userRoles?: string[] }) 
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t">
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start" 
+        <Button
+          variant="ghost"
+          className="w-full justify-start"
           data-testid="button-logout"
         >
           <LogOut className="mr-2 h-4 w-4" />

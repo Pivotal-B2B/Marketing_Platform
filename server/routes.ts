@@ -6,6 +6,7 @@ import webhooksRouter from "./routes/webhooks";
 import dvRouter from "./routes/dv-routes";
 import queueRouter from "./routes/queue-routes";
 import filterOptionsRouter from "./routes/filter-options-routes";
+import reportingRoutes from './routes/reporting-routes';
 import { z } from "zod";
 import { db } from "./db";
 import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts } from "@shared/schema";
@@ -498,7 +499,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/contacts", requireAuth, async (req, res) => {
     try {
       let filters = undefined;
-      
+
       // Support new FilterValues format
       if (req.query.filterValues) {
         try {
@@ -517,7 +518,7 @@ export function registerRoutes(app: Express) {
           return res.status(400).json({ message: "Invalid filters format" });
         }
       }
-      
+
       const contacts = await storage.getContacts(filters);
       res.json(contacts);
     } catch (error) {
@@ -1673,12 +1674,12 @@ export function registerRoutes(app: Express) {
           })
           .from(campaigns)
           .where(eq(campaigns.type, 'call'));
-        
+
         console.log(`[AGENT ASSIGNMENTS] Admin user ${agentId} - found ${allCampaigns.length} call campaigns:`, allCampaigns.map(c => ({ id: c.campaignId, name: c.campaignName, dialMode: c.dialMode })));
-        
+
         return res.status(200).json(allCampaigns);
       }
-      
+
       // Agents see only their assigned campaigns
       const assignments = await db
         .select({
@@ -1694,9 +1695,9 @@ export function registerRoutes(app: Express) {
             eq(campaignAgentAssignments.isActive, true)
           )
         );
-      
+
       console.log(`[AGENT ASSIGNMENTS] Agent user ${agentId} - returning ${assignments.length} assigned campaigns`);
-      
+
       return res.status(200).json(assignments);
     } catch (error) {
       console.error('[AGENT ASSIGNMENTS] Error:', error);
@@ -1922,7 +1923,7 @@ export function registerRoutes(app: Express) {
           // Build all queue items for bulk insert (much faster than individual inserts)
           const queueItems: any[] = [];
           const now = new Date();
-          
+
           for (const agentId of agentIds) {
             for (const contact of validContacts) {
               queueItems.push({
@@ -1942,7 +1943,7 @@ export function registerRoutes(app: Express) {
           // Bulk insert in batches - simplified without conflict handling for now
           let totalAdded = 0;
           const insertBatchSize = 500; // Smaller batches for stability
-          
+
           // Clear existing queue items for these agents first
           for (const agentId of agentIds) {
             await db.delete(agentQueue).where(
@@ -1952,7 +1953,7 @@ export function registerRoutes(app: Express) {
               )
             );
           }
-          
+
           for (let i = 0; i < queueItems.length; i += insertBatchSize) {
             const batch = queueItems.slice(i, i + insertBatchSize);
             try {
@@ -2223,13 +2224,13 @@ export function registerRoutes(app: Express) {
   app.post("/api/campaigns/:id/dial-mode", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
       const { dialMode } = req.body;
-      
+
       if (!['manual', 'power'].includes(dialMode)) {
         return res.status(400).json({ message: "Invalid dial mode. Must be 'manual' or 'power'" });
       }
 
       const campaign = await storage.updateCampaign(req.params.id, { dialMode });
-      
+
       if (!campaign) {
         return res.status(404).json({ message: "Campaign not found" });
       }
@@ -2254,7 +2255,7 @@ export function registerRoutes(app: Express) {
       const manualQueueService = new ManualQueueService();
 
       let actualFilters: any;
-      
+
       if (contactIds && Array.isArray(contactIds) && contactIds.length > 0) {
         // Convert contact IDs to a filter
         actualFilters = {
@@ -2330,7 +2331,7 @@ export function registerRoutes(app: Express) {
       const manualQueueService = new ManualQueueService();
 
       const contact = await manualQueueService.pullNextContact(req.params.id, agentId);
-      
+
       if (!contact) {
         return res.status(404).json({ message: "No contacts available in queue" });
       }
@@ -2369,9 +2370,9 @@ export function registerRoutes(app: Express) {
   app.get("/api/campaigns/:id/pacing-metrics", requireAuth, async (req, res) => {
     try {
       const { powerDialerEngine } = await import('./services/auto-dialer');
-      
+
       const metrics = powerDialerEngine.getPacingMetrics(req.params.id);
-      
+
       if (!metrics) {
         return res.json({
           callsInitiated: 0,
@@ -2467,19 +2468,19 @@ export function registerRoutes(app: Express) {
       }
 
       const { campaignId, status } = req.query;
-      
+
       console.log(`[AGENT QUEUE] Fetching queue for agent ${agentId}, campaign: ${campaignId}, status: ${status}`);
-      
+
       // If campaignId is specified, check dial mode to determine which queue to use
       if (campaignId) {
         const campaign = await storage.getCampaign(campaignId as string);
-        
+
         if (!campaign) {
           return res.status(404).json({ message: "Campaign not found" });
         }
 
         console.log(`[AGENT QUEUE] Campaign ${campaignId} dial mode: ${campaign.dialMode}`);
-        
+
         if (campaign?.dialMode === 'manual') {
           // Manual dial: query agent_queue (manual pull queue)
           const manualQueue = await db
@@ -2510,7 +2511,7 @@ export function registerRoutes(app: Express) {
               )
             )
             .orderBy(desc(agentQueue.priority), agentQueue.createdAt);
-          
+
           console.log(`[AGENT QUEUE] Manual queue returned ${manualQueue.length} items`);
           return res.json(manualQueue);
         } else if (campaign?.dialMode === 'power') {
@@ -2543,12 +2544,12 @@ export function registerRoutes(app: Express) {
               )
             )
             .orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
-          
+
           console.log(`[AGENT QUEUE] Power queue returned ${powerQueue.length} items`);
           return res.json(powerQueue);
         }
       }
-      
+
       // Fallback: no campaign specified, return empty array
       console.log(`[AGENT QUEUE] No campaign specified, returning empty array`);
       res.json([]);
@@ -2598,12 +2599,12 @@ export function registerRoutes(app: Express) {
       });
 
       const call = await storage.createCallDisposition(validated);
-      
+
       // SHARED QUEUE: Remove contact from ALL agents' queues after disposition
       if (req.body.contactId && req.body.campaignId) {
         try {
           console.log(`[DISPOSITION] Removing contact ${req.body.contactId} from ALL agents' queues in campaign ${req.body.campaignId}`);
-          
+
           // Remove from ALL agents' queues (contact is now "claimed" by the agent who disposed it)
           const removed = await db.delete(agentQueue)
             .where(
@@ -2613,7 +2614,7 @@ export function registerRoutes(app: Express) {
               )
             )
             .returning({ agentId: agentQueue.agentId, queueState: agentQueue.queueState });
-          
+
           if (removed.length > 0) {
             console.log(`[DISPOSITION] Removed contact from ${removed.length} agents' queues:`, removed.map(r => `${r.agentId} (${r.queueState})`));
           }
@@ -2622,7 +2623,7 @@ export function registerRoutes(app: Express) {
           // Don't fail the disposition if this fails
         }
       }
-      
+
       res.status(201).json(call);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -4901,17 +4902,17 @@ export function registerRoutes(app: Express) {
     try {
       const { transcribeLeadCall } = await import('./services/assemblyai-transcription');
       const { leads } = await import('@shared/schema');
-      
+
       // Update status to pending
       await db.update(leads)
         .set({ transcriptionStatus: 'pending' })
         .where(eq(leads.id, req.params.id));
-      
+
       // Start transcription in background (don't wait)
       transcribeLeadCall(req.params.id).catch(err => {
         console.error('Background transcription error:', err);
       });
-      
+
       // Return immediately
       res.status(202).json({ message: "Transcription started - check status later" });
     } catch (error) {
@@ -4925,7 +4926,7 @@ export function registerRoutes(app: Express) {
     try {
       const { analyzeLeadQualification } = await import('./services/ai-qa-analyzer');
       const analysis = await analyzeLeadQualification(req.params.id);
-      
+
       if (analysis) {
         res.json(analysis);
       } else {
@@ -4942,7 +4943,7 @@ export function registerRoutes(app: Express) {
     try {
       const { enrichAccountData } = await import('./services/ai-account-enrichment');
       const enrichmentResult = await enrichAccountData(req.params.id);
-      
+
       if (enrichmentResult) {
         res.json(enrichmentResult);
       } else {
@@ -4959,7 +4960,7 @@ export function registerRoutes(app: Express) {
     try {
       const { verifyAccountAgainstCriteria } = await import('./services/ai-account-enrichment');
       const { client_criteria } = req.body;
-      
+
       const verification = await verifyAccountAgainstCriteria(req.params.id, client_criteria);
       res.json(verification);
     } catch (error) {
@@ -4972,12 +4973,12 @@ export function registerRoutes(app: Express) {
   app.post("/api/campaigns/:id/enrich-accounts", requireAuth, async (req, res) => {
     try {
       const { enrichCampaignAccounts } = await import('./services/ai-account-enrichment');
-      
+
       // Start enrichment in background (don't wait)
       enrichCampaignAccounts(req.params.id).catch(err => {
         console.error('Background enrichment error:', err);
       });
-      
+
       res.json({ message: "Account enrichment started in background" });
     } catch (error) {
       console.error('Campaign enrichment error:', error);
@@ -4989,12 +4990,12 @@ export function registerRoutes(app: Express) {
   app.patch("/api/campaigns/:id/qa-parameters", requireAuth, async (req, res) => {
     try {
       const { qaParameters, clientSubmissionConfig } = req.body;
-      
+
       await storage.updateCampaign(req.params.id, {
         qaParameters,
         clientSubmissionConfig,
       });
-      
+
       res.json({ message: "QA parameters updated successfully" });
     } catch (error) {
       console.error('QA parameters update error:', error);
@@ -5006,7 +5007,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/leads/:id/submit-to-client", requireAuth, async (req, res) => {
     try {
       const { leads } = await import('@shared/schema');
-      
+
       // Get lead and campaign
       const [lead] = await db.select().from(leads).where(eq(leads.id, req.params.id)).limit(1);
       if (!lead) {
@@ -5023,14 +5024,14 @@ export function registerRoutes(app: Express) {
       }
 
       const submissionConfig = campaign.clientSubmissionConfig as any;
-      
+
       // Get contact and account data
       const [contact] = lead.contactId ? await db.select().from(contactsTable).where(eq(contactsTable.id, lead.contactId)).limit(1) : [null];
       const [account] = contact?.accountId ? await db.select().from(accountsTable).where(eq(accountsTable.id, contact.accountId)).limit(1) : [null];
 
       // Prepare submission data
       const submissionData: any = {};
-      
+
       if (submissionConfig.fieldMappings) {
         for (const [clientField, crmField] of Object.entries(submissionConfig.fieldMappings)) {
           if (crmField === 'contact.email') submissionData[clientField] = contact?.email;
@@ -5080,7 +5081,7 @@ export function registerRoutes(app: Express) {
     try {
       const { entityType, entityId } = req.params;
       const limitParam = req.query.limit as string | undefined;
-      
+
       // Validate params
       const paramsSchema = z.object({
         entityType: z.enum(['contact', 'account', 'campaign', 'call_job', 'call_session', 'lead', 'user', 'email_message']),
@@ -5093,7 +5094,7 @@ export function registerRoutes(app: Express) {
         entityId,
         limit: limitParam ? parseInt(limitParam) : 50,
       });
-      
+
       const logs = await storage.getActivityLogs(
         validatedParams.entityType,
         validatedParams.entityId,
@@ -5113,7 +5114,7 @@ export function registerRoutes(app: Express) {
   app.post("/api/activity-log", requireAuth, async (req: Request, res: Response) => {
     try {
       const validatedData = insertActivityLogSchema.omit({ createdBy: true }).parse(req.body);
-      
+
       const log = await storage.createActivityLog({
         ...validatedData,
         createdBy: req.user!.userId, // Always use authenticated user - cannot be spoofed
@@ -5143,4 +5144,7 @@ export function registerRoutes(app: Express) {
   // ==================== FILTER OPTIONS ====================
 
   app.use("/api/filters/options", filterOptionsRouter);
+
+  // ==================== CALL CAMPAIGN REPORTING ROUTES ====================
+  app.use('/api/reports/calls', reportingRoutes);
 }
