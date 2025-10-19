@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -10,16 +10,26 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+
+  // Redirect after successful login once authentication state is updated
+  useEffect(() => {
+    if (loginSuccess && isAuthenticated) {
+      console.log('[LOGIN] Authentication confirmed, redirecting to /');
+      setLocation("/");
+    }
+  }, [loginSuccess, isAuthenticated, setLocation]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('[LOGIN] Form submitted, username:', username);
     setIsLoading(true);
+    setLoginSuccess(false);
 
     try {
       console.log('[LOGIN] Sending POST request to /api/auth/login');
@@ -43,9 +53,8 @@ export default function LoginPage() {
       console.log('[LOGIN] Calling login() with token and user');
       login(data.token, data.user);
       
-      // Redirect to dashboard
-      console.log('[LOGIN] Redirecting to /');
-      setLocation("/");
+      // Set success flag to trigger redirect in useEffect after state updates
+      setLoginSuccess(true);
       
       toast({
         title: "Welcome back!",
@@ -58,7 +67,6 @@ export default function LoginPage() {
         title: "Login failed",
         description: error instanceof Error ? error.message : "Invalid credentials",
       });
-    } finally {
       setIsLoading(false);
     }
   };

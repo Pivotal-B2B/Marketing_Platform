@@ -34,7 +34,16 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-  const isAgent = user?.role === 'agent';
+  
+  // Get user roles array (support both legacy single role and new multi-role system)
+  const userRoles = (user as any)?.roles || [user?.role || ''];
+  
+  // Show agent dashboard ONLY if user has agent role and NO other elevated roles
+  // Users with qa_analyst, admin, or campaign_manager roles should see the full dashboard
+  const isAgent = userRoles.includes('agent') && 
+                  !userRoles.includes('admin') && 
+                  !userRoles.includes('campaign_manager') && 
+                  !userRoles.includes('qa_analyst');
   
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
