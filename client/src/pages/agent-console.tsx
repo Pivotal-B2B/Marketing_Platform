@@ -625,23 +625,6 @@ export default function AgentConsolePage() {
               </>
             )}
           </div>
-
-          {/* Device Controls */}
-          <div className="p-3 border-t bg-white space-y-2">
-            <p className="text-xs text-muted-foreground mb-2">Audio Controls</p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleMute}
-                disabled={!isCallActive}
-                className="flex-1"
-                data-testid="button-mute"
-              >
-                {isMuted ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
-              </Button>
-            </div>
-          </div>
         </div>
 
         {/* RIGHT MAIN SECTION (82% width) */}
@@ -729,6 +712,30 @@ export default function AgentConsolePage() {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Audio Controls - Integrated */}
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleMute}
+                    disabled={!isCallActive}
+                    className="bg-white/20 hover:bg-white/30 border-white/30 text-white backdrop-blur-sm"
+                    data-testid="button-mute"
+                  >
+                    {isMuted ? (
+                      <>
+                        <MicOff className="h-4 w-4 mr-2" />
+                        Unmute
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="h-4 w-4 mr-2" />
+                        Mute
+                      </>
+                    )}
+                  </Button>
                 </div>
 
                 {/* Call Button - Premium Design */}
