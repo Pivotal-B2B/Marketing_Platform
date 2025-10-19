@@ -31,23 +31,23 @@ export function TopBar({ userName = "Admin User", userRoles = ["admin"] }: { use
   };
 
   return (
-    <header className="flex items-center justify-between gap-4 border-b bg-background px-4 py-3">
-      <div className="flex items-center gap-4">
+    <header className="flex items-center justify-between gap-2 sm:gap-4 border-b bg-background px-2 sm:px-4 py-2 sm:py-3">
+      <div className="flex items-center gap-2 sm:gap-4">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
         <ThemeToggle />
 
-        <Button variant="ghost" size="icon" data-testid="button-help">
+        <Button variant="ghost" size="icon" className="hidden sm:flex" data-testid="button-help">
           <HelpCircle className="h-5 w-5" />
         </Button>
 
         <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
-          <Bell className="h-5 w-5" />
+          <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
           <Badge
             variant="destructive"
-            className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+            className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center p-0 text-[10px] sm:text-xs"
           >
             3
           </Badge>

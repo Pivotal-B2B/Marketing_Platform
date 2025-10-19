@@ -86,7 +86,7 @@ function AuthenticatedApp() {
             userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || 'User'} 
             userRoles={userRoles}
           />
-          <main className="flex-1 overflow-auto p-6 bg-background">
+          <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 bg-background">
             <Switch>
               <Route path="/" component={Dashboard} />
               <Route path="/accounts/:id" component={AccountDetailPage} />

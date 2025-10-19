@@ -551,23 +551,23 @@ export default function AgentConsolePage() {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50">
       {/* TOP FIXED HEADER - Premium Gradient Design */}
-      <div className="h-20 border-b shadow-2xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)' }}>
+      <div className="h-auto lg:h-20 border-b shadow-2xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)' }}>
         {/* Decorative overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0"></div>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
-        <div className="relative h-full px-6 flex items-center justify-between">
+        <div className="relative h-full px-3 sm:px-6 py-3 lg:py-0 flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:gap-0 justify-between">
           {/* Left: Title & Queue Management */}
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-white font-semibold text-lg" data-testid="text-page-title">Agent Console</h1>
-              <p className="text-white/70 text-xs">
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap lg:flex-nowrap w-full lg:w-auto">
+            <div className="flex-1 lg:flex-none">
+              <h1 className="text-white font-semibold text-base sm:text-lg" data-testid="text-page-title">Agent Console</h1>
+              <p className="text-white/70 text-xs line-clamp-1">
                 {campaignDetails?.name || 'Select a campaign'}
               </p>
             </div>
             
             {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
               <>
-                <Separator orientation="vertical" className="h-8 bg-white/20" />
+                <Separator orientation="vertical" className="h-8 bg-white/20 hidden lg:block" />
                 <QueueControls 
                   campaignId={selectedCampaignId}
                   compact={true}
@@ -584,19 +584,19 @@ export default function AgentConsolePage() {
           </div>
 
           {/* Center: Queue Progress */}
-          <div className="flex-1 max-w-md mx-8">
+          <div className="flex-1 max-w-md w-full lg:mx-8">
             <div className="text-center mb-1">
-              <span className="text-white text-sm font-medium">
+              <span className="text-white text-xs sm:text-sm font-medium">
                 Contact {currentContactIndex + 1} of {queueData.length}
               </span>
             </div>
-            <Progress value={queueProgress} className="h-2 bg-white/20" />
+            <Progress value={queueProgress} className="h-1.5 sm:h-2 bg-white/20" />
           </div>
 
           {/* Right: Status & Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap lg:flex-nowrap w-full lg:w-auto">
             <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
-              <SelectTrigger className="w-[200px] bg-white/10 text-white border-white/20" data-testid="select-campaign">
+              <SelectTrigger className="w-full sm:w-[180px] lg:w-[200px] bg-white/10 text-white border-white/20 text-sm" data-testid="select-campaign">
                 <SelectValue placeholder="Select campaign" />
               </SelectTrigger>
               <SelectContent>
@@ -616,16 +616,16 @@ export default function AgentConsolePage() {
             )}
             
             {campaignDetails && dialMode === 'power' && amdEnabled && (
-              <Badge variant="outline" className="gap-1 bg-white/10 text-white border-white/20" data-testid="badge-amd-enabled">
+              <Badge variant="outline" className="gap-1 bg-white/10 text-white border-white/20 text-xs hidden sm:flex" data-testid="badge-amd-enabled">
                 <CheckCircle2 className="h-3 w-3" />
                 AMD
               </Badge>
             )}
             
             {callStatus === 'active' && (
-              <div className="flex items-center gap-2 text-white">
-                <Clock className="h-4 w-4" />
-                <span className="font-mono text-sm" data-testid="text-call-duration">{formatDuration()}</span>
+              <div className="flex items-center gap-1 sm:gap-2 text-white">
+                <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="font-mono text-xs sm:text-sm" data-testid="text-call-duration">{formatDuration()}</span>
               </div>
             )}
             
@@ -638,16 +638,16 @@ export default function AgentConsolePage() {
               className="text-white hover:bg-white/10"
               data-testid="button-refresh"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
           </div>
         </div>
       </div>
 
       {/* MAIN BODY GRID */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* LEFT SIDEBAR: Queue (18% width) - Modern Glass Design */}
-        <div className="w-[18%] border-r flex flex-col bg-gradient-to-b from-purple-50/50 to-white">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* LEFT SIDEBAR: Queue - Modern Glass Design */}
+        <div className="w-full lg:w-64 xl:w-72 border-b lg:border-b-0 lg:border-r flex flex-col bg-gradient-to-b from-purple-50/50 to-white max-h-96 lg:max-h-none">
           <div className="p-4 border-b relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%)' }}>
             <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
             <div className="relative">
@@ -751,24 +751,24 @@ export default function AgentConsolePage() {
             <div className="border-b relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%)' }}>
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0"></div>
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500"></div>
-              <div className="relative px-6 py-6 flex items-center gap-6 text-white">
+              <div className="relative px-3 sm:px-6 py-4 sm:py-6 flex items-start sm:items-center gap-3 sm:gap-6 text-white">
                 {/* Profile Picture - Enhanced */}
-                <div className="relative">
-                  <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-2xl border border-white/20">
-                    <User className="h-8 w-8 text-white" />
+                <div className="relative flex-shrink-0">
+                  <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-sm flex items-center justify-center shadow-2xl border border-white/20">
+                    <User className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                   </div>
-                  <div className="absolute -bottom-1 -right-1 h-5 w-5 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
+                  <div className="absolute -bottom-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
                 </div>
 
                 {/* Contact Information - Organized Layout */}
-                <div className="flex-1 flex flex-col gap-2">
+                <div className="flex-1 flex flex-col gap-1.5 sm:gap-2 min-w-0">
                   {/* Contact Name */}
-                  <h2 className="text-xl font-semibold" data-testid="text-contact-name">
+                  <h2 className="text-lg sm:text-xl font-semibold truncate" data-testid="text-contact-name">
                     {currentQueueItem.contactName || 'Unknown Contact'}
                   </h2>
                   
                   {/* Contact Details Grid */}
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-1.5">
                     {/* Job Title & Company */}
                     <div className="flex items-center gap-2 text-sm text-white/90">
                       <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
@@ -838,18 +838,18 @@ export default function AgentConsolePage() {
                     size="sm"
                     onClick={toggleMute}
                     disabled={!isCallActive}
-                    className="bg-white/20 hover:bg-white/30 border-white/30 text-white backdrop-blur-sm"
+                    className="bg-white/20 hover:bg-white/30 border-white/30 text-white backdrop-blur-sm text-xs sm:text-sm"
                     data-testid="button-mute"
                   >
                     {isMuted ? (
                       <>
-                        <MicOff className="h-4 w-4 mr-2" />
-                        Unmute
+                        <MicOff className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        <span className="hidden sm:inline">Unmute</span>
                       </>
                     ) : (
                       <>
-                        <Mic className="h-4 w-4 mr-2" />
-                        Mute
+                        <Mic className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        <span className="hidden sm:inline">Mute</span>
                       </>
                     )}
                   </Button>
@@ -860,30 +860,30 @@ export default function AgentConsolePage() {
                   {!isCallActive && callStatus !== 'wrap-up' && (
                     <Button
                       size="lg"
-                      className="h-16 w-36 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30"
+                      className="h-12 w-24 sm:h-16 sm:w-36 rounded-xl sm:rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-sm sm:text-base"
                       onClick={handleDial}
                       disabled={!currentQueueItem}
                       data-testid="button-dial"
                     >
-                      <Phone className="h-5 w-5 mr-2" />
-                      Call
+                      <Phone className="h-4 w-4 sm:h-5 sm:w-5 sm:mr-2" />
+                      <span className="hidden sm:inline">Call</span>
                     </Button>
                   )}
 
                   {isCallActive && (
                     <Button
                       size="lg"
-                      className="h-16 w-36 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30"
+                      className="h-12 w-24 sm:h-16 sm:w-36 rounded-xl sm:rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-sm sm:text-base"
                       onClick={handleHangup}
                       data-testid="button-hangup"
                     >
-                      <PhoneOff className="h-5 w-5 mr-2" />
-                      Hang Up
+                      <PhoneOff className="h-4 w-4 sm:h-5 sm:w-5 sm:mr-2" />
+                      <span className="hidden sm:inline">Hang Up</span>
                     </Button>
                   )}
 
                   {callStatus === 'wrap-up' && (
-                    <div className="h-16 w-36 flex items-center justify-center text-sm text-white font-medium text-center bg-white/20 backdrop-blur-sm rounded-2xl border-2 border-white/30 shadow-xl">
+                    <div className="h-12 w-24 sm:h-16 sm:w-36 flex items-center justify-center text-xs sm:text-sm text-white font-medium text-center bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl border-2 border-white/30 shadow-xl px-2">
                       Complete disposition below
                     </div>
                   )}
@@ -899,10 +899,10 @@ export default function AgentConsolePage() {
             </div>
           )}
 
-          {/* BOTTOM SPLIT: Script (70%) | Dispositions (30%) - Premium Design */}
-          <div className="flex-1 flex overflow-hidden min-h-0">
-            {/* LEFT: SCRIPT PANEL (70%) - Enhanced Card */}
-            <div className="w-[70%] border-r p-4 bg-gradient-to-br from-indigo-50/50 via-purple-50/30 to-pink-50/20">
+          {/* BOTTOM SPLIT: Script | Dispositions - Premium Design */}
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+            {/* LEFT: SCRIPT PANEL - Enhanced Card */}
+            <div className="w-full lg:flex-[2] border-b lg:border-b-0 lg:border-r p-3 md:p-4 bg-gradient-to-br from-indigo-50/50 via-purple-50/30 to-pink-50/20 min-h-[300px] lg:min-h-0">
               <Card className="border-0 shadow-2xl h-full flex flex-col bg-white/80 backdrop-blur-sm">
                 <CardHeader className="pb-3 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border-b border-purple-100 flex-shrink-0">
                   <CardTitle className="flex items-center gap-3 text-base">
@@ -949,8 +949,8 @@ export default function AgentConsolePage() {
               </Card>
             </div>
 
-            {/* RIGHT: DISPOSITIONS PANEL (30%) - Premium Cards */}
-            <div className="w-[30%] p-3 bg-gradient-to-br from-slate-50 to-gray-50 min-h-0">
+            {/* RIGHT: DISPOSITIONS PANEL - Premium Cards */}
+            <div className="w-full lg:flex-1 p-2 md:p-3 bg-gradient-to-br from-slate-50 to-gray-50 min-h-0 overflow-auto">
               <div className="p-4 space-y-4">
                 {/* Call Notes - Enhanced */}
                 <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
