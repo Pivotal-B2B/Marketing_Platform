@@ -279,7 +279,7 @@ function buildCompanyFieldCondition(
       
       if (isArrayField) {
         // For array fields, use array overlap operator
-        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)})`;
+        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} && ARRAY[${sql.join(values.map(v => sql`${v}`), sql`, `)}]::text[])`;
       } else {
         // For text/enum fields, use ILIKE with OR
         const orConditions = values.map(v => sql`${compareColumnContains} ILIKE ${'%' + String(v) + '%'}`);
@@ -296,7 +296,7 @@ function buildCompanyFieldCondition(
         // For array fields, include NULL and empty arrays
         return or(
           isNull(contacts.accountId),
-          sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (NOT (${accountColumn} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)}) OR ${accountColumn} IS NULL OR ${accountColumn} = '{}'))`
+          sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (NOT (${accountColumn} && ARRAY[${sql.join(values.map(v => sql`${v}`), sql`, `)}]::text[]) OR ${accountColumn} IS NULL OR ${accountColumn} = '{}'))`
         );
       } else {
         // For text/enum fields, include NULL (and empty strings only for text fields)
@@ -416,7 +416,7 @@ function buildRegularFieldCondition(
       // Multi-value OR: contains ANY of the values
       if (isArrayField) {
         // For array fields, use array overlap operator
-        return sql`${column} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)}`;
+        return sql`${column} && ARRAY[${sql.join(values.map(v => sql`${v}`), sql`, `)}]::text[]`;
       } else {
         // For text/enum fields, use ILIKE with OR
         const orConditions = values.map(v => sql`${compareColumn} ILIKE ${'%' + String(v) + '%'}`);
@@ -429,7 +429,7 @@ function buildRegularFieldCondition(
       if (isArrayField) {
         // For array fields, include NULL and empty arrays
         return or(
-          sql`NOT (${column} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)})`,
+          sql`NOT (${column} && ARRAY[${sql.join(values.map(v => sql`${v}`), sql`, `)}]::text[])`,
           isNull(column),
           sql`${column} = '{}'`
         );
