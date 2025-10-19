@@ -3,6 +3,14 @@
 ## Overview
 Pivotal CRM is an enterprise-grade B2B customer relationship management platform designed to streamline B2B sales and marketing operations. It specializes in Account-Based Marketing (ABM), multi-channel campaign management (Email & Telemarketing), lead qualification, and includes a client portal. The platform emphasizes efficient customer engagement, robust compliance (DNC/Unsubscribe), comprehensive lead QA workflows, and features a "bridge model" for linking campaigns to orders. Its business vision is to provide a comprehensive, intelligent platform that drives sales growth and operational efficiency for B2B enterprises, capturing market share through advanced ABM and integrated campaign management.
 
+## Recent Changes (October 2025)
+- **Agent-Specific Dashboard**: Implemented personalized dashboard views for agent role users showing individual performance metrics (calls today/month, qualified leads, average call duration, approved/pending leads, and active campaigns). Admin/manager users continue to see global statistics.
+- **Filter Options Fix**: Fixed filter dropdown endpoints to query actual database tables instead of showing empty results or text boxes:
+  - `/api/filters/options/lists` - Now queries `lists` table to show actual Static Lists
+  - `/api/filters/options/segments` - Now queries `segments` table to show actual Dynamic Segments (was returning empty array)
+  - `/api/filters/options/domain-sets` - New endpoint that queries `domainSets` table to show Domain Sets/TAL
+- **Null-Safety Improvements**: Enhanced agent dashboard with crash-resistant error handling using nullish coalescing operators and toast-based error notifications for API failures.
+
 ## User Preferences
 - Clean, minimal enterprise design
 - Professional blue color scheme (trust, reliability)
