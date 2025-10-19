@@ -156,6 +156,8 @@ function buildCondition(condition: FilterCondition, table: TableType): SQL | und
 
   // Handle company fields for contacts (requires JOIN to accounts table)
   const companyFields = ['industries', 'industry', 'companySizes', 'companyRevenue', 'technologies', 'techStack'];
+  const arrayCompanyFields = ['technologies', 'techStack']; // Array fields
+  
   if (table === contacts && companyFields.includes(field)) {
     const accountColumnName = getColumnName(field, accounts);
     const accountColumn = (accounts as any)[accountColumnName];
@@ -165,32 +167,63 @@ function buildCondition(condition: FilterCondition, table: TableType): SQL | und
       return undefined;
     }
     
+    const isArrayField = arrayCompanyFields.includes(field);
+    
     // Build EXISTS subquery with account JOIN
+    // CRITICAL: Must check contacts.accountId IS NOT NULL to exclude contacts without accounts
     if (operator === 'equals') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${value})`;
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${value})`;
     } else if (operator === 'notEquals') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} != ${value})`;
+      // NOT EXISTS excludes contacts with no account OR contacts whose account has this value
+      return sql`${contacts.accountId} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${value})`;
     } else if (operator === 'contains') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value + '%'})`;
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value + '%'})`;
     } else if (operator === 'doesNotContain') {
-      return sql`NOT EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value + '%'})`;
+      return sql`${contacts.accountId} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value + '%'})`;
     } else if (operator === 'startsWith') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${value + '%'})`;
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${value + '%'})`;
     } else if (operator === 'endsWith') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value})`;
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value})`;
     } else if (operator === 'containsAny') {
       const values = value as string[];
       if (values.length === 0) return undefined;
-      // For array fields like techStack
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} && ${values})`;
+      
+      if (isArrayField) {
+        // For array fields like techStack, let Drizzle handle array parameterization
+        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} && ${values})`;
+      } else {
+        // For scalar fields like industry/revenue, use inArray
+        return and(
+          isNotNull(contacts.accountId),
+          sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${inArray(accountColumn, values)})`
+        )!;
+      }
     } else if (operator === 'containsAll') {
       const values = value as string[];
       if (values.length === 0) return undefined;
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} @> ${values})`;
+      
+      if (isArrayField) {
+        // For array fields, let Drizzle handle array parameterization
+        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} @> ${values})`;
+      } else {
+        // containsAll doesn't make sense for scalar fields - fail gracefully
+        // For now, match ALL values using AND clauses (equivalent to IN with all values)
+        if (values.length === 1) {
+          return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${values[0]})`;
+        }
+        // For multiple values, a scalar can only equal one value, so this is impossible
+        // Return a condition that's always false
+        return sql`FALSE`;
+      }
     } else if (operator === 'isEmpty') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${accountColumn} IS NULL OR ${accountColumn} = ''))`;
+      // Check if contact has no account OR account field is empty
+      return or(
+        isNull(contacts.accountId),
+        sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${accountColumn} IS NULL OR ${accountColumn} = ''))`
+      );
     } else if (operator === 'isNotEmpty') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} IS NOT NULL AND ${accountColumn} != '')`;
+      // Contact must have account AND field must not be empty
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} IS NOT NULL AND ${accountColumn} != '')`;
     }
   }
 
