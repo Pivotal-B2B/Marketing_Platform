@@ -2245,7 +2245,7 @@ export function registerRoutes(app: Express) {
   // Add contacts to manual queue (with filters)
   app.post("/api/campaigns/:id/manual/queue/add", requireAuth, requireRole('admin', 'campaign_manager', 'agent'), async (req, res) => {
     try {
-      const { agentId, filters, contactIds, limit = 100 } = req.body;
+      const { agentId, filters, contactIds, limit = 1000 } = req.body;
 
       if (!agentId) {
         return res.status(400).json({ message: "agentId is required" });
@@ -2600,6 +2600,42 @@ export function registerRoutes(app: Express) {
       });
 
       const call = await storage.createCallDisposition(validated);
+
+      // Handle DNC requests - add to global suppression list
+      if (req.body.disposition === 'dnc_request' && req.body.contactId) {
+        try {
+          console.log(`[DISPOSITION] DNC request for contact ${req.body.contactId}`);
+          
+          // Get contact details to add phone to suppression list
+          const contact = await storage.getContact(req.body.contactId);
+          
+          if (contact) {
+            // Add phone numbers to global DNC list
+            const phonesToSuppress: string[] = [];
+            if (contact.directPhoneE164) phonesToSuppress.push(contact.directPhoneE164);
+            if (contact.mobilePhoneE164) phonesToSuppress.push(contact.mobilePhoneE164);
+            
+            for (const phone of phonesToSuppress) {
+              try {
+                await storage.addPhoneSuppression({
+                  phoneE164: phone,
+                  reason: 'DNC request from agent',
+                  source: `Agent Console - ${agentId}`,
+                });
+                console.log(`[DISPOSITION] Added ${phone} to global DNC list`);
+              } catch (error) {
+                // Ignore duplicate key errors (phone already in DNC)
+                if (!error.message?.includes('duplicate key') && !error.message?.includes('unique constraint')) {
+                  console.error(`[DISPOSITION] Error adding ${phone} to DNC:`, error);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[DISPOSITION] Error handling DNC request:', error);
+          // Don't fail the disposition if this fails
+        }
+      }
 
       // SHARED QUEUE: Remove contact from ALL agents' queues after disposition
       if (req.body.contactId && req.body.campaignId) {

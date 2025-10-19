@@ -997,7 +997,7 @@ export default function AgentConsolePage() {
                           <SelectItem value="voicemail">📧 Voicemail</SelectItem>
                           <SelectItem value="no_answer">📵 No Answer</SelectItem>
                           <SelectItem value="busy">⏰ Busy</SelectItem>
-                          <SelectItem value="dnc_request">🚫 DNC</SelectItem>
+                          <SelectItem value="dnc_request">🚫 Do Not Call</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
