@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Check, ChevronsUpDown, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +28,7 @@ interface MultiSelectFilterProps {
   max?: number;
   placeholder?: string;
   testId?: string;
+  onOptionsLoaded?: (labels: Record<string, string>) => void;
 }
 
 export function MultiSelectFilter({
@@ -37,7 +38,8 @@ export function MultiSelectFilter({
   onChange,
   max = 10,
   placeholder = "Select options...",
-  testId
+  testId,
+  onOptionsLoaded
 }: MultiSelectFilterProps) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,6 +55,17 @@ export function MultiSelectFilter({
       name: opt.name || opt.label || opt.id
     }));
   }, [data]);
+
+  // Register option labels when options are loaded (useEffect to avoid render loops)
+  useEffect(() => {
+    if (options.length > 0 && onOptionsLoaded) {
+      const labels = options.reduce((acc, opt) => {
+        acc[opt.id] = opt.name;
+        return acc;
+      }, {} as Record<string, string>);
+      onOptionsLoaded(labels);
+    }
+  }, [options, onOptionsLoaded]);
 
   const filteredOptions = useMemo(() => {
     if (!searchTerm) return options;

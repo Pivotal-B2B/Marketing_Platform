@@ -6,7 +6,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon, Link as LinkIcon, Building2 } from "lucide-react";
-import { FilterBuilder } from "@/components/filter-builder";
+import { FilterShell } from "@/components/filters/filter-shell";
+import { FilterValues } from "@shared/filterConfig";
 import type { FilterGroup } from "@shared/filter-types";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
 import { exportContactsToCSV, downloadCSV, generateContactsTemplate } from "@/lib/csv-utils";
@@ -62,8 +63,9 @@ export default function ContactsPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [bulkUpdateDialogOpen, setBulkUpdateDialogOpen] = useState(false);
   const [addToListDialogOpen, setAddToListDialogOpen] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<FilterValues>({});
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>(() => {
-    // Check if there's a filter in sessionStorage
+    // Check if there's a filter in sessionStorage (legacy support)
     const savedFilter = sessionStorage.getItem('contactsFilter');
     if (savedFilter) {
       sessionStorage.removeItem('contactsFilter'); // Clear after reading
@@ -83,7 +85,7 @@ export default function ContactsPage() {
   const ITEMS_PER_PAGE = 250;
 
   const { data: contacts, isLoading: contactsLoading } = useQuery<Contact[]>({
-    queryKey: ['/api/contacts', filterGroup],
+    queryKey: ['/api/contacts', appliedFilters, filterGroup],
     queryFn: async () => {
       const token = localStorage.getItem('authToken');
       const headers: HeadersInit = {};
@@ -92,7 +94,10 @@ export default function ContactsPage() {
       }
 
       const params = new URLSearchParams();
-      if (filterGroup) {
+      // Prefer new filter format, fallback to legacy
+      if (Object.keys(appliedFilters).length > 0) {
+        params.set('filterValues', JSON.stringify(appliedFilters));
+      } else if (filterGroup) {
         params.set('filters', JSON.stringify(filterGroup));
       }
       const response = await fetch(`/api/contacts?${params.toString()}`, {
@@ -589,10 +594,11 @@ export default function ContactsPage() {
             data-testid="input-search-contacts"
           />
         </div>
-        <FilterBuilder
-          entityType="contact"
-          onApplyFilter={setFilterGroup}
-          initialFilter={filterGroup}
+        <FilterShell
+          module="contacts"
+          onApplyFilters={setAppliedFilters}
+          initialFilters={appliedFilters}
+          data-testid="filter-shell-contacts"
         />
         <Button variant="outline" data-testid="button-export">
           <Download className="mr-2 h-4 w-4" />

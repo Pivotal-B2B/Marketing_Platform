@@ -29,6 +29,7 @@ interface AsyncTypeaheadFilterProps {
   placeholder?: string;
   parents?: Record<string, string[]>; // Parent filter dependencies (e.g., { countries: ['us', 'ca'] })
   testId?: string;
+  onOptionsLoaded?: (labels: Record<string, string>) => void;
 }
 
 export function AsyncTypeaheadFilter({
@@ -39,7 +40,8 @@ export function AsyncTypeaheadFilter({
   max = 10,
   placeholder = "Type to search...",
   parents = {},
-  testId
+  testId,
+  onOptionsLoaded
 }: AsyncTypeaheadFilterProps) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,6 +87,17 @@ export function AsyncTypeaheadFilter({
   });
 
   const options = data?.data || [];
+
+  // Register option labels when options are loaded
+  useEffect(() => {
+    if (options.length > 0 && onOptionsLoaded) {
+      const labels = options.reduce((acc, opt) => {
+        acc[opt.id] = opt.name;
+        return acc;
+      }, {} as Record<string, string>);
+      onOptionsLoaded(labels);
+    }
+  }, [options, onOptionsLoaded]);
 
   // Get selected options from current value
   const selectedOptions = useMemo(() => {

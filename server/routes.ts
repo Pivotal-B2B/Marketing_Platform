@@ -52,6 +52,80 @@ import {
   insertSponsorSchema
 } from "@shared/schema";
 import { normalizePhoneE164 } from "./normalization"; // Import normalization utility
+import type { FilterValues } from "@shared/filterConfig";
+import type { FilterGroup, FilterCondition } from "@shared/filter-types";
+
+// Helper to convert new FilterValues format to legacy FilterGroup format
+function convertFilterValuesToFilterGroup(filterValues: FilterValues): FilterGroup | undefined {
+  const conditions: FilterCondition[] = [];
+
+  // Map filter fields to database columns and operators
+  const fieldMapping: Record<string, { column: string; operator: string }> = {
+    industries: { column: 'account.industry', operator: 'in' },
+    companySizes: { column: 'account.companySize', operator: 'in' },
+    companyRevenue: { column: 'account.revenue', operator: 'in' },
+    seniorityLevels: { column: 'contact.seniorityLevel', operator: 'in' },
+    jobFunctions: { column: 'contact.jobFunction', operator: 'in' },
+    departments: { column: 'contact.department', operator: 'in' },
+    technologies: { column: 'account.technologies', operator: 'arrayContains' },
+    countries: { column: 'account.country', operator: 'in' },
+    states: { column: 'account.state', operator: 'in' },
+    cities: { column: 'account.city', operator: 'in' },
+    accountOwners: { column: 'account.ownerId', operator: 'in' }
+  };
+
+  // Process each filter value
+  Object.entries(filterValues).forEach(([key, value]) => {
+    if (!value) return;
+
+    // Handle array filters (multi-select and typeahead)
+    if (Array.isArray(value) && value.length > 0) {
+      const mapping = fieldMapping[key];
+      if (mapping) {
+        conditions.push({
+          field: mapping.column,
+          operator: mapping.operator as any,
+          value: value
+        });
+      }
+    }
+    // Handle date range filters
+    else if (typeof value === 'object' && ('from' in value || 'to' in value)) {
+      const dateRange = value as { from?: string; to?: string };
+      if (dateRange.from) {
+        conditions.push({
+          field: key,
+          operator: 'gte',
+          value: dateRange.from
+        });
+      }
+      if (dateRange.to) {
+        conditions.push({
+          field: key,
+          operator: 'lte',
+          value: dateRange.to
+        });
+      }
+    }
+    // Handle text search
+    else if (typeof value === 'string' && value.trim()) {
+      conditions.push({
+        field: key,
+        operator: 'contains',
+        value: value.trim()
+      });
+    }
+  });
+
+  if (conditions.length === 0) {
+    return undefined;
+  }
+
+  return {
+    combinator: 'and',
+    conditions
+  };
+}
 
 export function registerRoutes(app: Express) {
   // ==================== AUTH ====================
@@ -424,13 +498,26 @@ export function registerRoutes(app: Express) {
   app.get("/api/contacts", requireAuth, async (req, res) => {
     try {
       let filters = undefined;
-      if (req.query.filters) {
+      
+      // Support new FilterValues format
+      if (req.query.filterValues) {
+        try {
+          const filterValues = JSON.parse(req.query.filterValues as string);
+          // Convert FilterValues to FilterGroup format for backward compatibility
+          filters = convertFilterValuesToFilterGroup(filterValues);
+        } catch (e) {
+          return res.status(400).json({ message: "Invalid filterValues format" });
+        }
+      }
+      // Fallback to legacy filter format
+      else if (req.query.filters) {
         try {
           filters = JSON.parse(req.query.filters as string);
         } catch (e) {
           return res.status(400).json({ message: "Invalid filters format" });
         }
       }
+      
       const contacts = await storage.getContacts(filters);
       res.json(contacts);
     } catch (error) {

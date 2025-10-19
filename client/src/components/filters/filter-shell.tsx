@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Filter, Save, FolderOpen, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +66,16 @@ export function FilterShell({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [segmentName, setSegmentName] = useState("");
+  const [optionLabels, setOptionLabels] = useState<Record<string, Record<string, string>>>({});
   const { toast } = useToast();
+
+  // Helper to register option labels from child components (memoized to prevent render loops)
+  const registerOptionLabels = useCallback((field: string, labels: Record<string, string>) => {
+    setOptionLabels(prev => ({
+      ...prev,
+      [field]: { ...prev[field], ...labels }
+    }));
+  }, []);
 
   // Get allowed fields for this module and user role
   const allowedFields = useMemo(() => {
@@ -239,6 +248,7 @@ export function FilterShell({
               max={config.max}
               placeholder={config.placeholder}
               testId={`filter-${field}`}
+              onOptionsLoaded={(labels) => registerOptionLabels(field as string, labels)}
             />
           </div>
         );
@@ -263,6 +273,7 @@ export function FilterShell({
               placeholder={config.placeholder}
               parents={parents}
               testId={`filter-${field}`}
+              onOptionsLoaded={(labels) => registerOptionLabels(field as string, labels)}
             />
           </div>
         );
@@ -365,6 +376,7 @@ export function FilterShell({
           <div className="mt-4">
             <ChipsBar
               filters={filters}
+              optionLabels={optionLabels}
               onRemove={removeFilterValue}
               onClearAll={clearAllFilters}
             />
