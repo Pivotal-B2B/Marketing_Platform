@@ -269,6 +269,7 @@ export interface IStorage {
   // Leads
   getLeads(filters?: any): Promise<LeadWithAccount[]>;
   getLead(id: string): Promise<Lead | undefined>;
+  getLeadWithDetails(id: string): Promise<any | undefined>;
   createLead(lead: InsertLead): Promise<Lead>;
   createLeadFromCallAttempt(callAttemptId: string): Promise<Lead | undefined>;
   updateLead(id: string, lead: Partial<InsertLead>): Promise<Lead | undefined>;
@@ -2658,6 +2659,91 @@ export class DatabaseStorage implements IStorage {
   async getLead(id: string): Promise<Lead | undefined> {
     const [lead] = await db.select().from(leads).where(eq(leads.id, id));
     return lead || undefined;
+  }
+
+  async getLeadWithDetails(id: string): Promise<any | undefined> {
+    const agentUser = aliasedTable(users, 'agentUser');
+    const approverUser = aliasedTable(users, 'approverUser');
+    
+    const [result] = await db
+      .select({
+        // Lead fields
+        id: leads.id,
+        contactId: leads.contactId,
+        contactName: leads.contactName,
+        contactEmail: leads.contactEmail,
+        campaignId: leads.campaignId,
+        callAttemptId: leads.callAttemptId,
+        recordingUrl: leads.recordingUrl,
+        callDuration: leads.callDuration,
+        agentId: leads.agentId,
+        qaStatus: leads.qaStatus,
+        checklistJson: leads.checklistJson,
+        approvedAt: leads.approvedAt,
+        approvedById: leads.approvedById,
+        rejectedReason: leads.rejectedReason,
+        notes: leads.notes,
+        transcript: leads.transcript,
+        transcriptionStatus: leads.transcriptionStatus,
+        aiScore: leads.aiScore,
+        aiAnalysis: leads.aiAnalysis,
+        aiQualificationStatus: leads.aiQualificationStatus,
+        submittedToClient: leads.submittedToClient,
+        submittedAt: leads.submittedAt,
+        submissionResponse: leads.submissionResponse,
+        createdAt: leads.createdAt,
+        updatedAt: leads.updatedAt,
+        // Contact info
+        contact: {
+          id: contacts.id,
+          firstName: contacts.firstName,
+          lastName: contacts.lastName,
+          email: contacts.email,
+          phone: contacts.phone,
+          title: contacts.title,
+          accountId: contacts.accountId,
+        },
+        // Account info
+        account: {
+          id: accounts.id,
+          name: accounts.name,
+          domain: accounts.domain,
+          industry: accounts.industry,
+          employeeCount: accounts.employeeCount,
+          annualRevenue: accounts.annualRevenue,
+        },
+        // Agent info
+        agent: {
+          id: agentUser.id,
+          firstName: agentUser.firstName,
+          lastName: agentUser.lastName,
+          email: agentUser.email,
+          username: agentUser.username,
+        },
+        // Approver info
+        approver: {
+          id: approverUser.id,
+          firstName: approverUser.firstName,
+          lastName: approverUser.lastName,
+          email: approverUser.email,
+        },
+        // Campaign info
+        campaign: {
+          id: campaigns.id,
+          name: campaigns.name,
+          type: campaigns.type,
+          status: campaigns.status,
+        },
+      })
+      .from(leads)
+      .leftJoin(contacts, eq(leads.contactId, contacts.id))
+      .leftJoin(accounts, eq(contacts.accountId, accounts.id))
+      .leftJoin(agentUser, eq(leads.agentId, agentUser.id))
+      .leftJoin(approverUser, eq(leads.approvedById, approverUser.id))
+      .leftJoin(campaigns, eq(leads.campaignId, campaigns.id))
+      .where(eq(leads.id, id));
+    
+    return result || undefined;
   }
 
   async createLead(insertLead: InsertLead): Promise<Lead> {

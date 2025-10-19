@@ -3172,12 +3172,13 @@ export function registerRoutes(app: Express) {
 
   app.get("/api/leads/:id", requireAuth, async (req, res) => {
     try {
-      const lead = await storage.getLead(req.params.id);
+      const lead = await storage.getLeadWithDetails(req.params.id);
       if (!lead) {
         return res.status(404).json({ message: "Lead not found" });
       }
       res.json(lead);
     } catch (error) {
+      console.error('Failed to fetch lead details:', error);
       res.status(500).json({ message: "Failed to fetch lead" });
     }
   });
