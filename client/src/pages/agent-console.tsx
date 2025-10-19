@@ -413,17 +413,17 @@ export default function AgentConsolePage() {
     
     switch (callStatus) {
       case 'idle':
-        return <Badge variant="secondary" data-testid="badge-call-idle">Ready</Badge>;
+        return <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 shadow-lg" data-testid="badge-call-idle">Ready</Badge>;
       case 'connecting':
-        return <Badge variant="outline" data-testid="badge-call-connecting">Connecting...</Badge>;
+        return <Badge variant="outline" className="bg-white/10 text-white border-white/20" data-testid="badge-call-connecting">Connecting...</Badge>;
       case 'ringing':
-        return <Badge variant="outline" data-testid="badge-call-ringing">Ringing...</Badge>;
+        return <Badge variant="outline" className="bg-white/10 text-white border-white/20" data-testid="badge-call-ringing">Ringing...</Badge>;
       case 'active':
-        return <Badge className="bg-green-600 hover:bg-green-700" data-testid="badge-call-active">Active - {formatDuration()}</Badge>;
+        return <Badge className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0 shadow-lg" data-testid="badge-call-active">Active - {formatDuration()}</Badge>;
       case 'held':
-        return <Badge variant="outline" data-testid="badge-call-held">On Hold</Badge>;
+        return <Badge variant="outline" className="bg-white/10 text-white border-white/20" data-testid="badge-call-held">On Hold</Badge>;
       case 'wrap-up':
-        return <Badge variant="outline" data-testid="badge-call-wrapup">Wrap-Up</Badge>;
+        return <Badge className="bg-gradient-to-r from-orange-500 to-amber-600 text-white border-0 shadow-lg" data-testid="badge-call-wrapup">Wrap-Up</Badge>;
       default:
         return null;
     }
