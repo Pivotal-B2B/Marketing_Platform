@@ -403,7 +403,7 @@ export default function ContactsPage() {
               </p>
             </div>
         <div className="flex gap-2">
-          {user?.role !== 'agent' && (
+          {(user?.role === 'admin' || user?.roles?.includes('admin')) && (
             <Button 
               variant="outline" 
               onClick={() => {
@@ -607,10 +607,6 @@ export default function ContactsPage() {
             data-testid="input-search-contacts"
           />
         </div>
-        <Button variant="outline" data-testid="button-export">
-          <Download className="mr-2 h-4 w-4" />
-          Export
-        </Button>
       </div>
 
       {selectedCount > 0 && (
@@ -634,10 +630,12 @@ export default function ContactsPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleBulkExport}>
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
+              {(user?.role === 'admin' || user?.roles?.includes('admin')) && (
+                <Button variant="outline" size="sm" onClick={handleBulkExport} data-testid="button-bulk-export">
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => setBulkUpdateDialogOpen(true)}>
                 Update
               </Button>
