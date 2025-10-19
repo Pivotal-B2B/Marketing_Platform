@@ -39,7 +39,7 @@ export function useTelnyxWebRTC({
   const { toast } = useToast();
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize Telnyx client
+  // Initialize Telnyx WebRTC client
   useEffect(() => {
     if (!sipUsername || !sipPassword) {
       return;
