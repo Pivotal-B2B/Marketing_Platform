@@ -1,7 +1,6 @@
-import { Search, Bell, HelpCircle, LogOut } from "lucide-react";
+import { Bell, HelpCircle, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
@@ -28,18 +27,8 @@ export function TopBar({ userName = "Admin User" }: { userName?: string }) {
 
   return (
     <header className="flex items-center justify-between gap-4 border-b bg-background px-4 py-3">
-      <div className="flex items-center gap-4 flex-1">
+      <div className="flex items-center gap-4">
         <SidebarTrigger data-testid="button-sidebar-toggle" />
-
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search accounts, contacts, campaigns..."
-            className="pl-10"
-            data-testid="input-global-search"
-          />
-        </div>
       </div>
 
       <div className="flex items-center gap-2">
