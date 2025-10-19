@@ -115,6 +115,17 @@ const NUMERIC_FIELDS = ['yearFounded', 'staffCount'];
 const ENUM_FIELDS = ['employeesSizeRange', 'revenueRange', 'annualRevenue'];
 
 /**
+ * Special fields that require custom handling (junction tables, complex queries)
+ * These fields are skipped in regular field condition building
+ */
+const SPECIAL_HANDLING_FIELDS = [
+  'listName',        // Contacts in static lists (junction table)
+  'segmentName',     // Contacts in dynamic segments (complex query)
+  'domainSetName',   // Contacts linked to domain sets (junction table)
+  'accountListName'  // Accounts in target account lists (junction table)
+];
+
+/**
  * Build SQL query from filter group
  */
 export function buildFilterQuery(filterGroup: FilterGroup, table: TableType): SQL | undefined {
@@ -138,6 +149,12 @@ export function buildFilterQuery(filterGroup: FilterGroup, table: TableType): SQ
  */
 function buildCondition(condition: FilterCondition, table: TableType): SQL | undefined {
   const { field, operator, values } = condition;
+
+  // Skip special handling fields (not yet implemented)
+  if (SPECIAL_HANDLING_FIELDS.includes(field)) {
+    console.warn(`[FILTER_BUILDER] Skipping special field '${field}' - custom handling not yet implemented`);
+    return undefined;
+  }
 
   // Get the actual column name
   const columnName = getColumnName(field, table);

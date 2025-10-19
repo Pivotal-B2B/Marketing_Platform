@@ -174,11 +174,11 @@ export function SidebarFilters({
 
   // Sidebar Content Component (reused for both desktop and mobile)
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900">
       {/* Header */}
-      <div className="p-4 border-b border-slate-200">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-base font-semibold text-slate-900">Filters</h2>
+      <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between mb-1.5">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filters</h2>
           {activeFilterCount > 0 && (
             <Badge variant="secondary" className="text-xs">
               {activeFilterCount}
@@ -191,7 +191,7 @@ export function SidebarFilters({
           <motion.p
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-sm text-slate-500"
+            className="text-xs text-slate-500 dark:text-slate-400"
             data-testid="text-result-count"
           >
             {isCountLoading ? (
@@ -199,7 +199,7 @@ export function SidebarFilters({
             ) : (
               <>
                 Showing{" "}
-                <span className="font-semibold text-slate-900">
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
                   {resultsCount.toLocaleString()}
                 </span>{" "}
                 {resultsCount === 1 ? "result" : "results"}
@@ -213,9 +213,9 @@ export function SidebarFilters({
           <motion.div
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 mt-3"
+            className="flex items-center gap-2 mt-2"
           >
-            <span className="text-xs text-slate-600 font-medium">Match:</span>
+            <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Match:</span>
             <ToggleGroup
               type="single"
               value={filterGroup.logic}
@@ -224,18 +224,18 @@ export function SidebarFilters({
                   setFilterGroup({ ...filterGroup, logic: value });
                 }
               }}
-              className="bg-slate-200 rounded-md p-1"
+              className="bg-slate-200 dark:bg-slate-800 rounded-md p-0.5"
             >
               <ToggleGroupItem
                 value="AND"
-                className="px-3 py-1 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
+                className="px-2.5 py-0.5 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
                 data-testid="toggle-logic-and"
               >
                 ALL (AND)
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="OR"
-                className="px-3 py-1 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
+                className="px-2.5 py-0.5 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
                 data-testid="toggle-logic-or"
               >
                 ANY (OR)
@@ -246,8 +246,8 @@ export function SidebarFilters({
       </div>
 
       {/* Body - Filter Conditions */}
-      <ScrollArea className="flex-1 px-3 pb-2 pt-3">
-        <div className="space-y-2">
+      <ScrollArea className="flex-1 px-2 pb-2 pt-2">
+        <div className="space-y-1.5">
           <AnimatePresence mode="popLayout">
             {filterGroup.conditions.map((condition) => (
               <motion.div
@@ -272,9 +272,9 @@ export function SidebarFilters({
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-center py-12 text-sm text-slate-400"
+              className="text-center py-8 text-sm text-slate-400 dark:text-slate-500"
             >
-              <Filter className="h-12 w-12 mx-auto mb-3 opacity-20" />
+              <Filter className="h-10 w-10 mx-auto mb-2 opacity-20" />
               <p>No filters added</p>
               <p className="text-xs mt-1">Click below to add your first filter</p>
             </motion.div>
@@ -288,7 +288,7 @@ export function SidebarFilters({
             <Button
               variant="outline"
               onClick={addCondition}
-              className="w-full border-dashed border-2 hover:border-blue-600 hover:bg-blue-50 transition-colors"
+              className="w-full border-dashed border-2 hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
               data-testid="button-add-condition"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -299,13 +299,13 @@ export function SidebarFilters({
       </ScrollArea>
 
       {/* Footer - Actions */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50">
-        <div className="flex items-center justify-between gap-3">
+      <div className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+        <div className="flex items-center justify-between gap-2">
           <Button
             variant="ghost"
             onClick={handleClear}
             disabled={activeFilterCount === 0 || isApplying}
-            className="text-slate-700 hover:text-slate-900"
+            className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
             data-testid="button-clear-filters"
           >
             Clear
@@ -326,7 +326,7 @@ export function SidebarFilters({
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"
+                    className="mr-2 h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full"
                   />
                   Applying...
                 </>
@@ -345,7 +345,7 @@ export function SidebarFilters({
   return (
     <>
       {/* Desktop: Persistent Sidebar (≥1280px) */}
-      <aside className="hidden xl:block w-[340px] shrink-0 border-r border-slate-200 h-screen sticky top-0">
+      <aside className="hidden xl:block w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 h-screen sticky top-0">
         <SidebarContent />
       </aside>
 
@@ -370,7 +370,7 @@ export function SidebarFilters({
               )}
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[340px] p-0">
+          <SheetContent side="left" className="w-[320px] p-0">
             <SidebarContent />
           </SheetContent>
         </Sheet>

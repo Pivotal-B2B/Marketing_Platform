@@ -130,15 +130,15 @@ export function UnifiedFilterRow({
   return (
     <motion.div
       layout
-      className="p-4 border border-slate-200 rounded-[14px] bg-white shadow-sm hover:shadow-md transition-shadow"
+      className="p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-shadow"
       data-testid={`filter-row-${condition.id}`}
     >
-      <div className="space-y-3">
+      <div className="space-y-2">
         {/* Field + Operator Row */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Field Selector - Grouped by Category */}
           <Select value={condition.field} onValueChange={handleFieldChange}>
-            <SelectTrigger className="flex-1 border-slate-300 focus:border-blue-600 focus:ring-blue-600" data-testid="select-field">
+            <SelectTrigger className="flex-1 text-xs h-8 border-slate-300 dark:border-slate-600 focus:border-blue-600 focus:ring-blue-600" data-testid="select-field">
               <SelectValue placeholder="Select field..." />
             </SelectTrigger>
             <SelectContent>
@@ -198,7 +198,7 @@ export function UnifiedFilterRow({
 
           {/* Operator Selector */}
           <Select value={condition.operator} onValueChange={handleOperatorChange}>
-            <SelectTrigger className="flex-1 border-slate-300 focus:border-blue-600 focus:ring-blue-600" data-testid="select-operator">
+            <SelectTrigger className="flex-1 text-xs h-8 border-slate-300 dark:border-slate-600 focus:border-blue-600 focus:ring-blue-600" data-testid="select-operator">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -216,17 +216,17 @@ export function UnifiedFilterRow({
             variant="ghost"
             size="icon"
             onClick={onRemove}
-            className="shrink-0 hover:bg-red-50 hover:text-red-600"
+            className="shrink-0 h-8 w-8 hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-600"
             data-testid="button-remove-condition"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </Button>
         </div>
 
         {/* Value Input (Chips) */}
         {needsValueInput && (
-          <div className="space-y-2">
-            <div className="relative flex flex-wrap items-center gap-1.5 p-2 border border-slate-300 rounded-lg min-h-[42px] bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20">
+          <div className="space-y-1.5">
+            <div className="relative flex flex-wrap items-center gap-1 p-1.5 border border-slate-300 dark:border-slate-600 rounded-lg min-h-[36px] bg-white dark:bg-slate-900 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20">
               {/* Chips for selected values */}
               <AnimatePresence mode="popLayout">
                 {condition.values.map((value, index) => (
@@ -239,17 +239,17 @@ export function UnifiedFilterRow({
                   >
                     <Badge
                       variant="secondary"
-                      className="flex items-center gap-1 bg-blue-50 text-blue-900 border-blue-200"
+                      className="flex items-center gap-0.5 text-xs bg-blue-50 dark:bg-blue-950 text-blue-900 dark:text-blue-100 border-blue-200 dark:border-blue-800"
                       data-testid={`chip-${value}`}
                     >
                       {String(value)}
                       <button
                         type="button"
                         onClick={() => handleRemoveValue(value)}
-                        className="ml-1 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                        className="ml-0.5 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5 transition-colors"
                         data-testid={`remove-chip-${value}`}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-2.5 w-2.5" />
                       </button>
                     </Badge>
                   </motion.div>
@@ -265,8 +265,8 @@ export function UnifiedFilterRow({
                   onKeyDown={handleInputKeyDown}
                   onFocus={() => setShowTypeAhead(true)}
                   onBlur={() => setTimeout(() => setShowTypeAhead(false), 200)}
-                  placeholder={condition.values.length === 0 ? "Type value and press ↵ Enter" : "Type and press ↵ Enter to add more..."}
-                  className="flex-1 min-w-[120px] border-0 shadow-none focus-visible:ring-0 p-0 h-auto text-[15px] placeholder:text-amber-600 placeholder:font-medium"
+                  placeholder={condition.values.length === 0 ? "Type value and press Enter" : "Type and press Enter..."}
+                  className="flex-1 min-w-[120px] border-0 shadow-none focus-visible:ring-0 p-0 h-auto text-xs placeholder:text-amber-600 dark:placeholder:text-amber-400 placeholder:font-medium"
                   data-testid="input-value"
                   disabled={isAtMax}
                 />
@@ -278,12 +278,12 @@ export function UnifiedFilterRow({
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
-                  className="absolute top-full left-0 right-0 mt-2 max-h-[240px] overflow-auto bg-white border border-slate-200 rounded-lg shadow-lg z-50"
+                  className="absolute top-full left-0 right-0 mt-1 max-h-[200px] overflow-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50"
                 >
                   {typeAheadOptions.data.slice(0, 10).map((option: { id: string; name: string }) => (
                     <div
                       key={option.id}
-                      className="px-3 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-sm"
+                      className="px-2.5 py-1.5 hover:bg-blue-50 dark:hover:bg-blue-950 cursor-pointer transition-colors text-xs"
                       onMouseDown={() => handleAddValue(option.name)}
                       data-testid={`typeahead-option-${option.id}`}
                     >
@@ -295,15 +295,15 @@ export function UnifiedFilterRow({
             </div>
 
             {/* Helper text for value count and cap */}
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-[10px]">
               {valueCount > 0 && (
-                <span className="text-slate-500">
+                <span className="text-slate-500 dark:text-slate-400">
                   {fieldConfig?.label} ({valueCount}/{maxValues})
                 </span>
               )}
               {isAtMax && (
-                <span className="text-amber-600 font-medium">
-                  Max {maxValues} values for precise results
+                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                  Max {maxValues} values
                 </span>
               )}
             </div>
@@ -312,7 +312,7 @@ export function UnifiedFilterRow({
 
         {/* Value display for operators that don't need input */}
         {!needsValueInput && (
-          <div className="px-3 py-2 bg-slate-50 rounded-lg text-sm text-slate-600 border border-slate-200">
+          <div className="px-2 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-xs text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
             {operatorLabels[condition.operator]}
           </div>
         )}
