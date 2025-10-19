@@ -7,41 +7,61 @@ import { ZodSchema, ZodError } from 'zod';
  * Protects against brute force attacks and API abuse
  */
 
-// General API rate limiter: 100 requests per 15 minutes per IP
+// General API rate limiter: 1000 requests per 15 minutes per IP (increased for development)
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
+  max: 1000, // limit each IP to 1000 requests per windowMs
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (_req, res) => {
+    res.status(429).json({
+      message: 'Too many requests from this IP, please try again later.',
+      retryAfter: 900 // 15 minutes in seconds
+    });
+  }
 });
 
-// Strict rate limiter for authentication endpoints: 5 attempts per 15 minutes
+// Strict rate limiter for authentication endpoints: 20 attempts per 15 minutes (increased)
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 login requests per windowMs
-  message: 'Too many login attempts, please try again after 15 minutes.',
+  max: 20, // limit each IP to 20 login requests per windowMs
   skipSuccessfulRequests: true, // Don't count successful logins
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({
+      message: 'Too many login attempts, please try again after 15 minutes.',
+      retryAfter: 900 // 15 minutes in seconds
+    });
+  }
 });
 
-// Medium rate limiter for write operations: 30 requests per 10 minutes
+// Medium rate limiter for write operations: 100 requests per 10 minutes (increased)
 export const writeLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 30, // limit each IP to 30 write requests per windowMs
-  message: 'Too many write operations, please slow down.',
+  max: 100, // limit each IP to 100 write requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({
+      message: 'Too many write operations, please slow down.',
+      retryAfter: 600 // 10 minutes in seconds
+    });
+  }
 });
 
-// Strict rate limiter for expensive operations (exports, bulk actions): 5 per hour
+// Strict rate limiter for expensive operations (exports, bulk actions): 20 per hour (increased)
 export const expensiveOperationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // limit each IP to 5 expensive operations per hour
-  message: 'Too many expensive operations, please try again later.',
+  max: 20, // limit each IP to 20 expensive operations per hour
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({
+      message: 'Too many expensive operations, please try again later.',
+      retryAfter: 3600 // 1 hour in seconds
+    });
+  }
 });
 
 /**
