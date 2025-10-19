@@ -805,6 +805,107 @@ export default function AccountDetailPage() {
               </div>
             </SectionCard>
 
+            {/* Data Quality */}
+            <SectionCard title="Data Quality" icon={Shield}>
+              {(() => {
+                // Calculate data completeness for this account
+                const keyFields = [
+                  'domain', 'industryStandardized', 'employeesSizeRange', 'annualRevenue',
+                  'hqCity', 'hqState', 'hqPostalCode', 'hqCountry', 'hqStreet1',
+                  'mainPhone', 'yearFounded', 'description', 'linkedinUrl',
+                  'companyLocation', 'sicCode', 'naicsCode'
+                ];
+                
+                const populatedFields = keyFields.filter(field => {
+                  const value = (account as any)[field];
+                  return value !== null && value !== undefined && value !== '';
+                });
+                
+                const missingFields = keyFields.filter(field => {
+                  const value = (account as any)[field];
+                  return value === null || value === undefined || value === '';
+                });
+                
+                const completeness = Math.round((populatedFields.length / keyFields.length) * 100);
+                
+                // Determine quality badge
+                const getQualityBadge = (score: number) => {
+                  if (score >= 80) return { label: 'Excellent', variant: 'default', className: 'bg-green-500/10 text-green-500 border-green-500/20' };
+                  if (score >= 60) return { label: 'Good', variant: 'secondary', className: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
+                  if (score >= 40) return { label: 'Fair', variant: 'secondary', className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' };
+                  return { label: 'Poor', variant: 'secondary', className: 'bg-red-500/10 text-red-500 border-red-500/20' };
+                };
+                
+                const quality = getQualityBadge(completeness);
+                
+                // Field name mapping for display
+                const fieldLabels: Record<string, string> = {
+                  domain: 'Domain',
+                  industryStandardized: 'Industry',
+                  employeesSizeRange: 'Employee Size',
+                  annualRevenue: 'Annual Revenue',
+                  hqCity: 'HQ City',
+                  hqState: 'HQ State',
+                  hqPostalCode: 'Postal Code',
+                  hqCountry: 'Country',
+                  hqStreet1: 'Street Address',
+                  mainPhone: 'Main Phone',
+                  yearFounded: 'Year Founded',
+                  description: 'Description',
+                  linkedinUrl: 'LinkedIn',
+                  companyLocation: 'Full Address',
+                  sicCode: 'SIC Code',
+                  naicsCode: 'NAICS Code'
+                };
+                
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Completeness Score</span>
+                      <Badge className={quality.className}>
+                        {completeness}% - {quality.label}
+                      </Badge>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{populatedFields.length} of {keyFields.length} key fields</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all ${
+                            completeness >= 80 ? 'bg-green-500' :
+                            completeness >= 60 ? 'bg-blue-500' :
+                            completeness >= 40 ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`}
+                          style={{ width: `${completeness}%` }}
+                        />
+                      </div>
+                    </div>
+                    
+                    {missingFields.length > 0 && (
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Missing Fields ({missingFields.length})</p>
+                        <div className="flex flex-wrap gap-1">
+                          {missingFields.slice(0, 8).map(field => (
+                            <Badge key={field} variant="outline" className="text-xs">
+                              {fieldLabels[field] || field}
+                            </Badge>
+                          ))}
+                          {missingFields.length > 8 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{missingFields.length - 8} more
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </SectionCard>
+            
             {/* Compliance & Health */}
             <SectionCard title="Compliance & Health" icon={Shield}>
               <div className="space-y-3">

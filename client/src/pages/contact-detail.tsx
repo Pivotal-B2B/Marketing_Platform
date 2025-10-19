@@ -617,6 +617,105 @@ export default function ContactDetailPage() {
               </div>
             </SectionCard>
 
+            {/* Data Quality */}
+            <SectionCard title="Data Quality" icon={Shield}>
+              {(() => {
+                // Calculate data completeness for this contact
+                const keyFields = [
+                  'firstName', 'lastName', 'jobTitle', 'department', 'seniorityLevel',
+                  'directPhone', 'mobilePhone', 'city', 'state', 'postalCode', 'country',
+                  'linkedinUrl', 'accountId', 'address', 'timezone'
+                ];
+                
+                const populatedFields = keyFields.filter(field => {
+                  const value = (contact as any)[field];
+                  return value !== null && value !== undefined && value !== '';
+                });
+                
+                const missingFields = keyFields.filter(field => {
+                  const value = (contact as any)[field];
+                  return value === null || value === undefined || value === '';
+                });
+                
+                const completeness = Math.round((populatedFields.length / keyFields.length) * 100);
+                
+                // Determine quality badge
+                const getQualityBadge = (score: number) => {
+                  if (score >= 80) return { label: 'Excellent', className: 'bg-green-500/10 text-green-500 border-green-500/20' };
+                  if (score >= 60) return { label: 'Good', className: 'bg-blue-500/10 text-blue-500 border-blue-500/20' };
+                  if (score >= 40) return { label: 'Fair', className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' };
+                  return { label: 'Poor', className: 'bg-red-500/10 text-red-500 border-red-500/20' };
+                };
+                
+                const quality = getQualityBadge(completeness);
+                
+                // Field name mapping for display
+                const fieldLabels: Record<string, string> = {
+                  firstName: 'First Name',
+                  lastName: 'Last Name',
+                  jobTitle: 'Job Title',
+                  department: 'Department',
+                  seniorityLevel: 'Seniority',
+                  directPhone: 'Direct Phone',
+                  mobilePhone: 'Mobile Phone',
+                  city: 'City',
+                  state: 'State',
+                  postalCode: 'Postal Code',
+                  country: 'Country',
+                  linkedinUrl: 'LinkedIn',
+                  accountId: 'Account',
+                  address: 'Address',
+                  timezone: 'Timezone'
+                };
+                
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Completeness Score</span>
+                      <Badge className={quality.className}>
+                        {completeness}% - {quality.label}
+                      </Badge>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>{populatedFields.length} of {keyFields.length} key fields</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all ${
+                            completeness >= 80 ? 'bg-green-500' :
+                            completeness >= 60 ? 'bg-blue-500' :
+                            completeness >= 40 ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`}
+                          style={{ width: `${completeness}%` }}
+                        />
+                      </div>
+                    </div>
+                    
+                    {missingFields.length > 0 && (
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Missing Fields ({missingFields.length})</p>
+                        <div className="flex flex-wrap gap-1">
+                          {missingFields.slice(0, 8).map(field => (
+                            <Badge key={field} variant="outline" className="text-xs">
+                              {fieldLabels[field] || field}
+                            </Badge>
+                          ))}
+                          {missingFields.length > 8 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{missingFields.length - 8} more
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </SectionCard>
+
             {/* Contact Status */}
             <SectionCard title="Contact Status" icon={Shield}>
               <div className="space-y-3">
