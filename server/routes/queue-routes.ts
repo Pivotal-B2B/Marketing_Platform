@@ -5,7 +5,7 @@ import { requireAuth, requireRole } from '../auth';
 import { requireFeatureFlag } from '../feature-flags';
 import { z } from 'zod';
 import { buildFilterQuery } from '../filter-builder';
-import { contacts, campaigns, agentQueue, campaignAudienceSnapshots } from '@shared/schema';
+import { contacts, campaigns, agentQueue, campaignAudienceSnapshots, lists, segments } from '@shared/schema';
 import type { FilterGroup } from '@shared/filter-types';
 
 const router = Router();
@@ -135,7 +135,20 @@ router.post(
         
         const released = releaseResult.length;
 
-        // Step 2: Get campaign audience snapshot (if exists)
+        // Step 2: Get campaign to check audience refs
+        const [campaign] = await tx.select()
+          .from(campaigns)
+          .where(eq(campaigns.id, campaignId))
+          .limit(1);
+
+        if (!campaign) {
+          return res.status(404).json({ error: 'not_found', message: 'Campaign not found' });
+        }
+
+        // Step 3: Get campaign audience (from snapshot or resolve dynamically)
+        let campaignContactIds: string[] = [];
+        
+        // Try snapshot first (most efficient)
         const snapshot = await tx.select({
           contactIds: campaignAudienceSnapshots.contactIds,
         })
@@ -144,36 +157,104 @@ router.post(
         .orderBy(sql`${campaignAudienceSnapshots.createdAt} DESC`)
         .limit(1);
 
-        const campaignContactIds = snapshot[0]?.contactIds || [];
-        const hasSnapshot = campaignContactIds.length > 0;
-
-        // Step 3: Query contacts based on filters
-        const whereConditions: any[] = [];
-        
-        // If snapshot exists, constrain to snapshot contacts
-        // If no snapshot, allow filtering from all contacts (manual queue mode)
-        if (hasSnapshot) {
-          whereConditions.push(inArray(contacts.id, campaignContactIds));
+        if (snapshot[0]?.contactIds && snapshot[0].contactIds.length > 0) {
+          campaignContactIds = snapshot[0].contactIds;
           console.log(`[queues:set] Using snapshot with ${campaignContactIds.length} contacts`);
-        } else {
-          console.log('[queues:set] No snapshot found - filtering from all contacts');
+        } else if (campaign.audienceRefs) {
+          // No snapshot - resolve audience dynamically from campaign refs
+          console.log('[queues:set] No snapshot - resolving audience from campaign refs');
+          const audienceRefs = campaign.audienceRefs as any;
+          const uniqueContactIds = new Set<string>();
+          
+          // Resolve from filterGroup (advanced filters)
+          if (audienceRefs.filterGroup) {
+            const filterSQL = buildFilterQuery(audienceRefs.filterGroup as FilterGroup, contacts);
+            if (filterSQL) {
+              const audienceContacts = await tx.select({ id: contacts.id })
+                .from(contacts)
+                .where(filterSQL);
+              audienceContacts.forEach(c => uniqueContactIds.add(c.id));
+              console.log(`[queues:set] Found ${audienceContacts.length} contacts from filterGroup`);
+            }
+          }
+          
+          // Resolve from lists
+          if (audienceRefs.lists && Array.isArray(audienceRefs.lists)) {
+            for (const listId of audienceRefs.lists) {
+              const [list] = await tx.select()
+                .from(lists)
+                .where(eq(lists.id, listId))
+                .limit(1);
+              
+              if (list && list.recordIds && list.recordIds.length > 0) {
+                list.recordIds.forEach((id: string) => uniqueContactIds.add(id));
+                console.log(`[queues:set] Found ${list.recordIds.length} contacts from list ${listId}`);
+              }
+            }
+          }
+          
+          // Resolve from selectedLists (alternate field name)
+          if (audienceRefs.selectedLists && Array.isArray(audienceRefs.selectedLists)) {
+            for (const listId of audienceRefs.selectedLists) {
+              const [list] = await tx.select()
+                .from(lists)
+                .where(eq(lists.id, listId))
+                .limit(1);
+              
+              if (list && list.recordIds && list.recordIds.length > 0) {
+                list.recordIds.forEach((id: string) => uniqueContactIds.add(id));
+                console.log(`[queues:set] Found ${list.recordIds.length} contacts from selectedList ${listId}`);
+              }
+            }
+          }
+          
+          // Resolve from segments
+          if (audienceRefs.segments && Array.isArray(audienceRefs.segments)) {
+            for (const segmentId of audienceRefs.segments) {
+              const [segment] = await tx.select()
+                .from(segments)
+                .where(eq(segments.id, segmentId))
+                .limit(1);
+              
+              if (segment && segment.definitionJson) {
+                const filterSQL = buildFilterQuery(segment.definitionJson as FilterGroup, contacts);
+                if (filterSQL) {
+                  const segmentContacts = await tx.select({ id: contacts.id })
+                    .from(contacts)
+                    .where(filterSQL);
+                  segmentContacts.forEach(c => uniqueContactIds.add(c.id));
+                  console.log(`[queues:set] Found ${segmentContacts.length} contacts from segment ${segmentId}`);
+                }
+              }
+            }
+          }
+          
+          campaignContactIds = Array.from(uniqueContactIds);
+          console.log(`[queues:set] Total resolved: ${campaignContactIds.length} unique contacts from audience refs`);
         }
+
+        // If campaign has no audience defined, return error
+        if (campaignContactIds.length === 0) {
+          console.log('[queues:set] Campaign has no audience defined');
+          return {
+            released,
+            assigned: 0,
+            skipped_due_to_collision: 0,
+            error: 'Campaign has no audience defined. Please configure campaign audience first.'
+          };
+        }
+
+        // Step 4: Apply agent's filters WITHIN campaign audience
+        const whereConditions: any[] = [
+          inArray(contacts.id, campaignContactIds) // ALWAYS constrain to campaign audience
+        ];
         
         if (filters && filters.conditions && filters.conditions.length > 0) {
           const filterSQL = buildFilterQuery(filters as FilterGroup, contacts);
           if (filterSQL) {
             whereConditions.push(filterSQL);
+            console.log('[queues:set] Applying agent filters within campaign audience');
           }
-        }
-        
-        // If no filters and no snapshot, return empty (prevent queuing all contacts)
-        if (whereConditions.length === 0) {
-          console.log('[queues:set] No filters and no snapshot - returning empty');
-          return {
-            released,
-            assigned: 0,
-            skipped_due_to_collision: 0,
-          };
         }
 
         let eligibleContacts;
@@ -185,11 +266,7 @@ router.post(
             ? buildFilterQuery(filters as FilterGroup, contacts) 
             : undefined;
           
-          // Build WHERE clause for raw SQL (snapshot constraint + filters)
-          const snapshotConstraint = hasSnapshot 
-            ? sql`c.id = ANY(${campaignContactIds})`
-            : sql`1=1`; // No constraint if no snapshot
-          
+          // ALWAYS constrain to campaign audience
           const baseQuery = max_queue_size
             ? sql`
                 SELECT id, account_id
@@ -200,7 +277,7 @@ router.post(
                     ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
                   FROM ${contacts} c
                   WHERE 
-                    ${snapshotConstraint}
+                    c.id = ANY(${campaignContactIds})
                     ${filterPart ? sql`AND ${filterPart}` : sql``}
                 ) t
                 WHERE rn <= ${per_account_cap}
@@ -216,7 +293,7 @@ router.post(
                     ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
                   FROM ${contacts} c
                   WHERE 
-                    ${snapshotConstraint}
+                    c.id = ANY(${campaignContactIds})
                     ${filterPart ? sql`AND ${filterPart}` : sql``}
                 ) t
                 WHERE rn <= ${per_account_cap}
