@@ -69,13 +69,19 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
     enabled: !!campaignId && !!effectiveAgentId,
   });
 
-  // Initialize filter with campaign's audienceRefs.filterGroup
+  // Reset filter to campaign's latest filter whenever dialog opens
   useEffect(() => {
-    if (campaign?.audienceRefs?.filterGroup && !filterGroup) {
-      console.log('[QUEUE_CONTROLS] Initializing filter from campaign:', campaign.audienceRefs.filterGroup);
-      setFilterGroup(campaign.audienceRefs.filterGroup);
+    if (showReplaceDialog && campaign) {
+      if (campaign.audienceRefs?.filterGroup) {
+        console.log('[QUEUE_CONTROLS] Resetting filter from campaign:', campaign.audienceRefs.filterGroup);
+        setFilterGroup(campaign.audienceRefs.filterGroup);
+      } else {
+        console.log('[QUEUE_CONTROLS] Campaign has no filter, clearing filter');
+        setFilterGroup(undefined);
+      }
+      setMaxQueueSize(300);
     }
-  }, [campaign, filterGroup]);
+  }, [showReplaceDialog, campaign]);
 
   // Set Queue (Replace) mutation
   const replaceQueueMutation = useMutation({
