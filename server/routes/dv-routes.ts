@@ -15,6 +15,7 @@ import { runJob } from '../lib/dv-queue';
 import { generateDedupeHash } from '../lib/dv-dedupe';
 import { checkExclusion, buildExclusionMap } from '../lib/dv-exclusion';
 import { evaluateConstraints } from '../lib/dv-constraints';
+import { requireAuth, requireRole } from '../auth';
 
 const router = Router();
 
@@ -521,8 +522,8 @@ router.post('/exclusions', async (req: Request, res: Response) => {
 // EXPORTS
 // ============================================================================
 
-// POST /api/dv/projects/:id/export - Generate export
-router.post('/projects/:id/export', async (req: Request, res: Response) => {
+// POST /api/dv/projects/:id/export - Generate export (RBAC: No agents)
+router.post('/projects/:id/export', requireAuth, requireRole('admin', 'campaign_manager', 'quality_analyst'), async (req: Request, res: Response) => {
   try {
     const { type, filter, fields } = req.body;
     
@@ -550,8 +551,8 @@ router.post('/projects/:id/export', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/dv/deliveries/:deliveryId - Download export
-router.get('/deliveries/:deliveryId', async (req: Request, res: Response) => {
+// GET /api/dv/deliveries/:deliveryId - Download export (RBAC: No agents)
+router.get('/deliveries/:deliveryId', requireAuth, requireRole('admin', 'campaign_manager', 'quality_analyst'), async (req: Request, res: Response) => {
   try {
     const [delivery] = await db.select()
       .from(dvDeliveries)

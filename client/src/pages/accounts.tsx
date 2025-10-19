@@ -46,8 +46,10 @@ import { AccountCardPremium } from "@/components/accounts/account-card-premium";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatRevenue } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AccountsPage() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -526,10 +528,12 @@ export default function AccountsPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleBulkExport}>
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
+              {user?.role !== 'agent' && (
+                <Button variant="outline" size="sm" onClick={handleBulkExport}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => setBulkUpdateDialogOpen(true)}>
                 Update
               </Button>

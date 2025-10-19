@@ -1368,7 +1368,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  app.post("/api/lists/:id/export", requireAuth, async (req, res) => {
+  app.post("/api/lists/:id/export", requireAuth, requireRole('admin', 'campaign_manager', 'quality_analyst'), async (req, res) => {
     try {
       const { format = 'csv' } = req.body;
       if (!['csv', 'json'].includes(format)) {
