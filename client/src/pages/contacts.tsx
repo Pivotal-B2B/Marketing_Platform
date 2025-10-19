@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, Download, Upload, Users, Trash2, ShieldAlert, Phone as PhoneIcon, Mail as MailIcon, Link as LinkIcon, Building2 } from "lucide-react";
 import { FilterShell } from "@/components/filters/filter-shell";
-import { FilterValues } from "@shared/filterConfig";
+import { FilterValues, type UserRole } from "@shared/filterConfig";
 import type { FilterGroup } from "@shared/filter-types";
+import { useAuth } from "@/contexts/AuthContext";
 import { CSVImportDialog } from "@/components/csv-import-dialog";
 import { exportContactsToCSV, downloadCSV, generateContactsTemplate } from "@/lib/csv-utils";
 import {
@@ -81,8 +82,15 @@ export default function ContactsPage() {
   const [selectAllPages, setSelectAllPages] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const ITEMS_PER_PAGE = 250;
+
+  // Normalize user role for filter RBAC (capitalize first letter)
+  const normalizeRole = (role: string): UserRole => {
+    const normalized = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+    return (normalized as UserRole) || "Agent";
+  };
 
   const { data: contacts, isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: ['/api/contacts', appliedFilters, filterGroup],
@@ -598,6 +606,7 @@ export default function ContactsPage() {
           module="contacts"
           onApplyFilters={setAppliedFilters}
           initialFilters={appliedFilters}
+          userRole={user?.role ? normalizeRole(user.role) : "Agent"}
           data-testid="filter-shell-contacts"
         />
         <Button variant="outline" data-testid="button-export">

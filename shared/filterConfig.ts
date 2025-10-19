@@ -385,26 +385,58 @@ export const FILTER_RBAC: Record<UserRole, { allow: FilterField[] | "all" }> = {
   },
   Manager: {
     allow: [
+      // General & Search
       "search",
+      // Company Information
       "industries",
       "companySizes",
       "companyRevenue",
+      "technologies",
+      "departments",
+      // Contact Information
       "seniorityLevels",
+      "jobFunctions",
+      "contactSource",
+      // Geography
       "countries",
       "states",
       "cities",
+      // Campaign filters
+      "campaignName",
+      "campaignType",
+      "campaignStatus",
+      "campaignOwner",
+      "dialMode",
+      // QA filters
+      "qaStatus",
+      "qaReviewer",
+      "qaOutcome",
+      // List/Segment filters
+      "listName",
+      "segmentName",
+      "segmentOwner",
+      // Verification filters
+      "emailStatus",
+      "phoneStatus",
+      "verificationStatus",
+      "assignedAgent",
+      // Ownership & Dates
       "accountOwners",
       "lastActivity",
-      "createdDate"
+      "createdDate",
+      "reviewedDate"
     ]
   },
   Agent: {
     allow: [
       "search",
       "seniorityLevels",
+      "jobFunctions",
       "countries",
       "states",
       "cities",
+      "campaignName",
+      "listName",
       "lastActivity"
     ]
   }
