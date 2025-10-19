@@ -600,7 +600,7 @@ export default function PhoneCampaignsPage() {
             <p className="text-muted-foreground mb-4">
               {searchQuery ? "No campaigns match your search" : "Get started by creating your first dialer campaign"}
             </p>
-            <Button onClick={() => setLocation("/campaigns/phone/create")}>
+            <Button onClick={() => setLocation("/campaigns/telemarketing/create")}>
               <Plus className="mr-2 h-4 w-4" />
               Create Dialer Campaign
             </Button>
