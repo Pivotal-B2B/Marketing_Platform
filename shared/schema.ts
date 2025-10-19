@@ -992,11 +992,6 @@ export const agentQueue = pgTable("agent_queue", {
   agentStateIdx: index("agent_queue_agent_state_idx").on(table.agentId, table.queueState),
   campaignIdx: index("agent_queue_campaign_idx").on(table.campaignId),
   contactIdx: index("agent_queue_contact_idx").on(table.contactId),
-  // NEW: Partial unique index - prevent dupes only for active states
-  // Allows re-queuing contacts in terminal states (completed, removed, released)
-  activeUniq: uniqueIndex("agent_queue_active_uniq")
-    .on(table.campaignId, table.contactId)
-    .where(sql`${table.queueState} IN ('queued', 'locked', 'in_progress')`),
   // NEW: Pull-path covering index for manual dial
   pullIdx: index("agent_queue_pull_idx")
     .on(table.campaignId, table.queueState, table.priority, table.scheduledFor),
