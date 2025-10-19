@@ -113,6 +113,7 @@ export interface IStorage {
   getContact(id: string): Promise<Contact | undefined>;
   getContactsByIds(ids: string[]): Promise<Contact[]>;
   getContactsByAccountId(accountId: string): Promise<Contact[]>;
+  getContactsByEmails(emails: string[]): Promise<Contact[]>;
   createContact(contact: InsertContact): Promise<Contact>;
   createContactsBulk(contacts: InsertContact[]): Promise<Contact[]>;
   updateContact(id: string, contact: Partial<InsertContact>): Promise<Contact | undefined>;
@@ -701,6 +702,13 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
     return await db.select().from(contacts).where(inArray(contacts.id, ids));
+  }
+
+  async getContactsByEmails(emails: string[]): Promise<Contact[]> {
+    if (emails.length === 0) return [];
+    // Normalize emails for comparison (lowercase, trim)
+    const normalizedEmails = emails.map(e => e.toLowerCase().trim());
+    return await db.select().from(contacts).where(inArray(contacts.emailNormalized, normalizedEmails));
   }
 
   async createContact(insertContact: InsertContact): Promise<Contact> {

@@ -563,6 +563,8 @@ export function registerRoutes(app: Express) {
 
       const results = {
         success: 0,
+        created: 0,
+        updated: 0,
         failed: 0,
         errors: [] as Array<{ index: number; error: string }>,
       };
@@ -610,10 +612,8 @@ export function registerRoutes(app: Express) {
       const suppressedEmails = await storage.checkEmailSuppressionBulk(emails);
       const suppressedPhones = await storage.checkPhoneSuppressionBulk(phones as string[]);
 
-      // Step 5: Validate and prepare contacts for bulk insert
-      const contactsToCreate: any[] = [];
-      const recordIndexMap = new Map<number, number>(); // maps contact array index to original record index
-
+      // Step 5: Fetch existing contacts by emails for deduplication
+      const contactsToProcess: any[] = [];
       for (let i = 0; i < records.length; i++) {
         try {
           const { contact: contactData, account: accountData } = records[i];
@@ -654,8 +654,7 @@ export function registerRoutes(app: Express) {
             }
           }
 
-          recordIndexMap.set(contactsToCreate.length, i);
-          contactsToCreate.push(validatedContact);
+          contactsToProcess.push({ validated: validatedContact, originalIndex: i });
         } catch (error) {
           results.failed++;
           results.errors.push({
@@ -665,20 +664,43 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      // Step 6: Create all contacts in bulk
+      // Step 6: Check for existing contacts by email and separate create vs update
+      const emailsToCheck = contactsToProcess.map(c => c.validated.email);
+      const existingContacts = await storage.getContactsByEmails(emailsToCheck);
+      const contactsByEmail = new Map(existingContacts.map(c => [c.emailNormalized!, c]));
+
+      const contactsToCreate: any[] = [];
+      const contactsToUpdate: Array<{ id: string; data: any; originalIndex: number }> = [];
+
+      for (const { validated, originalIndex } of contactsToProcess) {
+        const normalizedEmail = validated.email.toLowerCase().trim();
+        const existingContact = contactsByEmail.get(normalizedEmail);
+
+        if (existingContact) {
+          // Contact exists - update it
+          contactsToUpdate.push({ id: existingContact.id, data: validated, originalIndex });
+        } else {
+          // Contact doesn't exist - create it
+          contactsToCreate.push({ contact: validated, originalIndex });
+        }
+      }
+
+      // Step 7: Create new contacts in bulk
+      let createdCount = 0;
+      let updatedCount = 0;
+
       if (contactsToCreate.length > 0) {
         try {
-          await storage.createContactsBulk(contactsToCreate);
-          results.success = contactsToCreate.length;
+          await storage.createContactsBulk(contactsToCreate.map(c => c.contact));
+          createdCount = contactsToCreate.length;
         } catch (error) {
           // If bulk insert fails, fall back to individual inserts to identify specific failures
-          for (let i = 0; i < contactsToCreate.length; i++) {
+          for (const { contact, originalIndex } of contactsToCreate) {
             try {
-              await storage.createContact(contactsToCreate[i]);
-              results.success++;
+              await storage.createContact(contact);
+              createdCount++;
             } catch (err) {
               results.failed++;
-              const originalIndex = recordIndexMap.get(i) || i;
               results.errors.push({
                 index: originalIndex,
                 error: err instanceof Error ? err.message : "Unknown error"
@@ -687,6 +709,24 @@ export function registerRoutes(app: Express) {
           }
         }
       }
+
+      // Step 8: Update existing contacts individually
+      for (const { id, data, originalIndex } of contactsToUpdate) {
+        try {
+          await storage.updateContact(id, data);
+          updatedCount++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({
+            index: originalIndex,
+            error: error instanceof Error ? error.message : "Unknown error"
+          });
+        }
+      }
+
+      results.success = createdCount + updatedCount;
+      results.created = createdCount;
+      results.updated = updatedCount;
 
       res.status(200).json(results);
     } catch (error) {

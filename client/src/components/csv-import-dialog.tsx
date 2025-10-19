@@ -54,7 +54,7 @@ export function CSVImportDialog({
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [importProgress, setImportProgress] = useState(0);
-  const [importResults, setImportResults] = useState({ success: 0, failed: 0 });
+  const [importResults, setImportResults] = useState({ success: 0, created: 0, updated: 0, failed: 0 });
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -210,6 +210,8 @@ export function CSVImportDialog({
     setImportProgress(0);
 
     let successCount = 0;
+    let createdCount = 0;
+    let updatedCount = 0;
     let failedCount = 0;
 
     try {
@@ -285,6 +287,8 @@ export function CSVImportDialog({
               
               const result = await response.json() as {
                 success: number;
+                created: number;
+                updated: number;
                 failed: number;
                 errors: Array<{ index: number; error: string }>;
               };
@@ -292,6 +296,8 @@ export function CSVImportDialog({
               console.log('[CSV-IMPORT] Batch result:', result);
               
               successCount += result.success;
+              createdCount += result.created || 0;
+              updatedCount += result.updated || 0;
               failedCount += result.failed;
 
               if (result.errors.length > 0) {
@@ -352,14 +358,17 @@ export function CSVImportDialog({
         setImportProgress(Math.round(((end) / csvData.length) * 100));
       }
 
-      console.log('[CSV-IMPORT] Import complete - Success:', successCount, 'Failed:', failedCount);
+      console.log('[CSV-IMPORT] Import complete - Created:', createdCount, 'Updated:', updatedCount, 'Failed:', failedCount);
 
-      setImportResults({ success: successCount, failed: failedCount });
+      setImportResults({ success: successCount, created: createdCount, updated: updatedCount, failed: failedCount });
       setStage("complete");
 
-      const message = isUnifiedFormat 
-        ? `Successfully imported ${successCount} contacts with accounts. ${failedCount} failed.`
-        : `Successfully imported ${successCount} contacts. ${failedCount} failed.`;
+      const messageParts = [];
+      if (createdCount > 0) messageParts.push(`${createdCount} new contact(s) created`);
+      if (updatedCount > 0) messageParts.push(`${updatedCount} existing contact(s) updated`);
+      if (failedCount > 0) messageParts.push(`${failedCount} failed`);
+      
+      const message = messageParts.length > 0 ? messageParts.join(', ') : 'Import complete';
 
       toast({
         title: "Import Complete",
@@ -613,7 +622,7 @@ export function CSVImportDialog({
     setFieldMappings([]);
     setErrors([]);
     setImportProgress(0);
-    setImportResults({ success: 0, failed: 0 });
+    setImportResults({ success: 0, created: 0, updated: 0, failed: 0 });
     onOpenChange(false);
   };
 
@@ -816,10 +825,21 @@ export function CSVImportDialog({
               <Alert>
                 <CheckCircle2 className="h-4 w-4" />
                 <AlertDescription>
-                  Import completed! {importResults.success} record(s) imported
-                  successfully.
-                  {importResults.failed > 0 &&
-                    ` ${importResults.failed} record(s) failed.`}
+                  <div className="space-y-1">
+                    <p className="font-medium">Import completed!</p>
+                    {importResults.created > 0 && (
+                      <p className="text-sm">✓ {importResults.created} new contact(s) created</p>
+                    )}
+                    {importResults.updated > 0 && (
+                      <p className="text-sm">↻ {importResults.updated} existing contact(s) updated</p>
+                    )}
+                    {importResults.failed > 0 && (
+                      <p className="text-sm text-destructive">✗ {importResults.failed} record(s) failed</p>
+                    )}
+                    {importResults.success === 0 && importResults.failed === 0 && (
+                      <p className="text-sm">No records processed</p>
+                    )}
+                  </div>
                 </AlertDescription>
               </Alert>
             </div>
