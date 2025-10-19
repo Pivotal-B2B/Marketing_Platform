@@ -103,10 +103,19 @@ export default function ContactsPage() {
 
       const params = new URLSearchParams();
       
+      console.log('[CONTACTS] Query params:', {
+        filterGroup,
+        appliedFilters,
+        hasFilterGroup: filterGroup && filterGroup.conditions.length > 0,
+        hasAppliedFilters: Object.keys(appliedFilters).length > 0
+      });
+      
       // Priority: Use new SidebarFilters filterGroup first, then fall back to legacy appliedFilters
       if (filterGroup && filterGroup.conditions.length > 0) {
+        console.log('[CONTACTS] Using filterGroup:', filterGroup);
         params.set('filters', JSON.stringify(filterGroup));
       } else if (Object.keys(appliedFilters).length > 0) {
+        console.log('[CONTACTS] Using appliedFilters:', appliedFilters);
         const convertedFilterGroup = convertFilterValuesToFilterGroup(appliedFilters, 'contacts');
         if (convertedFilterGroup) {
           params.set('filters', JSON.stringify(convertedFilterGroup));
@@ -121,7 +130,12 @@ export default function ContactsPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      console.log('[CONTACTS] Loaded contacts:', data.length);
+      console.log('[CONTACTS] Loaded contacts from server:', {
+        count: data.length,
+        sample: data.slice(0, 2),
+        filterGroup,
+        appliedFilters
+      });
     },
     onError: (error) => {
       console.error('[CONTACTS] Error loading contacts:', error);

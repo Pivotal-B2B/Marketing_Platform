@@ -100,12 +100,21 @@ export function SidebarFilters({
 
   // Update condition
   const updateCondition = (id: string, updatedCondition: FilterCondition) => {
-    setFilterGroup({
+    console.log('[SIDEBAR_FILTERS] Updating condition:', {
+      id,
+      updatedCondition,
+      currentConditions: filterGroup.conditions
+    });
+    
+    const newFilterGroup = {
       ...filterGroup,
       conditions: filterGroup.conditions.map((c) =>
         c.id === id ? updatedCondition : c
       ),
-    });
+    };
+    
+    console.log('[SIDEBAR_FILTERS] New filterGroup:', newFilterGroup);
+    setFilterGroup(newFilterGroup);
   };
 
   // Apply filters with animation
@@ -113,6 +122,13 @@ export function SidebarFilters({
     setIsApplying(true);
     const filterToApply =
       filterGroup.conditions.length === 0 ? undefined : filterGroup;
+    
+    console.log('[SIDEBAR_FILTERS] Applying filters:', {
+      conditionsCount: filterGroup.conditions.length,
+      logic: filterGroup.logic,
+      conditions: filterGroup.conditions,
+      filterToApply
+    });
     
     // Brief delay for visual feedback
     await new Promise((resolve) => setTimeout(resolve, 300));
