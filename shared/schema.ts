@@ -1131,6 +1131,38 @@ export const suppressionPhones = pgTable("suppression_phones", {
   phoneIdx: index("suppression_phones_idx").on(table.phoneE164),
 }));
 
+// ========== CAMPAIGN-LEVEL SUPPRESSION SYSTEM ==========
+
+// Campaign Suppression - Accounts
+// Suppress entire accounts (and all their contacts) from specific campaigns
+export const campaignSuppressionAccounts = pgTable("campaign_suppression_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  reason: text("reason"),
+  addedBy: varchar("added_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignAccountIdx: index("campaign_suppression_accounts_campaign_idx").on(table.campaignId, table.accountId),
+  accountIdx: index("campaign_suppression_accounts_account_idx").on(table.accountId),
+  uniqueCampaignAccount: uniqueIndex("campaign_suppression_accounts_unique").on(table.campaignId, table.accountId),
+}));
+
+// Campaign Suppression - Contacts
+// Suppress specific contacts from specific campaigns
+export const campaignSuppressionContacts = pgTable("campaign_suppression_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: 'cascade' }).notNull(),
+  reason: text("reason"),
+  addedBy: varchar("added_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignContactIdx: index("campaign_suppression_contacts_campaign_idx").on(table.campaignId, table.contactId),
+  contactIdx: index("campaign_suppression_contacts_contact_idx").on(table.contactId),
+  uniqueCampaignContact: uniqueIndex("campaign_suppression_contacts_unique").on(table.campaignId, table.contactId),
+}));
+
 // ========== DISPOSITION MANAGEMENT & CALL ACTIVITY SYSTEM ==========
 
 // Dispositions - Client-defined labels mapped to system actions
@@ -1938,6 +1970,16 @@ export const insertSuppressionPhoneSchema = createInsertSchema(suppressionPhones
   createdAt: true,
 });
 
+export const insertCampaignSuppressionAccountSchema = createInsertSchema(campaignSuppressionAccounts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCampaignSuppressionContactSchema = createInsertSchema(campaignSuppressionContacts).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertCampaignOrderSchema = createInsertSchema(campaignOrders).omit({
   id: true,
   createdAt: true,
@@ -2184,6 +2226,12 @@ export type InsertSuppressionEmail = z.infer<typeof insertSuppressionEmailSchema
 
 export type SuppressionPhone = typeof suppressionPhones.$inferSelect;
 export type InsertSuppressionPhone = z.infer<typeof insertSuppressionPhoneSchema>;
+
+export type CampaignSuppressionAccount = typeof campaignSuppressionAccounts.$inferSelect;
+export type InsertCampaignSuppressionAccount = z.infer<typeof insertCampaignSuppressionAccountSchema>;
+
+export type CampaignSuppressionContact = typeof campaignSuppressionContacts.$inferSelect;
+export type InsertCampaignSuppressionContact = z.infer<typeof insertCampaignSuppressionContactSchema>;
 
 export type CampaignOrder = typeof campaignOrders.$inferSelect;
 export type InsertCampaignOrder = z.infer<typeof insertCampaignOrderSchema>;
