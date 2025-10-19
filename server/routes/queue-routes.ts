@@ -242,8 +242,8 @@ router.post(
           };
         }
 
-        // Only check active states AND exclude current agent - released/completed contacts can be reassigned
-        const activeStates = ['queued', 'locked', 'in_progress'] as const;
+        // Only check active states from OTHER agents - released/completed contacts can be reassigned
+        const activeStates: Array<'queued' | 'locked' | 'in_progress'> = ['queued', 'locked', 'in_progress'];
         
         const existingAssignments = await tx.select({
           contactId: agentQueue.contactId,
@@ -258,7 +258,7 @@ router.post(
           )
         );
 
-        console.log('[queues:set] Existing assignments in campaign:', existingAssignments.length);
+        console.log('[queues:set] Existing assignments in campaign (other agents):', existingAssignments.length);
 
         const assignedContactIds = new Set(existingAssignments.map(a => a.contactId));
         const availableContacts = eligibleContacts.filter(c => !assignedContactIds.has(c.id));
@@ -267,9 +267,21 @@ router.post(
         console.log('[queues:set] Available contacts after collision check:', availableContacts.length);
         console.log('[queues:set] Skipped due to collision:', skipped);
 
-        // Step 5: Assign available contacts to agent
+        // Step 5: Delete existing entries for this agent + contacts (to avoid unique constraint violation)
         if (availableContacts.length > 0) {
-          console.log('[queues:set] Inserting', availableContacts.length, 'contacts for agent', agent_id);
+          const availableContactIds = availableContacts.map(c => c.id);
+          
+          console.log('[queues:set] Deleting old entries for', availableContactIds.length, 'contacts');
+          await tx.delete(agentQueue)
+            .where(
+              and(
+                eq(agentQueue.agentId, agent_id),
+                eq(agentQueue.campaignId, campaignId),
+                inArray(agentQueue.contactId, availableContactIds)
+              )
+            );
+          
+          console.log('[queues:set] Inserting', availableContacts.length, 'new contacts for agent', agent_id);
           await tx.insert(agentQueue)
             .values(
               availableContacts.map(contact => ({
