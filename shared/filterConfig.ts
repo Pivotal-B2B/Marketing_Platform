@@ -340,11 +340,12 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
 export const MODULE_FILTERS: Record<string, FilterField[]> = {
   contacts: [
     "search",
-    // Company filters removed - require account table JOIN (not supported yet)
-    // "industries",
-    // "companySizes", 
-    // "companyRevenue",
-    // "technologies",
+    // Company filters (via account JOIN)
+    "industries",
+    "companySizes", 
+    "companyRevenue",
+    "technologies",
+    // Contact-specific filters
     "seniorityLevels",
     "departments",
     "countries",

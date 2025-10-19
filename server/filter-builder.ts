@@ -154,6 +154,46 @@ function buildCondition(condition: FilterCondition, table: TableType): SQL | und
     }
   }
 
+  // Handle company fields for contacts (requires JOIN to accounts table)
+  const companyFields = ['industries', 'industry', 'companySizes', 'companyRevenue', 'technologies', 'techStack'];
+  if (table === contacts && companyFields.includes(field)) {
+    const accountColumnName = getColumnName(field, accounts);
+    const accountColumn = (accounts as any)[accountColumnName];
+    
+    if (!accountColumn) {
+      console.warn(`Company field ${field} (mapped to ${accountColumnName}) not found in accounts table`);
+      return undefined;
+    }
+    
+    // Build EXISTS subquery with account JOIN
+    if (operator === 'equals') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${value})`;
+    } else if (operator === 'notEquals') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} != ${value})`;
+    } else if (operator === 'contains') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value + '%'})`;
+    } else if (operator === 'doesNotContain') {
+      return sql`NOT EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value + '%'})`;
+    } else if (operator === 'startsWith') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${value + '%'})`;
+    } else if (operator === 'endsWith') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value})`;
+    } else if (operator === 'containsAny') {
+      const values = value as string[];
+      if (values.length === 0) return undefined;
+      // For array fields like techStack
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} && ${values})`;
+    } else if (operator === 'containsAll') {
+      const values = value as string[];
+      if (values.length === 0) return undefined;
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} @> ${values})`;
+    } else if (operator === 'isEmpty') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${accountColumn} IS NULL OR ${accountColumn} = ''))`;
+    } else if (operator === 'isNotEmpty') {
+      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} IS NOT NULL AND ${accountColumn} != '')`;
+    }
+  }
+
   // Get the actual column name from field mapping
   const columnName = getColumnName(field, table);
   
