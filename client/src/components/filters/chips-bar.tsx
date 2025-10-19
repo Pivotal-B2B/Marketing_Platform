@@ -2,7 +2,7 @@ import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { FilterValues } from "@shared/filterConfig";
+import { FilterValues, type FieldRule, getOperatorLabel, isTextOperator, isNullCheckOperator } from "@shared/filterConfig";
 import { format } from "date-fns";
 
 interface ChipsBarProps {
@@ -24,15 +24,116 @@ export function ChipsBar({
   const getLabel = (field: string, id: string): string => {
     return optionLabels[field]?.[id] || id;
   };
+
+  // Helper to check if array contains FieldRule objects
+  const isFieldRuleArray = (arr: unknown[]): arr is FieldRule[] => {
+    return arr.length > 0 && typeof arr[0] === 'object' && arr[0] !== null && 'operator' in arr[0];
+  };
+
   // Count total active filters
   const totalFilters = Object.entries(filters).reduce((count, [key, value]) => {
     if (key === 'search' && value) return count + 1;
-    if (Array.isArray(value) && value.length > 0) return count + value.length;
+    if (Array.isArray(value) && value.length > 0) {
+      if (isFieldRuleArray(value)) {
+        // Count chips from FieldRule array
+        return count + value.reduce((ruleCount, rule) => {
+          if (isNullCheckOperator(rule.operator)) return ruleCount + 1;
+          if (rule.values && rule.values.length > 0) return ruleCount + rule.values.length;
+          if (rule.query && rule.query.trim()) return ruleCount + 1;
+          return ruleCount;
+        }, 0);
+      }
+      return count + value.length;
+    }
     if (value && typeof value === 'object' && 'from' in value) {
       if (value.from || value.to) return count + 1;
     }
     return count;
   }, 0);
+
+  // Helper to render chips for a field (handles both legacy string[] and new FieldRule[])
+  const renderFieldChips = (field: keyof FilterValues, fieldLabel: string) => {
+    const value = filters[field];
+    if (!Array.isArray(value) || value.length === 0) return null;
+
+    // Check if it's a FieldRule array
+    if (isFieldRuleArray(value)) {
+      // Render chips from FieldRule array
+      return value.flatMap((rule, ruleIndex) => {
+        const chips: JSX.Element[] = [];
+        
+        if (isNullCheckOperator(rule.operator)) {
+          // Null-check operators: render operator label as chip
+          chips.push(
+            <Badge
+              key={`${field}-rule-${ruleIndex}-null`}
+              variant="secondary"
+              className="gap-1"
+              data-testid={`chip-${field}-null-${ruleIndex}`}
+            >
+              {fieldLabel}: {getOperatorLabel(rule.operator)}
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={() => onRemove(field)}
+              />
+            </Badge>
+          );
+        } else if (isTextOperator(rule.operator) && rule.query && rule.query.trim()) {
+          // Text operators: render query as chip
+          chips.push(
+            <Badge
+              key={`${field}-rule-${ruleIndex}-query`}
+              variant="secondary"
+              className="gap-1"
+              data-testid={`chip-${field}-query-${ruleIndex}`}
+            >
+              {fieldLabel} {getOperatorLabel(rule.operator)}: "{rule.query}"
+              <X
+                className="h-3 w-3 cursor-pointer"
+                onClick={() => onRemove(field)}
+              />
+            </Badge>
+          );
+        } else if (rule.values && rule.values.length > 0) {
+          // Value operators: render each value as chip
+          rule.values.forEach((val, valIndex) => {
+            chips.push(
+              <Badge
+                key={`${field}-rule-${ruleIndex}-val-${valIndex}`}
+                variant="secondary"
+                className="gap-1"
+                data-testid={`chip-${field}-${val}`}
+              >
+                {fieldLabel}: {getLabel(field, val)}
+                <X
+                  className="h-3 w-3 cursor-pointer"
+                  onClick={() => onRemove(field, val)}
+                />
+              </Badge>
+            );
+          });
+        }
+        
+        return chips;
+      });
+    }
+
+    // Legacy string[] format
+    return value.map((val) => (
+      <Badge
+        key={val}
+        variant="secondary"
+        className="gap-1"
+        data-testid={`chip-${field}-${val}`}
+      >
+        {fieldLabel}: {getLabel(field, val as string)}
+        <X
+          className="h-3 w-3 cursor-pointer"
+          onClick={() => onRemove(field, val as string)}
+        />
+      </Badge>
+    ));
+  };
 
   if (totalFilters === 0) {
     return null;
@@ -59,171 +160,18 @@ export function ChipsBar({
         </Badge>
       )}
 
-      {/* Multi-select Array Filters */}
-      {filters.industries?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-industries-${value}`}
-        >
-          Industry: {getLabel('industries', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('industries', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.companySizes?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-companysize-${value}`}
-        >
-          Company Size: {getLabel('companySizes', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('companySizes', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.companyRevenue?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-revenue-${value}`}
-        >
-          Revenue: {getLabel('companyRevenue', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('companyRevenue', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.seniorityLevels?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-seniority-${value}`}
-        >
-          Seniority: {getLabel('seniorityLevels', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('seniorityLevels', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.countries?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-country-${value}`}
-        >
-          Country: {getLabel('countries', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('countries', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.states?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-state-${value}`}
-        >
-          State: {getLabel('states', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('states', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.cities?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-city-${value}`}
-        >
-          City: {getLabel('cities', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('cities', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.technologies?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-tech-${value}`}
-        >
-          Technology: {getLabel('technologies', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('technologies', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.jobFunctions?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-jobfunction-${value}`}
-        >
-          Job Function: {getLabel('jobFunctions', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('jobFunctions', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.departments?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-department-${value}`}
-        >
-          Department: {getLabel('departments', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('departments', value)}
-          />
-        </Badge>
-      ))}
-
-      {filters.accountOwners?.map((value) => (
-        <Badge
-          key={value}
-          variant="secondary"
-          className="gap-1"
-          data-testid={`chip-owner-${value}`}
-        >
-          Owner: {getLabel('accountOwners', value)}
-          <X
-            className="h-3 w-3 cursor-pointer"
-            onClick={() => onRemove('accountOwners', value)}
-          />
-        </Badge>
-      ))}
+      {/* Multi-select Array Filters - use helper to handle both legacy and FieldRule arrays */}
+      {renderFieldChips('industries', 'Industry')}
+      {renderFieldChips('companySizes', 'Company Size')}
+      {renderFieldChips('companyRevenue', 'Revenue')}
+      {renderFieldChips('seniorityLevels', 'Seniority')}
+      {renderFieldChips('countries', 'Country')}
+      {renderFieldChips('states', 'State')}
+      {renderFieldChips('cities', 'City')}
+      {renderFieldChips('technologies', 'Technology')}
+      {renderFieldChips('jobFunctions', 'Job Function')}
+      {renderFieldChips('departments', 'Department')}
+      {renderFieldChips('accountOwners', 'Owner')}
 
       {/* Date Range Filters */}
       {filters.createdDate && (filters.createdDate.from || filters.createdDate.to) && (
