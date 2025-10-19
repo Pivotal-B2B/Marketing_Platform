@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { FilterGroup, FilterCondition } from "@shared/filter-types";
@@ -40,11 +41,23 @@ export function SidebarFilters({
   const [isApplying, setIsApplying] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Fetch filter count in real-time
+  // Sync local filterGroup with initialFilter prop changes (e.g., when parent clears)
+  useEffect(() => {
+    if (initialFilter) {
+      setFilterGroup(initialFilter);
+    } else {
+      setFilterGroup({
+        logic: "AND",
+        conditions: [],
+      });
+    }
+  }, [initialFilter]);
+
+  // Fetch filter count in real-time (updates as filters change)
   const { data: countData, isLoading: isCountLoading } = useQuery<{
     count: number;
   }>({
-    queryKey: [`/api/filters/count/${entityType}`, filterGroup],
+    queryKey: [`/api/filters/count/${entityType}`, JSON.stringify(filterGroup)],
     queryFn: async () => {
       if (filterGroup.conditions.length === 0) {
         return { count: 0 };
@@ -58,7 +71,7 @@ export function SidebarFilters({
     },
     enabled: filterGroup.conditions.length > 0,
     refetchOnWindowFocus: false,
-    staleTime: 30000, // 30 seconds
+    staleTime: 0, // Always fresh - updates immediately when filterGroup changes
   });
 
   const resultsCount = countData?.count ?? 0;
@@ -154,6 +167,42 @@ export function SidebarFilters({
               </>
             )}
           </motion.p>
+        )}
+        
+        {/* AND/OR Logic Toggle */}
+        {activeFilterCount > 1 && (
+          <motion.div
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 mt-3"
+          >
+            <span className="text-xs text-slate-600 font-medium">Match:</span>
+            <ToggleGroup
+              type="single"
+              value={filterGroup.logic}
+              onValueChange={(value) => {
+                if (value === "AND" || value === "OR") {
+                  setFilterGroup({ ...filterGroup, logic: value });
+                }
+              }}
+              className="bg-slate-200 rounded-md p-1"
+            >
+              <ToggleGroupItem
+                value="AND"
+                className="px-3 py-1 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
+                data-testid="toggle-logic-and"
+              >
+                ALL (AND)
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="OR"
+                className="px-3 py-1 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
+                data-testid="toggle-logic-or"
+              >
+                ANY (OR)
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </motion.div>
         )}
       </div>
 

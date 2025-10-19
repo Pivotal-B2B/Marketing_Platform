@@ -93,7 +93,7 @@ export default function ContactsPage() {
   };
 
   const { data: contacts, isLoading: contactsLoading } = useQuery<Contact[]>({
-    queryKey: ['/api/contacts', appliedFilters, filterGroup],
+    queryKey: ['/api/contacts', JSON.stringify(filterGroup), JSON.stringify(appliedFilters)],
     queryFn: async () => {
       const token = localStorage.getItem('authToken');
       const headers: HeadersInit = {};
@@ -103,14 +103,14 @@ export default function ContactsPage() {
 
       const params = new URLSearchParams();
       
-      // Convert operator-based FilterValues to FilterGroup format for backend
-      if (Object.keys(appliedFilters).length > 0) {
+      // Priority: Use new SidebarFilters filterGroup first, then fall back to legacy appliedFilters
+      if (filterGroup && filterGroup.conditions.length > 0) {
+        params.set('filters', JSON.stringify(filterGroup));
+      } else if (Object.keys(appliedFilters).length > 0) {
         const convertedFilterGroup = convertFilterValuesToFilterGroup(appliedFilters, 'contacts');
         if (convertedFilterGroup) {
           params.set('filters', JSON.stringify(convertedFilterGroup));
         }
-      } else if (filterGroup) {
-        params.set('filters', JSON.stringify(filterGroup));
       }
       
       const response = await fetch(`/api/contacts?${params.toString()}`, {
