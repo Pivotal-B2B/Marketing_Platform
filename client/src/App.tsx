@@ -29,6 +29,7 @@ import TelemarketingCreatePage from "@/pages/telemarketing-create";
 import PhoneCampaignsPage from "@/pages/phone-campaigns";
 import CampaignConfigPage from "@/pages/campaign-config";
 import LeadsPage from "@/pages/leads";
+import LeadDetailPage from "@/pages/lead-detail";
 import ContentStudioPage from "@/pages/content-studio";
 import AIContentGeneratorPage from "@/pages/ai-content-generator";
 import SocialMediaPublisherPage from "@/pages/social-media-publisher";
@@ -104,6 +105,7 @@ function AuthenticatedApp() {
               <Route path="/campaigns/telemarketing" component={PhoneCampaignsPage} />
               <Route path="/campaigns/:id/queue" component={CampaignQueuePage} />
               <Route path="/campaigns/config" component={CampaignConfigPage} />
+              <Route path="/leads/:id" component={LeadDetailPage} />
               <Route path="/leads" component={LeadsPage} />
               <Route path="/suppressions" component={SuppressionsPage} />
               <Route path="/content-studio/ai-generator" component={AIContentGeneratorPage} />

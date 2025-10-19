@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, CheckCircle, XCircle, Clock, Download, Loader2, Phone, Play, Eye, User } from "lucide-react";
@@ -34,6 +35,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { LeadWithAccount } from "@shared/schema";
 
 export default function LeadsPage() {
+  const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -291,10 +293,7 @@ export default function LeadsPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => {
-                            setSelectedLead(lead);
-                            setDetailDialogOpen(true);
-                          }}
+                          onClick={() => navigate(`/leads/${lead.id}`)}
                           data-testid={`button-view-details-${lead.id}`}
                         >
                           <Eye className="mr-1 h-4 w-4" />

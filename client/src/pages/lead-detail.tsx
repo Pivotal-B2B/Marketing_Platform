@@ -1,5 +1,5 @@
 import { useParams, useLocation } from "wouter";
-import { useQuery, useMutation } from "@tantml:query/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
