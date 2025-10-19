@@ -619,52 +619,61 @@ export default function AgentConsolePage() {
 
         {/* RIGHT MAIN SECTION (82% width) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* CONTACT INFORMATION BAR (Horizontal) */}
+          {/* CONTACT INFORMATION BAR (Horizontal - Compact & Organized) */}
           {currentQueueItem ? (
-            <div className="h-[120px] border-b" style={{ background: 'linear-gradient(to right, #0a2540, #2f6feb)' }}>
-              <div className="h-full px-6 py-4 flex items-center justify-between text-white">
-                {/* Left: Profile */}
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                    <User className="h-8 w-8 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold mb-1" data-testid="text-contact-name">
-                      {currentQueueItem.contactName || 'Unknown Contact'}
-                    </h2>
-                    <div className="flex items-center gap-3 text-sm text-white/80">
-                      {contactDetails?.jobTitle && (
-                        <>
-                          <div className="flex items-center gap-1">
-                            <Briefcase className="h-3 w-3" />
-                            <span data-testid="text-contact-title">{contactDetails.jobTitle}</span>
-                          </div>
-                          <span>•</span>
-                        </>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <Building2 className="h-3 w-3" />
-                        <span data-testid="text-contact-company">{currentQueueItem.accountName || 'No company'}</span>
-                      </div>
-                    </div>
-                  </div>
+            <div className="h-[100px] border-b" style={{ background: 'linear-gradient(to right, #0a2540, #2f6feb)' }}>
+              <div className="h-full px-6 flex items-center gap-6 text-white">
+                {/* Profile Picture */}
+                <div className="h-14 w-14 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <User className="h-7 w-7 text-white" />
                 </div>
 
-                {/* Center: Contact Details */}
-                <div className="flex flex-col gap-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate max-w-xs" data-testid="text-contact-email">
+                {/* Contact Information - Organized Grid */}
+                <div className="flex-1 grid grid-cols-2 gap-x-8 gap-y-2">
+                  {/* Row 1: Name & Job Title */}
+                  <div className="col-span-2">
+                    <h2 className="text-lg font-semibold mb-1" data-testid="text-contact-name">
+                      {currentQueueItem.contactName || 'Unknown Contact'}
+                    </h2>
+                  </div>
+                  
+                  {/* Row 2: Job Title & Company */}
+                  <div className="flex items-center gap-2 text-sm text-white/90">
+                    {contactDetails?.jobTitle ? (
+                      <>
+                        <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span data-testid="text-contact-title">{contactDetails.jobTitle}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span data-testid="text-contact-company">{currentQueueItem.accountName || 'No company'}</span>
+                      </>
+                    )}
+                  </div>
+                  
+                  {contactDetails?.jobTitle && (
+                    <div className="flex items-center gap-2 text-sm text-white/90">
+                      <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span data-testid="text-contact-company">{currentQueueItem.accountName || 'No company'}</span>
+                    </div>
+                  )}
+                  
+                  {/* Row 3: Email & Phone */}
+                  <div className="flex items-center gap-2 text-sm text-white/90">
+                    <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="truncate" data-testid="text-contact-email">
                       {currentQueueItem.contactEmail || contactDetails?.email || 'No email'}
                     </span>
                   </div>
+                  
                   <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 flex-shrink-0" />
+                    <Phone className="h-3.5 w-3.5 flex-shrink-0 text-white/90" />
                     <Select value={selectedPhoneType} onValueChange={(value: 'direct' | 'company' | 'manual') => {
                       setSelectedPhoneType(value);
                       setShowManualDial(value === 'manual');
                     }}>
-                      <SelectTrigger className="h-7 bg-white/10 text-white border-white/20 text-xs w-[180px]" data-testid="select-phone-type">
+                      <SelectTrigger className="h-8 bg-white/10 text-white border-white/20 text-sm w-[200px]" data-testid="select-phone-type">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -679,24 +688,28 @@ export default function AgentConsolePage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  
                   {showManualDial && (
-                    <input
-                      type="tel"
-                      className="h-7 px-2 rounded bg-white/10 border border-white/20 text-white text-xs placeholder:text-white/50"
-                      placeholder="Enter phone number"
-                      value={manualPhoneNumber}
-                      onChange={(e) => setManualPhoneNumber(e.target.value)}
-                      data-testid="input-manual-phone"
-                    />
+                    <div className="col-span-2 flex items-center gap-2">
+                      <Phone className="h-3.5 w-3.5 flex-shrink-0 text-white/90" />
+                      <input
+                        type="tel"
+                        className="h-8 px-3 rounded bg-white/10 border border-white/20 text-white text-sm placeholder:text-white/50 w-[200px]"
+                        placeholder="Enter phone number"
+                        value={manualPhoneNumber}
+                        onChange={(e) => setManualPhoneNumber(e.target.value)}
+                        data-testid="input-manual-phone"
+                      />
+                    </div>
                   )}
                 </div>
 
-                {/* Right: Call Actions */}
-                <div className="flex flex-col gap-2">
+                {/* Call Button - Right Aligned */}
+                <div className="flex items-center gap-2">
                   {!isCallActive && callStatus !== 'wrap-up' && (
                     <Button
                       size="lg"
-                      className="h-14 w-32 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold"
+                      className="h-16 w-36 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold shadow-lg"
                       onClick={handleDial}
                       disabled={!currentQueueItem}
                       data-testid="button-dial"
@@ -710,7 +723,7 @@ export default function AgentConsolePage() {
                     <Button
                       size="lg"
                       variant="destructive"
-                      className="h-14 w-32 rounded-lg font-semibold"
+                      className="h-16 w-36 rounded-lg font-semibold shadow-lg"
                       onClick={handleHangup}
                       data-testid="button-hangup"
                     >
@@ -720,23 +733,17 @@ export default function AgentConsolePage() {
                   )}
 
                   {callStatus === 'wrap-up' && (
-                    <div className="text-xs text-white/80 text-center">Complete disposition below</div>
+                    <div className="h-16 w-36 flex items-center justify-center text-sm text-white/80 text-center bg-white/10 rounded-lg border border-white/20">
+                      Complete disposition below
+                    </div>
                   )}
-
-                  <div className="flex gap-2 mt-1">
-                    {contactDetails?.account?.id && (
-                      <Button variant="ghost" size="sm" className="text-white hover:bg-white/10 text-xs h-7">
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="h-[120px] border-b bg-muted/30 flex items-center justify-center">
+            <div className="h-[100px] border-b bg-muted/30 flex items-center justify-center">
               <div className="text-center">
-                <Phone className="h-12 w-12 mx-auto mb-2 opacity-50 text-muted-foreground" />
+                <Phone className="h-10 w-10 mx-auto mb-2 opacity-50 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">No contact selected</p>
               </div>
             </div>
