@@ -67,7 +67,18 @@ export function useTelnyxWebRTC({
       telnyxClient = new TelnyxRTC({
         login: username,
         password: sipPassword,
-        ringbackFile: undefined
+        ringbackFile: undefined,
+        // Force TCP transport instead of UDP (better for cloud environments)
+        iceTransportPolicy: 'relay',
+        // Configure TURN servers with TCP transport
+        iceServers: [
+          {
+            urls: 'turn:turn.telnyx.com:3478?transport=tcp',
+          },
+          {
+            urls: 'turns:turn.telnyx.com:5349', // TLS on port 5349
+          }
+        ]
       });
 
       // Set connection timeout (30 seconds)
