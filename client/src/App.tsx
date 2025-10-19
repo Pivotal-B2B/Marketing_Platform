@@ -81,7 +81,10 @@ function AuthenticatedApp() {
       <div className="flex h-screen w-full">
         <AppSidebar userRoles={userRoles} />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <TopBar userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || 'User'} />
+          <TopBar 
+            userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || 'User'} 
+            userRoles={userRoles}
+          />
           <main className="flex-1 overflow-auto p-6 bg-background">
             <Switch>
               <Route path="/" component={Dashboard} />
