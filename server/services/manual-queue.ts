@@ -112,43 +112,62 @@ export class ManualQueueService {
 
   /**
    * Pull next contact from agent's queue (with locking)
+   * Uses transaction with FOR UPDATE SKIP LOCKED for race-free pulls
    */
   async pullNextContact(agentId: string, campaignId: string): Promise<AgentQueue | null> {
     try {
-      // Release any stale locks first
-      await this.releaseStaleLocksForAgent(agentId, campaignId);
+      // Use a transaction to atomically select and lock in one operation
+      const result = await db.transaction(async (tx) => {
+        // SELECT ... FOR UPDATE SKIP LOCKED ensures:
+        // 1. Only one agent can lock a row at a time
+        // 2. Other agents skip locked rows and get the next available one
+        // 3. No race conditions or deadlocks
+        const selectResult = await tx.execute(sql`
+          SELECT id, lock_version
+          FROM agent_queue
+          WHERE agent_id = ${agentId}
+            AND campaign_id = ${campaignId}
+            AND queue_state = 'queued'
+            AND (scheduled_for IS NULL OR scheduled_for <= NOW())
+          ORDER BY priority DESC, created_at ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT 1
+        `);
 
-      // Get next queued contact (highest priority first, then FIFO)
-      const nextQueueItem = await db.query.agentQueue.findFirst({
-        where: and(
-          eq(agentQueue.agentId, agentId),
-          eq(agentQueue.campaignId, campaignId),
-          eq(agentQueue.queueState, 'queued')
-        ),
-        orderBy: [sql`${agentQueue.priority} DESC`, sql`${agentQueue.createdAt} ASC`],
+        const row = selectResult.rows[0];
+        if (!row) {
+          return null;
+        }
+
+        // Update with optimistic concurrency (lock_version check)
+        const updateResult = await tx.execute(sql`
+          UPDATE agent_queue
+          SET 
+            queue_state = 'locked',
+            locked_by = ${agentId},
+            locked_at = NOW(),
+            lock_expires_at = NOW() + INTERVAL '15 minutes',
+            lock_version = lock_version + 1,
+            updated_at = NOW()
+          WHERE id = ${row.id}
+            AND queue_state = 'queued'
+            AND lock_version = ${row.lock_version}
+          RETURNING *
+        `);
+
+        const updated = updateResult.rows[0];
+        return updated || null;
       });
 
-      if (!nextQueueItem) {
-        return null;
+      // Fetch full contact details if lock was successful
+      if (result) {
+        const fullItem = await db.query.agentQueue.findFirst({
+          where: eq(agentQueue.id, result.id),
+        });
+        return fullItem || null;
       }
 
-      // Lock the contact
-      await db
-        .update(agentQueue)
-        .set({
-          queueState: 'locked',
-          lockedBy: agentId,
-          lockedAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(agentQueue.id, nextQueueItem.id));
-
-      // Return updated item
-      const lockedItem = await db.query.agentQueue.findFirst({
-        where: eq(agentQueue.id, nextQueueItem.id),
-      });
-
-      return lockedItem || null;
+      return null;
 
     } catch (error) {
       console.error("[ManualQueue] Error pulling next contact:", error);

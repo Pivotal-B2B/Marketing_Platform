@@ -914,7 +914,7 @@ export const campaignAgents = pgTable("campaign_agents", {
   agentIdx: index("campaign_agents_agent_idx").on(table.agentId),
 }));
 
-// Campaign Queue table (for account lead cap enforcement)
+// Campaign Queue table (for account lead cap enforcement & power dial)
 export const campaignQueue = pgTable("campaign_queue", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
@@ -924,13 +924,28 @@ export const campaignQueue = pgTable("campaign_queue", {
   priority: integer("priority").notNull().default(0),
   status: queueStatusEnum("status").notNull().default('queued'),
   removedReason: text("removed_reason"),
+  // Lock management & concurrency control
+  lockVersion: integer("lock_version").notNull().default(0),
+  lockExpiresAt: timestamp("lock_expires_at"),
+  nextAttemptAt: timestamp("next_attempt_at"),
+  // Provenance tracking
+  enqueuedBy: text("enqueued_by"), // system|userId|dv_project_id
+  enqueuedReason: text("enqueued_reason"), // campaign_audience|retry|callback|dv_enrollment|manual_add
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
+  // Existing indexes
   campaignAccountIdx: index("campaign_queue_camp_acct_idx").on(table.campaignId, table.accountId),
   campaignStatusIdx: index("campaign_queue_camp_status_idx").on(table.campaignId, table.status),
   campaignContactUniq: uniqueIndex("campaign_queue_camp_contact_uniq").on(table.campaignId, table.contactId),
   agentIdx: index("campaign_queue_agent_idx").on(table.agentId),
+  // NEW: Partial unique index - prevent dupes unless done/removed
+  activeUniq: uniqueIndex("campaign_queue_active_uniq")
+    .on(table.campaignId, table.contactId)
+    .where(sql`${table.status} NOT IN ('done','removed')`),
+  // NEW: Pull-path covering index for power dialer
+  pullIdx: index("campaign_queue_pull_idx")
+    .on(table.campaignId, table.status, table.nextAttemptAt, table.priority),
 }));
 
 // Campaign Account Stats table (for O(1) cap checks)
@@ -961,14 +976,30 @@ export const agentQueue = pgTable("agent_queue", {
   releasedBy: varchar("released_by").references(() => users.id),
   priority: integer("priority").notNull().default(0),
   removedReason: text("removed_reason"),
+  // Lock management & concurrency control
+  lockVersion: integer("lock_version").notNull().default(0),
+  lockExpiresAt: timestamp("lock_expires_at"),
+  scheduledFor: timestamp("scheduled_for"), // for callbacks
+  // Provenance tracking
+  enqueuedBy: text("enqueued_by"), // system|userId|dv_project_id
+  enqueuedReason: text("enqueued_reason"), // campaign_audience|retry|callback|dv_enrollment|manual_add
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
+  // Existing indexes
   agentCampaignContactUniq: uniqueIndex("agent_queue_agent_campaign_contact_uniq")
     .on(table.agentId, table.campaignId, table.contactId),
   agentStateIdx: index("agent_queue_agent_state_idx").on(table.agentId, table.queueState),
   campaignIdx: index("agent_queue_campaign_idx").on(table.campaignId),
   contactIdx: index("agent_queue_contact_idx").on(table.contactId),
+  // NEW: Partial unique index - prevent dupes only for active states
+  // Allows re-queuing contacts in terminal states (completed, removed, released)
+  activeUniq: uniqueIndex("agent_queue_active_uniq")
+    .on(table.campaignId, table.contactId)
+    .where(sql`${table.queueState} IN ('queued', 'locked', 'in_progress')`),
+  // NEW: Pull-path covering index for manual dial
+  pullIdx: index("agent_queue_pull_idx")
+    .on(table.campaignId, table.queueState, table.priority, table.scheduledFor),
 }));
 
 // Voicemail Assets table (for AMD/Voicemail messages)
