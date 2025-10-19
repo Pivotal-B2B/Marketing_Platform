@@ -67,9 +67,15 @@ export function useTelnyxWebRTC({
         // - TURN: turn.telnyx.com:3478
       });
 
+      // Connection timeout detector
+      let connectionTimeout: NodeJS.Timeout;
+      let isReadyFired = false;
+      
       // Event listeners
       telnyxClient.on('telnyx.ready', () => {
         console.log('Telnyx WebRTC client ready');
+        isReadyFired = true;
+        clearTimeout(connectionTimeout);
         setIsConnected(true);
         toast({
           title: "Connected",
@@ -173,22 +179,34 @@ export function useTelnyxWebRTC({
         updateCallState('idle');
       });
 
-      // Connect to Telnyx with timeout protection
-      const connectPromise = telnyxClient.connect();
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Connection timeout after 15 seconds')), 15000);
-      });
-
-      Promise.race([connectPromise, timeoutPromise])
-        .catch((error: any) => {
-          console.error('Telnyx connection failed:', error);
+      // Start connection timeout - if telnyx.ready doesn't fire in 15s, show error
+      connectionTimeout = setTimeout(() => {
+        if (!isReadyFired) {
+          console.error('Telnyx connection timeout - telnyx.ready event never fired');
+          console.error('This usually means:');
+          console.error('1. Invalid credentials (check Telnyx dashboard)');
+          console.error('2. Network firewall blocking WebSocket/UDP ports');
+          console.error('3. Telnyx service issue');
           setIsConnected(false);
           toast({
             variant: "destructive",
-            title: "Connection Failed",
-            description: error.message || "Failed to connect to Telnyx server",
+            title: "Connection Timeout",
+            description: "Could not connect to Telnyx server. Check credentials and network.",
           });
+        }
+      }, 15000);
+      
+      // Connect to Telnyx
+      telnyxClient.connect().catch((error: any) => {
+        clearTimeout(connectionTimeout);
+        console.error('Telnyx connection failed during connect():', error);
+        setIsConnected(false);
+        toast({
+          variant: "destructive",
+          title: "Connection Failed",
+          description: error.message || "Failed to connect to Telnyx server",
         });
+      });
       
       setClient(telnyxClient);
 
