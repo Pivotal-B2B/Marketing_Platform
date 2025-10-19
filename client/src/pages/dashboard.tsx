@@ -60,12 +60,12 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gradient-primary rounded-2xl p-8 text-white shadow-smooth-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="bg-gradient-primary rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 text-white shadow-smooth-lg relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 sm:w-64 sm:h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold">Welcome Back{user?.firstName ? `, ${user.firstName}` : ''}!</h1>
-          <p className="mt-2 text-white/90">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Welcome Back{user?.firstName ? `, ${user.firstName}` : ''}!</h1>
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-white/90">
             {isAgent ? 'Your performance metrics and activity' : 'Overview of your B2B campaigns and performance metrics'}
           </p>
         </div>
@@ -74,7 +74,7 @@ export default function Dashboard() {
       {/* Agent Dashboard */}
       {isAgent && (
         <>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
             {agentLoading ? (
               <>
                 <Card><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
@@ -116,7 +116,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 md:grid-cols-3">
             <Card className="border-0 shadow-smooth-lg">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -167,7 +167,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
-            <CardContent className="flex gap-4">
+            <CardContent className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <Button 
                 onClick={() => setLocation('/agent-console')}
                 className="flex-1"
@@ -193,7 +193,7 @@ export default function Dashboard() {
       {/* Admin/Manager Dashboard */}
       {!isAgent && (
         <>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
             {isLoading ? (
               <>
                 <Card><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
@@ -278,7 +278,7 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-3">
                 <Card
                   role="button"
                   tabIndex={0}
