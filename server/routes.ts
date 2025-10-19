@@ -4569,14 +4569,30 @@ export function registerRoutes(app: Express) {
         userAgent: req.get('user-agent'),
       });
 
-      // TODO: Generate signed URL for recording from Telnyx or storage provider
-      // For now, return mock URL
-      const recordingUrl = `https://recordings.example.com/${attemptId}?token=mock-signed-token`;
+      // Try to get recording URL from call attempt first
+      let recordingUrl = attempt.recordingUrl;
+
+      // If no recording URL but we have a Telnyx call ID, try to fetch it
+      if (!recordingUrl && attempt.telnyxCallId) {
+        const { fetchTelnyxRecording } = await import("./services/telnyx-recordings");
+        recordingUrl = await fetchTelnyxRecording(attempt.telnyxCallId);
+        
+        // Update the call attempt with the fetched URL for future use
+        if (recordingUrl) {
+          await storage.updateCallAttempt(attemptId, { recordingUrl });
+        }
+      }
+
+      if (!recordingUrl) {
+        return res.status(404).json({ 
+          message: "Recording not available yet. Recordings may take a few minutes to process after the call ends." 
+        });
+      }
 
       res.json({
         accessLog,
         recordingUrl,
-        expiresIn: 3600, // URL expires in 1 hour
+        expiresIn: 3600, // Telnyx signed URLs expire in 1 hour
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -4607,31 +4623,102 @@ export function registerRoutes(app: Express) {
   // Telnyx webhook endpoint for call events (used for Telephony Credential configuration)
   app.post("/api/telnyx/webhook", async (req, res) => {
     try {
-      console.log("Telnyx webhook received:", JSON.stringify(req.body, null, 2));
+      console.log("[Telnyx Webhook] Event received:", JSON.stringify(req.body, null, 2));
 
-      // Acknowledge receipt immediately
+      // Acknowledge receipt immediately (Telnyx requires 2xx response within 10 seconds)
       res.status(200).json({ received: true });
 
-      // Process webhook event types
+      // Process webhook event types asynchronously
       const eventType = req.body?.data?.event_type;
+      const payload = req.body?.data?.payload;
 
-      if (eventType) {
-        console.log(`Telnyx event type: ${eventType}`);
+      if (!eventType) {
+        console.log("[Telnyx Webhook] No event type found");
+        return;
+      }
 
-        // Handle specific event types as needed
-        switch (eventType) {
-          case 'call.initiated':
-          case 'call.answered':
-          case 'call.hangup':
-            console.log(`Call event: ${eventType}`, req.body?.data);
-            break;
-          default:
-            console.log(`Unhandled Telnyx event: ${eventType}`);
-        }
+      console.log(`[Telnyx Webhook] Processing: ${eventType}`);
+
+      // Handle specific event types
+      switch (eventType) {
+        case 'call.initiated':
+          console.log(`[Telnyx Webhook] Call initiated:`, {
+            callControlId: payload?.call_control_id,
+            from: payload?.from,
+            to: payload?.to,
+          });
+          break;
+
+        case 'call.answered':
+          console.log(`[Telnyx Webhook] Call answered:`, {
+            callControlId: payload?.call_control_id,
+            state: payload?.state,
+          });
+          break;
+
+        case 'call.hangup':
+          console.log(`[Telnyx Webhook] Call ended:`, {
+            callControlId: payload?.call_control_id,
+            hangup_cause: payload?.hangup_cause,
+            hangup_source: payload?.hangup_source,
+          });
+          break;
+
+        case 'call.recording.saved':
+          // Recording is ready for download
+          const callControlId = payload?.call_control_id;
+          const recordingId = payload?.recording_id;
+          
+          console.log(`[Telnyx Webhook] Recording saved:`, {
+            callControlId,
+            recordingId,
+            recordingUrl: payload?.public_recording_url,
+          });
+
+          // Find call attempt by Telnyx call ID and update with recording URL
+          if (callControlId) {
+            try {
+              const { fetchTelnyxRecording } = await import("./services/telnyx-recordings");
+              
+              // Get the recording URL from Telnyx
+              const recordingUrl = await fetchTelnyxRecording(callControlId);
+              
+              if (recordingUrl) {
+                // Find call attempt by Telnyx call ID
+                const attempts = await storage.getCallAttemptsByTelnyxId(callControlId);
+                
+                if (attempts && attempts.length > 0) {
+                  for (const attempt of attempts) {
+                    // Update call attempt with recording URL
+                    await storage.updateCallAttempt(attempt.id, {
+                      recordingUrl,
+                    });
+                    
+                    console.log(`[Telnyx Webhook] ✅ Updated call attempt ${attempt.id} with recording URL`);
+                    
+                    // If this attempt has an associated lead, update it too
+                    const lead = await storage.getLeadByCallAttemptId(attempt.id);
+                    if (lead) {
+                      await storage.updateLead(lead.id, {
+                        recordingUrl,
+                      });
+                      console.log(`[Telnyx Webhook] ✅ Updated lead ${lead.id} with recording URL`);
+                    }
+                  }
+                }
+              }
+            } catch (error) {
+              console.error("[Telnyx Webhook] Error updating recording:", error);
+            }
+          }
+          break;
+
+        default:
+          console.log(`[Telnyx Webhook] Unhandled event: ${eventType}`);
       }
     } catch (error: any) {
-      console.error("Telnyx webhook error:", error.message);
-      res.status(500).json({ error: "Webhook processing failed" });
+      console.error("[Telnyx Webhook] Error:", error.message);
+      // Don't return error to Telnyx - we already acknowledged with 200
     }
   });
 

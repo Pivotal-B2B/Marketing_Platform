@@ -193,6 +193,7 @@ export interface IStorage {
   // Call Attempts
   getCallAttempts(campaignId?: string, agentId?: string): Promise<CallAttempt[]>;
   getCallAttempt(id: string): Promise<CallAttempt | undefined>;
+  getCallAttemptsByTelnyxId(telnyxCallId: string): Promise<CallAttempt[]>;
   createCallAttempt(attempt: InsertCallAttempt): Promise<CallAttempt>;
   updateCallAttempt(id: string, attempt: Partial<InsertCallAttempt>): Promise<CallAttempt | undefined>;
 
@@ -269,6 +270,7 @@ export interface IStorage {
   // Leads
   getLeads(filters?: any): Promise<LeadWithAccount[]>;
   getLead(id: string): Promise<Lead | undefined>;
+  getLeadByCallAttemptId(callAttemptId: string): Promise<Lead | undefined>;
   getLeadWithDetails(id: string): Promise<any | undefined>;
   createLead(lead: InsertLead): Promise<Lead>;
   createLeadFromCallAttempt(callAttemptId: string): Promise<Lead | undefined>;
@@ -2096,11 +2098,19 @@ export class DatabaseStorage implements IStorage {
     return attempt || undefined;
   }
 
+  async getCallAttemptsByTelnyxId(telnyxCallId: string): Promise<CallAttempt[]> {
+    return await db
+      .select()
+      .from(callAttempts)
+      .where(eq(callAttempts.telnyxCallId, telnyxCallId));
+  }
+
   async createCallAttempt(data: {
     contactId: string;
     agentId: string;
     campaignId: string;
     startedAt: Date;
+    telnyxCallId?: string;
   }): Promise<CallAttempt> {
     const attempt = {
       id: crypto.randomUUID(),
@@ -2658,6 +2668,14 @@ export class DatabaseStorage implements IStorage {
 
   async getLead(id: string): Promise<Lead | undefined> {
     const [lead] = await db.select().from(leads).where(eq(leads.id, id));
+    return lead || undefined;
+  }
+
+  async getLeadByCallAttemptId(callAttemptId: string): Promise<Lead | undefined> {
+    const [lead] = await db
+      .select()
+      .from(leads)
+      .where(eq(leads.callAttemptId, callAttemptId));
     return lead || undefined;
   }
 
