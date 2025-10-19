@@ -1,156 +1,437 @@
 import { z } from "zod";
 
-// Filter operators
-export const textOperators = ['equals', 'notEquals', 'contains', 'doesNotContain', 'startsWith', 'endsWith', 'isEmpty', 'isNotEmpty'] as const;
-export const numberOperators = ['equals', 'notEquals', 'greaterThan', 'lessThan', 'between', 'isEmpty', 'isNotEmpty'] as const;
-export const arrayOperators = ['containsAny', 'containsAll', 'isEmpty', 'isNotEmpty'] as const;
-export const booleanOperators = ['is'] as const;
-export const dateOperators = ['before', 'after', 'between', 'isEmpty', 'isNotEmpty'] as const;
+/**
+ * Simplified Unified Operator Model
+ * 
+ * All fields support the same 8 operators (where applicable):
+ * - equals, not_equals, contains, not_contains, begins_with, ends_with, is_empty, has_any_value
+ * 
+ * Multi-value support: users can provide one or more values per condition
+ * - Values within same field = OR logic
+ * - Different fields = AND logic
+ */
 
-export type TextOperator = typeof textOperators[number];
-export type NumberOperator = typeof numberOperators[number];
-export type ArrayOperator = typeof arrayOperators[number];
-export type BooleanOperator = typeof booleanOperators[number];
-export type DateOperator = typeof dateOperators[number];
-export type Operator = TextOperator | NumberOperator | ArrayOperator | BooleanOperator | DateOperator;
+// Core operators supported across all field types
+export const operators = [
+  'equals',
+  'not_equals',
+  'contains',
+  'not_contains',
+  'begins_with',
+  'ends_with',
+  'is_empty',
+  'has_any_value'
+] as const;
 
-// Operator display labels with descriptions
-export const operatorLabels: Record<string, string> = {
-  equals: 'Equals (=)',
-  notEquals: 'Not Equals (≠)',
+export type Operator = typeof operators[number];
+
+// Operator display labels
+export const operatorLabels: Record<Operator, string> = {
+  equals: 'Equals',
+  not_equals: 'Not Equals',
   contains: 'Contains',
-  doesNotContain: 'Does Not Contain',
-  startsWith: 'Begins With',
-  endsWith: 'Ends With',
-  greaterThan: 'Greater Than (>)',
-  lessThan: 'Less Than (<)',
-  between: 'Between',
-  before: 'Before',
-  after: 'After',
-  containsAny: 'Contains Any',
-  containsAll: 'Contains All',
-  isEmpty: 'Is Empty',
-  isNotEmpty: 'Has Value',
-  is: 'Is',
+  not_contains: 'Does Not Contain',
+  begins_with: 'Begins With',
+  ends_with: 'Ends With',
+  is_empty: 'Is Empty',
+  has_any_value: 'Has Any Value'
 };
 
-// Operator descriptions for tooltips/help text
-export const operatorDescriptions: Record<string, string> = {
-  equals: 'Returns records that exactly match the entered value',
-  notEquals: 'Excludes records that exactly match the entered value',
-  contains: 'Finds records where the field contains the specified text (case-insensitive)',
-  doesNotContain: 'Excludes records that contain the specified text',
-  startsWith: 'Returns records where the field starts with the entered text',
-  endsWith: 'Returns records where the field ends with the entered text',
-  greaterThan: 'Returns records where the value is greater than the specified number',
-  lessThan: 'Returns records where the value is less than the specified number',
-  between: 'Returns records where the value falls within the specified range',
-  before: 'Returns records with a date before the specified date',
-  after: 'Returns records with a date after the specified date',
-  containsAny: 'Returns records containing at least one of the specified values',
-  containsAll: 'Returns records containing all of the specified values',
-  isEmpty: 'Displays records where the field is empty or null',
-  isNotEmpty: 'Displays records where the field has a value (not empty or null)',
-  is: 'Checks if the boolean field matches the specified true/false value',
+// Operator descriptions for tooltips
+export const operatorDescriptions: Record<Operator, string> = {
+  equals: 'Exactly matches any of the entered values',
+  not_equals: 'Does not match any of the entered values',
+  contains: 'Contains any of the entered text (case-insensitive)',
+  not_contains: 'Does not contain any of the entered text',
+  begins_with: 'Starts with any of the entered text',
+  ends_with: 'Ends with any of the entered text',
+  is_empty: 'Field is empty or null',
+  has_any_value: 'Field has a value (not empty or null)'
 };
 
-// Filter field types
-export type FilterFieldType = 'text' | 'number' | 'array' | 'boolean' | 'date' | 'enum';
+// Field type categories (determines which operators are applicable)
+export type FilterFieldType = 'text' | 'number' | 'date' | 'enum' | 'array';
 
-// Enum operators (dropdown selection)
-export const enumOperators = ['equals', 'notEquals', 'isEmpty', 'isNotEmpty'] as const;
+// Field configuration with operator applicability
+export interface FieldConfig {
+  label: string;
+  type: FilterFieldType;
+  category?: string;
+  // Which operators are applicable for this field type
+  applicableOperators: Operator[];
+  // Whether this field supports type-ahead chip selection
+  typeAhead?: boolean;
+  // Type-ahead source endpoint (if applicable)
+  typeAheadSource?: string;
+}
 
-// Account filter fields
-export const accountFilterFields = {
+// Operator applicability by field type
+export const operatorsByFieldType: Record<FilterFieldType, Operator[]> = {
+  text: [
+    'equals',
+    'not_equals',
+    'contains',
+    'not_contains',
+    'begins_with',
+    'ends_with',
+    'is_empty',
+    'has_any_value'
+  ],
+  number: [
+    'equals',
+    'not_equals',
+    'is_empty',
+    'has_any_value'
+    // Range operators (greaterThan, lessThan, between) can be added later
+  ],
+  date: [
+    'equals',
+    'not_equals',
+    'is_empty',
+    'has_any_value'
+    // Date-specific operators (before, after, between) can be added later
+  ],
+  enum: [
+    'equals',
+    'not_equals',
+    'is_empty',
+    'has_any_value'
+  ],
+  array: [
+    'contains',      // Contains any of the values
+    'not_contains',  // Does not contain any of the values
+    'is_empty',
+    'has_any_value'
+  ]
+};
+
+// Account filter fields with simplified configuration
+export const accountFilterFields: Record<string, FieldConfig> = {
   // Text fields
-  name: { type: 'text' as const, label: 'Company Name' },
-  industry: { type: 'text' as const, label: 'Industry' },
-  domain: { type: 'text' as const, label: 'Domain' },
-  hqStreet1: { type: 'text' as const, label: 'HQ Street 1' },
-  hqStreet2: { type: 'text' as const, label: 'HQ Street 2' },
-  hqStreet3: { type: 'text' as const, label: 'HQ Street 3' },
-  hqCity: { type: 'text' as const, label: 'HQ City' },
-  hqState: { type: 'text' as const, label: 'HQ State' },
-  hqCountry: { type: 'text' as const, label: 'HQ Country' },
-  companyLocation: { type: 'text' as const, label: 'Company Location' },
-  sicCode: { type: 'text' as const, label: 'SIC Code' },
-  naicsCode: { type: 'text' as const, label: 'NAICS Code' },
-  // Enum fields (dropdown only)
-  revenueRange: { type: 'enum' as const, label: 'Company Revenue Range' },
-  employeesSizeRange: { type: 'enum' as const, label: 'Company Staff Count Range' },
+  name: {
+    label: 'Company Name',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  domain: {
+    label: 'Domain',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  industryStandardized: {
+    label: 'Industry',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'industries'
+  },
+  description: {
+    label: 'Description',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  hqCity: {
+    label: 'City',
+    type: 'text',
+    category: 'Geography',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'cities'
+  },
+  hqState: {
+    label: 'State / Province',
+    type: 'text',
+    category: 'Geography',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'states'
+  },
+  hqCountry: {
+    label: 'Country',
+    type: 'text',
+    category: 'Geography',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'countries'
+  },
+  sicCode: {
+    label: 'SIC Code',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  naicsCode: {
+    label: 'NAICS Code',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  mainPhone: {
+    label: 'Main Phone',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  linkedinUrl: {
+    label: 'LinkedIn URL',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  
+  // Enum fields (controlled vocabulary)
+  employeesSizeRange: {
+    label: 'Company Size',
+    type: 'enum',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.enum,
+    typeAhead: true,
+    typeAheadSource: 'company-sizes'
+  },
+  annualRevenue: {
+    label: 'Company Revenue',
+    type: 'enum',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.enum,
+    typeAhead: true,
+    typeAheadSource: 'company-revenue'
+  },
+  
   // Number fields
-  staffCount: { type: 'number' as const, label: 'Staff Count' },
-  yearFounded: { type: 'number' as const, label: 'Year Founded' },
+  staffCount: {
+    label: 'Staff Count',
+    type: 'number',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.number
+  },
+  yearFounded: {
+    label: 'Year Founded',
+    type: 'number',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.number
+  },
+  
   // Array fields
-  techStack: { type: 'array' as const, label: 'Tech Stack' },
-  linkedinSpecialties: { type: 'array' as const, label: 'LinkedIn Specialties' },
-  previousNames: { type: 'array' as const, label: 'Previous Names' },
-  intentTopics: { type: 'array' as const, label: 'Intent Topics' },
-  tags: { type: 'array' as const, label: 'Tags' },
-  // Boolean fields
-  hasContacts: { type: 'boolean' as const, label: 'Has Contacts' },
-  hasParent: { type: 'boolean' as const, label: 'Has Parent Account' },
+  techStack: {
+    label: 'Technologies',
+    type: 'array',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.array,
+    typeAhead: true,
+    typeAheadSource: 'technologies'
+  },
+  tags: {
+    label: 'Tags',
+    type: 'array',
+    category: 'General',
+    applicableOperators: operatorsByFieldType.array,
+    typeAhead: true,
+    typeAheadSource: 'account-tags'
+  }
 };
 
-// Contact filter fields
-export const contactFilterFields = {
+// Contact filter fields with simplified configuration
+export const contactFilterFields: Record<string, FieldConfig> = {
   // Text fields
-  fullName: { type: 'text' as const, label: 'Full Name' },
-  firstName: { type: 'text' as const, label: 'First Name' },
-  lastName: { type: 'text' as const, label: 'Last Name' },
-  email: { type: 'text' as const, label: 'Email' },
-  jobTitle: { type: 'text' as const, label: 'Job Title' },
-  department: { type: 'text' as const, label: 'Department' },
-  seniorityLevel: { type: 'text' as const, label: 'Seniority Level' },
-  formerPosition: { type: 'text' as const, label: 'Former Position' },
-  timeInCurrentPosition: { type: 'text' as const, label: 'Time in Current Position' },
-  timeInCurrentCompany: { type: 'text' as const, label: 'Time in Current Company' },
-  timezone: { type: 'text' as const, label: 'Timezone' },
-  city: { type: 'text' as const, label: 'City' },
-  state: { type: 'text' as const, label: 'State' },
-  country: { type: 'text' as const, label: 'Country' },
-  contactLocation: { type: 'text' as const, label: 'Contact Location' },
-  list: { type: 'text' as const, label: 'Source List' },
-  // Date fields
-  researchDate: { type: 'date' as const, label: 'Research Date' },
+  fullName: {
+    label: 'Full Name',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  firstName: {
+    label: 'First Name',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  lastName: {
+    label: 'Last Name',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  email: {
+    label: 'Email',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  jobTitle: {
+    label: 'Job Title',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'job-titles'
+  },
+  department: {
+    label: 'Department',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'departments'
+  },
+  seniorityLevel: {
+    label: 'Seniority Level',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'seniority-levels'
+  },
+  directPhone: {
+    label: 'Direct Phone',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  mobilePhone: {
+    label: 'Mobile Phone',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  linkedinUrl: {
+    label: 'LinkedIn URL',
+    type: 'text',
+    category: 'Contact Information',
+    applicableOperators: operatorsByFieldType.text
+  },
+  city: {
+    label: 'City',
+    type: 'text',
+    category: 'Geography',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'cities'
+  },
+  state: {
+    label: 'State / Province',
+    type: 'text',
+    category: 'Geography',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'states'
+  },
+  country: {
+    label: 'Country',
+    type: 'text',
+    category: 'Geography',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'countries'
+  },
+  consentBasis: {
+    label: 'Consent Basis',
+    type: 'text',
+    category: 'Compliance',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'consent-basis'
+  },
+  consentSource: {
+    label: 'Consent Source',
+    type: 'text',
+    category: 'Compliance',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'consent-source'
+  },
+  list: {
+    label: 'Source List',
+    type: 'text',
+    category: 'General',
+    applicableOperators: operatorsByFieldType.text
+  },
+  
   // Array fields
-  intentTopics: { type: 'array' as const, label: 'Intent Topics' },
-  tags: { type: 'array' as const, label: 'Tags' },
-  // Boolean fields
-  hasAccount: { type: 'boolean' as const, label: 'Has Linked Account' },
-  isEmailSuppressed: { type: 'boolean' as const, label: 'Email Suppressed' },
-  isPhoneSuppressed: { type: 'boolean' as const, label: 'Phone DNC' },
+  tags: {
+    label: 'Tags',
+    type: 'array',
+    category: 'General',
+    applicableOperators: operatorsByFieldType.array,
+    typeAhead: true,
+    typeAheadSource: 'contact-tags'
+  },
+  
+  // Company fields (via JOIN to accounts table)
+  accountName: {
+    label: 'Account Name',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'account-names'
+  },
+  accountDomain: {
+    label: 'Account Domain',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'account-domains'
+  },
+  industryStandardized: {
+    label: 'Industry (Company)',
+    type: 'text',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.text,
+    typeAhead: true,
+    typeAheadSource: 'industries'
+  },
+  employeesSizeRange: {
+    label: 'Company Size',
+    type: 'enum',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.enum,
+    typeAhead: true,
+    typeAheadSource: 'company-sizes'
+  },
+  annualRevenue: {
+    label: 'Company Revenue',
+    type: 'enum',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.enum,
+    typeAhead: true,
+    typeAheadSource: 'company-revenue'
+  },
+  techStack: {
+    label: 'Technologies (Company)',
+    type: 'array',
+    category: 'Company Information',
+    applicableOperators: operatorsByFieldType.array,
+    typeAhead: true,
+    typeAheadSource: 'technologies'
+  }
 };
 
-// Filter condition schema
+/**
+ * Simplified Filter Condition
+ * 
+ * Each condition has:
+ * - field: The field to filter on
+ * - operator: One of the 8 standard operators
+ * - values: Array of values (multi-value support with OR logic within field)
+ */
 export const filterConditionSchema = z.object({
   id: z.string(),
   field: z.string(),
-  operator: z.enum([
-    ...textOperators,
-    ...numberOperators,
-    ...arrayOperators,
-    ...booleanOperators,
-    ...dateOperators,
-    ...enumOperators
-  ]),
-  value: z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.array(z.string()),
-    z.object({ from: z.union([z.string(), z.number()]), to: z.union([z.string(), z.number()]) }),
-    z.null(),
-    z.undefined()
-  ]).optional(),
+  operator: z.enum(operators),
+  values: z.array(z.union([z.string(), z.number()])).default([])
 });
 
 export type FilterCondition = z.infer<typeof filterConditionSchema>;
 
-// Filter group schema (for AND/OR logic)
+// Filter group schema (for AND/OR logic between conditions)
 export const filterGroupSchema = z.object({
-  logic: z.enum(['AND', 'OR']),
-  conditions: z.array(filterConditionSchema),
+  logic: z.enum(['AND', 'OR']).default('AND'),
+  conditions: z.array(filterConditionSchema)
 });
 
 export type FilterGroup = z.infer<typeof filterGroupSchema>;
@@ -161,7 +442,7 @@ export const savedFilterSchema = z.object({
   name: z.string().min(1, 'Filter name is required'),
   description: z.string().optional(),
   entityType: z.enum(['account', 'contact']),
-  filterGroup: filterGroupSchema,
+  filterGroup: filterGroupSchema
 });
 
 export type SavedFilter = z.infer<typeof savedFilterSchema>;

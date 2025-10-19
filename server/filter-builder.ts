@@ -1,103 +1,80 @@
-import { SQL, and, or, eq, like, gt, lt, gte, lte, ilike, sql, isNull, isNotNull, inArray } from "drizzle-orm";
+import { SQL, and, or, eq, ilike, sql, isNull, isNotNull, inArray, notInArray } from "drizzle-orm";
 import { FilterGroup, FilterCondition } from "@shared/filter-types";
 import { accounts, contacts, leads } from "@shared/schema";
 
 type TableType = typeof accounts | typeof contacts | typeof leads;
 
 /**
- * Map filter field names to actual database column names
+ * Simplified Filter Builder
  * 
- * This ensures the filter UI can use user-friendly field names while
- * the backend queries use the correct database column names.
+ * Supports 8 unified operators:
+ * - equals, not_equals, contains, not_contains, begins_with, ends_with, is_empty, has_any_value
+ * 
+ * Multi-value handling:
+ * - Multiple values within same field = OR logic
+ * - Different fields = AND logic (based on filterGroup.logic)
+ */
+
+/**
+ * Map filter field names to actual database column names (Drizzle properties)
  */
 const FIELD_MAPPINGS: Record<string, Record<string, string>> = {
   accounts: {
-    // Company/Account fields
-    'industries': 'industryStandardized',
-    'industry': 'industryStandardized',
-    'companySizes': 'employeesSizeRange',
-    'companySize': 'employeesSizeRange',
-    'companyRevenue': 'annualRevenue',
-    'revenue': 'annualRevenue',
-    'revenueRange': 'annualRevenue',
-    'technologies': 'techStack',
+    // Simplified mappings - field name to Drizzle property
+    'industryStandardized': 'industryStandardized',
+    'employeesSizeRange': 'employeesSizeRange',
+    'annualRevenue': 'annualRevenue',
     'techStack': 'techStack',
     'domain': 'domain',
-    'accountMainPhone': 'mainPhone',
-    'accountLinkedinUrl': 'linkedinUrl',
-    'accountDescription': 'description',
-    'accountTags': 'tags',
+    'mainPhone': 'mainPhone',
+    'linkedinUrl': 'linkedinUrl',
+    'description': 'description',
     'tags': 'tags',
     'yearFounded': 'yearFounded',
     'sicCode': 'sicCode',
     'naicsCode': 'naicsCode',
-    
-    // Geography fields (accounts use hq_ prefix)
-    'countries': 'hqCountry',
-    'country': 'hqCountry',
-    'states': 'hqState',
-    'state': 'hqState',
-    'cities': 'hqCity',
-    'city': 'hqCity',
-    
-    // Ownership
-    'accountOwners': 'ownerId',
-    'owner': 'ownerId',
-    
-    // Date fields
-    'createdDate': 'createdAt',
-    'lastActivity': 'updatedAt'
+    'hqCity': 'hqCity',
+    'hqState': 'hqState',
+    'hqCountry': 'hqCountry',
+    'name': 'name',
+    'ownerId': 'ownerId',
+    'createdAt': 'createdAt',
+    'updatedAt': 'updatedAt',
+    'staffCount': 'staffCount'
   },
   contacts: {
     // Contact fields
-    'seniorityLevels': 'seniorityLevel',
-    'seniority': 'seniorityLevel',
-    'departments': 'department',
+    'seniorityLevel': 'seniorityLevel',
+    'department': 'department',
     'jobTitle': 'jobTitle',
     'directPhone': 'directPhone',
     'mobilePhone': 'mobilePhone',
-    'contactTags': 'tags',
     'tags': 'tags',
     'consentBasis': 'consentBasis',
     'consentSource': 'consentSource',
-    'contactLinkedinUrl': 'linkedinUrl',
+    'linkedinUrl': 'linkedinUrl',
     'list': 'list',
+    'fullName': 'fullName',
+    'firstName': 'firstName',
+    'lastName': 'lastName',
+    'email': 'email',
+    'city': 'city',
+    'state': 'state',
+    'country': 'country',
+    'ownerId': 'ownerId',
+    'sourceSystem': 'sourceSystem',
+    'createdAt': 'createdAt',
+    'updatedAt': 'updatedAt',
     
-    // Company fields (accessed via account join)
-    'industries': 'industryStandardized',  // Note: requires join to accounts table
-    'industry': 'industryStandardized',     // Note: requires join to accounts table
-    'companySizes': 'employeesSizeRange',   // Note: requires join to accounts table
-    'companyRevenue': 'annualRevenue',      // Note: requires join to accounts table
-    'technologies': 'techStack',            // Note: requires join to accounts table
-    'techStack': 'techStack',               // Note: requires join to accounts table
-    'accountName': 'name',                  // Note: requires join to accounts table
-    'accountDomain': 'domain',              // Note: requires join to accounts table
-    
-    // Geography fields (contacts don't use prefix)
-    'countries': 'country',
-    'states': 'state',
-    'cities': 'city',
-    
-    // Verification fields
-    'emailStatus': 'emailVerificationStatus',
-    'phoneStatus': 'phoneStatus',
-    
-    // Ownership
-    'accountOwners': 'ownerId',
-    'assignedAgent': 'ownerId',
-    'owner': 'ownerId',
-    
-    // Source
-    'contactSource': 'sourceSystem',
-    
-    // Date fields
-    'createdDate': 'createdAt',
-    'lastActivity': 'updatedAt',
-    'reviewedDate': 'reviewedAt'
+    // Company fields (via JOIN) - map to accounts table columns
+    'industryStandardized': 'industryStandardized',
+    'employeesSizeRange': 'employeesSizeRange',
+    'annualRevenue': 'annualRevenue',
+    'techStack': 'techStack',
+    'accountName': 'name',
+    'accountDomain': 'domain'
   },
-  leads: {
-    // Leads table uses standard field names
-  }
+  leads: {}
 };
 
 function getColumnName(field: string, table: TableType): string {
@@ -105,6 +82,41 @@ function getColumnName(field: string, table: TableType): string {
   return FIELD_MAPPINGS[tableName]?.[field] || field;
 }
 
+/**
+ * Fields that require JOIN to accounts table when filtering contacts
+ */
+const COMPANY_FIELDS = [
+  'industryStandardized',
+  'employeesSizeRange',
+  'annualRevenue',
+  'techStack',
+  'accountName',
+  'accountDomain'
+];
+
+/**
+ * Array fields (use different operators)
+ */
+const ARRAY_FIELDS = ['techStack', 'tags', 'linkedinSpecialties', 'intentTopics', 'previousNames'];
+
+/**
+ * Text fields (can check for empty string)
+ * Numeric and date fields should only check for NULL, not empty string
+ */
+const TEXT_FIELDS = [
+  'name', 'domain', 'industryStandardized', 'description', 'sicCode', 'naicsCode',
+  'mainPhone', 'linkedinUrl', 'hqCity', 'hqState', 'hqCountry',
+  'fullName', 'firstName', 'lastName', 'email', 'jobTitle', 'department',
+  'seniorityLevel', 'directPhone', 'mobilePhone', 'linkedinUrl', 'city',
+  'state', 'country', 'consentBasis', 'consentSource', 'list', 'sourceSystem'
+];
+
+const NUMERIC_FIELDS = ['yearFounded', 'staffCount'];
+const ENUM_FIELDS = ['employeesSizeRange', 'annualRevenue', 'revenueRange'];
+
+/**
+ * Build SQL query from filter group
+ */
 export function buildFilterQuery(filterGroup: FilterGroup, table: TableType): SQL | undefined {
   if (!filterGroup.conditions || filterGroup.conditions.length === 0) {
     return undefined;
@@ -121,218 +133,282 @@ export function buildFilterQuery(filterGroup: FilterGroup, table: TableType): SQ
   return filterGroup.logic === 'AND' ? and(...conditions) : or(...conditions);
 }
 
+/**
+ * Build SQL condition for a single filter condition
+ */
 function buildCondition(condition: FilterCondition, table: TableType): SQL | undefined {
-  const { field, operator, value } = condition;
+  const { field, operator, values } = condition;
 
-  // Handle special boolean fields
-  if (field === 'hasContacts' && table === accounts) {
-    const boolValue = value as boolean;
-    return boolValue 
-      ? sql`EXISTS (SELECT 1 FROM ${contacts} WHERE ${contacts.accountId} = ${accounts.id})`
-      : sql`NOT EXISTS (SELECT 1 FROM ${contacts} WHERE ${contacts.accountId} = ${accounts.id})`;
-  }
-
-  if (field === 'hasParent' && table === accounts) {
-    const boolValue = value as boolean;
-    return boolValue ? isNotNull(accounts.parentAccountId) : isNull(accounts.parentAccountId);
-  }
-
-  if (field === 'hasAccount' && table === contacts) {
-    const boolValue = value as boolean;
-    return boolValue ? isNotNull(contacts.accountId) : isNull(contacts.accountId);
-  }
-
-  // Handle account relationship fields for contacts
-  if (table === contacts && field === 'accountName') {
-    if (operator === 'equals') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.name} = ${value})`;
-    } else if (operator === 'contains') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.name} ILIKE ${'%' + value + '%'})`;
-    } else if (operator === 'startsWith') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.name} ILIKE ${value + '%'})`;
-    } else if (operator === 'isEmpty') {
-      return isNull(contacts.accountId);
-    } else if (operator === 'isNotEmpty') {
-      return isNotNull(contacts.accountId);
-    }
-  }
-
-  if (table === contacts && field === 'accountDomain') {
-    if (operator === 'equals') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.domain} = ${value})`;
-    } else if (operator === 'contains') {
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.domain} ILIKE ${'%' + value + '%'})`;
-    } else if (operator === 'containsAny') {
-      const values = value as string[];
-      if (values.length === 0) return undefined;
-      return sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accounts.domain} = ANY(${values}))`;
-    } else if (operator === 'isEmpty') {
-      return isNull(contacts.accountId);
-    } else if (operator === 'isNotEmpty') {
-      return isNotNull(contacts.accountId);
-    }
-  }
-
-  // Handle company fields for contacts (requires JOIN to accounts table)
-  const companyFields = ['industries', 'industry', 'companySizes', 'companyRevenue', 'technologies', 'techStack'];
-  const arrayCompanyFields = ['technologies', 'techStack']; // Array fields
+  // Get the actual column name
+  const columnName = getColumnName(field, table);
   
-  if (table === contacts && companyFields.includes(field)) {
-    const accountColumnName = getColumnName(field, accounts);
-    const accountColumn = (accounts as any)[accountColumnName];
-    
-    if (!accountColumn) {
-      console.warn(`Company field ${field} (mapped to ${accountColumnName}) not found in accounts table`);
-      return undefined;
-    }
-    
-    const isArrayField = arrayCompanyFields.includes(field);
-    
-    // Build EXISTS subquery with account JOIN
-    // CRITICAL: Must check contacts.accountId IS NOT NULL to exclude contacts without accounts
-    if (operator === 'equals') {
-      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${value})`;
-    } else if (operator === 'notEquals') {
-      // NOT EXISTS excludes contacts with no account OR contacts whose account has this value
-      return sql`${contacts.accountId} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${value})`;
-    } else if (operator === 'contains') {
-      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value + '%'})`;
-    } else if (operator === 'doesNotContain') {
-      return sql`${contacts.accountId} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value + '%'})`;
-    } else if (operator === 'startsWith') {
-      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${value + '%'})`;
-    } else if (operator === 'endsWith') {
-      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} ILIKE ${'%' + value})`;
-    } else if (operator === 'containsAny') {
-      const values = value as string[];
-      if (values.length === 0) return undefined;
-      
-      if (isArrayField) {
-        // For array fields like techStack, let Drizzle handle array parameterization
-        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} && ${values})`;
-      } else {
-        // For scalar fields like industry/revenue, use inArray
-        return and(
-          isNotNull(contacts.accountId),
-          sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${inArray(accountColumn, values)})`
-        )!;
-      }
-    } else if (operator === 'containsAll') {
-      const values = value as string[];
-      if (values.length === 0) return undefined;
-      
-      if (isArrayField) {
-        // For array fields, let Drizzle handle array parameterization
-        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} @> ${values})`;
-      } else {
-        // containsAll doesn't make sense for scalar fields - fail gracefully
-        // For now, match ALL values using AND clauses (equivalent to IN with all values)
-        if (values.length === 1) {
-          return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${values[0]})`;
-        }
-        // For multiple values, a scalar can only equal one value, so this is impossible
-        // Return a condition that's always false
-        return sql`FALSE`;
-      }
-    } else if (operator === 'isEmpty') {
-      // Check if contact has no account OR account field is empty
+  // Check if this is a company field on contacts (requires JOIN)
+  const isCompanyField = table === contacts && COMPANY_FIELDS.includes(field);
+  const isArrayField = ARRAY_FIELDS.includes(columnName);
+
+  // Handle company fields on contacts (requires EXISTS subquery with JOIN)
+  if (isCompanyField) {
+    return buildCompanyFieldCondition(field, operator, values, columnName, isArrayField);
+  }
+
+  // Handle regular fields
+  return buildRegularFieldCondition(field, operator, values, table, columnName, isArrayField);
+}
+
+/**
+ * Build condition for company fields on contacts (requires JOIN to accounts)
+ */
+function buildCompanyFieldCondition(
+  field: string,
+  operator: string,
+  values: (string | number)[],
+  accountColumnName: string,
+  isArrayField: boolean
+): SQL | undefined {
+  const accountColumn = (accounts as any)[accountColumnName];
+  
+  if (!accountColumn) {
+    console.warn(`Company field ${field} (mapped to ${accountColumnName}) not found in accounts table`);
+    return undefined;
+  }
+
+  // Determine if this is a text field (can check for empty string)
+  const isTextField = TEXT_FIELDS.includes(accountColumnName);
+
+  // Handle is_empty and has_any_value first (don't need values)
+  if (operator === 'is_empty') {
+    if (isArrayField) {
+      // For array fields, check for NULL or empty array '{}'
+      return or(
+        isNull(contacts.accountId),
+        sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${accountColumn} IS NULL OR ${accountColumn} = '{}'))`
+      );
+    } else if (isTextField) {
+      // For text fields, check for NULL or empty string
       return or(
         isNull(contacts.accountId),
         sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${accountColumn} IS NULL OR ${accountColumn} = ''))`
       );
-    } else if (operator === 'isNotEmpty') {
-      // Contact must have account AND field must not be empty
-      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} IS NOT NULL AND ${accountColumn} != '')`;
+    } else {
+      // For numeric/enum fields, only check NULL
+      return or(
+        isNull(contacts.accountId),
+        sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} IS NULL)`
+      );
     }
   }
 
-  // Get the actual column name from field mapping
-  const columnName = getColumnName(field, table);
-  
-  // Get the column from the table
+  if (operator === 'has_any_value') {
+    if (isArrayField) {
+      // For array fields, check for NOT NULL and not empty array
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} IS NOT NULL AND ${accountColumn} != '{}')`;
+    } else if (isTextField) {
+      // For text fields, check for NOT NULL and not empty string
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} IS NOT NULL AND ${accountColumn} != '')`;
+    } else {
+      // For numeric/enum fields, only check NOT NULL
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} IS NOT NULL)`;
+    }
+  }
+
+  // For all other operators, we need values
+  if (!values || values.length === 0) {
+    return undefined;
+  }
+
+  // Build condition based on operator
+  switch (operator) {
+    case 'equals':
+      // Multi-value OR: equals ANY of the values
+      if (values.length === 1) {
+        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ${values[0]})`;
+      }
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} = ANY(${values}))`;
+    
+    case 'not_equals':
+      // Multi-value AND: not equals ALL of the values
+      // IMPORTANT: Include contacts with no account or account with NULL field (and empty string for text fields)
+      if (values.length === 1) {
+        const nullCheck = isTextField 
+          ? sql`(${accountColumn} != ${values[0]} OR ${accountColumn} IS NULL OR ${accountColumn} = '')`
+          : sql`(${accountColumn} != ${values[0]} OR ${accountColumn} IS NULL)`;
+        return or(
+          isNull(contacts.accountId),
+          sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${nullCheck})`
+        );
+      }
+      const nullCheckMulti = isTextField
+        ? sql`(${accountColumn} NOT IN (SELECT unnest(${values}::text[])) OR ${accountColumn} IS NULL OR ${accountColumn} = '')`
+        : sql`(${accountColumn} NOT IN (SELECT unnest(${values}::text[])) OR ${accountColumn} IS NULL)`;
+      return or(
+        isNull(contacts.accountId),
+        sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${nullCheckMulti})`
+      );
+    
+    case 'contains':
+      // Multi-value OR: contains ANY of the values
+      if (isArrayField) {
+        // For array fields, use array overlap operator
+        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${accountColumn} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)})`;
+      } else {
+        // For text fields, use ILIKE with OR
+        const orConditions = values.map(v => sql`${accountColumn} ILIKE ${'%' + String(v) + '%'}`);
+        return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${or(...orConditions)}))`;
+      }
+    
+    case 'not_contains':
+      // Multi-value AND: does not contain ALL of the values
+      // IMPORTANT: Include contacts with no account or account with NULL field (and empty for arrays/text fields)
+      if (isArrayField) {
+        // For array fields, include NULL and empty arrays
+        return or(
+          isNull(contacts.accountId),
+          sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (NOT (${accountColumn} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)}) OR ${accountColumn} IS NULL OR ${accountColumn} = '{}'))`
+        );
+      } else {
+        // For text fields, include NULL (and empty strings only for text fields)
+        const andConditions = values.map(v => sql`${accountColumn} NOT ILIKE ${'%' + String(v) + '%'}`);
+        const nullCheck = isTextField
+          ? sql`((${and(...andConditions)}) OR ${accountColumn} IS NULL OR ${accountColumn} = '')`
+          : sql`((${and(...andConditions)}) OR ${accountColumn} IS NULL)`;
+        return or(
+          isNull(contacts.accountId),
+          sql`EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${nullCheck})`
+        );
+      }
+    
+    case 'begins_with':
+      // Multi-value OR: begins with ANY of the values
+      const startsOrConditions = values.map(v => sql`${accountColumn} ILIKE ${String(v) + '%'}`);
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${or(...startsOrConditions)}))`;
+    
+    case 'ends_with':
+      // Multi-value OR: ends with ANY of the values
+      const endsOrConditions = values.map(v => sql`${accountColumn} ILIKE ${'%' + String(v)}`);
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND (${or(...endsOrConditions)}))`;
+    
+    default:
+      console.warn(`Operator ${operator} not supported for company fields`);
+      return undefined;
+  }
+}
+
+/**
+ * Build condition for regular fields (no JOIN required)
+ */
+function buildRegularFieldCondition(
+  field: string,
+  operator: string,
+  values: (string | number)[],
+  table: TableType,
+  columnName: string,
+  isArrayField: boolean
+): SQL | undefined {
   const column = (table as any)[columnName];
+  
   if (!column) {
     console.warn(`Field ${field} (mapped to ${columnName}) not found in table`);
     return undefined;
   }
 
-  // Handle different operators
+  // Determine if this is a text field (can check for empty string)
+  const isTextField = TEXT_FIELDS.includes(columnName);
+
+  // Handle is_empty and has_any_value (don't need values)
+  if (operator === 'is_empty') {
+    if (isArrayField) {
+      return or(isNull(column), sql`${column} = '{}'`);
+    } else if (isTextField) {
+      // Text fields: check NULL or empty string
+      return or(isNull(column), eq(column, ''));
+    } else {
+      // Numeric/enum fields: only check NULL
+      return isNull(column);
+    }
+  }
+
+  if (operator === 'has_any_value') {
+    if (isArrayField) {
+      return and(isNotNull(column), sql`${column} != '{}'`);
+    } else if (isTextField) {
+      // Text fields: check NOT NULL and not empty string
+      return and(isNotNull(column), sql`${column} != ''`);
+    } else {
+      // Numeric/enum fields: only check NOT NULL
+      return isNotNull(column);
+    }
+  }
+
+  // For all other operators, we need values
+  if (!values || values.length === 0) {
+    return undefined;
+  }
+
+  // Build condition based on operator
   switch (operator) {
     case 'equals':
-      return eq(column, value as string | number);
+      // Multi-value OR: equals ANY of the values
+      if (values.length === 1) {
+        return eq(column, values[0]);
+      }
+      return inArray(column, values);
     
-    case 'notEquals':
-      return sql`${column} != ${value}`;
+    case 'not_equals':
+      // Multi-value AND: not equals ALL of the values
+      // IMPORTANT: Include NULL values (and empty strings for text fields)
+      if (values.length === 1) {
+        const nullConditions = [sql`${column} != ${values[0]}`, isNull(column)];
+        if (isTextField) {
+          nullConditions.push(eq(column, ''));
+        }
+        return or(...nullConditions);
+      }
+      const nullConditionsMulti = [notInArray(column, values), isNull(column)];
+      if (isTextField) {
+        nullConditionsMulti.push(eq(column, ''));
+      }
+      return or(...nullConditionsMulti);
     
     case 'contains':
-      return ilike(column, `%${value}%`);
-    
-    case 'doesNotContain':
-      return sql`${column} NOT ILIKE ${'%' + value + '%'}`;
-    
-    case 'startsWith':
-      return ilike(column, `${value}%`);
-    
-    case 'endsWith':
-      return ilike(column, `%${value}`);
-    
-    case 'greaterThan':
-      return gt(column, value as number);
-    
-    case 'lessThan':
-      return lt(column, value as number);
-    
-    case 'between':
-      const rangeValue = value as { from: string | number; to: string | number };
-      const conditions: SQL[] = [];
-      
-      // Only add from condition if value is present and not empty string
-      if (rangeValue.from !== '' && rangeValue.from !== null && rangeValue.from !== undefined) {
-        conditions.push(gte(column, rangeValue.from));
+      // Multi-value OR: contains ANY of the values
+      if (isArrayField) {
+        // For array fields, use array overlap operator
+        return sql`${column} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)}`;
+      } else {
+        // For text fields, use ILIKE with OR
+        const orConditions = values.map(v => ilike(column, `%${String(v)}%`));
+        return or(...orConditions);
       }
-      
-      // Only add to condition if value is present and not empty string
-      if (rangeValue.to !== '' && rangeValue.to !== null && rangeValue.to !== undefined) {
-        conditions.push(lte(column, rangeValue.to));
+    
+    case 'not_contains':
+      // Multi-value AND: does not contain ALL of the values
+      // IMPORTANT: Include NULL values (and empty for arrays/text fields)
+      if (isArrayField) {
+        // For array fields, include NULL and empty arrays
+        return or(
+          sql`NOT (${column} && ${sql.raw(`ARRAY[${values.map(v => `'${String(v).replace(/'/g, "''")}'`).join(',')}]::text[]`)})`,
+          isNull(column),
+          sql`${column} = '{}'`
+        );
+      } else {
+        // For text fields, include NULL (and empty strings for text fields)
+        const andConditions = values.map(v => sql`${column} NOT ILIKE ${'%' + String(v) + '%'}`);
+        const nullConditionsNotContains = [and(...andConditions), isNull(column)];
+        if (isTextField) {
+          nullConditionsNotContains.push(eq(column, ''));
+        }
+        return or(...nullConditionsNotContains);
       }
-      
-      // Return combined conditions or undefined if no valid bounds
-      if (conditions.length === 0) return undefined;
-      if (conditions.length === 1) return conditions[0];
-      return and(...conditions);
     
-    case 'containsAny':
-      // For array fields, check if any value in the filter array is in the column array
-      const anyValues = value as string[];
-      if (anyValues.length === 0) return undefined;
-      return sql`${column} && ${anyValues}`;
+    case 'begins_with':
+      // Multi-value OR: begins with ANY of the values
+      const startsOrConditions = values.map(v => ilike(column, `${String(v)}%`));
+      return or(...startsOrConditions);
     
-    case 'containsAll':
-      // For array fields, check if all values in the filter array are in the column array
-      const allValues = value as string[];
-      if (allValues.length === 0) return undefined;
-      return sql`${column} @> ${allValues}`;
-    
-    case 'isEmpty':
-      return or(
-        isNull(column),
-        sql`${column} = '{}'`
-      );
-    
-    case 'isNotEmpty':
-      return and(
-        isNotNull(column),
-        sql`${column} != '{}'`
-      );
-    
-    case 'before':
-      return lt(column, value as string);
-    
-    case 'after':
-      return gt(column, value as string);
-    
-    case 'is':
-      return eq(column, value as boolean);
+    case 'ends_with':
+      // Multi-value OR: ends with ANY of the values
+      const endsOrConditions = values.map(v => ilike(column, `%${String(v)}`));
+      return or(...endsOrConditions);
     
     default:
       console.warn(`Operator ${operator} not supported`);
@@ -352,36 +428,37 @@ export function buildSuppressionFilter(
       conditions.push(
         sql`EXISTS (
           SELECT 1 FROM suppression_emails 
-          WHERE suppression_emails.email = ${contacts.email}
+          WHERE suppression_emails.email = contacts.email_normalized
         )`
       );
     } else {
       conditions.push(
         sql`NOT EXISTS (
           SELECT 1 FROM suppression_emails 
-          WHERE suppression_emails.email = ${contacts.email}
+          WHERE suppression_emails.email = contacts.email_normalized
         )`
       );
     }
   }
 
   if (isPhoneSuppressed !== undefined && isPhoneSuppressed) {
-    if (isPhoneSuppressed) {
-      conditions.push(
+    conditions.push(
+      or(
         sql`EXISTS (
           SELECT 1 FROM suppression_phones 
-          WHERE suppression_phones.phone_e164 = ${contacts.directPhoneE164}
-        )`
-      );
-    } else {
-      conditions.push(
-        sql`NOT EXISTS (
+          WHERE suppression_phones.phone_number = contacts.direct_phone_e164
+        )`,
+        sql`EXISTS (
           SELECT 1 FROM suppression_phones 
-          WHERE suppression_phones.phone_e164 = ${contacts.directPhoneE164}
+          WHERE suppression_phones.phone_number = contacts.mobile_phone_e164
         )`
-      );
-    }
+      )!
+    );
   }
 
-  return conditions.length > 0 ? and(...conditions) : undefined;
+  if (conditions.length === 0) {
+    return undefined;
+  }
+
+  return and(...conditions);
 }
