@@ -1340,6 +1340,163 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Data completeness diagnostics for accounts
+  app.get("/api/accounts/data-completeness", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const accounts = await storage.getAccounts();
+      
+      if (accounts.length === 0) {
+        return res.json({
+          totalAccounts: 0,
+          message: "No accounts to analyze"
+        });
+      }
+
+      // Define key fields to analyze
+      const keyFields = [
+        'domain', 'industryStandardized', 'employeesSizeRange', 'annualRevenue',
+        'hqCity', 'hqState', 'hqPostalCode', 'hqCountry', 'hqStreet1',
+        'mainPhone', 'yearFounded', 'description', 'linkedinUrl',
+        'companyLocation', 'sicCode', 'naicsCode'
+      ];
+
+      const fieldStats: Record<string, { populated: number; blank: number; percentage: number }> = {};
+
+      // Calculate completeness for each field
+      keyFields.forEach(field => {
+        const populated = accounts.filter(account => {
+          const value = (account as any)[field];
+          return value !== null && value !== undefined && value !== '';
+        }).length;
+        
+        const blank = accounts.length - populated;
+        const percentage = (populated / accounts.length) * 100;
+
+        fieldStats[field] = {
+          populated,
+          blank,
+          percentage: Math.round(percentage * 10) / 10
+        };
+      });
+
+      // Sort fields by completeness (least complete first)
+      const sortedFields = Object.entries(fieldStats)
+        .sort(([, a], [, b]) => a.percentage - b.percentage)
+        .map(([field, stats]) => ({ field, ...stats }));
+
+      // Overall completeness score
+      const totalFields = keyFields.length;
+      const overallCompleteness = sortedFields.reduce((sum, { percentage }) => sum + percentage, 0) / totalFields;
+
+      // Find accounts with most/least complete data
+      const accountCompleteness = accounts.map(account => {
+        const fieldsPopulated = keyFields.filter(field => {
+          const value = (account as any)[field];
+          return value !== null && value !== undefined && value !== '';
+        }).length;
+        
+        return {
+          id: account.id,
+          name: account.name,
+          domain: account.domain,
+          fieldsPopulated,
+          totalFields,
+          completenessPercentage: Math.round((fieldsPopulated / totalFields) * 100)
+        };
+      }).sort((a, b) => b.completenessPercentage - a.completenessPercentage);
+
+      res.json({
+        totalAccounts: accounts.length,
+        overallCompleteness: Math.round(overallCompleteness * 10) / 10,
+        fieldStats: sortedFields,
+        mostCompleteAccounts: accountCompleteness.slice(0, 10),
+        leastCompleteAccounts: accountCompleteness.slice(-10).reverse()
+      });
+    } catch (error) {
+      console.error('Error analyzing account data completeness:', error);
+      res.status(500).json({ message: "Failed to analyze data completeness" });
+    }
+  });
+
+  // Data completeness diagnostics for contacts
+  app.get("/api/contacts/data-completeness", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
+    try {
+      const contacts = await storage.getContacts();
+      
+      if (contacts.length === 0) {
+        return res.json({
+          totalContacts: 0,
+          message: "No contacts to analyze"
+        });
+      }
+
+      // Define key fields to analyze
+      const keyFields = [
+        'firstName', 'lastName', 'jobTitle', 'department', 'seniorityLevel',
+        'directPhone', 'mobilePhone', 'city', 'state', 'postalCode', 'country',
+        'linkedinUrl', 'accountId', 'address', 'timezone'
+      ];
+
+      const fieldStats: Record<string, { populated: number; blank: number; percentage: number }> = {};
+
+      // Calculate completeness for each field
+      keyFields.forEach(field => {
+        const populated = contacts.filter(contact => {
+          const value = (contact as any)[field];
+          return value !== null && value !== undefined && value !== '';
+        }).length;
+        
+        const blank = contacts.length - populated;
+        const percentage = (populated / contacts.length) * 100;
+
+        fieldStats[field] = {
+          populated,
+          blank,
+          percentage: Math.round(percentage * 10) / 10
+        };
+      });
+
+      // Sort fields by completeness (least complete first)
+      const sortedFields = Object.entries(fieldStats)
+        .sort(([, a], [, b]) => a.percentage - b.percentage)
+        .map(([field, stats]) => ({ field, ...stats }));
+
+      // Overall completeness score
+      const totalFields = keyFields.length;
+      const overallCompleteness = sortedFields.reduce((sum, { percentage }) => sum + percentage, 0) / totalFields;
+
+      // Find contacts with most/least complete data
+      const contactCompleteness = contacts.map(contact => {
+        const fieldsPopulated = keyFields.filter(field => {
+          const value = (contact as any)[field];
+          return value !== null && value !== undefined && value !== '';
+        }).length;
+        
+        const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+        
+        return {
+          id: contact.id,
+          name: fullName || 'No name',
+          email: contact.email,
+          fieldsPopulated,
+          totalFields,
+          completenessPercentage: Math.round((fieldsPopulated / totalFields) * 100)
+        };
+      }).sort((a, b) => b.completenessPercentage - a.completenessPercentage);
+
+      res.json({
+        totalContacts: contacts.length,
+        overallCompleteness: Math.round(overallCompleteness * 10) / 10,
+        fieldStats: sortedFields,
+        mostCompleteContacts: contactCompleteness.slice(0, 10),
+        leastCompleteContacts: contactCompleteness.slice(-10).reverse()
+      });
+    } catch (error) {
+      console.error('Error analyzing contact data completeness:', error);
+      res.status(500).json({ message: "Failed to analyze data completeness" });
+    }
+  });
+
   // ==================== SEGMENTS ====================
 
   app.get("/api/segments", requireAuth, async (req, res) => {
