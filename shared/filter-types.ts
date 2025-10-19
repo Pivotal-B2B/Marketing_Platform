@@ -446,3 +446,22 @@ export const savedFilterSchema = z.object({
 });
 
 export type SavedFilter = z.infer<typeof savedFilterSchema>;
+
+/**
+ * BACKWARD COMPATIBILITY EXPORTS
+ * 
+ * Support old FilterBuilder component during migration to simplified system
+ * These map old multi-tier operators to new unified operators
+ */
+
+// Old operator type exports (map to new unified operators)
+export const textOperators = operators;
+export const numberOperators = operators.filter(op => ['equals', 'not_equals', 'is_empty', 'has_any_value'].includes(op));
+export const arrayOperators = operators.filter(op => ['contains', 'not_contains', 'is_empty', 'has_any_value'].includes(op));
+export const booleanOperators = ['equals', 'not_equals'] as const;
+export const enumOperators = operators.filter(op => ['equals', 'not_equals', 'is_empty', 'has_any_value'].includes(op));
+
+export type TextOperator = typeof operators[number];
+export type NumberOperator = 'equals' | 'not_equals' | 'is_empty' | 'has_any_value';
+export type ArrayOperator = 'contains' | 'not_contains' | 'is_empty' | 'has_any_value';
+export type BooleanOperator = 'equals' | 'not_equals';
