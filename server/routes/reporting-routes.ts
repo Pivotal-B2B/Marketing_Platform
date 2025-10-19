@@ -41,6 +41,7 @@ router.get('/global', requireAuth, async (req: Request, res: Response) => {
     }
     
     // Get call stats by disposition
+    const allConditions = [...sessionConditions, ...jobConditions].filter(Boolean);
     const dispositionStats = await db
       .select({
         disposition: dispositions.label,
@@ -52,15 +53,11 @@ router.get('/global', requireAuth, async (req: Request, res: Response) => {
       .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
-          jobConditions.length > 0 ? and(...jobConditions) : undefined
-        )
-      )
+      .where(allConditions.length > 0 ? and(...allConditions) : undefined)
       .groupBy(dispositions.label, dispositions.systemAction);
     
     // Get QA stats (leads linked through contact)
+    const qaConditions = [...allConditions, isNotNull(leads.qaStatus)].filter(Boolean);
     const qaStats = await db
       .select({
         qaStatus: leads.qaStatus,
@@ -70,13 +67,7 @@ router.get('/global', requireAuth, async (req: Request, res: Response) => {
       .innerJoin(contacts, eq(leads.contactId, contacts.id))
       .innerJoin(callJobs, eq(contacts.id, callJobs.contactId))
       .innerJoin(callSessions, eq(callJobs.id, callSessions.callJobId))
-      .where(
-        and(
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
-          jobConditions.length > 0 ? and(...jobConditions) : undefined,
-          isNotNull(leads.qaStatus)
-        )
-      )
+      .where(qaConditions.length > 0 ? and(...qaConditions) : undefined)
       .groupBy(leads.qaStatus);
     
     // Get campaign breakdown
@@ -93,15 +84,11 @@ router.get('/global', requireAuth, async (req: Request, res: Response) => {
       .innerJoin(campaigns, eq(callJobs.campaignId, campaigns.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
-          jobConditions.length > 0 ? and(...jobConditions) : undefined
-        )
-      )
+      .where(allConditions.length > 0 ? and(...allConditions) : undefined)
       .groupBy(campaigns.id, campaigns.name);
     
     // Get agent performance
+    const agentConditions = [...allConditions, isNotNull(callJobs.agentId)].filter(Boolean);
     const agentStats = await db
       .select({
         agentId: callJobs.agentId,
@@ -115,13 +102,7 @@ router.get('/global', requireAuth, async (req: Request, res: Response) => {
       .innerJoin(users, eq(callJobs.agentId, users.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
-          jobConditions.length > 0 ? and(...jobConditions) : undefined,
-          isNotNull(callJobs.agentId)
-        )
-      )
+      .where(agentConditions.length > 0 ? and(...agentConditions) : undefined)
       .groupBy(callJobs.agentId, users.firstName, users.lastName);
     
     // Calculate totals
@@ -176,6 +157,7 @@ router.get('/campaign/:campaignId', requireAuth, async (req: Request, res: Respo
     }
     
     // Get disposition breakdown
+    const campaignConditions = [eq(callJobs.campaignId, campaignId), ...sessionConditions].filter(Boolean);
     const dispositionStats = await db
       .select({
         disposition: dispositions.label,
@@ -188,15 +170,11 @@ router.get('/campaign/:campaignId', requireAuth, async (req: Request, res: Respo
       .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          eq(callJobs.campaignId, campaignId),
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
-        )
-      )
+      .where(campaignConditions.length > 0 ? and(...campaignConditions) : undefined)
       .groupBy(dispositions.label, dispositions.systemAction);
     
     // Get QA breakdown for this campaign
+    const qaConditions = [...campaignConditions, isNotNull(leads.qaStatus)].filter(Boolean);
     const qaStats = await db
       .select({
         qaStatus: leads.qaStatus,
@@ -206,16 +184,11 @@ router.get('/campaign/:campaignId', requireAuth, async (req: Request, res: Respo
       .innerJoin(contacts, eq(leads.contactId, contacts.id))
       .innerJoin(callJobs, eq(contacts.id, callJobs.contactId))
       .innerJoin(callSessions, eq(callJobs.id, callSessions.callJobId))
-      .where(
-        and(
-          eq(callJobs.campaignId, campaignId),
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
-          isNotNull(leads.qaStatus)
-        )
-      )
+      .where(qaConditions.length > 0 ? and(...qaConditions) : undefined)
       .groupBy(leads.qaStatus);
     
     // Get agent performance for this campaign
+    const agentConditions = [...campaignConditions, isNotNull(callJobs.agentId)].filter(Boolean);
     const agentStats = await db
       .select({
         agentId: callJobs.agentId,
@@ -229,13 +202,7 @@ router.get('/campaign/:campaignId', requireAuth, async (req: Request, res: Respo
       .innerJoin(users, eq(callJobs.agentId, users.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          eq(callJobs.campaignId, campaignId),
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
-          isNotNull(callJobs.agentId)
-        )
-      )
+      .where(agentConditions.length > 0 ? and(...agentConditions) : undefined)
       .groupBy(callJobs.agentId, users.firstName, users.lastName);
     
     // Get daily trend data
@@ -250,12 +217,7 @@ router.get('/campaign/:campaignId', requireAuth, async (req: Request, res: Respo
       .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          eq(callJobs.campaignId, campaignId),
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
-        )
-      )
+      .where(campaignConditions.length > 0 ? and(...campaignConditions) : undefined)
       .groupBy(sql`DATE(${callSessions.startedAt})`)
       .orderBy(sql`DATE(${callSessions.startedAt})`);
     
@@ -336,6 +298,7 @@ router.get('/agent/:agentId', requireAuth, async (req: Request, res: Response) =
     }
     
     // Get overall stats
+    const allConditions = [...jobConditions, ...sessionConditions].filter(Boolean);
     const dispositionStats = await db
       .select({
         disposition: dispositions.label,
@@ -347,12 +310,7 @@ router.get('/agent/:agentId', requireAuth, async (req: Request, res: Response) =
       .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          ...jobConditions,
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
-        )
-      )
+      .where(allConditions.length > 0 ? and(...allConditions) : undefined)
       .groupBy(dispositions.label, dispositions.systemAction);
     
     // Get campaign breakdown for this agent
@@ -369,12 +327,7 @@ router.get('/agent/:agentId', requireAuth, async (req: Request, res: Response) =
       .innerJoin(campaigns, eq(callJobs.campaignId, campaigns.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          ...jobConditions,
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
-        )
-      )
+      .where(allConditions.length > 0 ? and(...allConditions) : undefined)
       .groupBy(campaigns.id, campaigns.name);
     
     // Get daily trend
@@ -389,12 +342,7 @@ router.get('/agent/:agentId', requireAuth, async (req: Request, res: Response) =
       .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          ...jobConditions,
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined
-        )
-      )
+      .where(allConditions.length > 0 ? and(...allConditions) : undefined)
       .groupBy(sql`DATE(${callSessions.startedAt})`)
       .orderBy(sql`DATE(${callSessions.startedAt})`);
     
@@ -475,6 +423,12 @@ router.get('/details', requireAuth, async (req: Request, res: Response) => {
     }
     
     // Get detailed call list
+    const allConditions = [
+      ...sessionConditions,
+      ...jobConditions,
+      dispositionFilter ? eq(dispositions.label, dispositionFilter as string) : null
+    ].filter(Boolean);
+    
     const calls = await db
       .select({
         callId: callSessions.id,
@@ -505,13 +459,7 @@ router.get('/details', requireAuth, async (req: Request, res: Response) => {
       .leftJoin(users, eq(callJobs.agentId, users.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
-          jobConditions.length > 0 ? and(...jobConditions) : undefined,
-          dispositionFilter ? eq(dispositions.label, dispositionFilter as string) : undefined
-        )
-      )
+      .where(allConditions.length > 0 ? and(...allConditions) : undefined)
       .orderBy(desc(callSessions.startedAt))
       .limit(parseInt(limit as string))
       .offset(parseInt(offset as string));
@@ -525,13 +473,7 @@ router.get('/details', requireAuth, async (req: Request, res: Response) => {
       .innerJoin(callJobs, eq(callSessions.callJobId, callJobs.id))
       .leftJoin(callDispositions, eq(callSessions.id, callDispositions.callSessionId))
       .leftJoin(dispositions, eq(callDispositions.dispositionId, dispositions.id))
-      .where(
-        and(
-          sessionConditions.length > 0 ? and(...sessionConditions) : undefined,
-          jobConditions.length > 0 ? and(...jobConditions) : undefined,
-          dispositionFilter ? eq(dispositions.label, dispositionFilter as string) : undefined
-        )
-      );
+      .where(allConditions.length > 0 ? and(...allConditions) : undefined);
     
     res.json({
       calls,
