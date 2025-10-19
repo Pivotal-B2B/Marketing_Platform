@@ -621,8 +621,8 @@ export default function AgentConsolePage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* CONTACT INFORMATION BAR (Horizontal - Compact & Organized) */}
           {currentQueueItem ? (
-            <div className="h-[100px] border-b" style={{ background: 'linear-gradient(to right, #0a2540, #2f6feb)' }}>
-              <div className="h-full px-6 flex items-center gap-6 text-white">
+            <div className="border-b" style={{ background: 'linear-gradient(to right, #0a2540, #2f6feb)' }}>
+              <div className="px-6 py-6 flex items-center gap-6 text-white">
                 {/* Profile Picture */}
                 <div className="h-14 w-14 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
                   <User className="h-7 w-7 text-white" />
@@ -736,7 +736,7 @@ export default function AgentConsolePage() {
               </div>
             </div>
           ) : (
-            <div className="h-[100px] border-b bg-muted/30 flex items-center justify-center">
+            <div className="border-b bg-muted/30 py-6 flex items-center justify-center">
               <div className="text-center">
                 <Phone className="h-10 w-10 mx-auto mb-2 opacity-50 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">No contact selected</p>
