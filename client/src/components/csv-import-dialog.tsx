@@ -79,6 +79,27 @@ export function CSVImportDialog({
     }
   };
 
+  // Helper function to correctly apply field mappings to a CSV row
+  const applyFieldMappings = (row: string[], mappings: FieldMapping[]): { mappedRow: string[]; mappedHeaders: string[] } => {
+    // Create a map from CSV column name to its index in the original row
+    const csvColumnIndexMap = new Map<string, number>();
+    headers.forEach((header, idx) => {
+      csvColumnIndexMap.set(header, idx);
+    });
+    
+    // Apply mappings: get value from original CSV column position
+    const mappedRow = mappings.map(mapping => {
+      if (!mapping.csvColumn) return "";
+      const csvColumnIndex = csvColumnIndexMap.get(mapping.csvColumn);
+      return csvColumnIndex !== undefined ? (row[csvColumnIndex] || "") : "";
+    });
+    
+    // Create mapped headers based on target fields
+    const mappedHeaders = mappings.map(m => m.targetField || "");
+    
+    return { mappedRow, mappedHeaders };
+  };
+
   const handleMappingComplete = (mappings: FieldMapping[]) => {
     setFieldMappings(mappings);
     
@@ -101,8 +122,7 @@ export function CSVImportDialog({
 
     csvData.forEach((row, index) => {
       // Map the row data to match the expected contact format
-      const mappedRow = mappings.map((mapping, idx) => row[idx] || "");
-      const mappedHeaders = mappings.map(m => m.targetField || "");
+      const { mappedRow, mappedHeaders } = applyFieldMappings(row, mappings);
       
       const rowErrors = validateContactRow(mappedRow, mappedHeaders, index + 2);
       validationErrors.push(...rowErrors);
@@ -135,7 +155,13 @@ export function CSVImportDialog({
   };
 
   const validateDataWithMapping = (mappings: FieldMapping[]) => {
-    // Create a mapped headers array based on the field mappings
+    // Create a map from CSV column name to its index in the original row
+    const csvColumnIndexMap = new Map<string, number>();
+    headers.forEach((header, idx) => {
+      csvColumnIndexMap.set(header, idx);
+    });
+    
+    // Create mapped headers with account_ prefix for account fields
     const mappedHeaders = mappings.map(m => {
       if (!m.targetField || !m.targetEntity) return "";
       return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
@@ -144,8 +170,13 @@ export function CSVImportDialog({
     const validationErrors: ValidationError[] = [];
 
     csvData.forEach((row, index) => {
-      // Map the row data to match the expected format
-      const mappedRow = mappings.map((mapping, idx) => row[idx] || "");
+      // Map the row data by getting values from correct CSV column positions
+      const mappedRow = mappings.map(mapping => {
+        if (!mapping.csvColumn) return "";
+        const csvColumnIndex = csvColumnIndexMap.get(mapping.csvColumn);
+        return csvColumnIndex !== undefined ? (row[csvColumnIndex] || "") : "";
+      });
+      
       const rowErrors = validateContactWithAccountRow(mappedRow, mappedHeaders, index + 2);
       validationErrors.push(...rowErrors);
     });
@@ -205,6 +236,12 @@ export function CSVImportDialog({
         try {
           if (isUnifiedFormat) {
             // Unified format with account data
+            // Create a map from CSV column name to its index
+            const csvColumnIndexMap = new Map<string, number>();
+            headers.forEach((header, idx) => {
+              csvColumnIndexMap.set(header, idx);
+            });
+            
             const mappedHeaders = fieldMappings.map(m => {
               if (!m.targetField || !m.targetEntity) return "";
               return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
@@ -212,7 +249,13 @@ export function CSVImportDialog({
 
             const records = batchRows
               .map((row, idx) => {
-                const mappedRow = fieldMappings.map((mapping, mapIdx) => row[mapIdx] || "");
+                // Map row data by getting values from correct CSV column positions
+                const mappedRow = fieldMappings.map(mapping => {
+                  if (!mapping.csvColumn) return "";
+                  const csvColumnIndex = csvColumnIndexMap.get(mapping.csvColumn);
+                  return csvColumnIndex !== undefined ? (row[csvColumnIndex] || "") : "";
+                });
+                
                 const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
                 const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
                 return { 
@@ -260,9 +303,21 @@ export function CSVImportDialog({
             }
           } else {
             // Contacts-only format with mapping
+            // Create a map from CSV column name to its index
+            const csvColumnIndexMap = new Map<string, number>();
+            headers.forEach((header, idx) => {
+              csvColumnIndexMap.set(header, idx);
+            });
+            
             const mappedHeaders = fieldMappings.map(m => m.targetField || "");
             const contacts = batchRows.map((row, idx) => {
-              const mappedRow = fieldMappings.map((mapping, mapIdx) => row[mapIdx] || "");
+              // Map row data by getting values from correct CSV column positions
+              const mappedRow = fieldMappings.map(mapping => {
+                if (!mapping.csvColumn) return "";
+                const csvColumnIndex = csvColumnIndexMap.get(mapping.csvColumn);
+                return csvColumnIndex !== undefined ? (row[csvColumnIndex] || "") : "";
+              });
+              
               return { 
                 data: csvRowToContact(mappedRow, mappedHeaders),
                 rowIndex: start + idx + 2 // +2 for header and 1-based indexing
