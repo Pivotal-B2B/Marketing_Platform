@@ -74,13 +74,13 @@ export default function Dashboard() {
       {/* Agent Dashboard */}
       {isAgent && (
         <>
-          <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {agentLoading ? (
               <>
-                <Card><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
-                <Card><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
-                <Card><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
-                <Card><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
+                <Card className="border-0 shadow-smooth-lg"><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
+                <Card className="border-0 shadow-smooth-lg"><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
+                <Card className="border-0 shadow-smooth-lg"><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
+                <Card className="border-0 shadow-smooth-lg"><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
               </>
             ) : (
               <>
@@ -193,7 +193,7 @@ export default function Dashboard() {
       {/* Admin/Manager Dashboard */}
       {!isAgent && (
         <>
-          <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {isLoading ? (
               <>
                 <Card><CardContent className="pt-6"><Skeleton className="h-20" /></CardContent></Card>
