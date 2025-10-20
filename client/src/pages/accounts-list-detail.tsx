@@ -1,11 +1,17 @@
 import { useParams, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Building2, Users } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { ArrowLeft, Building2, Users, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useSelection } from "@/hooks/use-selection";
+import { AddToListDialog } from "@/components/add-to-list-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface DomainSet {
   id: string;
@@ -51,6 +57,11 @@ export default function AccountsListDetail() {
   const [location, setLocation] = useLocation();
   const queryParams = new URLSearchParams(location.split('?')[1] || '');
   const viewFilter = queryParams.get('view');
+  const { toast } = useToast();
+  
+  // Dialogs
+  const [addAccountsToListDialogOpen, setAddAccountsToListDialogOpen] = useState(false);
+  const [addContactsToListDialogOpen, setAddContactsToListDialogOpen] = useState(false);
 
   const { data: accountsList, isLoading: listLoading } = useQuery<DomainSet>({
     queryKey: [`/api/domain-sets/${id}`],
@@ -69,6 +80,91 @@ export default function AccountsListDetail() {
   const { data: contacts = [], isLoading: contactsLoading } = useQuery<Contact[]>({
     queryKey: [`/api/domain-sets/${id}/contacts`],
     enabled: !!id && viewFilter !== 'accounts',
+  });
+
+  // Selection hooks
+  const accountsSelection = useSelection(accounts);
+  const contactsSelection = useSelection(contacts);
+
+  // Add accounts to list mutation
+  const addAccountsToListMutation = useMutation({
+    mutationFn: async (listId: string) => {
+      return await apiRequest('POST', `/api/lists/${listId}/accounts`, {
+        accountIds: Array.from(accountsSelection.selectedIds)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
+      toast({ title: "Success", description: `Added ${accountsSelection.selectedCount} accounts to list` });
+      accountsSelection.clearSelection();
+      setAddAccountsToListDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to add accounts to list", variant: "destructive" });
+    },
+  });
+
+  // Add contacts to list mutation
+  const addContactsToListMutation = useMutation({
+    mutationFn: async (listId: string) => {
+      return await apiRequest('POST', `/api/lists/${listId}/contacts`, {
+        contactIds: Array.from(contactsSelection.selectedIds)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
+      toast({ title: "Success", description: `Added ${contactsSelection.selectedCount} contacts to list` });
+      contactsSelection.clearSelection();
+      setAddContactsToListDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to add contacts to list", variant: "destructive" });
+    },
+  });
+
+  // Create list mutations
+  const createAccountListMutation = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description: string }) => {
+      const list = await apiRequest('POST', '/api/lists', {
+        name,
+        description,
+        entityType: 'account',
+        sourceType: 'selection',
+        recordIds: Array.from(accountsSelection.selectedIds),
+      });
+      return list.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
+      accountsSelection.clearSelection();
+      setAddAccountsToListDialogOpen(false);
+      toast({
+        title: "Success",
+        description: `Created list and added ${accountsSelection.selectedCount} accounts`,
+      });
+    },
+  });
+
+  const createContactListMutation = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description: string }) => {
+      const list = await apiRequest('POST', '/api/lists', {
+        name,
+        description,
+        entityType: 'contact',
+        sourceType: 'selection',
+        recordIds: Array.from(contactsSelection.selectedIds),
+      });
+      return list.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
+      contactsSelection.clearSelection();
+      setAddContactsToListDialogOpen(false);
+      toast({
+        title: "Success",
+        description: `Created list and added ${contactsSelection.selectedCount} contacts`,
+      });
+    },
   });
 
   const getMatchTypeBadge = (matchType?: string) => {
@@ -203,8 +299,22 @@ export default function AccountsListDetail() {
       {(viewFilter === 'accounts' || !viewFilter) && (
         <Card>
           <CardHeader>
-            <CardTitle>Matched Accounts</CardTitle>
-            <CardDescription>Accounts that were successfully matched from this list</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Matched Accounts</CardTitle>
+                <CardDescription>Accounts that were successfully matched from this list</CardDescription>
+              </div>
+              {accountsSelection.selectedCount > 0 && (
+                <Button
+                  onClick={() => setAddAccountsToListDialogOpen(true)}
+                  size="sm"
+                  data-testid="button-add-accounts-to-list"
+                >
+                  <ListPlus className="mr-2 h-4 w-4" />
+                  Add {accountsSelection.selectedCount} to List
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {accountsLoading ? (
@@ -218,6 +328,14 @@ export default function AccountsListDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={accountsSelection.isAllSelected ? true : accountsSelection.isSomeSelected ? "indeterminate" : false}
+                          onCheckedChange={() => accountsSelection.isAllSelected ? accountsSelection.clearSelection() : accountsSelection.selectAll()}
+                          aria-label="Select all"
+                          data-testid="checkbox-select-all-accounts"
+                        />
+                      </TableHead>
                       <TableHead>Account Name</TableHead>
                       <TableHead>Domain</TableHead>
                       <TableHead>Industry</TableHead>
@@ -231,8 +349,17 @@ export default function AccountsListDetail() {
                       <TableRow
                         key={account.id}
                         className="hover-elevate cursor-pointer"
-                        onClick={() => handleCardClick(account.id, 'exact')} // Assuming 'exact' match for accounts here
+                        onClick={() => handleCardClick(account.id, 'exact')}
+                        data-testid={`row-account-${account.id}`}
                       >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={accountsSelection.isSelected(account.id)}
+                            onCheckedChange={() => accountsSelection.selectItem(account.id)}
+                            aria-label={`Select ${account.name}`}
+                            data-testid={`checkbox-account-${account.id}`}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
@@ -279,8 +406,22 @@ export default function AccountsListDetail() {
       {(viewFilter === 'contacts' || !viewFilter) && (
         <Card>
           <CardHeader>
-            <CardTitle>Matched Contacts ({contacts.length})</CardTitle>
-            <CardDescription>Contacts from accounts matched by this list</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Matched Contacts ({contacts.length})</CardTitle>
+                <CardDescription>Contacts from accounts matched by this list</CardDescription>
+              </div>
+              {contactsSelection.selectedCount > 0 && (
+                <Button
+                  onClick={() => setAddContactsToListDialogOpen(true)}
+                  size="sm"
+                  data-testid="button-add-contacts-to-list"
+                >
+                  <ListPlus className="mr-2 h-4 w-4" />
+                  Add {contactsSelection.selectedCount} to List
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {contactsLoading ? (
@@ -294,6 +435,14 @@ export default function AccountsListDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={contactsSelection.isAllSelected ? true : contactsSelection.isSomeSelected ? "indeterminate" : false}
+                          onCheckedChange={() => contactsSelection.isAllSelected ? contactsSelection.clearSelection() : contactsSelection.selectAll()}
+                          aria-label="Select all"
+                          data-testid="checkbox-select-all-contacts"
+                        />
+                      </TableHead>
                       <TableHead>Contact Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Phone</TableHead>
@@ -307,7 +456,16 @@ export default function AccountsListDetail() {
                         key={contact.id}
                         className="hover-elevate cursor-pointer"
                         onClick={() => handleCardClick(contact.id, 'exact')}
+                        data-testid={`row-contact-${contact.id}`}
                       >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={contactsSelection.isSelected(contact.id)}
+                            onCheckedChange={() => contactsSelection.selectItem(contact.id)}
+                            aria-label={`Select ${contact.fullName}`}
+                            data-testid={`checkbox-contact-${contact.id}`}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
@@ -456,6 +614,26 @@ export default function AccountsListDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Accounts to List Dialog */}
+      <AddToListDialog
+        open={addAccountsToListDialogOpen}
+        onOpenChange={setAddAccountsToListDialogOpen}
+        entityType="account"
+        selectedCount={accountsSelection.selectedCount}
+        onAddToList={(listId) => addAccountsToListMutation.mutate(listId)}
+        onCreateList={(name, description) => createAccountListMutation.mutate({ name, description })}
+      />
+
+      {/* Add Contacts to List Dialog */}
+      <AddToListDialog
+        open={addContactsToListDialogOpen}
+        onOpenChange={setAddContactsToListDialogOpen}
+        entityType="contact"
+        selectedCount={contactsSelection.selectedCount}
+        onAddToList={(listId) => addContactsToListMutation.mutate(listId)}
+        onCreateList={(name, description) => createContactListMutation.mutate({ name, description })}
+      />
     </div>
   );
 }
