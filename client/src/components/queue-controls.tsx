@@ -28,6 +28,7 @@ interface QueueControlsProps {
   agentId?: string;
   onQueueUpdated?: () => void;
   compact?: boolean; // Compact mode for header
+  renderDialogs?: boolean; // Only render dialogs in one instance to prevent duplicates
 }
 
 interface QueueStats {
@@ -38,7 +39,7 @@ interface QueueStats {
   released: number;
 }
 
-export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = false }: QueueControlsProps) {
+export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = false, renderDialogs = true }: QueueControlsProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -245,9 +246,11 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
           )}
         </div>
         
-        {/* Dialogs remain the same */}
-        {/* Replace Queue Dialog */}
-        <AlertDialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
+        {/* Dialogs - only render if renderDialogs is true to prevent duplicates */}
+        {renderDialogs && (
+          <>
+            {/* Replace Queue Dialog */}
+            <AlertDialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
           <AlertDialogContent className="max-w-2xl">
             <AlertDialogHeader>
               <AlertDialogTitle>Set Queue (Replace)</AlertDialogTitle>
@@ -366,6 +369,8 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+          </>
+        )}
       </>
     );
   }
@@ -426,8 +431,11 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
           )}
         </div>
 
-        {/* Replace Queue Dialog */}
-        <AlertDialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
+        {/* Dialogs - only render if renderDialogs is true to prevent duplicates */}
+        {renderDialogs && (
+          <>
+            {/* Replace Queue Dialog */}
+            <AlertDialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
           <AlertDialogContent className="max-w-2xl">
             <AlertDialogHeader>
               <AlertDialogTitle>Set Queue (Replace)</AlertDialogTitle>
@@ -546,6 +554,8 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+          </>
+        )}
       </CardContent>
     </Card>
   );

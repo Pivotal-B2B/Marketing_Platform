@@ -711,6 +711,7 @@ export default function AgentConsolePage() {
               <QueueControls 
                 campaignId={selectedCampaignId}
                 compact={true}
+                renderDialogs={false}
                 onQueueUpdated={() => {
                   refetchQueue();
                   toast({
