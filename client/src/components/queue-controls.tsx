@@ -202,7 +202,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
       <>
         {/* Replace Queue Dialog */}
         <AlertDialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
-          <AlertDialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
+          <AlertDialogContent className="max-w-xl w-[90vw] max-h-[85vh] overflow-y-auto">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-base">Set Queue Filters</AlertDialogTitle>
               <AlertDialogDescription className="text-sm">
