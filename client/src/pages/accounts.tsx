@@ -312,14 +312,14 @@ export default function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-shrink-0">
           <h1 className="text-4xl font-bold text-gradient">Accounts</h1>
           <p className="text-muted-foreground mt-2 text-base">
             Manage your B2B account database
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           <Button 
             variant="outline" 
             onClick={() => {
@@ -461,8 +461,8 @@ export default function AccountsPage() {
       </div>
 
       <div className="flex flex-col gap-4 mb-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap flex-1">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "table" | "cards")} className="flex-shrink-0">
               <TabsList className="grid grid-cols-2 w-[140px]">
                 <TabsTrigger value="cards" data-testid="view-cards">
@@ -498,11 +498,13 @@ export default function AccountsPage() {
               </Button>
             )}
           </div>
-          <SidebarFilters
-            entityType="account"
-            onApplyFilter={setFilterGroup}
-            initialFilter={filterGroup}
-          />
+          <div className="flex-shrink-0">
+            <SidebarFilters
+              entityType="account"
+              onApplyFilter={setFilterGroup}
+              initialFilter={filterGroup}
+            />
+          </div>
         </div>
         
         <div className="relative">
@@ -520,8 +522,8 @@ export default function AccountsPage() {
 
       {selectedCount > 0 && (
         <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
               <div>
                 <p className="font-medium">
                   {selectAllPages 
@@ -538,7 +540,7 @@ export default function AccountsPage() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
               {user?.role !== 'agent' && (
                 <Button variant="outline" size="sm" onClick={handleBulkExport}>
                   <Download className="mr-2 h-4 w-4" />
