@@ -174,7 +174,7 @@ export function SidebarFilters({
 
   // Sidebar Content Component (reused for both desktop and mobile)
   const SidebarContent = () => (
-    <div className="flex flex-col bg-white dark:bg-slate-900">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900">
       {/* Header */}
       <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
         <div className="flex items-center justify-between mb-1.5">
@@ -343,7 +343,7 @@ export function SidebarFilters({
   return (
     <>
       {/* Desktop: Persistent Sidebar (≥1280px) */}
-      <aside className="hidden xl:block w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700">
+      <aside className="hidden xl:block w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 h-screen overflow-hidden">
         <SidebarContent />
       </aside>
 
