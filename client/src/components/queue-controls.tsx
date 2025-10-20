@@ -218,6 +218,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
                   entityType="contact"
                   onApplyFilter={(filter) => setFilterGroup(filter)}
                   initialFilter={filterGroup}
+                  embedded={true}
                 />
               </div>
 

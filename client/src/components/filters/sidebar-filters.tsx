@@ -15,6 +15,7 @@ interface SidebarFiltersProps {
   entityType: "account" | "contact";
   onApplyFilter: (filterGroup: FilterGroup | undefined) => void;
   initialFilter?: FilterGroup;
+  embedded?: boolean; // When true, renders just the content without Sheet wrapper
 }
 
 /**
@@ -31,6 +32,7 @@ export function SidebarFilters({
   entityType,
   onApplyFilter,
   initialFilter,
+  embedded = false,
 }: SidebarFiltersProps) {
   const [filterGroup, setFilterGroup] = useState<FilterGroup>(
     initialFilter || {
@@ -339,6 +341,11 @@ export function SidebarFilters({
       </div>
     </div>
   );
+
+  // If embedded mode, just return the content without Sheet wrapper
+  if (embedded) {
+    return <SidebarContent />;
+  }
 
   return (
     <>
