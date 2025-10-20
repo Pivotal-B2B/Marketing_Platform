@@ -734,9 +734,9 @@ export default function AgentConsolePage() {
         </div>
         
         {/* Desktop Header - Original Layout */}
-        <div className="hidden lg:flex relative h-20 px-6 items-center gap-0 justify-between">
+        <div className="hidden lg:flex relative h-20 px-6 items-center gap-4 justify-between">
           {/* Left: Title & Queue Management */}
-          <div className="flex items-center gap-4 flex-nowrap">
+          <div className="flex items-center gap-4 flex-nowrap flex-shrink-0">
             <div>
               <h1 className="text-white font-semibold text-lg" data-testid="text-page-title">Agent Console</h1>
               <p className="text-white/70 text-xs line-clamp-1">
@@ -763,7 +763,7 @@ export default function AgentConsolePage() {
           </div>
 
           {/* Center: Queue Progress */}
-          <div className="flex-1 max-w-md mx-8">
+          <div className="flex-1 max-w-lg mx-4">
             <div className="text-center mb-1">
               <span className="text-white text-sm font-medium">
                 Contact {currentContactIndex + 1} of {queueData.length}
@@ -773,7 +773,7 @@ export default function AgentConsolePage() {
           </div>
 
           {/* Right: Status & Controls */}
-          <div className="flex items-center gap-3 flex-nowrap">
+          <div className="flex items-center gap-3 flex-nowrap flex-shrink-0">
             <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
               <SelectTrigger className="w-[200px] bg-white/10 text-white border-white/20 text-sm" data-testid="select-campaign">
                 <SelectValue placeholder="Select campaign" />
