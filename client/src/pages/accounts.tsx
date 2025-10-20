@@ -461,8 +461,8 @@ export default function AccountsPage() {
       </div>
 
       <div className="flex flex-col gap-4 mb-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "table" | "cards")} className="flex-shrink-0">
               <TabsList className="grid grid-cols-2 w-[140px]">
                 <TabsTrigger value="cards" data-testid="view-cards">
@@ -476,14 +476,14 @@ export default function AccountsPage() {
               </TabsList>
             </Tabs>
             {viewMode === "cards" && paginatedAccounts.length > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <Checkbox
                   checked={isAllSelected ? true : isSomeSelected ? "indeterminate" : false}
                   onCheckedChange={() => isAllSelected ? clearSelection() : selectAll()}
                   aria-label="Select all on page"
                   data-testid="checkbox-select-all-cards"
                 />
-                <span className="text-sm text-muted-foreground">Select all</span>
+                <span className="text-sm text-muted-foreground whitespace-nowrap">Select all</span>
               </div>
             )}
           </div>
