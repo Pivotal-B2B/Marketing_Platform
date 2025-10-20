@@ -751,6 +751,7 @@ export default function AgentConsolePage() {
                 <QueueControls 
                   campaignId={selectedCampaignId}
                   compact={true}
+                  renderDialogs={false}
                   onQueueUpdated={() => {
                     refetchQueue();
                     toast({
@@ -1404,6 +1405,24 @@ export default function AgentConsolePage() {
 
       {/* Hidden audio element for Telnyx */}
       <audio id="remoteAudio" autoPlay playsInline style={{ display: 'none' }} />
+      
+      {/* Hidden QueueControls instance - only for rendering dialogs */}
+      {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
+        <div className="hidden">
+          <QueueControls 
+            campaignId={selectedCampaignId}
+            compact={true}
+            renderDialogs={true}
+            onQueueUpdated={() => {
+              refetchQueue();
+              toast({
+                title: "Queue Updated",
+                description: "Your queue has been refreshed",
+              });
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
