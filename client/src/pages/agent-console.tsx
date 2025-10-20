@@ -706,23 +706,6 @@ export default function AgentConsolePage() {
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
-            
-            {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
-              <div className="lg:hidden">
-                <QueueControls 
-                  campaignId={selectedCampaignId}
-                  compact={true}
-                  renderDialogs={true}
-                  onQueueUpdated={() => {
-                    refetchQueue();
-                    toast({
-                      title: "Queue Updated",
-                      description: "Your queue has been refreshed",
-                    });
-                  }}
-                />
-              </div>
-            )}
           </div>
           
           {/* Row 3: Queue Progress */}
@@ -748,7 +731,7 @@ export default function AgentConsolePage() {
             </div>
             
             {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
-              <div className="hidden lg:flex items-center gap-4">
+              <>
                 <Separator orientation="vertical" className="h-8 bg-white/20" />
                 <QueueControls 
                   campaignId={selectedCampaignId}
@@ -762,7 +745,7 @@ export default function AgentConsolePage() {
                     });
                   }}
                 />
-              </div>
+              </>
             )}
           </div>
 
