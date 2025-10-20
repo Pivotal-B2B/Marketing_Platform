@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db";
-import { verificationCampaigns, insertVerificationCampaignSchema } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { verificationCampaigns, insertVerificationCampaignSchema, verificationLeadSubmissions, verificationContacts } from "@shared/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 
 const router = Router();
@@ -88,6 +88,33 @@ router.delete("/api/verification-campaigns/:id", async (req, res) => {
   } catch (error) {
     console.error("Error deleting campaign:", error);
     res.status(500).json({ error: "Failed to delete campaign" });
+  }
+});
+
+router.get("/api/verification-campaigns/:campaignId/accounts/:accountName/cap", async (req, res) => {
+  try {
+    const { campaignId, accountName } = req.params;
+    
+    const [result] = await db
+      .select({
+        submitted: sql<number>`count(*)`
+      })
+      .from(verificationLeadSubmissions)
+      .innerJoin(verificationContacts, eq(verificationLeadSubmissions.contactId, verificationContacts.id))
+      .where(
+        and(
+          eq(verificationLeadSubmissions.campaignId, campaignId),
+          eq(verificationContacts.account_name, accountName)
+        )
+      );
+    
+    res.json({
+      accountName,
+      submitted: Number(result?.submitted || 0)
+    });
+  } catch (error) {
+    console.error("Error fetching account cap:", error);
+    res.status(500).json({ error: "Failed to fetch account cap" });
   }
 });
 

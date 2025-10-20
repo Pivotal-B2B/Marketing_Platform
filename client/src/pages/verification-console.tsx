@@ -37,6 +37,11 @@ export default function VerificationConsolePage() {
     enabled: !!currentContactId,
   });
 
+  const { data: accountCap } = useQuery({
+    queryKey: ["/api/verification-campaigns", campaignId, "accounts", (contact as any)?.account_name, "cap"],
+    enabled: !!currentContactId && !!(contact as any)?.account_name,
+  });
+
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("PUT", `/api/verification-contacts/${currentContactId}`, data);
@@ -111,7 +116,7 @@ export default function VerificationConsolePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Eligible</CardTitle>
@@ -144,6 +149,22 @@ export default function VerificationConsolePage() {
               <Progress value={okRate * 100} className="h-2" />
               <div className="text-xs text-muted-foreground">
                 Target: {Number((campaign as any)?.okRateTarget || 0.95) * 100}%
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Deliverability</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="text-2xl font-bold" data-testid="text-deliverability-rate">
+                {(deliverability * 100).toFixed(1)}%
+              </div>
+              <Progress value={deliverability * 100} className="h-2" />
+              <div className="text-xs text-muted-foreground">
+                Target: {Number((campaign as any)?.deliverabilityTarget || 0.97) * 100}%
               </div>
             </div>
           </CardContent>
@@ -203,6 +224,35 @@ export default function VerificationConsolePage() {
           </TabsList>
 
           <TabsContent value="verify" className="space-y-4">
+            {(contact as any)?.account_name && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Account Lead Cap</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">
+                        {(contact as any)?.account_name}
+                      </span>
+                      <span className="text-sm font-medium" data-testid="text-account-cap">
+                        {(accountCap as any)?.submitted || 0} / {(campaign as any)?.leadCapPerAccount || 10}
+                      </span>
+                    </div>
+                    <Progress
+                      value={((accountCap as any)?.submitted || 0) / ((campaign as any)?.leadCapPerAccount || 10) * 100}
+                      className="h-2"
+                      data-testid="progress-account-cap"
+                    />
+                    {((accountCap as any)?.submitted || 0) >= ((campaign as any)?.leadCapPerAccount || 10) && (
+                      <p className="text-xs text-destructive" data-testid="text-cap-reached">
+                        Cap reached - cannot submit more leads for this account
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
                 <CardTitle>Contact Details</CardTitle>
