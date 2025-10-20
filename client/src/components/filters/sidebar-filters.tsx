@@ -246,41 +246,45 @@ export function SidebarFilters({
       </div>
 
       {/* Body - Filter Conditions */}
-      <ScrollArea className="flex-1 px-2 pb-2 pt-2">
-        <div className="space-y-1.5">
-          <AnimatePresence mode="popLayout">
-            {filterGroup.conditions.map((condition) => (
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <ScrollArea className="flex-1">
+          <div className="px-2 pt-2 pb-2 space-y-1.5">
+            <AnimatePresence mode="popLayout">
+              {filterGroup.conditions.map((condition) => (
+                <motion.div
+                  key={condition.id}
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <UnifiedFilterRow
+                    condition={condition}
+                    entityType={entityType}
+                    onChange={(updated) => updateCondition(condition.id, updated)}
+                    onRemove={() => removeCondition(condition.id)}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {/* Empty State */}
+            {filterGroup.conditions.length === 0 && (
               <motion.div
-                key={condition.id}
-                initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, x: -20 }}
-                transition={{ duration: 0.2 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center py-6 text-sm text-slate-400 dark:text-slate-500"
               >
-                <UnifiedFilterRow
-                  condition={condition}
-                  entityType={entityType}
-                  onChange={(updated) => updateCondition(condition.id, updated)}
-                  onRemove={() => removeCondition(condition.id)}
-                />
+                <Filter className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                <p>No filters added</p>
+                <p className="text-xs mt-1">Click below to add your first filter</p>
               </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {/* Empty State */}
-          {filterGroup.conditions.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-8 text-sm text-slate-400 dark:text-slate-500"
-            >
-              <Filter className="h-10 w-10 mx-auto mb-2 opacity-20" />
-              <p>No filters added</p>
-              <p className="text-xs mt-1">Click below to add your first filter</p>
-            </motion.div>
-          )}
-
-          {/* Add Condition Button */}
+            )}
+          </div>
+        </ScrollArea>
+        
+        {/* Add Condition Button - Fixed at bottom of filter area */}
+        <div className="px-2 pb-2">
           <motion.div
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
@@ -296,7 +300,7 @@ export function SidebarFilters({
             </Button>
           </motion.div>
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Footer - Actions */}
       <div className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
