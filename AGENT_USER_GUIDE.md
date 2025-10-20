@@ -5,7 +5,15 @@
 This guide will help you get started with making calls, managing your queue, and completing dispositions in the Pivotal CRM Agent Console.
 
 ---
+## Access Platform
 
+Access the Pivotal B2B platform at the following URL:
+
+- [Pivotal B2B Platform](https://beta-platform.pivotal-b2b.com/)
+
+Ensure you're logged into your account to access all features.
+
+---
 ## Table of Contents
 1. [Login Instructions](#login-instructions)
 2. [Accessing the Agent Console](#accessing-the-agent-console)
@@ -21,18 +29,28 @@ This guide will help you get started with making calls, managing your queue, and
 ---
 
 ## Login Instructions
+#### Pivotal B2B – Agent Credentials (Setup Sheet)
 
+**Default Password Policy:** Password = Username (case-sensitive)
+
+| Username        | Full Name             | Email                | Role            | Secondary Role | Password | Date Added    |
+|-----------------|-----------------------|----------------------|-----------------|----------------|----------|---------------|
+| belalm          | Belal Mirzayee        | belalm@crm.local     | Agent           | —              | belalm   | 19 Oct 2025   |
+| samp            | Sami Peerzad          | sam@crm.local        | Quality Analyst | Agent          | samp     | 19 Oct 2025   |
+| paikanm         | Paikan Adham          | paikan@crm.local     | Agent           | —              | paikanm  | 19 Oct 2025   |
+| besmullaha      | Besumullah Ahmadi     | besmulllah@crm.local | Agent           | —              | besmullaha | 19 Oct 2025  |
+| mashalh         | Mashal Hayat          | mashal@crm.global    | Agent           | —              | mashalh  | 19 Oct 2025   |
+| mashalf         | Fatima Mashal         | mashal.f@crm.local   | Agent           | —              | mashalf  | 19 Oct 2025   |
+| anasa           | Anas Ahmad            | anas@crm.local       | Agent           | —              | anasa    | 19 Oct 2025   |
 ### Step 1: Access the System
 Navigate to your Pivotal CRM URL in your web browser (Chrome, Firefox, or Safari recommended).
 
 ### Step 2: Enter Your Credentials
 Use the credentials provided by your administrator:
 
-**Available Agent Accounts:**
-- **Username:** `admin121` | **Email:** admin12@crm.local | **Name:** Zahid Mohammadi
-- **Username:** `testuser` | **Email:** test@example.com | **Name:** Test User
-- **Username:** `zakeradhma` | **Email:** zm@pivotal-b2b.info | **Name:** Zaker Adham
-- **Username:** `admin` | **Email:** admin@crm.local | **Name:** Admin User (Administrator)
+**Available Agent Accounts:** 
+
+
 
 > **Note:** Passwords should be provided separately by your system administrator for security reasons.
 
@@ -332,62 +350,7 @@ I see you're the VP of Sales - is this still accurate?
 
 ---
 
-## Power Dial vs Manual Dial Mode
-
-### Power Dial Mode (Automated)
-
-**How It Works:**
-1. System automatically dials multiple numbers simultaneously
-2. AMD (Answering Machine Detection) filters out voicemails
-3. Only human-answered calls are connected to available agents
-4. Pacing engine adjusts dial rate based on agent availability
-
-**Best For:**
-- High-volume campaigns
-- Simple, repeatable messaging
-- Time-sensitive outreach
-- When you have many contacts to reach
-
-**Agent Experience:**
-- Always be ready - calls connect automatically
-- Less downtime between calls
-- Higher calls per hour
-- System manages the queue
-
-**Limitations:**
-- Less time to review contact before call
-- Cannot cherry-pick contacts
-- Must stay actively engaged
-
-### Manual Dial Mode (Agent-Controlled)
-
-**How It Works:**
-1. You review each contact's information
-2. Click "Call Now" when ready to dial
-3. You control the pacing
-4. Can add contacts to your queue
-
-**Best For:**
-- Complex sales cycles
-- High-value prospects
-- Personalized outreach
-- When research before calling is important
-
-**Agent Experience:**
-- Full control over timing
-- Review contacts thoroughly
-- Take breaks between calls
-- Manage your own queue
-
-**Advantages:**
-- Better preparation
-- More personalized approach
-- Control your workload
-- Strategic contact selection
-
----
-
-## Troubleshooting
+##
 
 ### "Disconnected" Status
 
