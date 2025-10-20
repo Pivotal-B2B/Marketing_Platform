@@ -45,11 +45,25 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
   
   // Use user ID if agentId not provided
   const effectiveAgentId = agentId || user?.id || '';
+  
+  // Debug: Log component mount
+  useEffect(() => {
+    console.log('[QUEUE_CONTROLS_MOUNT]', { campaignId, compact, renderDialogs, effectiveAgentId });
+    return () => console.log('[QUEUE_CONTROLS_UNMOUNT]', { campaignId, compact, renderDialogs });
+  }, []);
 
   // State for confirmation dialogs
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
+  
+  // Debug: Log dialog state changes
+  useEffect(() => {
+    if (showReplaceDialog) {
+      console.log('[QUEUE_CONTROLS_DIALOG] Replace dialog opened', { campaignId, renderDialogs });
+    }
+  }, [showReplaceDialog]);
+
 
   // State for replace queue options
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
