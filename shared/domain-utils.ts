@@ -234,8 +234,18 @@ export function getMatchTypeAndConfidence(
     const normalizedInputName = inputAccountName.toLowerCase().trim();
     const normalizedAccountName = accountName.toLowerCase().trim();
     
-    // Exact name match
-    if (normalizedInputName === normalizedAccountName) {
+    // Remove common suffixes for better matching
+    const cleanName = (name: string) => {
+      return name
+        .replace(/\b(inc|llc|ltd|corp|corporation|company|co|group|gmbh|sa|ag|plc)\b\.?$/gi, '')
+        .trim();
+    };
+    
+    const cleanedInputName = cleanName(normalizedInputName);
+    const cleanedAccountName = cleanName(normalizedAccountName);
+    
+    // Exact name match (with and without suffixes)
+    if (normalizedInputName === normalizedAccountName || cleanedInputName === cleanedAccountName) {
       // If we already have exact domain match, this is a "both" match
       if (bestMatch.matchType === 'exact' && bestMatch.matchedBy === 'domain') {
         return { matchType: 'exact', confidence: 1.0, matchedBy: 'both' };
@@ -245,23 +255,36 @@ export function getMatchTypeAndConfidence(
         bestMatch = { matchType: 'exact', confidence: 1.0, matchedBy: 'name' };
       }
     } else {
-      // Fuzzy name match
-      const nameSimilarity = calculateSimilarity(normalizedInputName, normalizedAccountName);
-      const nameDistance = levenshteinDistance(normalizedInputName, normalizedAccountName);
-      
-      if (nameSimilarity >= 0.85 && nameDistance <= 3) {
-        const nameConfidence = parseFloat(nameSimilarity.toFixed(2));
-        
-        // If we have both domain and name fuzzy matches, combine confidence
-        if (bestMatch.matchType === 'fuzzy' && bestMatch.matchedBy === 'domain') {
-          const combinedConfidence = parseFloat(((bestMatch.confidence + nameConfidence) / 2).toFixed(2));
-          bestMatch = {
-            matchType: 'fuzzy',
-            confidence: Math.max(combinedConfidence, bestMatch.confidence),
-            matchedBy: 'both'
-          };
-        } else if (nameConfidence > bestMatch.confidence) {
+      // Check if one name contains the other (for cases like "Acme" vs "Acme Corporation")
+      if (cleanedAccountName.includes(cleanedInputName) || cleanedInputName.includes(cleanedAccountName)) {
+        const nameConfidence = 0.95; // Very high confidence for contains match
+        if (nameConfidence > bestMatch.confidence) {
           bestMatch = { matchType: 'fuzzy', confidence: nameConfidence, matchedBy: 'name' };
+        }
+      } else {
+        // Fuzzy name match with improved thresholds
+        const nameSimilarity = calculateSimilarity(cleanedInputName, cleanedAccountName);
+        const nameDistance = levenshteinDistance(cleanedInputName, cleanedAccountName);
+        
+        // More lenient thresholds for company names:
+        // - 75% similarity (was 85%)
+        // - Distance based on name length (20% of longer string length)
+        const maxDistance = Math.max(Math.ceil(Math.max(cleanedInputName.length, cleanedAccountName.length) * 0.2), 3);
+        
+        if (nameSimilarity >= 0.75 && nameDistance <= maxDistance) {
+          const nameConfidence = parseFloat(nameSimilarity.toFixed(2));
+          
+          // If we have both domain and name fuzzy matches, combine confidence
+          if (bestMatch.matchType === 'fuzzy' && bestMatch.matchedBy === 'domain') {
+            const combinedConfidence = parseFloat(((bestMatch.confidence + nameConfidence) / 2).toFixed(2));
+            bestMatch = {
+              matchType: 'fuzzy',
+              confidence: Math.max(combinedConfidence, bestMatch.confidence),
+              matchedBy: 'both'
+            };
+          } else if (nameConfidence > bestMatch.confidence) {
+            bestMatch = { matchType: 'fuzzy', confidence: nameConfidence, matchedBy: 'name' };
+          }
         }
       }
     }
