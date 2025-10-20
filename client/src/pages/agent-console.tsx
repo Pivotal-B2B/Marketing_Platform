@@ -647,16 +647,98 @@ export default function AgentConsolePage() {
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50">
-      {/* TOP FIXED HEADER - Premium Gradient Design */}
-      <div className="h-auto lg:h-20 border-b shadow-2xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)' }}>
+      {/* TOP FIXED HEADER - Premium Gradient Design - IMPROVED RESPONSIVE */}
+      <div className="border-b shadow-2xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)' }}>
         {/* Decorative overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0"></div>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
-        <div className="relative h-full px-3 sm:px-6 py-3 lg:py-0 flex flex-col lg:flex-row items-start lg:items-center gap-3 lg:gap-0 justify-between">
+        
+        {/* Compact Mobile Header */}
+        <div className="lg:hidden">
+          {/* Row 1: Title & Campaign Selector */}
+          <div className="px-3 py-2 flex items-center gap-2 border-b border-white/10">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-white font-semibold text-sm truncate" data-testid="text-page-title">Agent Console</h1>
+              <p className="text-white/70 text-[10px] truncate">
+                {campaignDetails?.name || 'Select a campaign'}
+              </p>
+            </div>
+            <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+              <SelectTrigger className="w-[140px] min-h-10 bg-white/10 text-white border-white/20 text-xs" data-testid="select-campaign">
+                <SelectValue placeholder="Campaign" />
+              </SelectTrigger>
+              <SelectContent>
+                {campaigns.map(campaign => (
+                  <SelectItem key={campaign.id} value={campaign.id}>
+                    {campaign.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Row 2: Status Badges & Controls */}
+          <div className="px-3 py-2 flex items-center gap-2 flex-wrap">
+            {campaignDetails && dialMode && (
+              <Badge variant={dialMode === 'power' ? 'default' : 'secondary'} className="gap-1 text-[10px] h-6" data-testid="badge-dial-mode">
+                {dialMode === 'power' ? <Zap className="h-2.5 w-2.5" /> : <Phone className="h-2.5 w-2.5" />}
+                {dialMode === 'power' ? 'Power' : 'Manual'}
+              </Badge>
+            )}
+            
+            {callStatus === 'active' && (
+              <div className="flex items-center gap-1 text-white">
+                <Clock className="h-3 w-3" />
+                <span className="font-mono text-[10px]" data-testid="text-call-duration">{formatDuration()}</span>
+              </div>
+            )}
+            
+            <div className="flex-1"></div>
+            
+            {getStatusBadge()}
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refetchQueue()}
+              className="h-10 w-10 p-0 text-white hover:bg-white/10"
+              data-testid="button-refresh"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            
+            {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
+              <QueueControls 
+                campaignId={selectedCampaignId}
+                compact={true}
+                onQueueUpdated={() => {
+                  refetchQueue();
+                  toast({
+                    title: "Queue Updated",
+                    description: "Your queue has been refreshed",
+                  });
+                }}
+              />
+            )}
+          </div>
+          
+          {/* Row 3: Queue Progress */}
+          <div className="px-3 pb-2">
+            <div className="text-center mb-1">
+              <span className="text-white text-[10px] font-medium">
+                Contact {currentContactIndex + 1} of {queueData.length}
+              </span>
+            </div>
+            <Progress value={queueProgress} className="h-1 bg-white/20" />
+          </div>
+        </div>
+        
+        {/* Desktop Header - Original Layout */}
+        <div className="hidden lg:flex relative h-20 px-6 items-center gap-0 justify-between">
           {/* Left: Title & Queue Management */}
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap lg:flex-nowrap w-full lg:w-auto">
-            <div className="flex-1 lg:flex-none">
-              <h1 className="text-white font-semibold text-base sm:text-lg" data-testid="text-page-title">Agent Console</h1>
+          <div className="flex items-center gap-4 flex-nowrap">
+            <div>
+              <h1 className="text-white font-semibold text-lg" data-testid="text-page-title">Agent Console</h1>
               <p className="text-white/70 text-xs line-clamp-1">
                 {campaignDetails?.name || 'Select a campaign'}
               </p>
@@ -664,7 +746,7 @@ export default function AgentConsolePage() {
             
             {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
               <>
-                <Separator orientation="vertical" className="h-8 bg-white/20 hidden lg:block" />
+                <Separator orientation="vertical" className="h-8 bg-white/20" />
                 <QueueControls 
                   campaignId={selectedCampaignId}
                   compact={true}
@@ -681,19 +763,19 @@ export default function AgentConsolePage() {
           </div>
 
           {/* Center: Queue Progress */}
-          <div className="flex-1 max-w-md w-full lg:mx-8">
+          <div className="flex-1 max-w-md mx-8">
             <div className="text-center mb-1">
-              <span className="text-white text-xs sm:text-sm font-medium">
+              <span className="text-white text-sm font-medium">
                 Contact {currentContactIndex + 1} of {queueData.length}
               </span>
             </div>
-            <Progress value={queueProgress} className="h-1.5 sm:h-2 bg-white/20" />
+            <Progress value={queueProgress} className="h-2 bg-white/20" />
           </div>
 
           {/* Right: Status & Controls */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap lg:flex-nowrap w-full lg:w-auto">
+          <div className="flex items-center gap-3 flex-nowrap">
             <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
-              <SelectTrigger className="w-full sm:w-[180px] lg:w-[200px] bg-white/10 text-white border-white/20 text-sm" data-testid="select-campaign">
+              <SelectTrigger className="w-[200px] bg-white/10 text-white border-white/20 text-sm" data-testid="select-campaign">
                 <SelectValue placeholder="Select campaign" />
               </SelectTrigger>
               <SelectContent>
@@ -713,16 +795,16 @@ export default function AgentConsolePage() {
             )}
             
             {campaignDetails && dialMode === 'power' && amdEnabled && (
-              <Badge variant="outline" className="gap-1 bg-white/10 text-white border-white/20 text-xs hidden sm:flex" data-testid="badge-amd-enabled">
+              <Badge variant="outline" className="gap-1 bg-white/10 text-white border-white/20 text-xs" data-testid="badge-amd-enabled">
                 <CheckCircle2 className="h-3 w-3" />
                 AMD
               </Badge>
             )}
             
             {callStatus === 'active' && (
-              <div className="flex items-center gap-1 sm:gap-2 text-white">
-                <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="font-mono text-xs sm:text-sm" data-testid="text-call-duration">{formatDuration()}</span>
+              <div className="flex items-center gap-2 text-white">
+                <Clock className="h-4 w-4" />
+                <span className="font-mono text-sm" data-testid="text-call-duration">{formatDuration()}</span>
               </div>
             )}
             
@@ -735,7 +817,7 @@ export default function AgentConsolePage() {
               className="text-white hover:bg-white/10"
               data-testid="button-refresh"
             >
-              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
+              <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -843,29 +925,160 @@ export default function AgentConsolePage() {
 
         {/* RIGHT MAIN SECTION (82% width) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* CONTACT INFORMATION BAR - Premium Card Design */}
+          {/* CONTACT INFORMATION BAR - Premium Card Design - IMPROVED RESPONSIVE */}
           {currentQueueItem ? (
             <div className="border-b relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%)' }}>
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0"></div>
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500"></div>
-              <div className="relative px-3 sm:px-6 py-4 sm:py-6 flex items-start sm:items-center gap-3 sm:gap-6 text-white">
+              
+              {/* Mobile Layout */}
+              <div className="lg:hidden relative px-3 py-3 text-white space-y-3">
+                {/* Row 1: Profile & Name */}
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-shrink-0">
+                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-sm flex items-center justify-center shadow-2xl border border-white/20">
+                      <User className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-semibold truncate" data-testid="text-contact-name">
+                      {currentQueueItem.contactName || 'Unknown Contact'}
+                    </h2>
+                    <div className="flex items-center gap-1.5 text-xs text-white/90">
+                      <Briefcase className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate" data-testid="text-contact-title">
+                        {contactDetails?.jobTitle || 'No title'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Row 2: Company & Email */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-white/90">
+                    <Building2 className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate" data-testid="text-contact-company">
+                      {currentQueueItem.accountName || 'No company'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-white/90">
+                    <Mail className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate" data-testid="text-contact-email">
+                      {currentQueueItem.contactEmail || contactDetails?.email || 'No email'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Row 3: Phone Selector */}
+                <div className="flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5 flex-shrink-0 text-white/90" />
+                  <Select value={selectedPhoneType} onValueChange={(value: 'direct' | 'company' | 'manual') => {
+                    setSelectedPhoneType(value);
+                    setShowManualDial(value === 'manual');
+                  }}>
+                    <SelectTrigger className="min-h-10 flex-1 bg-white/10 text-white border-white/20 text-xs" data-testid="select-phone-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {validPhoneOptions.map((option) => (
+                        <SelectItem key={option.type} value={option.type} data-testid={`option-${option.type}-phone`}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="manual" data-testid="option-manual-dial">
+                        Manual Dial
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Manual Phone Input */}
+                {showManualDial && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-3.5 w-3.5 flex-shrink-0 text-white/90" />
+                    <input
+                      type="tel"
+                      className="min-h-10 px-3 rounded bg-white/10 border border-white/20 text-white text-xs placeholder:text-white/50 flex-1"
+                      placeholder="Enter phone number"
+                      value={manualPhoneNumber}
+                      onChange={(e) => setManualPhoneNumber(e.target.value)}
+                      data-testid="input-manual-phone"
+                    />
+                  </div>
+                )}
+                
+                {/* Row 4: Call Controls */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleMute}
+                    disabled={!isCallActive}
+                    className="h-9 bg-white/20 hover:bg-white/30 border-white/30 text-white backdrop-blur-sm text-xs"
+                    data-testid="button-mute"
+                  >
+                    {isMuted ? (
+                      <><MicOff className="h-3 w-3 mr-1" />Unmute</>
+                    ) : (
+                      <><Mic className="h-3 w-3 mr-1" />Mute</>
+                    )}
+                  </Button>
+                  
+                  <div className="flex-1">
+                    {!isCallActive && callStatus !== 'wrap-up' && (
+                      <Button
+                        size="lg"
+                        className="w-full h-12 rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold shadow-2xl border-2 border-white/30 text-sm"
+                        onClick={handleDial}
+                        disabled={!currentQueueItem}
+                        data-testid="button-dial"
+                      >
+                        <Phone className="h-4 w-4 mr-2" />
+                        Call Now
+                      </Button>
+                    )}
+
+                    {isCallActive && (
+                      <Button
+                        size="lg"
+                        className="w-full h-12 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold shadow-2xl border-2 border-white/30 text-sm"
+                        onClick={handleHangup}
+                        data-testid="button-hangup"
+                      >
+                        <PhoneOff className="h-4 w-4 mr-2" />
+                        Hang Up
+                      </Button>
+                    )}
+
+                    {callStatus === 'wrap-up' && (
+                      <div className="w-full h-12 flex items-center justify-center text-xs text-white font-medium text-center bg-white/20 backdrop-blur-sm rounded-xl border-2 border-white/30 shadow-xl px-2">
+                        Complete disposition below
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Desktop Layout - Original */}
+              <div className="hidden lg:flex relative px-6 py-6 items-start gap-6 text-white">
                 {/* Profile Picture - Enhanced */}
                 <div className="relative flex-shrink-0">
-                  <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-sm flex items-center justify-center shadow-2xl border border-white/20">
-                    <User className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                  <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-sm flex items-center justify-center shadow-2xl border border-white/20">
+                    <User className="h-8 w-8 text-white" />
                   </div>
-                  <div className="absolute -bottom-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
+                  <div className="absolute -bottom-1 -right-1 h-5 w-5 bg-green-500 rounded-full border-2 border-white shadow-lg"></div>
                 </div>
 
                 {/* Contact Information - Organized Layout */}
-                <div className="flex-1 flex flex-col gap-1.5 sm:gap-2 min-w-0">
+                <div className="flex-1 flex flex-col gap-2 min-w-0">
                   {/* Contact Name */}
-                  <h2 className="text-lg sm:text-xl font-semibold truncate" data-testid="text-contact-name">
+                  <h2 className="text-xl font-semibold truncate" data-testid="text-contact-name">
                     {currentQueueItem.contactName || 'Unknown Contact'}
                   </h2>
                   
                   {/* Contact Details Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-1.5">
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
                     {/* Job Title & Company */}
                     <div className="flex items-center gap-2 text-sm text-white/90">
                       <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
@@ -935,18 +1148,18 @@ export default function AgentConsolePage() {
                     size="sm"
                     onClick={toggleMute}
                     disabled={!isCallActive}
-                    className="bg-white/20 hover:bg-white/30 border-white/30 text-white backdrop-blur-sm text-xs sm:text-sm"
+                    className="bg-white/20 hover:bg-white/30 border-white/30 text-white backdrop-blur-sm text-sm"
                     data-testid="button-mute"
                   >
                     {isMuted ? (
                       <>
-                        <MicOff className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                        <span className="hidden sm:inline">Unmute</span>
+                        <MicOff className="h-4 w-4 mr-2" />
+                        Unmute
                       </>
                     ) : (
                       <>
-                        <Mic className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                        <span className="hidden sm:inline">Mute</span>
+                        <Mic className="h-4 w-4 mr-2" />
+                        Mute
                       </>
                     )}
                   </Button>
@@ -957,30 +1170,30 @@ export default function AgentConsolePage() {
                   {!isCallActive && callStatus !== 'wrap-up' && (
                     <Button
                       size="lg"
-                      className="h-12 w-24 sm:h-16 sm:w-36 rounded-xl sm:rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-sm sm:text-base"
+                      className="h-16 w-36 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-base"
                       onClick={handleDial}
                       disabled={!currentQueueItem}
                       data-testid="button-dial"
                     >
-                      <Phone className="h-4 w-4 sm:h-5 sm:w-5 sm:mr-2" />
-                      <span className="hidden sm:inline">Call</span>
+                      <Phone className="h-5 w-5 mr-2" />
+                      Call
                     </Button>
                   )}
 
                   {isCallActive && (
                     <Button
                       size="lg"
-                      className="h-12 w-24 sm:h-16 sm:w-36 rounded-xl sm:rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-sm sm:text-base"
+                      className="h-16 w-36 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-base"
                       onClick={handleHangup}
                       data-testid="button-hangup"
                     >
-                      <PhoneOff className="h-4 w-4 sm:h-5 sm:w-5 sm:mr-2" />
-                      <span className="hidden sm:inline">Hang Up</span>
+                      <PhoneOff className="h-5 w-5 mr-2" />
+                      Hang Up
                     </Button>
                   )}
 
                   {callStatus === 'wrap-up' && (
-                    <div className="h-12 w-24 sm:h-16 sm:w-36 flex items-center justify-center text-xs sm:text-sm text-white font-medium text-center bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl border-2 border-white/30 shadow-xl px-2">
+                    <div className="h-16 w-36 flex items-center justify-center text-sm text-white font-medium text-center bg-white/20 backdrop-blur-sm rounded-2xl border-2 border-white/30 shadow-xl px-2">
                       Complete disposition below
                     </div>
                   )}
