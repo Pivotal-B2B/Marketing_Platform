@@ -3385,3 +3385,173 @@ export type DvRun = typeof dvRuns.$inferSelect;
 export type InsertDvRun = z.infer<typeof insertDvRunSchema>;
 export type DvDelivery = typeof dvDeliveries.$inferSelect;
 export type DvSelectionSet = typeof dvSelectionSets.$inferSelect;
+
+export const verificationEligibilityStatusEnum = pgEnum('verification_eligibility_status', ['Eligible', 'Out_of_Scope']);
+export const verificationStatusEnum = pgEnum('verification_status', ['Pending', 'Validated', 'Replaced', 'Invalid']);
+export const verificationQaStatusEnum = pgEnum('verification_qa_status', ['Unreviewed', 'Flagged', 'Passed', 'Rejected']);
+export const verificationEmailStatusEnum = pgEnum('verification_email_status', ['unknown', 'ok', 'invalid', 'risky']);
+export const verificationSourceTypeEnum = pgEnum('verification_source_type', ['Client_Provided', 'New_Sourced']);
+
+export const verificationCampaigns = pgTable("verification_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  monthlyTarget: integer("monthly_target").default(1000),
+  leadCapPerAccount: integer("lead_cap_per_account").default(10),
+  
+  eligibilityConfig: jsonb("eligibility_config").notNull().$type<{
+    geoAllow: string[];
+    titleKeywords: string[];
+    seniorDmFallback: string[];
+  }>(),
+  
+  emailValidationProvider: text("email_validation_provider").default("emaillistverify"),
+  okEmailStates: text("ok_email_states").array().default(sql`ARRAY['valid', 'accept_all']::text[]`),
+  
+  suppressionMatchFields: text("suppression_match_fields").array().default(sql`ARRAY['email_lower', 'cav_id', 'cav_user_id', 'name_company_hash']::text[]`),
+  
+  addressPrecedence: text("address_precedence").array().default(sql`ARRAY['contact', 'hq']::text[]`),
+  
+  okRateTarget: numeric("ok_rate_target", { precision: 5, scale: 2 }).default('0.95'),
+  deliverabilityTarget: numeric("deliverability_target", { precision: 5, scale: 2 }).default('0.97'),
+  suppressionHitRateMax: numeric("suppression_hit_rate_max", { precision: 5, scale: 2 }).default('0.05'),
+  qaPassRateMin: numeric("qa_pass_rate_min", { precision: 5, scale: 2 }).default('0.98'),
+  
+  status: text("status").default('active'),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("verification_campaigns_name_idx").on(table.name),
+}));
+
+export const verificationContacts = pgTable("verification_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => verificationCampaigns.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'set null' }),
+  sourceType: verificationSourceTypeEnum("source_type").notNull(),
+
+  fullName: text("full_name").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  title: text("title"),
+  email: text("email"),
+  phone: text("phone"),
+  mobile: text("mobile"),
+  linkedinUrl: text("linkedin_url"),
+
+  contactCity: text("contact_city"),
+  contactState: text("contact_state"),
+  contactCountry: text("contact_country"),
+  contactPostal: text("contact_postal"),
+
+  cavId: text("cav_id"),
+  cavUserId: text("cav_user_id"),
+
+  eligibilityStatus: verificationEligibilityStatusEnum("eligibility_status").default('Out_of_Scope'),
+  eligibilityReason: text("eligibility_reason"),
+  verificationStatus: verificationStatusEnum("verification_status").default('Pending'),
+  qaStatus: verificationQaStatusEnum("qa_status").default('Unreviewed'),
+  emailStatus: verificationEmailStatusEnum("email_status").default('unknown'),
+  suppressed: boolean("suppressed").default(false),
+
+  assigneeId: varchar("assignee_id").references(() => users.id, { onDelete: 'set null' }),
+  priorityScore: numeric("priority_score", { precision: 10, scale: 2 }),
+  inSubmissionBuffer: boolean("in_submission_buffer").default(false),
+
+  firstNameNorm: text("first_name_norm"),
+  lastNameNorm: text("last_name_norm"),
+  companyKey: text("company_key"),
+  contactCountryKey: text("contact_country_key"),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignIdx: index("verification_contacts_campaign_idx").on(table.campaignId),
+  eligibilityIdx: index("verification_contacts_eligibility_idx").on(table.eligibilityStatus),
+  suppressedIdx: index("verification_contacts_suppressed_idx").on(table.suppressed),
+  normKeysIdx: index("verification_contacts_norm_keys_idx").on(table.firstNameNorm, table.lastNameNorm, table.companyKey, table.contactCountryKey),
+  cavIdIdx: index("verification_contacts_cav_id_idx").on(table.cavId),
+  emailIdx: index("verification_contacts_email_idx").on(table.email),
+}));
+
+export const verificationEmailValidations = pgTable("verification_email_validations", {
+  contactId: varchar("contact_id").primaryKey().references(() => verificationContacts.id, { onDelete: 'cascade' }),
+  provider: text("provider").default("ELV").notNull(),
+  status: verificationEmailStatusEnum("status").notNull(),
+  rawJson: jsonb("raw_json"),
+  checkedAt: timestamp("checked_at").notNull().defaultNow(),
+});
+
+export const verificationSuppressionList = pgTable("verification_suppression_list", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => verificationCampaigns.id, { onDelete: 'cascade' }),
+  emailLower: text("email_lower"),
+  cavId: text("cav_id"),
+  cavUserId: text("cav_user_id"),
+  nameCompanyHash: text("name_company_hash"),
+  addedAt: timestamp("added_at").notNull().defaultNow(),
+}, (table) => ({
+  emailIdx: index("verification_suppression_email_idx").on(table.emailLower),
+  cavIdIdx: index("verification_suppression_cav_id_idx").on(table.cavId),
+  campaignIdx: index("verification_suppression_campaign_idx").on(table.campaignId),
+}));
+
+export const verificationLeadSubmissions = pgTable("verification_lead_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contactId: varchar("contact_id").references(() => verificationContacts.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'set null' }),
+  campaignId: varchar("campaign_id").references(() => verificationCampaigns.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  excludedReason: text("excluded_reason"),
+}, (table) => ({
+  campaignAccountIdx: index("verification_submissions_campaign_account_idx").on(table.campaignId, table.accountId),
+}));
+
+export const verificationAuditLog = pgTable("verification_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actorId: varchar("actor_id").references(() => users.id, { onDelete: 'set null' }),
+  entityType: text("entity_type"),
+  entityId: text("entity_id"),
+  action: text("action"),
+  before: jsonb("before"),
+  after: jsonb("after"),
+  at: timestamp("at").notNull().defaultNow(),
+}, (table) => ({
+  entityIdx: index("verification_audit_entity_idx").on(table.entityType, table.entityId),
+  atIdx: index("verification_audit_at_idx").on(table.at),
+}));
+
+export const verificationCampaignsRelations = relations(verificationCampaigns, ({ one, many }) => ({
+  createdBy: one(users, { fields: [verificationCampaigns.createdBy], references: [users.id] }),
+  contacts: many(verificationContacts),
+  suppressionList: many(verificationSuppressionList),
+  leadSubmissions: many(verificationLeadSubmissions),
+}));
+
+export const verificationContactsRelations = relations(verificationContacts, ({ one, many }) => ({
+  campaign: one(verificationCampaigns, { fields: [verificationContacts.campaignId], references: [verificationCampaigns.id] }),
+  account: one(accounts, { fields: [verificationContacts.accountId], references: [accounts.id] }),
+  assignee: one(users, { fields: [verificationContacts.assigneeId], references: [users.id] }),
+  emailValidation: one(verificationEmailValidations, { fields: [verificationContacts.id], references: [verificationEmailValidations.contactId] }),
+  leadSubmission: one(verificationLeadSubmissions),
+}));
+
+export const insertVerificationCampaignSchema = createInsertSchema(verificationCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertVerificationContactSchema = createInsertSchema(verificationContacts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertVerificationEmailValidationSchema = createInsertSchema(verificationEmailValidations).omit({ checkedAt: true });
+export const insertVerificationSuppressionListSchema = createInsertSchema(verificationSuppressionList).omit({ id: true, addedAt: true });
+export const insertVerificationLeadSubmissionSchema = createInsertSchema(verificationLeadSubmissions).omit({ id: true, createdAt: true });
+export const insertVerificationAuditLogSchema = createInsertSchema(verificationAuditLog).omit({ id: true, at: true });
+
+export type VerificationCampaign = typeof verificationCampaigns.$inferSelect;
+export type InsertVerificationCampaign = z.infer<typeof insertVerificationCampaignSchema>;
+export type VerificationContact = typeof verificationContacts.$inferSelect;
+export type InsertVerificationContact = z.infer<typeof insertVerificationContactSchema>;
+export type VerificationEmailValidation = typeof verificationEmailValidations.$inferSelect;
+export type InsertVerificationEmailValidation = z.infer<typeof insertVerificationEmailValidationSchema>;
+export type VerificationSuppressionList = typeof verificationSuppressionList.$inferSelect;
+export type InsertVerificationSuppressionList = z.infer<typeof insertVerificationSuppressionListSchema>;
+export type VerificationLeadSubmission = typeof verificationLeadSubmissions.$inferSelect;
+export type InsertVerificationLeadSubmission = z.infer<typeof insertVerificationLeadSubmissionSchema>;
+export type VerificationAuditLog = typeof verificationAuditLog.$inferSelect;
+export type InsertVerificationAuditLog = z.infer<typeof insertVerificationAuditLogSchema>;
