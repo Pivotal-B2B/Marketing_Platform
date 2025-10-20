@@ -708,18 +708,20 @@ export default function AgentConsolePage() {
             </Button>
             
             {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
-              <QueueControls 
-                campaignId={selectedCampaignId}
-                compact={true}
-                renderDialogs={false}
-                onQueueUpdated={() => {
-                  refetchQueue();
-                  toast({
-                    title: "Queue Updated",
-                    description: "Your queue has been refreshed",
-                  });
-                }}
-              />
+              <div className="lg:hidden">
+                <QueueControls 
+                  campaignId={selectedCampaignId}
+                  compact={true}
+                  renderDialogs={true}
+                  onQueueUpdated={() => {
+                    refetchQueue();
+                    toast({
+                      title: "Queue Updated",
+                      description: "Your queue has been refreshed",
+                    });
+                  }}
+                />
+              </div>
             )}
           </div>
           
@@ -746,7 +748,7 @@ export default function AgentConsolePage() {
             </div>
             
             {campaignDetails && dialMode === 'manual' && selectedCampaignId && (
-              <>
+              <div className="hidden lg:flex items-center gap-4">
                 <Separator orientation="vertical" className="h-8 bg-white/20" />
                 <QueueControls 
                   campaignId={selectedCampaignId}
@@ -760,7 +762,7 @@ export default function AgentConsolePage() {
                     });
                   }}
                 />
-              </>
+              </div>
             )}
           </div>
 
