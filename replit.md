@@ -25,7 +25,7 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 **Technical Implementations & Features:**
 - **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
 - **AI-Powered Quality Assurance:** Integrates AssemblyAI for call transcription and Replit AI (OpenAI-compatible) for lead qualification scoring, account enrichment, and multi-factor scoring.
-- **Data Management:** Unified CSV Import/Export System with intelligent deduplication/upsert logic, platform-wide dynamic filters, and RBAC-enforced filter visibility.
+- **Data Management:** Unified CSV Import/Export System with intelligent deduplication/upsert logic, platform-wide dynamic filters, and RBAC-enforced filter visibility. Domain Sets support enhanced CSV format with company names (domain,account_name,notes) enabling hybrid matching by both domain and company name for improved account identification.
 - **Compliance & Suppression:** Multi-tier suppression system with campaign-level and global enforcement for emails (unsubscribe) and phones (Do Not Call), preventing suppressed contacts from being queued. RESTful APIs support bulk operations.
 - **Campaign Management:**
     - **Email:** HTML editor, personalization, tracking, pre-send guards, mandatory unsubscribe.

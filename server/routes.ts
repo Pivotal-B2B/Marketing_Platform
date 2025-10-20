@@ -1833,7 +1833,7 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "Name and CSV content are required" });
       }
 
-      // Parse domains from CSV
+      // Parse domains from CSV (supports domain, domain,account_name, domain,account_name,notes)
       const parsed = parseDomainsFromCSV(csvContent);
 
       // Fix typos and normalize
@@ -1842,8 +1842,20 @@ export function registerRoutes(app: Express) {
         domain: fixCommonDomainTypos(p.domain)
       }));
 
-      // Deduplicate
-      const { unique, duplicates } = deduplicateDomains(fixedDomains.map(p => p.domain));
+      // Deduplicate by domain, keeping first occurrence (which includes account name)
+      const uniqueDomainMap = new Map<string, typeof fixedDomains[0]>();
+      const duplicates: string[] = [];
+      
+      for (const item of fixedDomains) {
+        const normalizedDomain = normalizeDomain(item.domain);
+        if (!uniqueDomainMap.has(normalizedDomain)) {
+          uniqueDomainMap.set(normalizedDomain, item);
+        } else {
+          duplicates.push(item.domain);
+        }
+      }
+      
+      const uniqueItems = Array.from(uniqueDomainMap.values());
 
       // Create domain set
       const domainSet = await storage.createDomainSet({
@@ -1856,11 +1868,13 @@ export function registerRoutes(app: Express) {
         tags: tags || [],
       });
 
-      // Create domain item
-      const items = unique.map(domain => ({
+      // Create domain items with account names
+      const items = uniqueItems.map(item => ({
         domainSetId: domainSet.id,
-        domain,
-        normalizedDomain: normalizeDomain(domain),
+        domain: item.domain,
+        normalizedDomain: normalizeDomain(item.domain),
+        accountName: item.accountName || null,
+        notes: item.notes || null,
       }));
 
       await storage.createDomainSetItemsBulk(items);

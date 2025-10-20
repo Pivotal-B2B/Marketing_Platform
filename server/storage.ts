@@ -3471,54 +3471,60 @@ export class DatabaseStorage implements IStorage {
     // Process each domain item
     for (const item of items) {
       const normalizedDomain = normalizeDomain(item.domain);
-
-      // Try to find exact match first
-      const exactMatch = allAccounts.find(acc => 
+      
+      // Try exact domain match first
+      const exactDomainMatch = allAccounts.find(acc => 
         acc.domain && normalizeDomain(acc.domain) === normalizedDomain
       );
 
-      if (exactMatch) {
-        // Exact match found
+      if (exactDomainMatch) {
+        // Exact domain match found
         await this.updateDomainSetItem(item.id, {
           normalizedDomain,
-          accountId: exactMatch.id,
+          accountId: exactDomainMatch.id,
           matchType: 'exact',
           matchConfidence: '1.00',
+          matchedBy: 'domain',
         });
         matchedAccounts++;
 
         // Count contacts for this account
-        const accountContacts = await this.getContactsByAccountId(exactMatch.id);
+        const accountContacts = await this.getContactsByAccountId(exactDomainMatch.id);
         await this.updateDomainSetItem(item.id, {
           matchedContactsCount: accountContacts.length,
         });
         matchedContacts += accountContacts.length;
       } else {
-        // Try fuzzy matching
-        let bestMatch: { account: typeof allAccounts[0]; confidence: number } | null = null;
+        // Try fuzzy matching (domain + name)
+        let bestMatch: { account: typeof allAccounts[0]; confidence: number; matchedBy?: string } | null = null;
 
         for (const account of allAccounts) {
-          if (!account.domain) continue;
-
+          // Use the full matching function with both domain and account name from CSV
           const matchResult = getMatchTypeAndConfidence(
             item.domain,
-            account.domain,
+            item.accountName || undefined,  // Pass account name from CSV
+            account.domain || '',
             account.name
           );
 
-          if (matchResult.matchType === 'fuzzy' && 
+          if ((matchResult.matchType === 'exact' || matchResult.matchType === 'fuzzy') && 
               (!bestMatch || matchResult.confidence > bestMatch.confidence)) {
-            bestMatch = { account, confidence: matchResult.confidence };
+            bestMatch = { 
+              account, 
+              confidence: matchResult.confidence,
+              matchedBy: matchResult.matchedBy
+            };
           }
         }
 
         if (bestMatch) {
-          // Fuzzy match found
+          // Match found (exact name or fuzzy domain/name)
           await this.updateDomainSetItem(item.id, {
             normalizedDomain,
             accountId: bestMatch.account.id,
-            matchType: 'fuzzy',
+            matchType: bestMatch.confidence === 1.0 ? 'exact' : 'fuzzy',
             matchConfidence: bestMatch.confidence.toFixed(2),
+            matchedBy: bestMatch.matchedBy || 'domain',
           });
           matchedAccounts++;
 
@@ -3534,6 +3540,7 @@ export class DatabaseStorage implements IStorage {
             normalizedDomain,
             matchType: 'none',
             matchConfidence: '0.00',
+            matchedBy: null,
           });
           unknownDomains++;
         }

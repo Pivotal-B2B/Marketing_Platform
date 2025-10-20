@@ -806,9 +806,11 @@ export const domainSetItems = pgTable("domain_set_items", {
   domainSetId: varchar("domain_set_id").references(() => domainSets.id, { onDelete: 'cascade' }).notNull(),
   domain: text("domain").notNull(),
   normalizedDomain: text("normalized_domain").notNull(),
+  accountName: text("account_name"), // Company name from CSV for matching
   accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'set null' }),
   matchType: text("match_type"), // exact | fuzzy | none
   matchConfidence: numeric("match_confidence", { precision: 3, scale: 2 }), // 0.00 to 1.00
+  matchedBy: text("matched_by"), // domain | name | both
   matchedContactsCount: integer("matched_contacts_count").default(0),
   autoCreatedAccount: boolean("auto_created_account").default(false),
   notes: text("notes"),
