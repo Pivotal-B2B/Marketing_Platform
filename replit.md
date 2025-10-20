@@ -38,6 +38,14 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Campaign Activity Log:** Real-time activity tracking system that logs campaign interactions.
 - **Client Portal (Bridge Model):** Allows clients to specify campaign order requirements via configurable webhooks.
 - **Data Verification (DV) Module:** Project-based workflow for data cleaning and verification with CSV upload, smart field mapping, multi-stage background processing, durable idempotency, smart deduplication, and suppression management. Includes an enhanced agent console for verification and dispositioning.
+- **Verification System (Campaign-Based):** Configurable B2B CRM data verification and enrichment system with campaign-level eligibility rules, manual EmailListVerify validation, and strict quality controls. Features include:
+    - **Configurable Campaigns:** Campaign-specific eligibility rules (geography allowlist, job title keywords, senior decision-maker fallback) stored as JSON config, allowing dynamic customization without code changes.
+    - **Multi-Field Suppression:** 4-field suppression matching (email, CAV ID, CAV user ID, name+company hash) with suppression gates preventing suppressed contacts from entering the queue.
+    - **Manual Email Validation:** EmailListVerify (ELV) integration with 60-day result caching, precondition enforcement (Eligible + Validated + Not Suppressed), and manual trigger from agent console.
+    - **Lead Cap Enforcement:** Configurable per-account lead limits (default 10) with automatic cap tracking and submission blocking when limits reached.
+    - **Quality Metrics:** Real-time monitoring of OK email rate (95% target) and deliverability (97% target) with progress visualization.
+    - **Agent Console:** Multi-tab interface (Verify, Company, History, QA) with contact details, email validation, account cap meters, and quality assurance workflows.
+    - **Campaign Stats Dashboard:** Real-time statistics showing eligible count, validated count, submission count, OK rate, and deliverability with progress bars against targets.
 - **Security & User Management:** JWT token generation, bcrypt password hashing, and multi-role user management system with RBAC.
 - **Call Reporting System:** Comprehensive analytics and reporting for telemarketing campaigns with specialized endpoints for global dashboards, campaign analytics, agent performance, and detailed call lists, all with RBAC enforcement.
 - **Content Studio & Integrations:** Unified asset library, AI content generator, multi-platform social media publishing, and secure inter-Repl communication with an external Resources Centre.
