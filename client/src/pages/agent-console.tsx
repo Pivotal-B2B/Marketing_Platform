@@ -220,6 +220,7 @@ export default function AgentConsolePage() {
     name: string;
     dialMode?: 'manual' | 'power';
     callScript?: string;
+    scriptId?: string | null;
     qualificationQuestions?: Array<{
       id: string;
       label: string;
@@ -241,6 +242,17 @@ export default function AgentConsolePage() {
     enabled: !!selectedCampaignId,
   });
 
+  // Fetch assigned call script if scriptId is present
+  const { data: assignedScript } = useQuery<{
+    id: string;
+    name: string;
+    content: string;
+    version: number;
+  }>({
+    queryKey: campaignDetails?.scriptId ? [`/api/call-scripts/${campaignDetails.scriptId}`] : [],
+    enabled: !!campaignDetails?.scriptId,
+  });
+
   // Fetch full contact details for the current queue item
   const { data: fullContactDetails } = useQuery<{
     id: string;
@@ -249,9 +261,19 @@ export default function AgentConsolePage() {
     lastName: string | null;
     email: string;
     directPhone: string | null;
+    mobilePhone: string | null;
     jobTitle: string | null;
     department: string | null;
     seniorityLevel: string | null;
+    city: string | null;
+    state: string | null;
+    county: string | null;
+    postalCode: string | null;
+    country: string | null;
+    linkedinUrl: string | null;
+    formerPosition: string | null;
+    timeInCurrentPosition: string | null;
+    timeInCurrentCompany: string | null;
     accountId: string | null;
     account?: {
       id: string;
@@ -261,6 +283,14 @@ export default function AgentConsolePage() {
       staffCount: number | null;
       annualRevenue: string | null;
       mainPhone: string | null;
+      hqCity: string | null;
+      hqState: string | null;
+      hqPostalCode: string | null;
+      hqCountry: string | null;
+      hqStreet1: string | null;
+      yearFounded: number | null;
+      techStack: string[] | null;
+      linkedinUrl: string | null;
     } | null;
   }>({
     queryKey: currentQueueItem?.contactId ? [`/api/contacts/${currentQueueItem.contactId}`] : [],
@@ -283,9 +313,19 @@ export default function AgentConsolePage() {
       lastName: null,
       email: currentQueueItem?.contactEmail || '',
       directPhone: currentQueueItem?.contactPhone || '',
+      mobilePhone: null,
       jobTitle: null,
       department: null,
       seniorityLevel: null,
+      city: null,
+      state: null,
+      county: null,
+      postalCode: null,
+      country: null,
+      linkedinUrl: null,
+      formerPosition: null,
+      timeInCurrentPosition: null,
+      timeInCurrentCompany: null,
     };
 
     const account = fullContactDetails?.account || {
@@ -295,6 +335,14 @@ export default function AgentConsolePage() {
       staffCount: null,
       annualRevenue: null,
       mainPhone: null,
+      hqCity: null,
+      hqState: null,
+      hqPostalCode: null,
+      hqCountry: null,
+      hqStreet1: null,
+      yearFounded: null,
+      techStack: null,
+      linkedinUrl: null,
     };
 
     const agent = {
@@ -317,10 +365,24 @@ export default function AgentConsolePage() {
       .replace(/\{\{contact\.email\}\}/gi, contact.email)
       .replace(/\{\{contact\.phone\}\}/gi, contact.directPhone || '')
       .replace(/\{\{contact\.directPhone\}\}/gi, contact.directPhone || '')
+      .replace(/\{\{contact\.mobilePhone\}\}/gi, contact.mobilePhone || '')
+      .replace(/\{\{contact\.mobile\}\}/gi, contact.mobilePhone || '')
       .replace(/\{\{contact\.jobTitle\}\}/gi, contact.jobTitle || '')
       .replace(/\{\{contact\.title\}\}/gi, contact.jobTitle || '')
       .replace(/\{\{contact\.department\}\}/gi, contact.department || '')
       .replace(/\{\{contact\.seniority\}\}/gi, contact.seniorityLevel || '')
+      .replace(/\{\{contact\.seniorityLevel\}\}/gi, contact.seniorityLevel || '')
+      .replace(/\{\{contact\.city\}\}/gi, contact.city || '')
+      .replace(/\{\{contact\.state\}\}/gi, contact.state || '')
+      .replace(/\{\{contact\.county\}\}/gi, contact.county || '')
+      .replace(/\{\{contact\.postalCode\}\}/gi, contact.postalCode || '')
+      .replace(/\{\{contact\.zip\}\}/gi, contact.postalCode || '')
+      .replace(/\{\{contact\.country\}\}/gi, contact.country || '')
+      .replace(/\{\{contact\.linkedinUrl\}\}/gi, contact.linkedinUrl || '')
+      .replace(/\{\{contact\.linkedin\}\}/gi, contact.linkedinUrl || '')
+      .replace(/\{\{contact\.formerPosition\}\}/gi, contact.formerPosition || '')
+      .replace(/\{\{contact\.timeInCurrentPosition\}\}/gi, contact.timeInCurrentPosition || '')
+      .replace(/\{\{contact\.timeInCurrentCompany\}\}/gi, contact.timeInCurrentCompany || '')
       
       // Account fields - {{ }} format
       .replace(/\{\{account\.name\}\}/gi, account.name)
@@ -328,8 +390,27 @@ export default function AgentConsolePage() {
       .replace(/\{\{account\.domain\}\}/gi, account.domain || '')
       .replace(/\{\{account\.industry\}\}/gi, account.industryStandardized || '')
       .replace(/\{\{account\.employees\}\}/gi, account.staffCount ? account.staffCount.toString() : '')
+      .replace(/\{\{account\.staffCount\}\}/gi, account.staffCount ? account.staffCount.toString() : '')
       .replace(/\{\{account\.revenue\}\}/gi, account.annualRevenue || '')
+      .replace(/\{\{account\.annualRevenue\}\}/gi, account.annualRevenue || '')
       .replace(/\{\{account\.phone\}\}/gi, account.mainPhone || '')
+      .replace(/\{\{account\.mainPhone\}\}/gi, account.mainPhone || '')
+      .replace(/\{\{account\.hqCity\}\}/gi, account.hqCity || '')
+      .replace(/\{\{account\.city\}\}/gi, account.hqCity || '')
+      .replace(/\{\{account\.hqState\}\}/gi, account.hqState || '')
+      .replace(/\{\{account\.state\}\}/gi, account.hqState || '')
+      .replace(/\{\{account\.hqPostalCode\}\}/gi, account.hqPostalCode || '')
+      .replace(/\{\{account\.zip\}\}/gi, account.hqPostalCode || '')
+      .replace(/\{\{account\.hqCountry\}\}/gi, account.hqCountry || '')
+      .replace(/\{\{account\.country\}\}/gi, account.hqCountry || '')
+      .replace(/\{\{account\.hqStreet1\}\}/gi, account.hqStreet1 || '')
+      .replace(/\{\{account\.address\}\}/gi, account.hqStreet1 || '')
+      .replace(/\{\{account\.yearFounded\}\}/gi, account.yearFounded ? account.yearFounded.toString() : '')
+      .replace(/\{\{account\.founded\}\}/gi, account.yearFounded ? account.yearFounded.toString() : '')
+      .replace(/\{\{account\.techStack\}\}/gi, account.techStack ? account.techStack.join(', ') : '')
+      .replace(/\{\{account\.technologies\}\}/gi, account.techStack ? account.techStack.join(', ') : '')
+      .replace(/\{\{account\.linkedinUrl\}\}/gi, account.linkedinUrl || '')
+      .replace(/\{\{account\.linkedin\}\}/gi, account.linkedinUrl || '')
       
       // Agent fields - {{ }} format
       .replace(/\{\{agent\.fullName\}\}/gi, agent.fullName)
@@ -346,12 +427,17 @@ export default function AgentConsolePage() {
       .replace(/\[Contact First Name\]/gi, contact.firstName || contact.fullName.split(' ')[0] || '')
       .replace(/\[Contact Email\]/gi, contact.email)
       .replace(/\[Contact Phone\]/gi, contact.directPhone || '')
+      .replace(/\[Contact Mobile\]/gi, contact.mobilePhone || '')
+      .replace(/\[Contact City\]/gi, contact.city || '')
+      .replace(/\[Contact State\]/gi, contact.state || '')
       .replace(/\[Contact Title\]/gi, contact.jobTitle || '')
       .replace(/\[Job Title\]/gi, contact.jobTitle || '')
       .replace(/\[Company Name\]/gi, account.name)
       .replace(/\[Company\]/gi, account.name)
       .replace(/\[Account Name\]/gi, account.name)
       .replace(/\[Industry\]/gi, account.industryStandardized || '')
+      .replace(/\[Company City\]/gi, account.hqCity || '')
+      .replace(/\[Company State\]/gi, account.hqState || '')
       .replace(/\[Agent Name\]/gi, agent.fullName)
       .replace(/\[Your Name\]/gi, agent.fullName)
       .replace(/\[Campaign Name\]/gi, campaign.name);
@@ -924,10 +1010,10 @@ export default function AgentConsolePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 min-h-0 pt-3">
-                  {campaignDetails?.callScript ? (
+                  {(assignedScript?.content || campaignDetails?.callScript) ? (
                     <div className="p-5 bg-gradient-to-br from-white to-purple-50/30 rounded-xl border-2 border-purple-100 shadow-inner h-full overflow-auto">
                       <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">
-                        {replacePlaceholders(campaignDetails.callScript)}
+                        {replacePlaceholders(assignedScript?.content || campaignDetails?.callScript || '')}
                       </p>
                     </div>
                   ) : (

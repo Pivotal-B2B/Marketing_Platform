@@ -847,6 +847,7 @@ export const campaigns = pgTable("campaigns", {
   emailSubject: text("email_subject"),
   emailHtmlContent: text("email_html_content"),
   callScript: text("call_script"),
+  scriptId: varchar("script_id"),
   qualificationQuestions: jsonb("qualification_questions"),
   ownerId: varchar("owner_id").references(() => users.id),
   accountCapEnabled: boolean("account_cap_enabled").notNull().default(false),
