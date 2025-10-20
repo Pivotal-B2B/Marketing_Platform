@@ -25,22 +25,32 @@ export default function VerificationCampaignConfigPage() {
     name: "",
     monthlyTarget: 1000,
     leadCapPerAccount: 10,
-    geoAllow: "United States\nCanada\nUnited Kingdom",
-    titleKeywords: "director\nmanager\nvp\nvice president\nhead of",
-    seniorDmFallback: "c-level\nceo\ncfo\ncto\ncoo\nchief",
+    geoAllow: "",
+    titleKeywords: "",
+    seniorDmFallback: "",
     okRateTarget: 0.95,
     deliverabilityTarget: 0.97,
   });
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
+      const eligibilityConfig: any = {};
+      
+      if (data.geoAllow?.trim()) {
+        eligibilityConfig.geoAllow = data.geoAllow.split("\n").filter((s: string) => s.trim());
+      }
+      
+      if (data.titleKeywords?.trim()) {
+        eligibilityConfig.titleKeywords = data.titleKeywords.split("\n").filter((s: string) => s.trim());
+      }
+      
+      if (data.seniorDmFallback?.trim()) {
+        eligibilityConfig.seniorDmFallback = data.seniorDmFallback.split("\n").filter((s: string) => s.trim());
+      }
+      
       const payload = {
         ...data,
-        eligibilityConfig: {
-          geoAllow: data.geoAllow.split("\n").filter((s: string) => s.trim()),
-          titleKeywords: data.titleKeywords.split("\n").filter((s: string) => s.trim()),
-          seniorDmFallback: data.seniorDmFallback.split("\n").filter((s: string) => s.trim()),
-        },
+        eligibilityConfig: Object.keys(eligibilityConfig).length > 0 ? eligibilityConfig : null,
       };
 
       if (isNew) {
@@ -79,15 +89,15 @@ export default function VerificationCampaignConfigPage() {
   }
 
   if (campaign && !isLoading) {
-    const config = (campaign as any).eligibilityConfig;
+    const config = (campaign as any).eligibilityConfig || {};
     if (formData.name === "") {
       setFormData({
         name: (campaign as any).name,
         monthlyTarget: (campaign as any).monthlyTarget,
         leadCapPerAccount: (campaign as any).leadCapPerAccount,
-        geoAllow: config.geoAllow.join("\n"),
-        titleKeywords: config.titleKeywords.join("\n"),
-        seniorDmFallback: config.seniorDmFallback.join("\n"),
+        geoAllow: config.geoAllow?.join("\n") || "",
+        titleKeywords: config.titleKeywords?.join("\n") || "",
+        seniorDmFallback: config.seniorDmFallback?.join("\n") || "",
         okRateTarget: Number((campaign as any).okRateTarget),
         deliverabilityTarget: Number((campaign as any).deliverabilityTarget),
       });
@@ -160,11 +170,11 @@ export default function VerificationCampaignConfigPage() {
       <Card>
         <CardHeader>
           <CardTitle>Eligibility Rules</CardTitle>
-          <CardDescription>Define which contacts are eligible for this campaign</CardDescription>
+          <CardDescription>Define which contacts are eligible for this campaign (all fields optional)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="geoAllow">Allowed Geographies (one per line)</Label>
+            <Label htmlFor="geoAllow">Allowed Geographies (Optional - one per line)</Label>
             <Textarea
               id="geoAllow"
               rows={4}
@@ -173,9 +183,10 @@ export default function VerificationCampaignConfigPage() {
               placeholder="United States&#10;Canada&#10;United Kingdom"
               data-testid="input-geo-allow"
             />
+            <p className="text-xs text-muted-foreground mt-1">Leave empty to allow all geographies</p>
           </div>
           <div>
-            <Label htmlFor="titleKeywords">Title Keywords (one per line)</Label>
+            <Label htmlFor="titleKeywords">Title Keywords (Optional - one per line)</Label>
             <Textarea
               id="titleKeywords"
               rows={5}
@@ -184,9 +195,10 @@ export default function VerificationCampaignConfigPage() {
               placeholder="director&#10;manager&#10;vp"
               data-testid="input-title-keywords"
             />
+            <p className="text-xs text-muted-foreground mt-1">Leave empty to allow all job titles</p>
           </div>
           <div>
-            <Label htmlFor="seniorDmFallback">Senior Decision Maker Fallback (one per line)</Label>
+            <Label htmlFor="seniorDmFallback">Senior Decision Maker Fallback (Optional - one per line)</Label>
             <Textarea
               id="seniorDmFallback"
               rows={4}
@@ -195,6 +207,7 @@ export default function VerificationCampaignConfigPage() {
               placeholder="c-level&#10;ceo&#10;cfo"
               data-testid="input-senior-fallback"
             />
+            <p className="text-xs text-muted-foreground mt-1">Fallback keywords when title matching fails</p>
           </div>
         </CardContent>
       </Card>

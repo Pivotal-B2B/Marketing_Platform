@@ -3398,10 +3398,10 @@ export const verificationCampaigns = pgTable("verification_campaigns", {
   monthlyTarget: integer("monthly_target").default(1000),
   leadCapPerAccount: integer("lead_cap_per_account").default(10),
   
-  eligibilityConfig: jsonb("eligibility_config").notNull().$type<{
-    geoAllow: string[];
-    titleKeywords: string[];
-    seniorDmFallback: string[];
+  eligibilityConfig: jsonb("eligibility_config").$type<{
+    geoAllow?: string[];
+    titleKeywords?: string[];
+    seniorDmFallback?: string[];
   }>(),
   
   emailValidationProvider: text("email_validation_provider").default("emaillistverify"),
@@ -3536,7 +3536,14 @@ export const verificationContactsRelations = relations(verificationContacts, ({ 
   leadSubmission: one(verificationLeadSubmissions),
 }));
 
-export const insertVerificationCampaignSchema = createInsertSchema(verificationCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertVerificationCampaignSchema = createInsertSchema(verificationCampaigns)
+  .omit({ id: true, createdAt: true, updatedAt: true })
+  .extend({
+    okRateTarget: z.union([z.string(), z.number()]).optional().transform(val => val !== undefined ? String(val) : undefined),
+    deliverabilityTarget: z.union([z.string(), z.number()]).optional().transform(val => val !== undefined ? String(val) : undefined),
+    suppressionHitRateMax: z.union([z.string(), z.number()]).optional().transform(val => val !== undefined ? String(val) : undefined),
+    qaPassRateMin: z.union([z.string(), z.number()]).optional().transform(val => val !== undefined ? String(val) : undefined),
+  });
 export const insertVerificationContactSchema = createInsertSchema(verificationContacts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertVerificationEmailValidationSchema = createInsertSchema(verificationEmailValidations).omit({ checkedAt: true });
 export const insertVerificationSuppressionListSchema = createInsertSchema(verificationSuppressionList).omit({ id: true, addedAt: true });
