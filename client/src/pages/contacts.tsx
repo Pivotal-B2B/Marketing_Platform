@@ -84,7 +84,7 @@ export default function ContactsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const ITEMS_PER_PAGE = 250;
+  const ITEMS_PER_PAGE = 50;
 
   // Normalize user role for filter RBAC (capitalize first letter)
   const normalizeRole = (role: string): UserRole => {

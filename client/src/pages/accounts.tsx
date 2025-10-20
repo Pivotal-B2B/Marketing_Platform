@@ -75,7 +75,7 @@ export default function AccountsPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const ITEMS_PER_PAGE = 250;
+  const ITEMS_PER_PAGE = 50;
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
     queryKey: ['/api/accounts', filterGroup],
