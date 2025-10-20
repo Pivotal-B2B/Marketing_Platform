@@ -902,11 +902,14 @@ export default function ContactsPage() {
           setSelectAllPages(false);
           clearSelection();
           
-          // Invalidate queries to refresh data
-          await queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
-          await queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+          // Remove all cached contact queries to force fresh data
+          queryClient.removeQueries({ queryKey: ['/api/contacts'] });
+          queryClient.removeQueries({ queryKey: ['/api/accounts'] });
           
-          // Force an immediate refetch
+          // Wait a moment for the backend to finish processing
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Force an immediate refetch with fresh data
           await refetchContacts();
           
           toast({
