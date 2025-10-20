@@ -174,9 +174,9 @@ export function SidebarFilters({
 
   // Sidebar Content Component (reused for both desktop and mobile)
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900">
+    <div className="flex flex-col bg-white dark:bg-slate-900">
       {/* Header */}
-      <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700">
+      <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
         <div className="flex items-center justify-between mb-1.5">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filters</h2>
           {activeFilterCount > 0 && (
@@ -246,8 +246,8 @@ export function SidebarFilters({
       </div>
 
       {/* Body - Filter Conditions */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <ScrollArea className="flex-1">
+      <div className="flex-shrink-0">
+        <ScrollArea className="max-h-[calc(100vh-280px)]">
           <div className="px-2 pt-2 pb-2 space-y-1.5">
             <AnimatePresence mode="popLayout">
               {filterGroup.conditions.map((condition) => (
@@ -273,37 +273,31 @@ export function SidebarFilters({
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-center py-6 text-sm text-slate-400 dark:text-slate-500"
+                className="text-center py-4 text-sm text-slate-400 dark:text-slate-500"
               >
-                <Filter className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                <p>No filters added</p>
-                <p className="text-xs mt-1">Click below to add your first filter</p>
+                <Filter className="h-6 w-6 mx-auto mb-1.5 opacity-20" />
+                <p className="text-xs">No filters added</p>
               </motion.div>
             )}
           </div>
         </ScrollArea>
         
-        {/* Add Condition Button - Fixed at bottom of filter area */}
-        <div className="px-2 pb-2">
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
+        {/* Add Condition Button */}
+        <div className="px-2 pb-2 pt-1">
+          <Button
+            variant="outline"
+            onClick={addCondition}
+            className="w-full border-dashed border-2 hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+            data-testid="button-add-condition"
           >
-            <Button
-              variant="outline"
-              onClick={addCondition}
-              className="w-full border-dashed border-2 hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
-              data-testid="button-add-condition"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Filter
-            </Button>
-          </motion.div>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Filter
+          </Button>
         </div>
       </div>
 
       {/* Footer - Actions */}
-      <div className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+      <div className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0">
         <div className="flex items-center justify-between gap-2">
           <Button
             variant="ghost"
@@ -349,7 +343,7 @@ export function SidebarFilters({
   return (
     <>
       {/* Desktop: Persistent Sidebar (≥1280px) */}
-      <aside className="hidden xl:block w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700 h-screen sticky top-0">
+      <aside className="hidden xl:block w-[320px] shrink-0 border-r border-slate-200 dark:border-slate-700">
         <SidebarContent />
       </aside>
 
@@ -374,7 +368,7 @@ export function SidebarFilters({
               )}
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[320px] p-0">
+          <SheetContent side="left" className="w-[320px] p-0 overflow-y-auto">
             <SidebarContent />
           </SheetContent>
         </Sheet>
