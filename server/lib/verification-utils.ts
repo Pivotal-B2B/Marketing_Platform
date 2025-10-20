@@ -17,17 +17,22 @@ export function evaluateEligibility(
   const t = (title ?? "").toLowerCase();
   const c = normalize.countryKey(contactCountry);
   
-  const { geoAllow, titleKeywords, seniorDmFallback } = campaign.eligibilityConfig;
+  const eligibilityConfig = campaign.eligibilityConfig || {};
+  const { geoAllow = [], titleKeywords = [], seniorDmFallback = [] } = eligibilityConfig;
   
-  const countryOk = geoAllow.some(allowed => 
+  if (geoAllow.length === 0 && titleKeywords.length === 0 && seniorDmFallback.length === 0) {
+    return { status: 'Eligible' as const, reason: 'no_restrictions' };
+  }
+  
+  const countryOk = geoAllow.length === 0 || geoAllow.some(allowed => 
     c.includes(allowed.toLowerCase()) || allowed.toLowerCase().includes(c)
   );
   
-  const titleMatch = titleKeywords.some(keyword => 
+  const titleMatch = titleKeywords.length === 0 || titleKeywords.some(keyword => 
     t.includes(keyword.toLowerCase())
   );
   
-  const seniorMatch = seniorDmFallback.some(senior => 
+  const seniorMatch = seniorDmFallback.length === 0 || seniorDmFallback.some(senior => 
     t.includes(senior.toLowerCase())
   );
   
@@ -35,7 +40,7 @@ export function evaluateEligibility(
     return { status: 'Out_of_Scope' as const, reason: 'country_not_in_geo_allow_list' };
   }
   
-  if (!(titleMatch || seniorMatch)) {
+  if (titleKeywords.length > 0 && !(titleMatch || seniorMatch)) {
     return { status: 'Out_of_Scope' as const, reason: 'title_not_matching_keywords' };
   }
   
@@ -69,4 +74,62 @@ export function computeNormalizedKeys(contact: {
     contactCountryKey: normalize.countryKey(contact.contactCountry),
     companyKey: normalize.toKey(contact.accountName),
   };
+}
+
+export async function checkSuppression(
+  campaignId: string,
+  contact: {
+    email?: string | null;
+    cavId?: string | null;
+    cavUserId?: string | null;
+    fullName?: string | null;
+    account_name?: string | null;
+  }
+): Promise<boolean> {
+  const { db } = await import('../db');
+  const { verificationSuppressionList } = await import('@shared/schema');
+  const { eq, or, and, sql } = await import('drizzle-orm');
+  
+  const checks = [];
+  
+  if (contact.email) {
+    checks.push(eq(verificationSuppressionList.emailLower, contact.email.toLowerCase()));
+  }
+  
+  if (contact.cavId) {
+    checks.push(eq(verificationSuppressionList.cavId, contact.cavId));
+  }
+  
+  if (contact.cavUserId) {
+    checks.push(eq(verificationSuppressionList.cavUserId, contact.cavUserId));
+  }
+  
+  if (contact.fullName && contact.account_name) {
+    const hash = computeNameCompanyHash(
+      contact.fullName.split(' ')[0],
+      contact.fullName.split(' ').slice(1).join(' '),
+      contact.account_name
+    );
+    checks.push(eq(verificationSuppressionList.nameCompanyHash, hash));
+  }
+  
+  if (checks.length === 0) {
+    return false;
+  }
+  
+  const suppressed = await db
+    .select()
+    .from(verificationSuppressionList)
+    .where(
+      and(
+        or(
+          eq(verificationSuppressionList.campaignId, campaignId),
+          sql`${verificationSuppressionList.campaignId} IS NULL`
+        ),
+        or(...checks)
+      )
+    )
+    .limit(1);
+  
+  return suppressed.length > 0;
 }

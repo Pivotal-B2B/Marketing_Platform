@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, Settings } from "lucide-react";
+import { Plus, Settings, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -78,16 +78,24 @@ export default function VerificationCampaignsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/verification/campaigns/${campaign.id}`}>
-                        <Button variant="ghost" size="sm" data-testid={`button-view-${campaign.id}`}>
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Link href={`/verification/console/${campaign.id}`}>
-                        <Button variant="ghost" size="sm" data-testid={`button-console-${campaign.id}`}>
-                          Console
-                        </Button>
-                      </Link>
+                      <div className="flex justify-end gap-1">
+                        <Link href={`/verification/upload/${campaign.id}`}>
+                          <Button variant="ghost" size="sm" data-testid={`button-upload-${campaign.id}`}>
+                            <Upload className="h-4 w-4 mr-1" />
+                            Upload
+                          </Button>
+                        </Link>
+                        <Link href={`/verification/console/${campaign.id}`}>
+                          <Button variant="ghost" size="sm" data-testid={`button-console-${campaign.id}`}>
+                            Console
+                          </Button>
+                        </Link>
+                        <Link href={`/verification/campaigns/${campaign.id}`}>
+                          <Button variant="ghost" size="sm" data-testid={`button-config-${campaign.id}`}>
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
