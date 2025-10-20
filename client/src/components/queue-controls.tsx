@@ -202,73 +202,49 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
       <>
         {/* Replace Queue Dialog */}
         <AlertDialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
-          <AlertDialogContent className="max-w-2xl">
+          <AlertDialogContent className="max-w-md w-[95vw] max-h-[90vh] overflow-y-auto">
             <AlertDialogHeader>
-              <AlertDialogTitle>Set Queue (Replace)</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will clear your current queue and assign new contacts based on the filters below.
-                If no filters are applied, all available campaign contacts will be queued.
+              <AlertDialogTitle className="text-base">Set Queue Filters</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm">
+                Add filters to queue specific contacts
               </AlertDialogDescription>
             </AlertDialogHeader>
 
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Filter Contacts (optional)</Label>
-                <SidebarFilters
-                  entityType="contact"
-                  onApplyFilter={(filter) => setFilterGroup(filter)}
-                  initialFilter={filterGroup}
-                  embedded={true}
-                />
-              </div>
-
-              {filterGroup && filterGroup.conditions.length > 0 && (
-                <div className="border rounded-lg p-3 bg-muted/50">
-                  <div className="text-sm font-medium mb-2">Active Filters:</div>
-                  <div className="space-y-1">
-                    <div className="text-sm text-muted-foreground">
-                      Match <Badge variant="outline">{filterGroup.logic}</Badge> of {filterGroup.conditions.length} condition{filterGroup.conditions.length !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div className="space-y-3 py-2">
+              <SidebarFilters
+                entityType="contact"
+                onApplyFilter={(filter) => setFilterGroup(filter)}
+                initialFilter={filterGroup}
+                embedded={true}
+              />
 
               <Separator />
 
               <div className="space-y-2">
-                <Label htmlFor="maxQueueSize">Max Queue Size</Label>
+                <Label htmlFor="maxQueueSize" className="text-sm">Max Queue Size</Label>
                 <Input
                   id="maxQueueSize"
                   type="number"
                   min="1"
-                  placeholder="300 (recommended daily limit)"
+                  placeholder="300"
                   value={maxQueueSize}
                   onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : 300)}
                   data-testid="input-max-queue-size"
+                  className="h-9"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Default: 300 contacts (typical daily call capacity per agent)
-                </p>
-              </div>
-
-              <div className="bg-muted p-3 rounded-md flex items-start gap-2">
-                <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-muted-foreground">
-                  Contacts already assigned to other agents will be skipped to prevent collisions.
-                  Remaining matches can be assigned to other agents. Items in progress are preserved automatically.
-                </p>
               </div>
             </div>
 
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isPending} data-testid="button-cancel-replace">Cancel</AlertDialogCancel>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel disabled={isPending} data-testid="button-cancel-replace" className="h-9">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => replaceQueueMutation.mutate()}
                 disabled={isPending}
                 data-testid="button-confirm-replace"
+                className="h-9"
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Replace Queue
+                Save Queue
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
