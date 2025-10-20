@@ -607,6 +607,24 @@ export default function ContactsPage() {
             data-testid="input-search-contacts"
           />
         </div>
+        {(filterGroup?.conditions.length || Object.keys(appliedFilters).length > 0) && (
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              setFilterGroup(undefined);
+              setAppliedFilters({});
+              setCurrentPage(1);
+              toast({
+                title: "Filters Cleared",
+                description: "Showing all contacts",
+              });
+            }}
+          >
+            <Filter className="mr-2 h-4 w-4" />
+            Clear Filters ({filteredContacts.length} shown)
+          </Button>
+        )}
       </div>
 
       {selectedCount > 0 && (
@@ -877,8 +895,21 @@ export default function ContactsPage() {
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onImportComplete={() => {
+          // Clear any applied filters to show all contacts including newly imported ones
+          setFilterGroup(undefined);
+          setAppliedFilters({});
+          setCurrentPage(1);
+          setSelectAllPages(false);
+          clearSelection();
+          
+          // Invalidate queries to refresh data
           queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
           queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+          
+          toast({
+            title: "Import Complete",
+            description: "Filters cleared to show all contacts including newly imported ones",
+          });
         }}
       />
 
