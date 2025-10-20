@@ -92,7 +92,7 @@ export default function ContactsPage() {
     return (normalized as UserRole) || "Agent";
   };
 
-  const { data: contacts, isLoading: contactsLoading } = useQuery<Contact[]>({
+  const { data: contacts, isLoading: contactsLoading, refetch: refetchContacts } = useQuery<Contact[]>({
     queryKey: ['/api/contacts', JSON.stringify(filterGroup), JSON.stringify(appliedFilters)],
     queryFn: async () => {
       const token = localStorage.getItem('authToken');
@@ -894,7 +894,7 @@ export default function ContactsPage() {
       <CSVImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
-        onImportComplete={() => {
+        onImportComplete={async () => {
           // Clear any applied filters to show all contacts including newly imported ones
           setFilterGroup(undefined);
           setAppliedFilters({});
@@ -903,12 +903,15 @@ export default function ContactsPage() {
           clearSelection();
           
           // Invalidate queries to refresh data
-          queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+          await queryClient.invalidateQueries({ queryKey: ['/api/contacts'] });
+          await queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+          
+          // Force an immediate refetch
+          await refetchContacts();
           
           toast({
             title: "Import Complete",
-            description: "Filters cleared to show all contacts including newly imported ones",
+            description: "Showing all contacts including newly imported ones",
           });
         }}
       />
