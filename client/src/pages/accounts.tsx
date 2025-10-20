@@ -486,6 +486,17 @@ export default function AccountsPage() {
                 <span className="text-sm text-muted-foreground whitespace-nowrap">Select all</span>
               </div>
             )}
+            {filterGroup && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilterGroup(undefined)}
+                data-testid="button-clear-filters"
+              >
+                <Filter className="mr-2 h-4 w-4" />
+                Clear Filters ({filterGroup.conditions.length})
+              </Button>
+            )}
           </div>
           <SidebarFilters
             entityType="account"
