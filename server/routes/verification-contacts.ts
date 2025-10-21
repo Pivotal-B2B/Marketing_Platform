@@ -1148,10 +1148,14 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
 });
 
 // Background processing function for email validation jobs
-async function processEmailValidationJob(jobId: string) {
-  console.log(`[EMAIL VALIDATION JOB] Starting job ${jobId}`);
+// Export for job recovery module
+export async function processEmailValidationJob(jobId: string) {
+  console.log(`[EMAIL VALIDATION JOB] ===== STARTING JOB ${jobId} =====`);
+  console.log(`[EMAIL VALIDATION JOB] Function called at: ${new Date().toISOString()}`);
   
   try {
+    console.log(`[EMAIL VALIDATION JOB] Fetching job ${jobId} from database...`);
+    
     // Fetch the job details
     const [job] = await db
       .select()
@@ -1159,9 +1163,16 @@ async function processEmailValidationJob(jobId: string) {
       .where(eq(verificationEmailValidationJobs.id, jobId));
     
     if (!job) {
-      console.error(`[EMAIL VALIDATION JOB] Job ${jobId} not found`);
+      console.error(`[EMAIL VALIDATION JOB] Job ${jobId} not found in database`);
       return;
     }
+    
+    console.log(`[EMAIL VALIDATION JOB] Job ${jobId} fetched successfully:`, {
+      status: job.status,
+      totalContacts: job.totalContacts,
+      processedContacts: job.processedContacts,
+      contactIdsLength: job.contactIds?.length || 0,
+    });
     
     const { campaignId, contactIds: allContactIds } = job;
     
@@ -1405,8 +1416,26 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
     
     console.log(`[BULK EMAIL VERIFY] Job ${job.id} created, starting background processing`);
     
-    // Start background processing WITHOUT awaiting (fire and forget)
-    Promise.resolve().then(() => processEmailValidationJob(job.id));
+    // Start background processing using setImmediate (more reliable than Promise)
+    // setImmediate ensures the function executes in the next event loop tick
+    setImmediate(async () => {
+      try {
+        console.log(`[BULK EMAIL VERIFY] setImmediate triggered for job ${job.id}`);
+        await processEmailValidationJob(job.id);
+      } catch (error) {
+        console.error(`[BULK EMAIL VERIFY] Background processing failed for job ${job.id}:`, error);
+        // Update job status to failed
+        await db.update(verificationEmailValidationJobs)
+          .set({
+            status: 'failed',
+            errorMessage: error instanceof Error ? error.message : String(error),
+            finishedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(verificationEmailValidationJobs.id, job.id))
+          .catch(err => console.error(`[BULK EMAIL VERIFY] Failed to update job status:`, err));
+      }
+    });
     
     // Return immediately with job ID
     res.json({
