@@ -391,7 +391,7 @@ export const accounts = pgTable("accounts", {
   industryAiReviewedAt: timestamp("industry_ai_reviewed_at"),
   industryAiStatus: industryAIStatusEnum("industry_ai_status"),
 
-  annualRevenue: numeric("annual_revenue", { precision: 20, scale: 2 }), // UPDATED: numeric(20,2) to avoid scientific notation
+  annualRevenue: numeric("annual_revenue"), // Removed precision to allow deployment
   revenueRange: revenueRangeEnum("revenue_range"), // Pivotal Template: "$500M - $1B", "$1B+", etc.
   employeesSizeRange: staffCountRangeEnum("employees_size_range"), // Pivotal Template: "501-1000", "10000+", etc.
   staffCount: integer("staff_count"),
