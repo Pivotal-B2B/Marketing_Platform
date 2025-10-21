@@ -42,7 +42,7 @@ interface CSVRow {
 router.post("/api/verification-campaigns/:campaignId/upload", async (req: Request, res: Response) => {
   try {
     const { campaignId } = req.params;
-    const { csvData } = req.body;
+    const { csvData, fieldMappings } = req.body;
 
     if (!csvData) {
       return res.status(400).json({ error: "csvData is required" });
@@ -57,12 +57,28 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
       return res.status(404).json({ error: "Campaign not found" });
     }
 
+    // Build mapping lookup from user's custom mappings
+    const userMappingLookup: Record<string, string> = {};
+    if (fieldMappings && Array.isArray(fieldMappings)) {
+      fieldMappings.forEach((mapping: any) => {
+        if (mapping.csvColumn && mapping.targetField && mapping.targetField !== 'skip') {
+          userMappingLookup[mapping.csvColumn] = mapping.targetField;
+        }
+      });
+    }
+
     const parseResult = Papa.parse<CSVRow>(csvData, {
       header: true,
       skipEmptyLines: true,
       delimiter: "",  // Auto-detect delimiter
       delimitersToGuess: [',', '\t', '|', ';', Papa.RECORD_SEP, Papa.UNIT_SEP],
       transformHeader: (header) => {
+        // First, check if user provided a custom mapping for this exact header
+        if (userMappingLookup[header]) {
+          return userMappingLookup[header];
+        }
+
+        // Fall back to auto-mapping
         const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
         
         const mappings: Record<string, string> = {

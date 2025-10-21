@@ -114,9 +114,10 @@ export default function VerificationUploadPage() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async (csvData: string) => {
+    mutationFn: async ({ csvData, fieldMappings }: { csvData: string; fieldMappings: FieldMapping[] }) => {
       const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/upload`, {
         csvData,
+        fieldMappings,
       });
       return res.json();
     },
@@ -178,7 +179,7 @@ export default function VerificationUploadPage() {
   const handleUpload = async () => {
     if (!file || !rawCSVContent) return;
 
-    uploadMutation.mutate(rawCSVContent);
+    uploadMutation.mutate({ csvData: rawCSVContent, fieldMappings });
   };
 
   return (
