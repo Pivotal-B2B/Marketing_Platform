@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Upload, FileText, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
@@ -111,6 +111,9 @@ export default function VerificationUploadPage() {
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [updateMode, setUpdateMode] = useState<boolean>(false);
+  const [uploadJobId, setUploadJobId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadStatus, setUploadStatus] = useState<string>("idle");
 
   const { data: campaign } = useQuery({
     queryKey: ["/api/verification-campaigns", campaignId],
@@ -118,7 +121,8 @@ export default function VerificationUploadPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async ({ csvData, fieldMappings, updateMode }: { csvData: string; fieldMappings: FieldMapping[]; updateMode: boolean }) => {
-      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/upload`, {
+      const res = await apiRequest("POST", `/api/verification-upload-jobs`, {
+        campaignId,
         csvData,
         fieldMappings,
         updateMode,
@@ -126,19 +130,8 @@ export default function VerificationUploadPage() {
       return res.json();
     },
     onSuccess: (data) => {
-      setUploadResult(data);
-      setStage("complete");
-      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
-      
-      const message = updateMode
-        ? `Updated ${data.updated || 0} contacts, created ${data.created || 0} new, skipped ${data.skipped || 0}`
-        : `Created ${data.created} contacts, skipped ${data.skipped}`;
-      
-      toast({
-        title: "Upload Complete",
-        description: message,
-      });
+      setUploadJobId(data.jobId);
+      setUploadStatus("processing");
     },
     onError: (error: any) => {
       toast({
@@ -148,6 +141,52 @@ export default function VerificationUploadPage() {
       });
     },
   });
+
+  useEffect(() => {
+    if (!uploadJobId || (uploadStatus !== "processing" && uploadStatus !== "pending")) {
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/verification-upload-jobs/${uploadJobId}`);
+        const data = await res.json();
+
+        setUploadProgress(data.progress || 0);
+        setUploadStatus(data.status);
+
+        if (data.status === "completed") {
+          clearInterval(pollInterval);
+          setUploadResult({
+            total: data.totalRows,
+            created: data.successCount,
+            updated: 0,
+            skipped: data.errorCount,
+            errors: data.errors || [],
+          });
+          setStage("complete");
+          queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+          
+          toast({
+            title: "Upload Complete",
+            description: `${data.successCount} contacts processed successfully, ${data.errorCount} errors`,
+          });
+        } else if (data.status === "failed") {
+          clearInterval(pollInterval);
+          toast({
+            variant: "destructive",
+            title: "Upload Failed",
+            description: data.errors?.[0]?.message || "Upload processing failed",
+          });
+        }
+      } catch (error: any) {
+        console.error("Error polling upload status:", error);
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [uploadJobId, uploadStatus, campaignId, queryClient, toast]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -510,11 +549,11 @@ export default function VerificationUploadPage() {
               </Button>
             </div>
 
-            {uploadMutation.isPending && (
+            {(uploadMutation.isPending || uploadStatus === "processing" || uploadStatus === "pending") && (
               <div className="space-y-2">
-                <Progress value={50} data-testid="progress-upload" />
+                <Progress value={uploadProgress} data-testid="progress-upload" />
                 <p className="text-sm text-muted-foreground" data-testid="text-processing">
-                  Processing contacts... This may take a moment.
+                  Processing contacts... {uploadProgress}% complete
                 </p>
               </div>
             )}
