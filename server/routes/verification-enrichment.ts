@@ -258,6 +258,159 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
 });
 
 /**
+ * POST /api/verification-contacts/:contactId/enrich
+ * Trigger AI enrichment for a single contact
+ */
+router.post("/api/verification-contacts/:contactId/enrich", async (req, res) => {
+  const { contactId } = req.params;
+  const { force = false } = req.body;
+
+  try {
+    console.log(`[Enrichment] Starting single-contact enrichment for ${contactId}`);
+
+    // Get the contact with account info
+    const contactResult = await db
+      .select({
+        id: verificationContacts.id,
+        fullName: verificationContacts.fullName,
+        accountId: verificationContacts.accountId,
+        accountName: accounts.name,
+        contactCountry: verificationContacts.contactCountry,
+        hqCountry: verificationContacts.hqCountry,
+        hqAddress1: verificationContacts.hqAddress1,
+        hqCity: verificationContacts.hqCity,
+        hqState: verificationContacts.hqState,
+        hqPostal: verificationContacts.hqPostal,
+        hqPhone: verificationContacts.hqPhone,
+        addressEnrichmentStatus: verificationContacts.addressEnrichmentStatus,
+        phoneEnrichmentStatus: verificationContacts.phoneEnrichmentStatus,
+        eligibilityStatus: verificationContacts.eligibilityStatus,
+        deleted: verificationContacts.deleted,
+        suppressed: verificationContacts.suppressed,
+      })
+      .from(verificationContacts)
+      .leftJoin(accounts, eq(verificationContacts.accountId, accounts.id))
+      .where(eq(verificationContacts.id, contactId));
+
+    if (contactResult.length === 0) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
+
+    const contact = contactResult[0];
+
+    // Server-side guards: only enrich eligible, non-suppressed, non-deleted contacts
+    if (contact.deleted) {
+      return res.status(400).json({ error: "Cannot enrich deleted contact" });
+    }
+
+    if (contact.suppressed) {
+      return res.status(400).json({ error: "Cannot enrich suppressed contact" });
+    }
+
+    if (contact.eligibilityStatus !== 'Eligible' && !force) {
+      return res.status(400).json({ error: "Contact must be eligible for enrichment" });
+    }
+
+    // Check if contact needs enrichment
+    const needsAddress = CompanyEnrichmentService.needsAddressEnrichment(contact);
+    const needsPhone = CompanyEnrichmentService.needsPhoneEnrichment(contact);
+
+    if (!force && !needsAddress && !needsPhone) {
+      return res.json({
+        message: "Contact does not need enrichment",
+        addressEnriched: false,
+        phoneEnriched: false,
+      });
+    }
+
+    if (!contact.accountName) {
+      return res.status(400).json({ error: "No company name available for enrichment" });
+    }
+
+    const CONFIDENCE_THRESHOLD = 0.7;
+
+    // Perform enrichment
+    const result = await CompanyEnrichmentService.enrichCompanyData(
+      contact as any,
+      contact.accountName
+    );
+
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+
+    let addressEnriched = false;
+    let phoneEnriched = false;
+
+    // Handle address enrichment result
+    if (result.address && result.addressConfidence !== undefined) {
+      if (result.addressConfidence >= CONFIDENCE_THRESHOLD) {
+        updateData.contactAddress1 = result.address.address1;
+        updateData.contactAddress2 = result.address.address2 || null;
+        updateData.contactAddress3 = result.address.address3 || null;
+        updateData.contactCity = result.address.city;
+        updateData.contactState = result.address.state;
+        updateData.contactPostal = result.address.postalCode;
+        updateData.contactCountry = result.address.country;
+        updateData.addressEnrichmentStatus = 'completed';
+        updateData.addressEnrichedAt = new Date();
+        updateData.addressEnrichmentError = null;
+        addressEnriched = true;
+        console.log(`[Enrichment] Contact address enriched for ${contact.fullName} (confidence: ${result.addressConfidence})`);
+      } else {
+        updateData.addressEnrichmentStatus = 'failed';
+        updateData.addressEnrichmentError = `Low confidence: ${result.addressConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;
+        console.log(`[Enrichment] Rejected low-confidence address for ${contact.fullName} (confidence: ${result.addressConfidence})`);
+      }
+    } else if (result.addressError) {
+      updateData.addressEnrichmentStatus = 'failed';
+      updateData.addressEnrichmentError = result.addressError;
+    }
+
+    // Handle phone enrichment result
+    if (result.phone && result.phoneConfidence !== undefined) {
+      if (result.phoneConfidence >= CONFIDENCE_THRESHOLD) {
+        updateData.directPhone = result.phone;
+        updateData.phoneEnrichmentStatus = 'completed';
+        updateData.phoneEnrichedAt = new Date();
+        updateData.phoneEnrichmentError = null;
+        phoneEnriched = true;
+        console.log(`[Enrichment] Contact phone enriched for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
+      } else {
+        updateData.phoneEnrichmentStatus = 'failed';
+        updateData.phoneEnrichmentError = `Low confidence: ${result.phoneConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;
+        console.log(`[Enrichment] Rejected low-confidence phone for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
+      }
+    } else if (result.phoneError) {
+      updateData.phoneEnrichmentStatus = 'failed';
+      updateData.phoneEnrichmentError = result.phoneError;
+    }
+
+    // Update contact with enriched data
+    await db.update(verificationContacts)
+      .set(updateData)
+      .where(eq(verificationContacts.id, contactId));
+
+    console.log(`[Enrichment] Single contact enriched: ${contact.fullName}, address=${addressEnriched}, phone=${phoneEnriched}`);
+
+    res.json({
+      message: "Contact enriched successfully",
+      addressEnriched,
+      phoneEnriched,
+      addressConfidence: result.addressConfidence,
+      phoneConfidence: result.phoneConfidence,
+    });
+
+  } catch (error: any) {
+    console.error(`[Enrichment] Error enriching contact ${contactId}:`, error);
+    res.status(500).json({ 
+      error: "Failed to enrich contact",
+      details: error.message 
+    });
+  }
+});
+
+/**
  * GET /api/verification-campaigns/:campaignId/enrichment-stats
  * Get enrichment statistics for a campaign
  */

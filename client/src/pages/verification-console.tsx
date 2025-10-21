@@ -171,6 +171,28 @@ export default function VerificationConsolePage() {
     },
   });
 
+  const singleContactEnrichmentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/verification-contacts/${currentContactId}/enrich`, {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Enrichment complete",
+        description: `Address enriched: ${data.addressEnriched ? 'Yes' : 'No'}, Phone enriched: ${data.phoneEnriched ? 'Yes' : 'No'}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-contacts", currentContactId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Enrichment failed",
+        description: error.message || "Failed to enrich company data",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (contactId: string) => {
       const res = await apiRequest("DELETE", `/api/verification-contacts/${contactId}`, undefined);
@@ -1177,6 +1199,28 @@ export default function VerificationConsolePage() {
                 >
                   <Mail className="h-4 w-4 mr-2" />
                   {elvMutation.isPending ? "Validating..." : "Validate Email"}
+                </Button>
+                <Button
+                  onClick={() => singleContactEnrichmentMutation.mutate()}
+                  disabled={
+                    singleContactEnrichmentMutation.isPending ||
+                    (contact as any)?.eligibility_status !== 'Eligible' ||
+                    (contact as any)?.suppressed === true ||
+                    !(contact as any)?.account_name
+                  }
+                  data-testid="button-enrich-contact"
+                  title={
+                    (contact as any)?.suppressed
+                      ? "Contact is suppressed"
+                      : (contact as any)?.eligibility_status !== 'Eligible'
+                      ? "Contact must be Eligible"
+                      : !(contact as any)?.account_name
+                      ? "No company name available"
+                      : ""
+                  }
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {singleContactEnrichmentMutation.isPending ? "Enriching..." : "Enrich Company"}
                 </Button>
                 <Button
                   variant="destructive"
