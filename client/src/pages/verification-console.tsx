@@ -288,6 +288,11 @@ export default function VerificationConsolePage() {
     });
   };
 
+  const handleEnrichCompanyData = () => {
+    setEnrichmentDialogOpen(false);
+    enrichmentMutation.mutate();
+  };
+
   const handleSaveAndNext = async () => {
     await updateMutation.mutateAsync({
       verificationStatus: "Validated",
@@ -321,6 +326,14 @@ export default function VerificationConsolePage() {
             </p>
           </div>
         </div>
+        <Button
+          onClick={() => setEnrichmentDialogOpen(true)}
+          disabled={enrichmentMutation.isPending}
+          data-testid="button-enrich"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          {enrichmentMutation.isPending ? "Enriching..." : "Enrich Company Data"}
+        </Button>
       </div>
 
       <div className="grid grid-cols-5 gap-4">
@@ -1026,6 +1039,46 @@ export default function VerificationConsolePage() {
               data-testid="button-confirm-bulk-delete"
             >
               {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedContactIds.size} Contact(s)`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={enrichmentDialogOpen} onOpenChange={setEnrichmentDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Enrich Company Data</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will use AI to enrich company addresses and phone numbers for all eligible contacts in this campaign.
+              Only contacts that are eligible, validated, and not suppressed will be processed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-2">
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
+              <span>AI will enrich HQ addresses (Address 1-3, City, State, Postal Code)</span>
+            </div>
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
+              <span>AI will enrich company phone numbers</span>
+            </div>
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
+              <span>Processing occurs in batches with rate limiting</span>
+            </div>
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
+              <span>Only high-confidence results (≥70%) will be saved</span>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-enrichment">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleEnrichCompanyData}
+              disabled={enrichmentMutation.isPending}
+              data-testid="button-confirm-enrichment"
+            >
+              {enrichmentMutation.isPending ? "Enriching..." : "Start Enrichment"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

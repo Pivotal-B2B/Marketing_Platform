@@ -23,7 +23,8 @@ interface EnrichmentResult {
   phone?: string;
   addressError?: string;
   phoneError?: string;
-  confidence?: number;
+  addressConfidence?: number;
+  phoneConfidence?: number;
 }
 
 /**
@@ -33,15 +34,17 @@ interface EnrichmentResult {
 export class CompanyEnrichmentService {
   /**
    * Determines if a contact needs address enrichment
+   * Returns true if ANY required address field is missing
    */
   static needsAddressEnrichment(contact: Partial<VerificationContact>): boolean {
-    const hasHqAddress = !!(
-      contact.hqAddress1 ||
-      contact.hqCity ||
-      contact.hqState ||
+    // Require ALL essential fields to be present for a complete address
+    const hasCompleteAddress = !!(
+      contact.hqAddress1 &&
+      contact.hqCity &&
+      contact.hqState &&
       contact.hqPostal
     );
-    return !hasHqAddress;
+    return !hasCompleteAddress;
   }
 
   /**
@@ -127,7 +130,8 @@ CRITICAL REQUIREMENTS:
 - Never fabricate or guess information
 - Ensure country-specific formatting for addresses and phone numbers
 - Extract precise details when available
-- Return confidence score based on data certainty
+- Return SEPARATE confidence scores for address and phone data (0.0-1.0)
+- Confidence should reflect your certainty about THAT specific data type
 - For phone numbers, ONLY provide the main company phone in the specified country
 
 Output valid JSON only.`
@@ -154,7 +158,6 @@ Output valid JSON only.`
       
       const result: EnrichmentResult = {
         success: false,
-        confidence: parsed.confidence || 0.8,
       };
 
       // Extract address if needed and found
@@ -163,11 +166,14 @@ Output valid JSON only.`
           const address = this.normalizeAddress(parsed.address, country);
           if (this.validateAddress(address, country)) {
             result.address = address;
+            result.addressConfidence = parsed.addressConfidence || parsed.confidence || 0.8;
           } else {
             result.addressError = "Extracted address failed validation";
+            result.addressConfidence = 0;
           }
         } else {
           result.addressError = parsed.addressReason || "Address not found in knowledge base";
+          result.addressConfidence = 0;
         }
       }
 
@@ -177,11 +183,14 @@ Output valid JSON only.`
           const phone = this.normalizePhone(parsed.phone, country);
           if (phone) {
             result.phone = phone;
+            result.phoneConfidence = parsed.phoneConfidence || parsed.confidence || 0.8;
           } else {
             result.phoneError = "Extracted phone failed normalization";
+            result.phoneConfidence = 0;
           }
         } else {
           result.phoneError = parsed.phoneReason || "Phone not found in knowledge base";
+          result.phoneConfidence = 0;
         }
       }
 
@@ -229,8 +238,8 @@ Output valid JSON only.`
 
     parts.push(`\nReturn JSON in this EXACT format:
 {
-  "confidence": 0.0-1.0,
   ${needsAddress ? `"addressFound": true/false,
+  "addressConfidence": 0.0-1.0,
   "addressReason": "explanation if not found or low confidence",
   "address": {
     "address1": "primary street address",
@@ -243,6 +252,7 @@ Output valid JSON only.`
     "country": "country name"
   },` : ''}
   ${needsPhone ? `"phoneFound": true/false,
+  "phoneConfidence": 0.0-1.0,
   "phoneReason": "explanation if not found",
   "phone": "main company phone number with country code"` : ''}
 }

@@ -19,6 +19,12 @@ interface EnrichmentProgress {
  * POST /api/verification-campaigns/:campaignId/enrich
  * Trigger AI enrichment for eligible contacts in a campaign
  * Enriches both address and phone number in a single operation
+ * 
+ * Features:
+ * - Separate confidence thresholds (≥0.7) for address and phone data
+ * - Only enriches incomplete data (missing any required field)
+ * - Preserves previously completed enrichments during errors
+ * - force=true: Re-enriches even completed data (use for data refresh)
  */
 router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) => {
   const { campaignId } = req.params;
@@ -33,7 +39,7 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
         id: verificationContacts.id,
         fullName: verificationContacts.fullName,
         accountId: verificationContacts.accountId,
-        accountName: sql<string>`a.name`.as('accountName'),
+        accountName: accounts.name,
         contactCountry: verificationContacts.contactCountry,
         hqCountry: verificationContacts.hqCountry,
         hqAddress1: verificationContacts.hqAddress1,
@@ -57,10 +63,10 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
 
     const eligibleContacts = await query;
 
-    // Filter contacts that need enrichment
+    // Filter contacts that need enrichment using service methods
     const contactsNeedingEnrichment = eligibleContacts.filter(contact => {
-      const needsAddress = !contact.hqAddress1 && !contact.hqCity;
-      const needsPhone = !contact.hqPhone;
+      const needsAddress = CompanyEnrichmentService.needsAddressEnrichment(contact);
+      const needsPhone = CompanyEnrichmentService.needsPhoneEnrichment(contact);
       
       if (force) {
         return needsAddress || needsPhone;
@@ -140,31 +146,47 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
               updatedAt: new Date(),
             };
 
-            // Handle address enrichment result
-            if (result.address) {
-              updateData.hqAddress1 = result.address.address1;
-              updateData.hqAddress2 = result.address.address2 || null;
-              updateData.hqAddress3 = result.address.address3 || null;
-              updateData.hqCity = result.address.city;
-              updateData.hqState = result.address.state;
-              updateData.hqPostal = result.address.postalCode;
-              updateData.hqCountry = result.address.country;
-              updateData.addressEnrichmentStatus = 'completed';
-              updateData.addressEnrichedAt = new Date();
-              updateData.addressEnrichmentError = null;
-              progress.addressEnriched++;
+            const CONFIDENCE_THRESHOLD = 0.7;
+
+            // Handle address enrichment result - only save if addressConfidence >= 0.7
+            if (result.address && result.addressConfidence !== undefined) {
+              if (result.addressConfidence >= CONFIDENCE_THRESHOLD) {
+                updateData.hqAddress1 = result.address.address1;
+                updateData.hqAddress2 = result.address.address2 || null;
+                updateData.hqAddress3 = result.address.address3 || null;
+                updateData.hqCity = result.address.city;
+                updateData.hqState = result.address.state;
+                updateData.hqPostal = result.address.postalCode;
+                updateData.hqCountry = result.address.country;
+                updateData.addressEnrichmentStatus = 'completed';
+                updateData.addressEnrichedAt = new Date();
+                updateData.addressEnrichmentError = null;
+                progress.addressEnriched++;
+                console.log(`[Enrichment] Address enriched for ${contact.fullName} (confidence: ${result.addressConfidence})`);
+              } else {
+                updateData.addressEnrichmentStatus = 'failed';
+                updateData.addressEnrichmentError = `Low confidence: ${result.addressConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;
+                console.log(`[Enrichment] Rejected low-confidence address for ${contact.fullName} (confidence: ${result.addressConfidence})`);
+              }
             } else if (result.addressError) {
               updateData.addressEnrichmentStatus = 'failed';
               updateData.addressEnrichmentError = result.addressError;
             }
 
-            // Handle phone enrichment result
-            if (result.phone) {
-              updateData.hqPhone = result.phone;
-              updateData.phoneEnrichmentStatus = 'completed';
-              updateData.phoneEnrichedAt = new Date();
-              updateData.phoneEnrichmentError = null;
-              progress.phoneEnriched++;
+            // Handle phone enrichment result - only save if phoneConfidence >= 0.7
+            if (result.phone && result.phoneConfidence !== undefined) {
+              if (result.phoneConfidence >= CONFIDENCE_THRESHOLD) {
+                updateData.hqPhone = result.phone;
+                updateData.phoneEnrichmentStatus = 'completed';
+                updateData.phoneEnrichedAt = new Date();
+                updateData.phoneEnrichmentError = null;
+                progress.phoneEnriched++;
+                console.log(`[Enrichment] Phone enriched for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
+              } else {
+                updateData.phoneEnrichmentStatus = 'failed';
+                updateData.phoneEnrichmentError = `Low confidence: ${result.phoneConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;
+                console.log(`[Enrichment] Rejected low-confidence phone for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
+              }
             } else if (result.phoneError) {
               updateData.phoneEnrichmentStatus = 'failed';
               updateData.phoneEnrichmentError = result.phoneError;
@@ -182,15 +204,24 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
           } catch (error: any) {
             console.error(`[Enrichment] Error processing contact ${contact.id}:`, error);
             
-            // Mark as failed
+            // Only mark as failed the enrichment types that were actually attempted
+            // This preserves previously completed enrichments
+            const errorUpdateData: any = {
+              updatedAt: new Date(),
+            };
+
+            if (CompanyEnrichmentService.needsAddressEnrichment(contact)) {
+              errorUpdateData.addressEnrichmentStatus = 'failed';
+              errorUpdateData.addressEnrichmentError = error.message;
+            }
+
+            if (CompanyEnrichmentService.needsPhoneEnrichment(contact)) {
+              errorUpdateData.phoneEnrichmentStatus = 'failed';
+              errorUpdateData.phoneEnrichmentError = error.message;
+            }
+
             await db.update(verificationContacts)
-              .set({
-                addressEnrichmentStatus: 'failed',
-                addressEnrichmentError: error.message,
-                phoneEnrichmentStatus: 'failed',
-                phoneEnrichmentError: error.message,
-                updatedAt: new Date(),
-              })
+              .set(errorUpdateData)
               .where(eq(verificationContacts.id, contact.id));
 
             progress.failed++;
