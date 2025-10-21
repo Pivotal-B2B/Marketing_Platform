@@ -48,6 +48,7 @@ export default function VerificationConsolePage() {
     verificationStatus: "",
     hasPhone: "",
     hasAddress: "",
+    hasCav: "",
   });
 
   const updateFilters = (newFilters: typeof filters) => {
@@ -78,6 +79,7 @@ export default function VerificationConsolePage() {
       if (filters.verificationStatus) params.append("verificationStatus", filters.verificationStatus);
       if (filters.hasPhone) params.append("hasPhone", filters.hasPhone);
       if (filters.hasAddress) params.append("hasAddress", filters.hasAddress);
+      if (filters.hasCav) params.append("hasCav", filters.hasCav);
       
       const url = `/api/verification-campaigns/${campaignId}/queue?${params.toString()}`;
       const res = await fetch(url, {
@@ -106,6 +108,7 @@ export default function VerificationConsolePage() {
       if (filters.verificationStatus) params.append("verificationStatus", filters.verificationStatus);
       if (filters.hasPhone) params.append("hasPhone", filters.hasPhone);
       if (filters.hasAddress) params.append("hasAddress", filters.hasAddress);
+      if (filters.hasCav) params.append("hasCav", filters.hasCav);
       
       const url = `/api/verification-campaigns/${campaignId}/queue/all-ids?${params.toString()}`;
       const res = await fetch(url, {
@@ -687,10 +690,26 @@ export default function VerificationConsolePage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label className="text-xs">CAV Status</Label>
+                    <Select
+                      value={filters.hasCav || "all"}
+                      onValueChange={(value) => updateFilters({ ...filters, hasCav: value === "all" ? "" : value })}
+                    >
+                      <SelectTrigger data-testid="select-has-cav">
+                        <SelectValue placeholder="All" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="yes">Has CAV</SelectItem>
+                        <SelectItem value="no">No CAV</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
-                    {(filters.contactSearch || filters.phoneSearch || filters.companySearch || filters.sourceType || filters.country || filters.eligibilityStatus || filters.emailStatus || filters.verificationStatus || filters.hasPhone || filters.hasAddress)
+                    {(filters.contactSearch || filters.phoneSearch || filters.companySearch || filters.sourceType || filters.country || filters.eligibilityStatus || filters.emailStatus || filters.verificationStatus || filters.hasPhone || filters.hasAddress || filters.hasCav)
                       ? "Filters active"
                       : "No filters applied"}
                   </p>
@@ -708,7 +727,8 @@ export default function VerificationConsolePage() {
                         emailStatus: "", 
                         verificationStatus: "",
                         hasPhone: "",
-                        hasAddress: ""
+                        hasAddress: "",
+                        hasCav: ""
                       });
                     }}
                     data-testid="button-clear-filters"

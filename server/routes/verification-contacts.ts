@@ -30,6 +30,7 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
     const verificationStatus = req.query.verificationStatus as string || "";
     const hasPhone = req.query.hasPhone as string || "";
     const hasAddress = req.query.hasAddress as string || "";
+    const hasCav = req.query.hasCav as string || "";
     
     const [campaign] = await db
       .select()
@@ -91,6 +92,12 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
       filterConditions.push(sql`c.contact_address1 IS NOT NULL AND c.contact_address1 != '' AND c.contact_city IS NOT NULL AND c.contact_city != ''`);
     } else if (hasAddress === 'no') {
       filterConditions.push(sql`(c.contact_address1 IS NULL OR c.contact_address1 = '' OR c.contact_city IS NULL OR c.contact_city = '')`);
+    }
+    
+    if (hasCav === 'yes') {
+      filterConditions.push(sql`((c.cav_id IS NOT NULL AND c.cav_id != '') OR (c.cav_user_id IS NOT NULL AND c.cav_user_id != ''))`);
+    } else if (hasCav === 'no') {
+      filterConditions.push(sql`((c.cav_id IS NULL OR c.cav_id = '') AND (c.cav_user_id IS NULL OR c.cav_user_id = ''))`);
     }
     
     const filterSQL = filterConditions.length > 0 
@@ -157,6 +164,7 @@ router.get("/api/verification-campaigns/:campaignId/queue/all-ids", async (req, 
     const verificationStatus = req.query.verificationStatus as string || "";
     const hasPhone = req.query.hasPhone as string || "";
     const hasAddress = req.query.hasAddress as string || "";
+    const hasCav = req.query.hasCav as string || "";
     
     const [campaign] = await db
       .select()
@@ -218,6 +226,12 @@ router.get("/api/verification-campaigns/:campaignId/queue/all-ids", async (req, 
       filterConditions.push(sql`c.contact_address1 IS NOT NULL AND c.contact_address1 != '' AND c.contact_city IS NOT NULL AND c.contact_city != ''`);
     } else if (hasAddress === 'no') {
       filterConditions.push(sql`(c.contact_address1 IS NULL OR c.contact_address1 = '' OR c.contact_city IS NULL OR c.contact_city = '')`);
+    }
+    
+    if (hasCav === 'yes') {
+      filterConditions.push(sql`((c.cav_id IS NOT NULL AND c.cav_id != '') OR (c.cav_user_id IS NOT NULL AND c.cav_user_id != ''))`);
+    } else if (hasCav === 'no') {
+      filterConditions.push(sql`((c.cav_id IS NULL OR c.cav_id = '') AND (c.cav_user_id IS NULL OR c.cav_user_id = ''))`);
     }
     
     const filterSQL = filterConditions.length > 0 

@@ -203,6 +203,12 @@ export async function processUpload(jobId: string) {
               continue;
             }
 
+            if (!row.contactCountry) {
+              errorCount++;
+              errors.push({ row: globalIndex + 1, message: 'Missing Contact Country - required field' });
+              continue;
+            }
+
             const accountNameCsv = row.account_name || row.companyName || null;
             const domainValue = (row.domain || row.companyDomain || null)?.toLowerCase() || null;
             const emailDomain = row.email ? normalize.extractDomain(row.email) : null;
