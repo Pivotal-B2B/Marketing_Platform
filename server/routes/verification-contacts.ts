@@ -663,7 +663,8 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", asyn
     
     const { contactIds, reason } = bulkDeleteSchema.parse(req.body);
     
-    const allowClientProvidedDelete = process.env.ALLOW_CLIENT_PROVIDED_DELETE === 'true';
+    const isAdmin = req.user?.role === 'admin' || req.user?.roles?.includes('admin');
+    const allowClientProvidedDelete = process.env.ALLOW_CLIENT_PROVIDED_DELETE === 'true' || isAdmin;
     
     const result = await db.execute(sql`
       UPDATE verification_contacts c
