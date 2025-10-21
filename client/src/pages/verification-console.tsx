@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -17,6 +18,13 @@ export default function VerificationConsolePage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [currentContactId, setCurrentContactId] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    contactSearch: "",
+    companySearch: "",
+    sourceType: "",
+    suppressionStatus: "",
+  });
 
   const { data: campaign } = useQuery({
     queryKey: ["/api/verification-campaigns", campaignId],
@@ -28,7 +36,7 @@ export default function VerificationConsolePage() {
   });
 
   const { data: queue, isLoading: queueLoading } = useQuery({
-    queryKey: ["/api/verification-campaigns", campaignId, "queue"],
+    queryKey: ["/api/verification-campaigns", campaignId, "queue", filters],
     enabled: !currentContactId,
   });
 
@@ -198,12 +206,101 @@ export default function VerificationConsolePage() {
       {!currentContactId ? (
         <Card>
           <CardHeader>
-            <CardTitle>Verification Queue</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {queueLoading ? "Loading..." : `${(queue as any)?.total || 0} contacts ready for verification`}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Verification Queue</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {queueLoading ? "Loading..." : `${(queue as any)?.total || 0} contacts ready for verification`}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                data-testid="button-toggle-filters"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                {showFilters ? "Hide" : "Show"} Filters
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
+            {showFilters && (
+              <div className="mb-4 p-4 border rounded-md bg-muted/50 space-y-4">
+                <div className="grid grid-cols-4 gap-4">
+                  <div>
+                    <Label className="text-xs">Contact Search</Label>
+                    <Input
+                      placeholder="Name or email..."
+                      value={filters.contactSearch}
+                      onChange={(e) => setFilters({ ...filters, contactSearch: e.target.value })}
+                      data-testid="input-contact-search"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Company Search</Label>
+                    <Input
+                      placeholder="Company name..."
+                      value={filters.companySearch}
+                      onChange={(e) => setFilters({ ...filters, companySearch: e.target.value })}
+                      data-testid="input-company-search"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Source Type</Label>
+                    <Select
+                      value={filters.sourceType || "all"}
+                      onValueChange={(value) => setFilters({ ...filters, sourceType: value === "all" ? "" : value })}
+                    >
+                      <SelectTrigger data-testid="select-source-type">
+                        <SelectValue placeholder="All sources" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All sources</SelectItem>
+                        <SelectItem value="New_Sourced">New Sourced</SelectItem>
+                        <SelectItem value="Existing_Contact">Existing Contact</SelectItem>
+                        <SelectItem value="ZoomInfo">ZoomInfo</SelectItem>
+                        <SelectItem value="Upload">Upload</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Suppression Status</Label>
+                    <Select
+                      value={filters.suppressionStatus || "all"}
+                      onValueChange={(value) => setFilters({ ...filters, suppressionStatus: value === "all" ? "" : value })}
+                    >
+                      <SelectTrigger data-testid="select-suppression-status">
+                        <SelectValue placeholder="All" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="matched">Suppressed</SelectItem>
+                        <SelectItem value="unmatched">Not Suppressed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {(filters.contactSearch || filters.companySearch || filters.sourceType || filters.suppressionStatus)
+                      ? "Filters active"
+                      : "No filters applied"}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFilters({ contactSearch: "", companySearch: "", sourceType: "", suppressionStatus: "" });
+                    }}
+                    data-testid="button-clear-filters"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+            )}
             {queueLoading ? (
               <div className="text-muted-foreground" data-testid="text-loading">Loading queue...</div>
             ) : (queue as any)?.data && (queue as any).data.length > 0 ? (

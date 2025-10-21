@@ -18,6 +18,10 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
   try {
     const { campaignId } = req.params;
     const limit = Number(req.query.limit) || 50;
+    const contactSearch = req.query.contactSearch as string || "";
+    const companySearch = req.query.companySearch as string || "";
+    const sourceType = req.query.sourceType as string || "";
+    const suppressionStatus = req.query.suppressionStatus as string || "";
     
     const [campaign] = await db
       .select()
@@ -30,6 +34,30 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
     
     const cap = campaign.leadCapPerAccount;
     
+    // Build dynamic filter conditions
+    const filterConditions = [];
+    
+    if (contactSearch) {
+      filterConditions.push(sql`(
+        LOWER(c.full_name) LIKE ${`%${contactSearch.toLowerCase()}%`}
+        OR LOWER(c.email) LIKE ${`%${contactSearch.toLowerCase()}%`}
+      )`);
+    }
+    
+    if (sourceType) {
+      filterConditions.push(sql`c.source_type = ${sourceType}`);
+    }
+    
+    if (suppressionStatus === 'matched') {
+      filterConditions.push(sql`c.suppressed = TRUE`);
+    } else if (suppressionStatus === 'unmatched') {
+      filterConditions.push(sql`c.suppressed = FALSE`);
+    }
+    
+    const filterSQL = filterConditions.length > 0 
+      ? sql`AND ${sql.join(filterConditions, sql` AND `)}`
+      : sql``;
+    
     const queueItems = await db.execute(sql`
       WITH next_batch AS (
         SELECT c.id
@@ -37,12 +65,16 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
         WHERE c.campaign_id = ${campaignId}
           AND c.eligibility_status = 'Eligible'
           AND c.verification_status = 'Pending'
-          AND c.suppressed = FALSE
+          ${suppressionStatus === 'matched' || suppressionStatus === 'unmatched' ? sql`` : sql`AND c.suppressed = FALSE`}
           AND c.in_submission_buffer = FALSE
           AND (
             SELECT COUNT(*) FROM verification_lead_submissions s
             WHERE s.account_id = c.account_id AND s.campaign_id = ${campaignId}
           ) < ${cap}
+          ${filterSQL}
+          ${companySearch ? sql`AND c.account_id IN (
+            SELECT id FROM accounts WHERE LOWER(name) LIKE ${`%${companySearch.toLowerCase()}%`}
+          )` : sql``}
         ORDER BY c.priority_score DESC NULLS LAST, c.updated_at ASC
         LIMIT ${limit}
         FOR UPDATE SKIP LOCKED
