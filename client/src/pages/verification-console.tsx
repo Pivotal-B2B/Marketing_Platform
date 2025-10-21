@@ -10,6 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -19,6 +29,8 @@ export default function VerificationConsolePage() {
   const { toast } = useToast();
   const [currentContactId, setCurrentContactId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<{ id: string; name: string; accountId?: string; accountName?: string } | null>(null);
   const [filters, setFilters] = useState({
     contactSearch: "",
     companySearch: "",
@@ -108,14 +120,29 @@ export default function VerificationConsolePage() {
       const res = await apiRequest("DELETE", `/api/verification-contacts/${contactId}`, undefined);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, contactId) => {
       toast({
         title: "Contact deleted",
         description: "Contact has been removed from the queue",
       });
       setCurrentContactId(null);
+      setDeleteDialogOpen(false);
+      setContactToDelete(null);
+      
+      queryClient.removeQueries({ queryKey: ["/api/verification-contacts", contactId] });
       queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
       queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+      
+      if (contactToDelete?.accountId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/verification-contacts/account", contactToDelete.accountId, { campaignId }] 
+        });
+      }
+      if (contactToDelete?.accountName) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/verification-campaigns", campaignId, "accounts", contactToDelete.accountName, "cap"] 
+        });
+      }
     },
     onError: () => {
       toast({
@@ -123,6 +150,8 @@ export default function VerificationConsolePage() {
         description: "Failed to delete contact",
         variant: "destructive",
       });
+      setDeleteDialogOpen(false);
+      setContactToDelete(null);
     },
   });
 
@@ -378,17 +407,37 @@ export default function VerificationConsolePage() {
                           </Badge>
                         </td>
                         <td className="p-3 text-right">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCurrentContactId(contact.id);
-                            }}
-                            data-testid={`button-view-${index}`}
-                          >
-                            View Details
-                          </Button>
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentContactId(contact.id);
+                              }}
+                              data-testid={`button-view-${index}`}
+                            >
+                              View Details
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setContactToDelete({
+                                  id: contact.id,
+                                  name: contact.full_name || contact.fullName || "this contact",
+                                  accountId: contact.account_id || contact.accountId,
+                                  accountName: contact.account_name || contact.accountName,
+                                });
+                                setDeleteDialogOpen(true);
+                              }}
+                              disabled={deleteMutation.isPending}
+                              data-testid={`button-delete-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -608,9 +657,13 @@ export default function VerificationConsolePage() {
                 <Button
                   variant="destructive"
                   onClick={() => {
-                    if (confirm("Are you sure you want to delete this contact?")) {
-                      deleteMutation.mutate(currentContactId!);
-                    }
+                    setContactToDelete({
+                      id: currentContactId!,
+                      name: (contact as any)?.full_name || (contact as any)?.fullName || "this contact",
+                      accountId: (contact as any)?.account_id || (contact as any)?.accountId,
+                      accountName: (contact as any)?.account_name || (contact as any)?.accountName,
+                    });
+                    setDeleteDialogOpen(true);
                   }}
                   disabled={deleteMutation.isPending}
                   data-testid="button-delete-contact"
@@ -694,6 +747,32 @@ export default function VerificationConsolePage() {
           )}
         </div>
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Contact</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {contactToDelete?.name}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (contactToDelete) {
+                  deleteMutation.mutate(contactToDelete.id);
+                }
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
