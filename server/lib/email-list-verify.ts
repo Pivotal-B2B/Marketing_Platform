@@ -36,17 +36,39 @@ export interface EmailVerificationResult {
 
 /**
  * Map Email List Verify status to our internal status enum
+ * ELV returns plain text status codes like: ok, invalid, invalid_mx, disposable, etc.
  */
 function mapElvStatusToInternal(elvStatus: string): EmailVerificationStatus {
-  const statusLower = elvStatus.toLowerCase();
+  const statusLower = elvStatus.toLowerCase().trim();
   
-  // ELV returns: ok, invalid, unknown, email_disabled, disposable, catch_all, etc.
+  // OK statuses
   if (statusLower === 'ok' || statusLower === 'valid') return 'ok';
-  if (statusLower === 'invalid' || statusLower === 'email_disabled') return 'invalid';
-  if (statusLower === 'disposable' || statusLower === 'temporary') return 'disposable';
-  if (statusLower === 'catch_all' || statusLower === 'accept_all') return 'accept_all';
-  if (statusLower === 'risky' || statusLower === 'role' || statusLower === 'complainer') return 'risky';
   
+  // Invalid statuses (syntax, domain, or mailbox issues)
+  if (statusLower === 'invalid' || 
+      statusLower === 'invalid_mx' || 
+      statusLower === 'invalid_email' ||
+      statusLower === 'email_disabled' ||
+      statusLower === 'failed_syntax_check' ||
+      statusLower === 'failed_smtp_check') return 'invalid';
+  
+  // Disposable/temporary email services
+  if (statusLower === 'disposable' || 
+      statusLower === 'temporary' ||
+      statusLower === 'disposable_email') return 'disposable';
+  
+  // Catch-all / Accept-all domains
+  if (statusLower === 'catch_all' || 
+      statusLower === 'accept_all' ||
+      statusLower === 'unknown_email') return 'accept_all';
+  
+  // Risky (role-based, complainers, etc.)
+  if (statusLower === 'risky' || 
+      statusLower === 'role' || 
+      statusLower === 'complainer' ||
+      statusLower === 'spamtrap') return 'risky';
+  
+  // Everything else
   return 'unknown';
 }
 
@@ -76,24 +98,25 @@ export async function verifyEmail(email: string): Promise<EmailVerificationResul
     const data = response.data;
     
     // Parse ELV response format
-    // Example response: {"status":"ok","email":"[email protected]","syntax_error":false,"domain":"example.com",...}
-    const status = mapElvStatusToInternal(data.status || 'unknown');
+    // Email List Verify returns plain text status codes like: "ok", "invalid", "invalid_mx", "disposable", etc.
+    const statusText = typeof data === 'string' ? data.trim() : (data.status || 'unknown');
+    const status = mapElvStatusToInternal(statusText);
     
     return {
       email: emailTrimmed,
       status,
       details: {
-        syntax: !data.syntax_error,
-        domain: data.domain_check !== false,
-        smtp: data.smtp_check !== false,
-        catch_all: data.catch_all === true,
-        disposable: data.disposable === true || data.temporary === true,
-        free: data.free === true,
-        role: data.role === true,
+        syntax: typeof data === 'object' ? !data.syntax_error : true,
+        domain: typeof data === 'object' ? (data.domain_check !== false) : (status !== 'invalid'),
+        smtp: typeof data === 'object' ? (data.smtp_check !== false) : (status === 'ok'),
+        catch_all: typeof data === 'object' ? (data.catch_all === true) : (status === 'accept_all'),
+        disposable: typeof data === 'object' ? (data.disposable === true || data.temporary === true) : (status === 'disposable'),
+        free: typeof data === 'object' ? (data.free === true) : false,
+        role: typeof data === 'object' ? (data.role === true) : false,
       },
-      reason: data.reason || data.error || undefined,
+      reason: typeof data === 'object' ? (data.reason || data.error) : statusText,
       provider: 'emaillistverify',
-      rawResponse: data,
+      rawResponse: typeof data === 'string' ? { status: data } : data,
       checkedAt: new Date(),
     };
   } catch (error: any) {
