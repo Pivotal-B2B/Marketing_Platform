@@ -13,6 +13,7 @@ import { z } from "zod";
 import { evaluateEligibility, computeNormalizedKeys } from "../lib/verification-utils";
 import { applySuppressionForContacts } from "../lib/verification-suppression";
 import { requireAuth } from "../auth";
+import { exportVerificationContactsToCsv, createCsvDownloadResponse } from "../lib/csv-export";
 
 const router = Router();
 
@@ -1099,6 +1100,51 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
     res.status(500).json({ error: "Failed to bulk enrich contacts" });
+  }
+});
+
+// CSV Export endpoint
+router.get("/api/verification-campaigns/:campaignId/contacts/export/csv", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const includeCompanyFields = req.query.includeCompany !== 'false';
+    
+    // Fetch all contacts for the campaign with account data
+    const contactsData = await db
+      .select({
+        contact: verificationContacts,
+        account: accounts,
+      })
+      .from(verificationContacts)
+      .leftJoin(accounts, eq(verificationContacts.accountId, accounts.id))
+      .where(eq(verificationContacts.campaignId, campaignId))
+      .orderBy(desc(verificationContacts.createdAt));
+    
+    // Transform data to include account info
+    const contacts = contactsData.map(row => ({
+      ...row.contact,
+      account: row.account || undefined,
+    }));
+    
+    // Generate CSV with UTF-8 BOM and proper formatting
+    const csvContent = exportVerificationContactsToCsv(contacts, includeCompanyFields);
+    
+    // Create download response with proper headers
+    const { content, headers } = createCsvDownloadResponse(
+      csvContent,
+      `verification-contacts-${campaignId}-${new Date().toISOString().split('T')[0]}.csv`
+    );
+    
+    // Set headers
+    Object.entries(headers).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+    
+    // Send the file
+    res.send(content);
+  } catch (error) {
+    console.error("Error exporting contacts to CSV:", error);
+    res.status(500).json({ error: "Failed to export contacts" });
   }
 });
 

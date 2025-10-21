@@ -391,11 +391,11 @@ export const accounts = pgTable("accounts", {
   industryAiReviewedAt: timestamp("industry_ai_reviewed_at"),
   industryAiStatus: industryAIStatusEnum("industry_ai_status"),
 
-  annualRevenue: text("annual_revenue"),
+  annualRevenue: numeric("annual_revenue", { precision: 20, scale: 2 }), // UPDATED: numeric(20,2) to avoid scientific notation
   revenueRange: revenueRangeEnum("revenue_range"), // Pivotal Template: "$500M - $1B", "$1B+", etc.
   employeesSizeRange: staffCountRangeEnum("employees_size_range"), // Pivotal Template: "501-1000", "10000+", etc.
   staffCount: integer("staff_count"),
-  description: text("description"),
+  description: text("description"), // Multiline text with UTF-8 support
 
   // Pivotal B2B Standard Template - Company Location Fields
   hqStreet1: text("hq_street_1"),
@@ -410,10 +410,13 @@ export const accounts = pgTable("accounts", {
   companyLocation: text("company_location"), // Formatted: "5420 Wade Park Boulevard, Raleigh, NC 27607, United States"
 
   yearFounded: integer("year_founded"),
+  foundedDate: date("founded_date"), // NEW: YYYY-MM-DD or YYYY only
+  foundedDatePrecision: text("founded_date_precision"), // NEW: 'year' or 'full'
   sicCode: text("sic_code"),
   naicsCode: text("naics_code"),
   domain: text("domain"),
   domainNormalized: text("domain_normalized"),
+  websiteDomain: text("website_domain"), // NEW: Normalized naked domain (e.g., aircanada.com)
   previousNames: text("previous_names").array(),
   linkedinUrl: text("linkedin_url"),
   linkedinId: text("linkedin_id"), // LinkedIn numeric ID
@@ -423,6 +426,8 @@ export const accounts = pgTable("accounts", {
   mainPhoneExtension: text("main_phone_extension"),
   intentTopics: text("intent_topics").array(),
   techStack: text("tech_stack").array(),
+  webTechnologies: text("web_technologies"), // NEW: BuiltWith URL or comma-separated list
+  webTechnologiesJson: jsonb("web_technologies_json"), // NEW: Normalized array for filtering
   parentAccountId: varchar("parent_account_id"),
   tags: text("tags").array(),
   ownerId: varchar("owner_id").references(() => users.id),
@@ -493,8 +498,10 @@ export const contacts = pgTable("contacts", {
 
   // Career & Tenure fields (Pivotal B2B Standard Template)
   formerPosition: text("former_position"),
-  timeInCurrentPosition: text("time_in_current_position"), // e.g., "2 years"
-  timeInCurrentCompany: text("time_in_current_company"), // e.g., "4 years"
+  timeInCurrentPosition: text("time_in_current_position"), // e.g., "2 years" (raw string)
+  timeInCurrentPositionMonths: integer("time_in_current_position_months"), // NEW: Computed shadow field for filtering/sorting
+  timeInCurrentCompany: text("time_in_current_company"), // e.g., "4 years" (raw string)
+  timeInCurrentCompanyMonths: integer("time_in_current_company_months"), // NEW: Computed shadow field for filtering/sorting
   intentTopics: text("intent_topics").array(),
   tags: text("tags").array(),
   consentBasis: text("consent_basis"),
@@ -3455,6 +3462,13 @@ export const verificationContacts = pgTable("verification_contacts", {
   phone: text("phone"),
   mobile: text("mobile"),
   linkedinUrl: text("linkedin_url"),
+  
+  // Career & Tenure fields (matching contacts table)
+  formerPosition: text("former_position"),
+  timeInCurrentPosition: text("time_in_current_position"),
+  timeInCurrentPositionMonths: integer("time_in_current_position_months"),
+  timeInCurrentCompany: text("time_in_current_company"),
+  timeInCurrentCompanyMonths: integer("time_in_current_company_months"),
 
   contactAddress1: text("contact_address1"),
   contactAddress2: text("contact_address2"),

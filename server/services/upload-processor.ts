@@ -4,6 +4,14 @@ import { eq, and, sql } from 'drizzle-orm';
 import Papa from 'papaparse';
 import { evaluateEligibility, checkSuppression, computeNormalizedKeys, normalize } from '../lib/verification-utils';
 import { getMatchTypeAndConfidence, normalizeDomain, extractRootDomain } from '@shared/domain-utils';
+import {
+  normalizeDomain as normalizeWebDomain,
+  normalizeLinkedInUrl,
+  parseWebTechnologies,
+  parseDurationToMonths,
+  parseFoundedDate,
+  validateAnnualRevenue
+} from '../lib/data-normalization';
 
 interface CSVRow {
   fullName?: string;
@@ -14,6 +22,9 @@ interface CSVRow {
   phone?: string;
   mobile?: string;
   linkedinUrl?: string;
+  formerPosition?: string;
+  timeInCurrentPosition?: string;
+  timeInCurrentCompany?: string;
   contactAddress1?: string;
   contactAddress2?: string;
   contactAddress3?: string;
@@ -36,6 +47,19 @@ interface CSVRow {
   cavId?: string;
   cavUserId?: string;
   sourceType?: string;
+  
+  // NEW: Company custom fields
+  annualRevenue?: string;
+  revenueRange?: string;
+  staffCountRange?: string;
+  description?: string;
+  websiteDomain?: string;
+  foundedDate?: string;
+  industry?: string;
+  linkedinId?: string;
+  webTechnologies?: string;
+  sicCode?: string;
+  naicsCode?: string;
 }
 
 const BATCH_SIZE = 50;
@@ -112,6 +136,56 @@ const autoMappings: Record<string, string> = {
   'sourcetype': 'sourceType',
   'source_type': 'sourceType',
   'source': 'sourceType',
+  
+  // NEW: Contact career fields
+  'formerposition': 'formerPosition',
+  'former_position': 'formerPosition',
+  'previousposition': 'formerPosition',
+  'timeincurrentposition': 'timeInCurrentPosition',
+  'time_in_current_position': 'timeInCurrentPosition',
+  'positiontenure': 'timeInCurrentPosition',
+  'timeincurrentcompany': 'timeInCurrentCompany',
+  'time_in_current_company': 'timeInCurrentCompany',
+  'companytenure': 'timeInCurrentCompany',
+  'tenure': 'timeInCurrentCompany',
+  
+  // NEW: Company custom fields
+  'annualrevenue': 'annualRevenue',
+  'annual_revenue': 'annualRevenue',
+  'revenue': 'annualRevenue',
+  'revenuerange': 'revenueRange',
+  'revenue_range': 'revenueRange',
+  'staffcountrange': 'staffCountRange',
+  'staff_count_range': 'staffCountRange',
+  'employeesizerange': 'staffCountRange',
+  'employee_size_range': 'staffCountRange',
+  'description': 'description',
+  'companydescription': 'description',
+  'company_description': 'description',
+  'websitedomain': 'websiteDomain',
+  'website_domain': 'websiteDomain',
+  'foundeddate': 'foundedDate',
+  'founded_date': 'foundedDate',
+  'founded': 'foundedDate',
+  'yearfounded': 'foundedDate',
+  'industry': 'industry',
+  'companyindustry': 'industry',
+  'company_industry': 'industry',
+  'linkedinid': 'linkedinId',
+  'linkedin_id': 'linkedinId',
+  'companylinkedinid': 'linkedinId',
+  'company_linkedin_id': 'linkedinId',
+  'webtechnologies': 'webTechnologies',
+  'web_technologies': 'webTechnologies',
+  'technologies': 'webTechnologies',
+  'techstack': 'webTechnologies',
+  'tech_stack': 'webTechnologies',
+  'siccode': 'sicCode',
+  'sic_code': 'sicCode',
+  'sic': 'sicCode',
+  'naicscode': 'naicsCode',
+  'naics_code': 'naicsCode',
+  'naics': 'naicsCode',
 };
 
 export async function processUpload(jobId: string) {
@@ -301,6 +375,13 @@ export async function processUpload(jobId: string) {
               }
 
               if (!accountId) {
+                // Parse and normalize new company custom fields
+                const normalizedWebDomain = normalizeWebDomain(row.websiteDomain || row.domain);
+                const normalizedLinkedInUrl = normalizeLinkedInUrl(row.linkedinUrl);
+                const webTechParsed = parseWebTechnologies(row.webTechnologies);
+                const foundedDateParsed = parseFoundedDate(row.foundedDate);
+                const validatedRevenue = validateAnnualRevenue(row.annualRevenue);
+                
                 const newAccount = await tx.insert(accounts).values({
                   name: accountNameCsv ?? (rootDomain ? rootDomain.split('.')[0] : 'Unknown Company'),
                   domain: rootDomain,
@@ -312,6 +393,19 @@ export async function processUpload(jobId: string) {
                   hqState: row.hqState ?? null,
                   hqPostalCode: row.hqPostal ?? null,
                   hqCountry: row.hqCountry ?? null,
+                  // NEW: Company custom fields
+                  annualRevenue: validatedRevenue,
+                  description: row.description ?? null,
+                  websiteDomain: normalizedWebDomain,
+                  foundedDate: foundedDateParsed.date ? new Date(foundedDateParsed.date) : null,
+                  foundedDatePrecision: foundedDateParsed.precision,
+                  industry: row.industry ?? null,
+                  linkedinId: row.linkedinId ?? null,
+                  linkedinUrl: normalizedLinkedInUrl,
+                  webTechnologies: webTechParsed.raw,
+                  webTechnologiesJson: webTechParsed.json,
+                  sicCode: row.sicCode ?? null,
+                  naicsCode: row.naicsCode ?? null,
                 }).returning();
                 accountId = newAccount[0].id;
                 accountData = newAccount[0];
@@ -493,6 +587,10 @@ export async function processUpload(jobId: string) {
                   .where(eq(verificationContacts.id, existingContact.id));
               }
             } else {
+              // Parse duration fields to months
+              const positionMonths = parseDurationToMonths(row.timeInCurrentPosition);
+              const companyMonths = parseDurationToMonths(row.timeInCurrentCompany);
+              
               await tx.insert(verificationContacts).values({
                 campaignId,
                 accountId,
@@ -505,6 +603,12 @@ export async function processUpload(jobId: string) {
                 phone: contactPhone,
                 mobile: row.mobile || null,
                 linkedinUrl: row.linkedinUrl || null,
+                // NEW: Career & tenure fields
+                formerPosition: row.formerPosition || null,
+                timeInCurrentPosition: row.timeInCurrentPosition || null,
+                timeInCurrentPositionMonths: positionMonths,
+                timeInCurrentCompany: row.timeInCurrentCompany || null,
+                timeInCurrentCompanyMonths: companyMonths,
                 contactAddress1,
                 contactAddress2,
                 contactAddress3,
