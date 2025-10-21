@@ -1049,18 +1049,19 @@ export default function VerificationConsolePage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Enrich Company Data</AlertDialogTitle>
             <AlertDialogDescription>
-              This will use AI to enrich company addresses and phone numbers for all eligible contacts in this campaign.
+              This will use AI to find and enrich LOCAL office addresses and phone numbers based on each contact's location.
+              The system searches for regional/local office information in the contact's country, not global HQ data.
               Only contacts that are eligible, validated, and not suppressed will be processed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4 space-y-2">
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
-              <span>AI will enrich HQ addresses (Address 1-3, City, State, Postal Code)</span>
+              <span>AI searches for LOCAL office in contact's country (e.g., "Company Name Singapore office address phone")</span>
             </div>
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
-              <span>AI will enrich company phone numbers</span>
+              <span>Enriches local address (Address 1-3, City, State, Postal Code) and local phone number</span>
             </div>
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />

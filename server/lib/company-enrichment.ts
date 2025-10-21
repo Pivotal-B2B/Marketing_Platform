@@ -29,7 +29,8 @@ interface EnrichmentResult {
 
 /**
  * AI-powered company data enrichment service
- * Enriches both HQ address and company phone number in a single operation
+ * Enriches LOCAL office address and phone number based on contact's location
+ * Searches for regional/local office information, not global HQ
  */
 export class CompanyEnrichmentService {
   /**
@@ -55,10 +56,11 @@ export class CompanyEnrichmentService {
   }
 
   /**
-   * Enriches both address AND phone for a company in a single AI request
-   * @param contact - The contact to enrich
+   * Enriches both address AND phone for a company's LOCAL office in a single AI request
+   * Searches for regional/local office data based on contact's country
+   * @param contact - The contact to enrich (must have contactCountry)
    * @param accountName - The company name
-   * @returns EnrichmentResult with structured address and phone data
+   * @returns EnrichmentResult with structured LOCAL office address and phone data
    */
   static async enrichCompanyData(
     contact: Partial<VerificationContact>,
@@ -123,16 +125,19 @@ export class CompanyEnrichmentService {
         messages: [
           {
             role: "system",
-            content: `You are a precise company data extraction expert. Your task is to find and extract accurate, official company information based on your training data knowledge.
+            content: `You are a precise company data extraction expert. Your task is to find and extract accurate, official LOCAL/REGIONAL company office information based on your training data knowledge.
 
 CRITICAL REQUIREMENTS:
+- Find the company's LOCAL office/branch in the SPECIFIED COUNTRY
+- Do NOT return global HQ information unless it's located in the specified country
+- Search for: "Company Name" + "Country" + "Address" + "Phone Number"
 - Only return REAL, VERIFIABLE data from your knowledge base
 - Never fabricate or guess information
 - Ensure country-specific formatting for addresses and phone numbers
-- Extract precise details when available
 - Return SEPARATE confidence scores for address and phone data (0.0-1.0)
 - Confidence should reflect your certainty about THAT specific data type
-- For phone numbers, ONLY provide the main company phone in the specified country
+- For phone numbers, ONLY provide the local office phone in the specified country
+- If the company has no presence in the specified country, mark as not found
 
 Output valid JSON only.`
           },
@@ -209,7 +214,8 @@ Output valid JSON only.`
   }
 
   /**
-   * Build GPT prompt for comprehensive company data extraction
+   * Build GPT prompt for LOCAL office company data extraction
+   * Searches for regional/local office information, not global HQ
    */
   private static buildEnrichmentPrompt(
     companyName: string,
@@ -219,21 +225,28 @@ Output valid JSON only.`
   ): string {
     const parts: string[] = [];
     
-    parts.push(`Find official company information for: "${companyName}" located in ${country}\n`);
+    parts.push(`Find the LOCAL OFFICE information for "${companyName}" in ${country}
+
+SEARCH STRATEGY:
+- Search for: "${companyName}" + "${country}" + "office" + "address" + "phone"
+- Find the company's regional/local office, branch, or subsidiary in ${country}
+- Do NOT return global headquarters unless it's located in ${country}
+- If the company has no presence in ${country}, mark as not found\n`);
 
     if (needsAddress) {
-      parts.push(`REQUIRED: Headquarters Address
-- Extract complete, accurate headquarters address
+      parts.push(`REQUIRED: Local Office Address in ${country}
+- Extract the complete, accurate address of the company's office/branch in ${country}
 - Include: Street (lines 1, 2, 3 if applicable), City, State/Province, Postal Code, Country
-- Use country-specific formatting`);
+- Use country-specific formatting
+- Must be physically located in ${country}`);
     }
 
     if (needsPhone) {
-      parts.push(`REQUIRED: Company Main Phone Number
-- Find the main company/headquarters phone number in ${country}
+      parts.push(`REQUIRED: Local Office Phone Number in ${country}
+- Find the local office phone number for the company's ${country} location
 - Format with country code and proper formatting
-- ONLY provide company main line, not individual departments
-- Must be for location in ${country}`);
+- ONLY provide the local office main line in ${country}
+- Do NOT provide global HQ phone unless HQ is in ${country}`);
     }
 
     parts.push(`\nReturn JSON in this EXACT format:
@@ -258,16 +271,20 @@ Output valid JSON only.`
 }
 
 CRITICAL REQUIREMENTS:
+- Find LOCAL office in ${country} - NOT global HQ (unless HQ is in ${country})
 - Only return data you are CERTAIN about from your training data
-- If uncertain about any field, mark that field as not found
+- If the company has no office/presence in ${country}, mark as not found
 - Use proper country-specific formatting:
   * USA: State abbr (CA, NY), 5-digit ZIP, phone: +1-XXX-XXX-XXXX
   * UK: Postal codes (SW1A 1AA), phone: +44-XXXX-XXXXXX
   * Canada: Province (ON, BC), postal (A1A 1A1), phone: +1-XXX-XXX-XXXX
+  * Singapore: Postal codes (6 digits), phone: +65-XXXX-XXXX
+  * Vietnam: Province/City, phone: +84-XX-XXXX-XXXX
   * Other: Follow local standards
-- For phone: Only provide main company number for ${country} location
-- Confidence 0.9+ = official/verified data
-- Confidence 0.7-0.9 = high likelihood but not fully verified
+- For address and phone: Must be for ${country} location specifically
+- Search hint: Look for "${companyName} ${country} office address phone"
+- Confidence 0.9+ = official/verified LOCAL office data
+- Confidence 0.7-0.9 = high likelihood LOCAL office but not fully verified
 - Below 0.7 = mark as not found`);
 
     return parts.join('\n\n');
@@ -329,6 +346,29 @@ CRITICAL REQUIREMENTS:
       'India': '91',
       'China': '86',
       'Japan': '81',
+      'Singapore': '65',
+      'Vietnam': '84',
+      'Thailand': '66',
+      'Malaysia': '60',
+      'Indonesia': '62',
+      'Philippines': '63',
+      'South Korea': '82',
+      'Hong Kong': '852',
+      'Taiwan': '886',
+      'New Zealand': '64',
+      'Mexico': '52',
+      'Brazil': '55',
+      'Spain': '34',
+      'Italy': '39',
+      'Netherlands': '31',
+      'Switzerland': '41',
+      'Sweden': '46',
+      'Norway': '47',
+      'Denmark': '45',
+      'Poland': '48',
+      'UAE': '971',
+      'Saudi Arabia': '966',
+      'South Africa': '27',
       // Add more as needed
     };
     
