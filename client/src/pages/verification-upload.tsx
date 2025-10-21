@@ -327,11 +327,11 @@ export default function VerificationUploadPage() {
                       <li>Name + Country + Company (all three required)</li>
                       <li>If multiple matches found, will create new instead of updating</li>
                     </ol>
-                    <p className="mt-2"><strong>Update rules:</strong></p>
+                    <p className="mt-2"><strong>Update rules (strict):</strong></p>
                     <ul className="list-disc list-inside pl-2 space-y-1">
-                      <li>If CSV has CAV IDs → only CAV ID fields updated</li>
-                      <li>If DB has CAV IDs → all non-CAV fields updated</li>
-                      <li>If neither/both have CAV IDs → all fields updated</li>
+                      <li><strong>CSV has CAV IDs?</strong> → ONLY CAV ID fields updated</li>
+                      <li><strong>DB has CAV IDs (CSV doesn't)?</strong> → ALL non-CAV fields updated</li>
+                      <li><strong>Neither has CAV IDs?</strong> → ALL fields updated</li>
                       <li>Empty CSV values never overwrite existing data</li>
                     </ul>
                   </>

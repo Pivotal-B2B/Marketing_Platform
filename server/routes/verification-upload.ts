@@ -355,19 +355,19 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
           }
 
           if (existingContact) {
-            // Update existing contact based on CAV ID logic
+            // Update existing contact based on STRICT CAV ID logic
             const csvHasCavId = !!(row.cavId || row.cavUserId);
             const dbHasCavId = !!(existingContact.cavId || existingContact.cavUserId);
             
             const updateData: any = {};
             
-            if (csvHasCavId && !dbHasCavId) {
-              // CSV has CAV IDs but DB doesn't -> ONLY update CAV ID fields
+            // RULE 1: If CSV has CAV IDs → ONLY update CAV ID fields (regardless of DB)
+            if (csvHasCavId) {
               if (row.cavId) updateData.cavId = row.cavId;
               if (row.cavUserId) updateData.cavUserId = row.cavUserId;
               
-            } else if (!csvHasCavId && dbHasCavId) {
-              // DB has CAV IDs but CSV doesn't -> update ALL non-CAV fields
+            // RULE 2: Else if DB has CAV IDs → update ALL non-CAV fields
+            } else if (dbHasCavId) {
               // Only overwrite if CSV provides non-empty values
               if (row.firstName) updateData.firstName = row.firstName;
               if (row.lastName) updateData.lastName = row.lastName;
@@ -391,34 +391,8 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
               if (row.hqCountry) updateData.hqCountry = row.hqCountry;
               if (row.hqPostal) updateData.hqPostal = row.hqPostal;
               
-            } else if (csvHasCavId && dbHasCavId) {
-              // Both have CAV IDs -> update CAV IDs + all other fields with non-empty CSV values
-              if (row.cavId) updateData.cavId = row.cavId;
-              if (row.cavUserId) updateData.cavUserId = row.cavUserId;
-              if (row.firstName) updateData.firstName = row.firstName;
-              if (row.lastName) updateData.lastName = row.lastName;
-              if (row.title) updateData.title = row.title;
-              if (row.email) updateData.email = row.email;
-              if (row.phone) updateData.phone = row.phone;
-              if (row.mobile) updateData.mobile = row.mobile;
-              if (row.linkedinUrl) updateData.linkedinUrl = row.linkedinUrl;
-              if (contactAddress1) updateData.contactAddress1 = contactAddress1;
-              if (contactAddress2) updateData.contactAddress2 = contactAddress2;
-              if (contactAddress3) updateData.contactAddress3 = contactAddress3;
-              if (contactCity) updateData.contactCity = contactCity;
-              if (contactState) updateData.contactState = contactState;
-              if (row.contactCountry) updateData.contactCountry = row.contactCountry;
-              if (contactPostal) updateData.contactPostal = contactPostal;
-              if (row.hqAddress1) updateData.hqAddress1 = row.hqAddress1;
-              if (row.hqAddress2) updateData.hqAddress2 = row.hqAddress2;
-              if (row.hqAddress3) updateData.hqAddress3 = row.hqAddress3;
-              if (row.hqCity) updateData.hqCity = row.hqCity;
-              if (row.hqState) updateData.hqState = row.hqState;
-              if (row.hqCountry) updateData.hqCountry = row.hqCountry;
-              if (row.hqPostal) updateData.hqPostal = row.hqPostal;
-              
+            // RULE 3: Else (neither has CAV IDs) → update all fields
             } else {
-              // Neither has CAV IDs -> update all fields with non-empty CSV values
               if (row.firstName) updateData.firstName = row.firstName;
               if (row.lastName) updateData.lastName = row.lastName;
               if (row.title) updateData.title = row.title;
