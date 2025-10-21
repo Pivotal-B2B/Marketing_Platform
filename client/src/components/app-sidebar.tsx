@@ -194,13 +194,16 @@ const getNavSections = (): NavSection[] => [
     roles: ["admin", "data_ops", "quality_analyst"],
     items: [
       {
-        title: "Data Verification",
+        title: "Verification Campaigns",
+        url: "/verification/campaigns",
         icon: Database,
         roles: ["admin", "data_ops", "quality_analyst"],
-        items: [
-          { title: "Verification Campaigns", url: "/data-verification", roles: ["admin", "data_ops", "quality_analyst"] },
-          { title: "DV Projects", url: "/dv/projects", roles: ["admin", "data_ops", "quality_analyst"] },
-        ],
+      },
+      {
+        title: "DV Projects",
+        url: "/dv/projects",
+        icon: Briefcase,
+        roles: ["admin", "data_ops", "quality_analyst"],
       },
     ],
   },
