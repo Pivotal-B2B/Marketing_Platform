@@ -100,7 +100,10 @@ export function exportVerificationContactsToCsv(
       'First Name': contact.firstName || '',
       'Last Name': contact.lastName || '',
       'Title': contact.title || '',
+      'Department': contact.department || '',
+      'Seniority Level': contact.seniorityLevel || '',
       'Email': contact.email || '',
+      'Email Status': contact.emailStatus || '',
       'Phone': contact.phone || '',
       'Mobile': contact.mobile || '',
       'LinkedIn URL': contact.linkedinUrl || '',
@@ -153,7 +156,11 @@ export function exportVerificationContactsToCsv(
     }
 
     // Add verification status fields
+    row['Source Type'] = contact.sourceType || '';
     row['Eligibility Status'] = contact.eligibilityStatus || '';
+    row['Verification Status'] = contact.verificationStatus || '';
+    row['Queue Status'] = contact.queueStatus || '';
+    row['Enrichment Status'] = contact.enrichmentStatus || '';
     row['Suppressed'] = contact.suppressed ? 'Yes' : 'No';
     row['Email Verification Status'] = contact.emailVerificationStatus || '';
     row['CAV ID'] = contact.cavId || '';
