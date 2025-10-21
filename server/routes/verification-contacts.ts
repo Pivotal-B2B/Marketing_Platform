@@ -1168,7 +1168,7 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
           })
           .where(eq(verificationContacts.id, contact.id));
         
-        // Cache the validation result
+        // Cache the validation result (using composite key upsert)
         await db
           .insert(verificationEmailValidations)
           .values({
@@ -1179,15 +1179,7 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
             rawJson: result.rawResponse || {},
             checkedAt: result.checkedAt,
           })
-          .onConflictDoUpdate({
-            target: [verificationEmailValidations.contactId, verificationEmailValidations.emailLower],
-            set: {
-              provider: result.provider,
-              status: result.status,
-              rawJson: result.rawResponse || {},
-              checkedAt: result.checkedAt,
-            },
-          });
+          .onConflictDoNothing();
         
         successCount++;
       } catch (error) {

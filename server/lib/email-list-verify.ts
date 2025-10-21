@@ -70,7 +70,7 @@ export async function verifyEmail(email: string): Promise<EmailVerificationResul
         secret: ELV_API_KEY,
         email: emailTrimmed,
       },
-      timeout: 10000, // 10 second timeout
+      timeout: 30000, // 30 second timeout - some email verifications take longer
     });
 
     const data = response.data;
