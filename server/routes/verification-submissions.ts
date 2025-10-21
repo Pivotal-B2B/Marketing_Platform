@@ -89,6 +89,7 @@ router.get("/api/verification-campaigns/:campaignId/submission/export", async (r
       c.campaign_id = ${campaignId}
       AND c.eligibility_status = 'Eligible'
       AND c.suppressed = FALSE
+      AND c.deleted = FALSE
       AND c.email_status = 'ok'
       AND c.in_submission_buffer = TRUE
     `;

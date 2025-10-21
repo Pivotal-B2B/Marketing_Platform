@@ -4,10 +4,11 @@ import {
   verificationContacts,
   verificationCampaigns,
   verificationLeadSubmissions,
+  verificationAuditLog,
   accounts,
   insertVerificationContactSchema,
 } from "@shared/schema";
-import { eq, sql, and, desc } from "drizzle-orm";
+import { eq, sql, and, desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { evaluateEligibility, computeNormalizedKeys } from "../lib/verification-utils";
 import { applySuppressionForContacts } from "../lib/verification-suppression";
@@ -59,6 +60,7 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
           AND c.eligibility_status = 'Eligible'
           AND c.verification_status = 'Pending'
           AND c.suppressed = FALSE
+          AND c.deleted = FALSE
           AND c.in_submission_buffer = FALSE
           AND (
             SELECT COUNT(*) FROM verification_lead_submissions s
@@ -94,7 +96,12 @@ router.delete("/api/verification-contacts/:id", async (req, res) => {
     const { id } = req.params;
     
     const [deletedContact] = await db
-      .delete(verificationContacts)
+      .update(verificationContacts)
+      .set({ 
+        deleted: true, 
+        suppressed: true,
+        updatedAt: new Date()
+      })
       .where(eq(verificationContacts.id, id))
       .returning();
     
@@ -113,22 +120,28 @@ router.get("/api/verification-contacts/account/:accountId", async (req, res) => 
   try {
     const { accountId } = req.params;
     const campaignId = req.query.campaignId as string;
+    const includeSuppressed = req.query.includeSuppressed === 'true';
 
     if (!campaignId) {
       return res.status(400).json({ error: "campaignId query parameter is required" });
     }
 
+    const conditions = [
+      eq(verificationContacts.accountId, accountId),
+      eq(verificationContacts.campaignId, campaignId),
+      eq(verificationContacts.deleted, false),
+    ];
+
+    if (!includeSuppressed) {
+      conditions.push(eq(verificationContacts.suppressed, false));
+    }
+
     const contacts = await db
       .select()
       .from(verificationContacts)
-      .where(
-        and(
-          eq(verificationContacts.accountId, accountId),
-          eq(verificationContacts.campaignId, campaignId)
-        )
-      )
-      .orderBy(desc(verificationContacts.updatedAt))
-      .limit(20);
+      .where(and(...conditions))
+      .orderBy(desc(verificationContacts.verificationStatus), desc(verificationContacts.updatedAt))
+      .limit(200);
 
     res.json(contacts);
   } catch (error) {
@@ -178,6 +191,7 @@ router.post("/api/verification-contacts", async (req, res) => {
     
     const accountName = req.body.accountName;
     const normalizedKeys = computeNormalizedKeys({
+      email: validatedData.email,
       firstName: validatedData.firstName,
       lastName: validatedData.lastName,
       contactCountry: validatedData.contactCountry,
@@ -251,9 +265,10 @@ router.put("/api/verification-contacts/:id", async (req, res) => {
       updates.eligibilityReason = eligibility.reason;
     }
     
-    if (validatedData.firstName || validatedData.lastName || validatedData.contactCountry) {
+    if (validatedData.email || validatedData.firstName || validatedData.lastName || validatedData.contactCountry) {
       const accountName = req.body.accountName;
       const normalizedKeys = computeNormalizedKeys({
+        email: validatedData.email ?? existingContact.email,
         firstName: validatedData.firstName ?? existingContact.firstName,
         lastName: validatedData.lastName ?? existingContact.lastName,
         contactCountry: validatedData.contactCountry ?? existingContact.contactCountry,
@@ -316,16 +331,17 @@ router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => 
     
     const stats = await db.execute(sql`
       SELECT
-        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible') as eligible_count,
-        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND suppressed = FALSE) as eligible_unsuppressed_count,
-        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND suppressed = TRUE) as eligible_suppressed_count,
-        COUNT(*) FILTER (WHERE verification_status = 'Validated') as validated_count,
-        COUNT(*) FILTER (WHERE verification_status = 'Pending') as pending_count,
-        COUNT(*) FILTER (WHERE suppressed = TRUE) as suppressed_count,
-        COUNT(*) FILTER (WHERE email_status = 'ok') as ok_email_count,
-        COUNT(*) FILTER (WHERE email_status = 'invalid') as invalid_email_count,
-        COUNT(*) FILTER (WHERE email_status = 'risky') as risky_email_count,
-        COUNT(*) FILTER (WHERE in_submission_buffer = TRUE) as in_buffer_count
+        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND deleted = FALSE) as eligible_count,
+        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND suppressed = FALSE AND deleted = FALSE) as eligible_unsuppressed_count,
+        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND suppressed = TRUE AND deleted = FALSE) as eligible_suppressed_count,
+        COUNT(*) FILTER (WHERE verification_status = 'Validated' AND deleted = FALSE) as validated_count,
+        COUNT(*) FILTER (WHERE verification_status = 'Pending' AND deleted = FALSE) as pending_count,
+        COUNT(*) FILTER (WHERE suppressed = TRUE AND deleted = FALSE) as suppressed_count,
+        COUNT(*) FILTER (WHERE email_status = 'ok' AND deleted = FALSE) as ok_email_count,
+        COUNT(*) FILTER (WHERE email_status = 'invalid' AND deleted = FALSE) as invalid_email_count,
+        COUNT(*) FILTER (WHERE email_status = 'risky' AND deleted = FALSE) as risky_email_count,
+        COUNT(*) FILTER (WHERE in_submission_buffer = TRUE AND deleted = FALSE) as in_buffer_count,
+        COUNT(*) FILTER (WHERE deleted = TRUE) as deleted_count
       FROM verification_contacts
       WHERE campaign_id = ${campaignId}
     `);
@@ -570,6 +586,61 @@ router.post("/api/verification-campaigns/:campaignId/flush", async (req, res) =>
   } catch (error) {
     console.error("Error flushing buffer:", error);
     res.status(500).json({ error: "Failed to flush buffer" });
+  }
+});
+
+router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const bulkDeleteSchema = z.object({
+      contactIds: z.array(z.string().uuid()).nonempty(),
+      reason: z.string().min(1),
+    });
+    
+    const { contactIds, reason } = bulkDeleteSchema.parse(req.body);
+    
+    const allowClientProvidedDelete = process.env.ALLOW_CLIENT_PROVIDED_DELETE === 'true';
+    
+    const result = await db.execute(sql`
+      UPDATE verification_contacts c
+      SET deleted = TRUE, suppressed = TRUE, updated_at = NOW()
+      WHERE c.id = ANY(${contactIds}::varchar[])
+        AND c.campaign_id = ${campaignId}
+        AND c.deleted = FALSE
+        AND (c.source_type <> 'Client_Provided' OR ${allowClientProvidedDelete})
+        AND c.id NOT IN (
+          SELECT contact_id FROM verification_lead_submissions s 
+          WHERE s.campaign_id = ${campaignId}
+        )
+        AND c.in_submission_buffer = FALSE
+      RETURNING c.id
+    `);
+    
+    const deletedIds = result.rows.map((r: any) => r.id);
+    
+    if (deletedIds.length > 0 && req.user?.userId) {
+      await db.insert(verificationAuditLog).values({
+        actorId: req.user.userId,
+        entityType: 'contact',
+        action: 'bulk_delete',
+        entityId: campaignId,
+        before: null,
+        after: { contactIds: deletedIds, reason, requestedIds: contactIds },
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      deletedCount: deletedIds.length,
+      deletedIds,
+      skippedCount: contactIds.length - deletedIds.length,
+    });
+  } catch (error) {
+    console.error("Error bulk deleting contacts:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    res.status(500).json({ error: "Failed to bulk delete contacts" });
   }
 });
 

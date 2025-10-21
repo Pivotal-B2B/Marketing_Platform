@@ -63,12 +63,14 @@ export function computeNameCompanyHash(
 }
 
 export function computeNormalizedKeys(contact: {
+  email?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   contactCountry?: string | null;
   accountName?: string | null;
 }) {
   return {
+    emailLower: normalize.emailLower(contact.email),
     firstNameNorm: normalize.toKey(contact.firstName),
     lastNameNorm: normalize.toKey(contact.lastName),
     contactCountryKey: normalize.countryKey(contact.contactCountry),

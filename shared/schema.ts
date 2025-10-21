@@ -372,6 +372,7 @@ export const accounts = pgTable("accounts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   nameNormalized: text("name_normalized"),
+  canonicalName: text("canonical_name"),
 
   // Dual-Industry Field Strategy (Phase 8)
   industryStandardized: text("industry_standardized"),
@@ -443,6 +444,7 @@ export const accounts = pgTable("accounts", {
   nameCityCountryUniqueIdx: uniqueIndex("accounts_name_city_country_unique_idx").on(table.nameNormalized, table.hqCity, table.hqCountry).where(sql`deleted_at IS NULL AND domain_normalized IS NULL`),
   ownerIdx: index("accounts_owner_idx").on(table.ownerId),
   nameIdx: index("accounts_name_idx").on(table.name),
+  canonicalNameIdx: index("accounts_canonical_name_idx").on(table.canonicalName),
   specialtiesGinIdx: index("accounts_specialties_gin_idx").using('gin', table.linkedinSpecialties),
   techStackGinIdx: index("accounts_tech_stack_gin_idx").using('gin', table.techStack),
   tagsGinIdx: index("accounts_tags_gin_idx").using('gin', table.tags),
@@ -451,6 +453,18 @@ export const accounts = pgTable("accounts", {
     foreignColumns: [table.id],
     name: "accounts_parent_account_id_fkey"
   }).onDelete('set null'),
+}));
+
+// Company Aliases - Manual overrides for company name matching
+export const companyAliases = pgTable("company_aliases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  canonicalName: text("canonical_name").notNull(),
+  alias: text("alias").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'set null' }),
+}, (table) => ({
+  canonicalAliasUniq: uniqueIndex("company_aliases_canonical_alias_uniq").on(table.canonicalName, table.alias),
+  aliasIdx: index("company_aliases_alias_idx").on(table.alias),
 }));
 
 // Contacts table

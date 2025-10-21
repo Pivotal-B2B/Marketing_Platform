@@ -3,7 +3,7 @@ import { db } from "../db";
 import { verificationContacts, verificationCampaigns, accounts } from "@shared/schema";
 import { eq, and, or, sql } from "drizzle-orm";
 import Papa from "papaparse";
-import { evaluateEligibility, checkSuppression } from "../lib/verification-utils";
+import { evaluateEligibility, checkSuppression, computeNormalizedKeys } from "../lib/verification-utils";
 
 const router = Router();
 
@@ -160,6 +160,15 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             ? 'Client_Provided'
             : 'New_Sourced';
 
+          // Compute normalized keys including emailLower
+          const normalizedKeys = computeNormalizedKeys({
+            email: row.email || null,
+            firstName: row.firstName || null,
+            lastName: row.lastName || null,
+            contactCountry: row.contactCountry || null,
+            accountName: accountNameCsv,
+          });
+
           // Pre-compute eligibility and suppression BEFORE insert
           const eligibility = evaluateEligibility(
             row.title || null,
@@ -184,7 +193,7 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             firstName: row.firstName || null,
             lastName: row.lastName || null,
             title: row.title || null,
-            email: row.email?.toLowerCase() || null,
+            email: row.email || null,
             phone: row.phone || null,
             mobile: row.mobile || null,
             linkedinUrl: row.linkedinUrl || null,
@@ -197,7 +206,7 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             eligibilityStatus: eligibility.status,
             eligibilityReason: eligibility.reason,
             suppressed: isSuppressed,
-            // email_lower set by trigger
+            ...normalizedKeys,
           });
 
           results.created++;
