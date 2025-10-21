@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -103,6 +103,29 @@ export default function VerificationConsolePage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      const res = await apiRequest("DELETE", `/api/verification-contacts/${contactId}`, undefined);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Contact deleted",
+        description: "Contact has been removed from the queue",
+      });
+      setCurrentContactId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete contact",
+        variant: "destructive",
+      });
+    },
+  });
+
   const loadNextContact = () => {
     if ((queue as any)?.data && (queue as any).data.length > 0) {
       setCurrentContactId((queue as any).data[0].id);
@@ -147,11 +170,16 @@ export default function VerificationConsolePage() {
       <div className="grid grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Eligible</CardTitle>
+            <CardTitle className="text-sm font-medium">Eligible (Total)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-eligible-count">
               {(stats as any)?.eligible_count || 0}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              <span className="text-green-600">✓ {(stats as any)?.eligible_unsuppressed_count || 0} Active</span>
+              {" • "}
+              <span className="text-destructive">✗ {(stats as any)?.eligible_suppressed_count || 0} Suppressed</span>
             </div>
           </CardContent>
         </Card>
@@ -576,6 +604,19 @@ export default function VerificationConsolePage() {
                 >
                   <Mail className="h-4 w-4 mr-2" />
                   {elvMutation.isPending ? "Validating..." : "Validate Email"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    if (confirm("Are you sure you want to delete this contact?")) {
+                      deleteMutation.mutate(currentContactId!);
+                    }
+                  }}
+                  disabled={deleteMutation.isPending}
+                  data-testid="button-delete-contact"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
                 </Button>
                 <div className="flex-1" />
                 <Button

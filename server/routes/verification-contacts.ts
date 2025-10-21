@@ -89,6 +89,26 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
   }
 });
 
+router.delete("/api/verification-contacts/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [deletedContact] = await db
+      .delete(verificationContacts)
+      .where(eq(verificationContacts.id, id))
+      .returning();
+    
+    if (!deletedContact) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
+    
+    res.json({ success: true, id: deletedContact.id });
+  } catch (error) {
+    console.error("Error deleting contact:", error);
+    res.status(500).json({ error: "Failed to delete contact" });
+  }
+});
+
 router.get("/api/verification-contacts/account/:accountId", async (req, res) => {
   try {
     const { accountId } = req.params;
@@ -297,6 +317,8 @@ router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => 
     const stats = await db.execute(sql`
       SELECT
         COUNT(*) FILTER (WHERE eligibility_status = 'Eligible') as eligible_count,
+        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND suppressed = FALSE) as eligible_unsuppressed_count,
+        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND suppressed = TRUE) as eligible_suppressed_count,
         COUNT(*) FILTER (WHERE verification_status = 'Validated') as validated_count,
         COUNT(*) FILTER (WHERE verification_status = 'Pending') as pending_count,
         COUNT(*) FILTER (WHERE suppressed = TRUE) as suppressed_count,
