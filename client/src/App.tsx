@@ -56,6 +56,7 @@ import DvProjectDetailPage from "@/pages/dv-project-detail";
 import DvAgentConsolePage from "@/pages/dv-agent-console";
 import VerificationCampaignsPage from "@/pages/verification-campaigns";
 import VerificationCampaignConfigPage from "@/pages/verification-campaign-config";
+import VerificationCampaignStatsPage from "@/pages/verification-campaign-stats";
 import VerificationConsolePage from "@/pages/verification-console";
 import VerificationUploadPage from "@/pages/verification-upload";
 import VerificationSuppressionUploadPage from "@/pages/verification-suppression-upload";
@@ -137,9 +138,11 @@ function AuthenticatedApp() {
               <Route path="/dv/projects/new" component={DvProjectNewPage} />
               <Route path="/dv/projects/:id" component={DvProjectDetailPage} />
               <Route path="/dv/projects" component={DvProjectsPage} />
-              <Route path="/verification/console/:campaignId" component={VerificationConsolePage} />
-              <Route path="/verification/upload/:campaignId" component={VerificationUploadPage} />
-              <Route path="/verification/suppression-upload/:campaignId?" component={VerificationSuppressionUploadPage} />
+              <Route path="/verification/:campaignId/stats" component={VerificationCampaignStatsPage} />
+              <Route path="/verification/:campaignId/console" component={VerificationConsolePage} />
+              <Route path="/verification/:campaignId/upload" component={VerificationUploadPage} />
+              <Route path="/verification/:campaignId/suppression-upload" component={VerificationSuppressionUploadPage} />
+              <Route path="/verification/suppression-upload" component={VerificationSuppressionUploadPage} />
               <Route path="/verification/campaigns/:id" component={VerificationCampaignConfigPage} />
               <Route path="/verification/campaigns" component={VerificationCampaignsPage} />
               <Route component={NotFound} />

@@ -135,6 +135,82 @@ router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => 
   }
 });
 
+router.get("/api/verification-campaigns/:campaignId/contacts", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const filter = req.query.filter as string;
+    
+    if (!filter) {
+      return res.status(400).json({ error: "filter query parameter is required" });
+    }
+    
+    let filterCondition = sql`1=1`;
+    
+    switch (filter) {
+      case 'all':
+        filterCondition = sql`c.deleted = FALSE`;
+        break;
+      case 'eligible':
+        filterCondition = sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.eligibility_status = 'Eligible'`;
+        break;
+      case 'suppressed':
+        filterCondition = sql`c.deleted = FALSE AND c.suppressed = TRUE`;
+        break;
+      case 'validated':
+        filterCondition = sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.verification_status = 'Validated'`;
+        break;
+      case 'ok_email':
+        filterCondition = sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.email_status = 'ok'`;
+        break;
+      case 'invalid_email':
+        filterCondition = sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.verification_status = 'Invalid'`;
+        break;
+      case 'submitted':
+        // Get submitted lead contact IDs
+        const submittedLeads = await db
+          .select({ contactId: verificationLeadSubmissions.contactId })
+          .from(verificationLeadSubmissions)
+          .where(eq(verificationLeadSubmissions.campaignId, campaignId));
+        
+        const submittedIds = submittedLeads.map(l => l.contactId).filter(Boolean);
+        
+        if (submittedIds.length === 0) {
+          return res.json([]);
+        }
+        
+        filterCondition = sql`c.id IN (${sql.join(submittedIds.map(id => sql`${id}`), sql`, `)})`;
+        break;
+      default:
+        return res.status(400).json({ error: "Invalid filter" });
+    }
+    
+    const contacts = await db.execute(sql`
+      SELECT 
+        c.id,
+        c.full_name as "fullName",
+        c.email,
+        c.title,
+        c.verification_status as "verificationStatus",
+        c.email_status as "emailStatus",
+        c.suppressed,
+        c.eligibility_status as "eligibilityStatus",
+        c.eligibility_reason as "eligibilityReason",
+        a.name as "accountName"
+      FROM verification_contacts c
+      LEFT JOIN accounts a ON a.id = c.account_id
+      WHERE c.campaign_id = ${campaignId}
+        AND ${filterCondition}
+      ORDER BY c.updated_at DESC
+      LIMIT 500
+    `);
+    
+    res.json(contacts.rows);
+  } catch (error) {
+    console.error("Error fetching filtered contacts:", error);
+    res.status(500).json({ error: "Failed to fetch filtered contacts" });
+  }
+});
+
 router.get("/api/verification-campaigns/:campaignId/accounts/:accountName/cap", async (req, res) => {
   try {
     const { campaignId, accountName } = req.params;

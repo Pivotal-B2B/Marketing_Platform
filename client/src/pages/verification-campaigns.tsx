@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, Settings, Upload } from "lucide-react";
+import { Plus, Settings, Upload, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -79,13 +79,19 @@ export default function VerificationCampaignsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Link href={`/verification/upload/${campaign.id}`}>
+                        <Link href={`/verification/${campaign.id}/upload`}>
                           <Button variant="ghost" size="sm" data-testid={`button-upload-${campaign.id}`}>
                             <Upload className="h-4 w-4 mr-1" />
                             Upload
                           </Button>
                         </Link>
-                        <Link href={`/verification/console/${campaign.id}`}>
+                        <Link href={`/verification/${campaign.id}/stats`}>
+                          <Button variant="ghost" size="sm" data-testid={`button-stats-${campaign.id}`}>
+                            <BarChart3 className="h-4 w-4 mr-1" />
+                            Stats
+                          </Button>
+                        </Link>
+                        <Link href={`/verification/${campaign.id}/console`}>
                           <Button variant="ghost" size="sm" data-testid={`button-console-${campaign.id}`}>
                             Console
                           </Button>
