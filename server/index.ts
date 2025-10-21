@@ -89,6 +89,10 @@ app.use((req, res, next) => {
   const { startJobScheduler } = await import("./lib/dv-queue");
   startJobScheduler();
   
+  // Auto-resume stuck email validation jobs
+  const { resumeStuckEmailValidationJobs } = await import("./lib/resume-validation-jobs");
+  setTimeout(() => resumeStuckEmailValidationJobs(), 5000); // Wait 5 seconds after startup
+  
   registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
