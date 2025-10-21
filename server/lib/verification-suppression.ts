@@ -46,20 +46,35 @@ export async function addToSuppressionList(
     companyKey?: string;
   }[]
 ) {
-  const insertData = entries.map(entry => ({
-    campaignId: campaignId ?? null,
-    emailLower: entry.email ? normalize.emailLower(entry.email) : null,
-    cavId: entry.cavId || null,
-    cavUserId: entry.cavUserId || null,
-    nameCompanyHash: (entry.firstName || entry.lastName || entry.companyKey)
-      ? computeNameCompanyHash(entry.firstName, entry.lastName, entry.companyKey)
-      : null,
-  }));
+  if (entries.length === 0) return;
+
+  // Use raw SQL to avoid Drizzle stack overflow on large inserts
+  const BATCH_SIZE = 500;
   
-  // Batch insert to prevent stack overflow with large datasets
-  const BATCH_SIZE = 1000;
-  for (let i = 0; i < insertData.length; i += BATCH_SIZE) {
-    const batch = insertData.slice(i, i + BATCH_SIZE);
-    await db.insert(verificationSuppressionList).values(batch);
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const batch = entries.slice(i, i + BATCH_SIZE);
+    
+    const values = batch.map(entry => {
+      const emailLower = entry.email ? normalize.emailLower(entry.email) : null;
+      const cavId = entry.cavId || null;
+      const cavUserId = entry.cavUserId || null;
+      const nameCompanyHash = (entry.firstName || entry.lastName || entry.companyKey)
+        ? computeNameCompanyHash(entry.firstName, entry.lastName, entry.companyKey)
+        : null;
+      
+      return sql`(
+        ${campaignId},
+        ${emailLower},
+        ${cavId},
+        ${cavUserId},
+        ${nameCompanyHash}
+      )`;
+    });
+    
+    await db.execute(sql`
+      INSERT INTO verification_suppression_list 
+        (campaign_id, email_lower, cav_id, cav_user_id, name_company_hash)
+      VALUES ${sql.join(values, sql`, `)}
+    `);
   }
 }
