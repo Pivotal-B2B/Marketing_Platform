@@ -62,7 +62,7 @@ interface CSVRow {
   naicsCode?: string;
 }
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = 500; // Optimized for large uploads (was 50)
 
 const autoMappings: Record<string, string> = {
   'fullname': 'fullName',

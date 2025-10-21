@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./db-init";
@@ -21,6 +22,17 @@ app.set('trust proxy', 1);
 // Apply security middleware early in the stack
 app.use(securityHeaders); // Set security headers on all responses
 app.use(captureClientIP); // Capture client IP for audit logging
+
+// Enable response compression for better performance with large datasets
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6, // Compression level (0-9, 6 is default balance)
+}));
 
 // Payload size limits (防止 DOS attacks)
 app.use(express.json({ limit: PAYLOAD_LIMITS.json }));
