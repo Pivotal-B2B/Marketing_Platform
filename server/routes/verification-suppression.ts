@@ -83,33 +83,53 @@ router.post("/api/verification-campaigns/:campaignId/suppression/upload", async 
       return res.status(400).json({ error: "csvData is required" });
     }
 
-    const parseResult = Papa.parse<SuppressionCSVRow>(csvData, {
-      header: true,
-      skipEmptyLines: true,
-      delimiter: "",  // Auto-detect delimiter
-      delimitersToGuess: [',', '\t', '|', ';', Papa.RECORD_SEP, Papa.UNIT_SEP],
-      transformHeader: (header) => {
-        const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-        
-        const mappings: Record<string, string> = {
-          'email': 'email',
-          'emailaddress': 'email',
-          'mail': 'email',
-          'cavid': 'cavId',
-          'cavuserid': 'cavUserId',
-          'firstname': 'firstName',
-          'lastname': 'lastName',
-          'companyname': 'companyName',
-          'company': 'companyName',
-          'account': 'companyName',
-          'accountname': 'companyName',
-        };
+    // Try parsing with different delimiters
+    let parseResult: Papa.ParseResult<SuppressionCSVRow> | null = null;
+    const delimiters = [',', '\t', '|', ';'];
+    
+    for (const delimiter of delimiters) {
+      const result = Papa.parse<SuppressionCSVRow>(csvData, {
+        header: true,
+        skipEmptyLines: true,
+        delimiter: delimiter,
+        transformHeader: (header) => {
+          const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          
+          const mappings: Record<string, string> = {
+            'email': 'email',
+            'emailaddress': 'email',
+            'mail': 'email',
+            'cavid': 'cavId',
+            'cavuserid': 'cavUserId',
+            'firstname': 'firstName',
+            'lastname': 'lastName',
+            'companyname': 'companyName',
+            'company': 'companyName',
+            'account': 'companyName',
+            'accountname': 'companyName',
+          };
 
-        return mappings[normalized] || normalized;
-      },
-    });
+          return mappings[normalized] || normalized;
+        },
+      });
+      
+      // Check if this delimiter worked (has data and minimal errors)
+      if (result.data && result.data.length > 0 && result.errors.length === 0) {
+        parseResult = result;
+        break;
+      }
+    }
+
+    if (!parseResult || parseResult.data.length === 0) {
+      console.error("CSV parsing failed - could not detect delimiter");
+      return res.status(400).json({
+        error: "CSV parsing failed",
+        details: "Could not detect delimiter. Please ensure your CSV uses comma, tab, pipe, or semicolon as delimiter.",
+      });
+    }
 
     if (parseResult.errors.length > 0) {
+      console.error("CSV parsing errors:", parseResult.errors);
       return res.status(400).json({
         error: "CSV parsing failed",
         details: parseResult.errors,
@@ -175,33 +195,53 @@ router.post("/api/verification-suppression/global/upload", async (req, res) => {
       return res.status(400).json({ error: "csvData is required" });
     }
 
-    const parseResult = Papa.parse<SuppressionCSVRow>(csvData, {
-      header: true,
-      skipEmptyLines: true,
-      delimiter: "",  // Auto-detect delimiter
-      delimitersToGuess: [',', '\t', '|', ';', Papa.RECORD_SEP, Papa.UNIT_SEP],
-      transformHeader: (header) => {
-        const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-        
-        const mappings: Record<string, string> = {
-          'email': 'email',
-          'emailaddress': 'email',
-          'mail': 'email',
-          'cavid': 'cavId',
-          'cavuserid': 'cavUserId',
-          'firstname': 'firstName',
-          'lastname': 'lastName',
-          'companyname': 'companyName',
-          'company': 'companyName',
-          'account': 'companyName',
-          'accountname': 'companyName',
-        };
+    // Try parsing with different delimiters
+    let parseResult: Papa.ParseResult<SuppressionCSVRow> | null = null;
+    const delimiters = [',', '\t', '|', ';'];
+    
+    for (const delimiter of delimiters) {
+      const result = Papa.parse<SuppressionCSVRow>(csvData, {
+        header: true,
+        skipEmptyLines: true,
+        delimiter: delimiter,
+        transformHeader: (header) => {
+          const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          
+          const mappings: Record<string, string> = {
+            'email': 'email',
+            'emailaddress': 'email',
+            'mail': 'email',
+            'cavid': 'cavId',
+            'cavuserid': 'cavUserId',
+            'firstname': 'firstName',
+            'lastname': 'lastName',
+            'companyname': 'companyName',
+            'company': 'companyName',
+            'account': 'companyName',
+            'accountname': 'companyName',
+          };
 
-        return mappings[normalized] || normalized;
-      },
-    });
+          return mappings[normalized] || normalized;
+        },
+      });
+      
+      // Check if this delimiter worked (has data and minimal errors)
+      if (result.data && result.data.length > 0 && result.errors.length === 0) {
+        parseResult = result;
+        break;
+      }
+    }
+
+    if (!parseResult || parseResult.data.length === 0) {
+      console.error("CSV parsing failed - could not detect delimiter");
+      return res.status(400).json({
+        error: "CSV parsing failed",
+        details: "Could not detect delimiter. Please ensure your CSV uses comma, tab, pipe, or semicolon as delimiter.",
+      });
+    }
 
     if (parseResult.errors.length > 0) {
+      console.error("CSV parsing errors:", parseResult.errors);
       return res.status(400).json({
         error: "CSV parsing failed",
         details: parseResult.errors,
