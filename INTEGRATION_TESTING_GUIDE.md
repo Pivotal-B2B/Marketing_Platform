@@ -79,9 +79,13 @@ Both integrations are **fully functional** and tested:
 4. Watch for toast notification showing enrichment results
 
 **What Gets Enriched:**
-- **Address fields**: HQ Address 1-3, City, State, Postal Code, Country
-- **Phone field**: HQ Phone (local office number)
+- **Address fields**: Contact Address 1-3, City, State, Postal Code, Country (saved to contactAddress* fields)
+- **Phone field**: HQ Phone (local office number) - saved to `hqPhone` field
 - **Smart filtering**: Only enriches INCOMPLETE data unless force=true
+
+**Where to See Enriched Data:**
+- **Company Tab** → "HQ Phone (Enriched)" field shows the enriched phone
+- **Company Tab** → Address fields show enriched local office address
 
 **Enrichment Requirements:**
 - Contact must be **Eligible**

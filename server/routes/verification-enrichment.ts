@@ -237,10 +237,10 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
         }
 
         // Handle phone enrichment result - only save if phoneConfidence >= 0.7
-        // Save to contact's direct phone (local office phone where the contact works)
+        // Save to HQ Phone field (local office phone where the contact works)
         if (result.phone && result.phoneConfidence !== undefined) {
           if (result.phoneConfidence >= CONFIDENCE_THRESHOLD) {
-            updateData.phone = result.phone; // FIXED: Use 'phone' field for verificationContacts table
+            updateData.hqPhone = result.phone; // Save to hqPhone field (LOCAL office phone)
             updateData.phoneEnrichmentStatus = 'completed';
             updateData.phoneEnrichedAt = new Date();
             updateData.phoneEnrichmentError = null;
@@ -457,7 +457,7 @@ router.post("/api/verification-contacts/:contactId/enrich", async (req, res) => 
     // Handle phone enrichment result
     if (result.phone && result.phoneConfidence !== undefined) {
       if (result.phoneConfidence >= CONFIDENCE_THRESHOLD) {
-        updateData.directPhone = result.phone;
+        updateData.hqPhone = result.phone; // Save to hqPhone field (LOCAL office phone)
         updateData.phoneEnrichmentStatus = 'completed';
         updateData.phoneEnrichedAt = new Date();
         updateData.phoneEnrichmentError = null;
