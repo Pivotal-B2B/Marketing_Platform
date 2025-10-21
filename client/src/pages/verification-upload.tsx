@@ -521,7 +521,7 @@ export default function VerificationUploadPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className={`grid ${updateMode ? 'grid-cols-4' : 'grid-cols-3'} gap-4 mb-4`}>
               <div className="p-4 bg-secondary rounded-md">
                 <div className="text-sm text-muted-foreground">Total Rows</div>
                 <div className="text-2xl font-bold" data-testid="text-total">
@@ -531,13 +531,21 @@ export default function VerificationUploadPage() {
               <div className="p-4 bg-primary/10 rounded-md">
                 <div className="text-sm text-muted-foreground">Created</div>
                 <div className="text-2xl font-bold text-primary" data-testid="text-created">
-                  {uploadResult.created}
+                  {uploadResult.created || 0}
                 </div>
               </div>
+              {updateMode && (
+                <div className="p-4 bg-green-500/10 rounded-md">
+                  <div className="text-sm text-muted-foreground">Updated</div>
+                  <div className="text-2xl font-bold text-green-600" data-testid="text-updated">
+                    {uploadResult.updated || 0}
+                  </div>
+                </div>
+              )}
               <div className="p-4 bg-destructive/10 rounded-md">
                 <div className="text-sm text-muted-foreground">Skipped</div>
                 <div className="text-2xl font-bold text-destructive" data-testid="text-skipped">
-                  {uploadResult.skipped}
+                  {uploadResult.skipped || 0}
                 </div>
               </div>
             </div>
