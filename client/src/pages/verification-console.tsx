@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles, Download } from "lucide-react";
@@ -39,6 +39,8 @@ export default function VerificationConsolePage() {
   const [enrichmentProgress, setEnrichmentProgress] = useState<any>(null);
   const [enrichmentBatchSize, setEnrichmentBatchSize] = useState(50);
   const [enrichmentDelay, setEnrichmentDelay] = useState(1500);
+  const [validationJobId, setValidationJobId] = useState<string | null>(null);
+  const [validationProgress, setValidationProgress] = useState<any>(null);
   const [filters, setFilters] = useState({
     contactSearch: "",
     phoneSearch: "",
@@ -307,16 +309,13 @@ export default function VerificationConsolePage() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      const { statusCounts, successCount, processedBatches, totalContacts } = data;
-      const batchInfo = processedBatches > 1 ? ` (${processedBatches} batches)` : '';
+      const { jobId, totalContacts, totalBatches } = data;
+      setValidationJobId(jobId);
       toast({
-        title: `Email Verification Complete${batchInfo}`,
-        description: `Verified ${successCount}/${totalContacts} contacts: ${statusCounts.ok || 0} OK, ${statusCounts.invalid || 0} Invalid, ${statusCounts.risky || 0} Risky, ${statusCounts.disposable || 0} Disposable, ${statusCounts.accept_all || 0} Accept-All`,
-        duration: 10000,
+        title: "Email validation started",
+        description: `Processing ${totalContacts} contact(s) in ${totalBatches} batch(es). Polling for progress...`,
+        duration: 5000,
       });
-      setSelectedContactIds(new Set());
-      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
     },
     onError: (error: any) => {
       toast({
@@ -376,6 +375,63 @@ export default function VerificationConsolePage() {
       });
     },
   });
+
+  useEffect(() => {
+    if (!validationJobId) return;
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/verification-campaigns/${campaignId}/email-validation-jobs/${validationJobId}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          },
+          credentials: "include",
+        });
+        
+        if (!res.ok) {
+          throw new Error("Failed to fetch job status");
+        }
+        
+        const job = await res.json();
+        setValidationProgress(job);
+        
+        if (job.status === 'completed') {
+          clearInterval(pollInterval);
+          toast({
+            title: "Email Verification Complete",
+            description: `Verified ${job.successCount} contacts: ${job.statusCounts?.ok || 0} OK, ${job.statusCounts?.invalid || 0} Invalid, ${job.statusCounts?.risky || 0} Risky, ${job.statusCounts?.disposable || 0} Disposable, ${job.statusCounts?.accept_all || 0} Accept-All`,
+            duration: 10000,
+          });
+          setValidationJobId(null);
+          setValidationProgress(null);
+          setSelectedContactIds(new Set());
+          queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+        } else if (job.status === 'failed') {
+          clearInterval(pollInterval);
+          toast({ 
+            title: "Validation failed", 
+            description: job.errorMessage || "Email validation job failed", 
+            variant: "destructive" 
+          });
+          setValidationJobId(null);
+          setValidationProgress(null);
+        }
+      } catch (error: any) {
+        console.error("Polling error:", error);
+        clearInterval(pollInterval);
+        toast({
+          title: "Polling error",
+          description: error.message || "Failed to check validation status",
+          variant: "destructive",
+        });
+        setValidationJobId(null);
+        setValidationProgress(null);
+      }
+    }, 2000);
+    
+    return () => clearInterval(pollInterval);
+  }, [validationJobId, campaignId, toast]);
 
   const loadNextContact = () => {
     if ((queue as any)?.data && (queue as any).data.length > 0) {
@@ -789,6 +845,22 @@ export default function VerificationConsolePage() {
                     Clear All
                   </Button>
                 </div>
+              </div>
+            )}
+            {validationProgress && validationProgress.status === 'processing' && (
+              <div className="mb-4 p-4 rounded-md border bg-blue-50 dark:bg-blue-950" data-testid="validation-progress">
+                <p className="text-sm font-medium">Email Validation in Progress</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Batch {validationProgress.currentBatch}/{validationProgress.totalBatches} 
+                  {" | "}
+                  {validationProgress.processedContacts}/{validationProgress.totalContacts} contacts
+                  {" | "}
+                  {Math.round((validationProgress.processedContacts / validationProgress.totalContacts) * 100)}% complete
+                </p>
+                <Progress 
+                  value={(validationProgress.processedContacts / validationProgress.totalContacts) * 100} 
+                  className="h-2 mt-2" 
+                />
               </div>
             )}
             <div className="mb-4 flex items-center justify-between gap-3">
