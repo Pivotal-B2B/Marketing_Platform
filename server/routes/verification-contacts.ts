@@ -219,9 +219,12 @@ router.get("/api/verification-contacts/:id", async (req, res) => {
       SELECT 
         c.*,
         a.name as account_name,
+        a.hq_street_1,
+        a.hq_street_2,
+        a.hq_street_3,
         a.hq_city,
-        a.hq_country,
         a.hq_state,
+        a.hq_country,
         a.domain
       FROM verification_contacts c
       LEFT JOIN accounts a ON a.id = c.account_id

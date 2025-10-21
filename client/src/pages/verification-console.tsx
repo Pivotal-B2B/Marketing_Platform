@@ -660,13 +660,21 @@ export default function VerificationConsolePage() {
                     <Input value={(contact as any)?.full_name || (contact as any)?.fullName || ""} readOnly data-testid="input-full-name" />
                   </div>
                   <div>
+                    <Label>First Name</Label>
+                    <Input value={(contact as any)?.first_name || (contact as any)?.firstName || ""} readOnly data-testid="input-first-name" />
+                  </div>
+                  <div>
+                    <Label>Last Name</Label>
+                    <Input value={(contact as any)?.last_name || (contact as any)?.lastName || ""} readOnly data-testid="input-last-name" />
+                  </div>
+                  <div>
                     <Label>Title</Label>
                     <Input value={(contact as any)?.title || ""} readOnly data-testid="input-title" />
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <Label>Email</Label>
                     <div className="flex gap-2">
-                      <Input value={(contact as any)?.email || ""} readOnly data-testid="input-email" />
+                      <Input value={(contact as any)?.email || ""} readOnly data-testid="input-email" className="flex-1" />
                       {((contact as any)?.email_status || (contact as any)?.emailStatus) && (
                         <Badge
                           variant={
@@ -698,6 +706,18 @@ export default function VerificationConsolePage() {
                     <Label>LinkedIn URL</Label>
                     <Input value={(contact as any)?.linkedin_url || (contact as any)?.linkedinUrl || ""} readOnly data-testid="input-linkedin" />
                   </div>
+                  <div className="col-span-3">
+                    <Label>Contact Address 1</Label>
+                    <Input value={(contact as any)?.contact_address1 || (contact as any)?.contactAddress1 || ""} readOnly data-testid="input-contact-address1" />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>Contact Address 2</Label>
+                    <Input value={(contact as any)?.contact_address2 || (contact as any)?.contactAddress2 || ""} readOnly data-testid="input-contact-address2" />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>Contact Address 3</Label>
+                    <Input value={(contact as any)?.contact_address3 || (contact as any)?.contactAddress3 || ""} readOnly data-testid="input-contact-address3" />
+                  </div>
                   <div>
                     <Label>City</Label>
                     <Input value={(contact as any)?.contact_city || (contact as any)?.contactCity || ""} readOnly data-testid="input-city" />
@@ -728,9 +748,25 @@ export default function VerificationConsolePage() {
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold mb-3">Company Information</h3>
                 <div className="grid grid-cols-3 gap-4">
-                  <div>
+                  <div className="col-span-2">
                     <Label>Company Name</Label>
                     <Input value={(contact as any)?.account_name || ""} readOnly data-testid="input-company-name" />
+                  </div>
+                  <div>
+                    <Label>Domain</Label>
+                    <Input value={(contact as any)?.domain || ""} readOnly data-testid="input-domain" />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>HQ Address 1</Label>
+                    <Input value={(contact as any)?.hq_street_1 || (contact as any)?.hq_street1 || ""} readOnly data-testid="input-hq-address1" />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>HQ Address 2</Label>
+                    <Input value={(contact as any)?.hq_street_2 || (contact as any)?.hq_street2 || ""} readOnly data-testid="input-hq-address2" />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>HQ Address 3</Label>
+                    <Input value={(contact as any)?.hq_street_3 || (contact as any)?.hq_street3 || ""} readOnly data-testid="input-hq-address3" />
                   </div>
                   <div>
                     <Label>HQ City</Label>
@@ -743,10 +779,6 @@ export default function VerificationConsolePage() {
                   <div>
                     <Label>HQ Country</Label>
                     <Input value={(contact as any)?.hq_country || ""} readOnly data-testid="input-hq-country" />
-                  </div>
-                  <div>
-                    <Label>Domain</Label>
-                    <Input value={(contact as any)?.domain || ""} readOnly data-testid="input-domain" />
                   </div>
                 </div>
               </div>
