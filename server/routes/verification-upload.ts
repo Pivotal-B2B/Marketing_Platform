@@ -278,7 +278,8 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
           const eligibility = evaluateEligibility(
             row.title || null,
             row.contactCountry || null,
-            campaign
+            campaign,
+            row.email || null
           );
 
           const isSuppressed = await checkSuppression(campaignId, {

@@ -13,8 +13,14 @@ export const normalize = {
 export function evaluateEligibility(
   title: string | null | undefined,
   contactCountry: string | null | undefined,
-  campaign: VerificationCampaign
+  campaign: VerificationCampaign,
+  email?: string | null
 ) {
+  // CRITICAL: Email is required for verification campaigns
+  if (!email || email.trim() === '') {
+    return { status: 'Out_of_Scope' as const, reason: 'missing_email_address' };
+  }
+  
   const t = (title ?? "").toLowerCase();
   const c = normalize.countryKey(contactCountry);
   
