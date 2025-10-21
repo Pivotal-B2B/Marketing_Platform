@@ -360,26 +360,44 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             account_name: accountNameCsv,
           });
 
-          // Auto-populate contact address from company HQ if countries match
+          // Auto-populate contact address and phone from company HQ if countries match
+          // AND Company HQ has complete data (Street 1, City, State, Postal, Phone)
           let contactAddress1 = row.contactAddress1 || null;
           let contactAddress2 = row.contactAddress2 || null;
           let contactAddress3 = row.contactAddress3 || null;
           let contactCity = row.contactCity || null;
           let contactState = row.contactState || null;
           let contactPostal = row.contactPostal || null;
+          let contactPhone = row.phone || null;
           
           if (accountData && row.contactCountry && accountData.hqCountry) {
             const contactCountryNorm = row.contactCountry.trim().toLowerCase();
             const hqCountryNorm = accountData.hqCountry.trim().toLowerCase();
             
+            // Check if countries match
             if (contactCountryNorm === hqCountryNorm) {
-              // Auto-populate contact address fields if empty
-              contactAddress1 = contactAddress1 || accountData.hqStreet1;
-              contactAddress2 = contactAddress2 || accountData.hqStreet2;
-              contactAddress3 = contactAddress3 || accountData.hqStreet3;
-              contactCity = contactCity || accountData.hqCity;
-              contactState = contactState || accountData.hqState;
-              contactPostal = contactPostal || accountData.hqPostalCode;
+              // Check if Company HQ has complete address data
+              // Completeness criteria: Street 1, City, State (where applicable), Postal Code, Phone
+              const hqHasCompleteData = 
+                accountData.hqStreet1 && 
+                accountData.hqCity && 
+                accountData.hqPostalCode &&
+                accountData.mainPhone;
+              
+              if (hqHasCompleteData) {
+                // Auto-populate contact address fields if empty
+                contactAddress1 = contactAddress1 || accountData.hqStreet1;
+                contactAddress2 = contactAddress2 || accountData.hqStreet2;
+                contactAddress3 = contactAddress3 || accountData.hqStreet3;
+                contactCity = contactCity || accountData.hqCity;
+                contactState = contactState || accountData.hqState;
+                contactPostal = contactPostal || accountData.hqPostalCode;
+                
+                // Auto-populate contact phone if empty
+                contactPhone = contactPhone || accountData.mainPhone;
+                
+                console.log(`[HQ Enrichment] Row ${i + 1}: Auto-populated contact fields from Company HQ (${accountData.name})`);
+              }
             }
           }
 
@@ -444,7 +462,7 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
               if (row.lastName) updateData.lastName = row.lastName;
               if (row.title) updateData.title = row.title;
               if (row.email) updateData.email = row.email;
-              if (row.phone) updateData.phone = row.phone;
+              if (contactPhone) updateData.phone = contactPhone; // Use enriched phone
               if (row.mobile) updateData.mobile = row.mobile;
               if (row.linkedinUrl) updateData.linkedinUrl = row.linkedinUrl;
               if (contactAddress1) updateData.contactAddress1 = contactAddress1;
@@ -468,7 +486,7 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
               if (row.lastName) updateData.lastName = row.lastName;
               if (row.title) updateData.title = row.title;
               if (row.email) updateData.email = row.email;
-              if (row.phone) updateData.phone = row.phone;
+              if (contactPhone) updateData.phone = contactPhone; // Use enriched phone
               if (row.mobile) updateData.mobile = row.mobile;
               if (row.linkedinUrl) updateData.linkedinUrl = row.linkedinUrl;
               if (contactAddress1) updateData.contactAddress1 = contactAddress1;
@@ -524,7 +542,7 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
               lastName: row.lastName || null,
               title: row.title || null,
               email: row.email || null,
-              phone: row.phone || null,
+              phone: contactPhone, // Use enriched phone (may include HQ phone)
               mobile: row.mobile || null,
               linkedinUrl: row.linkedinUrl || null,
               contactAddress1,
