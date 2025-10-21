@@ -108,7 +108,7 @@ export default function VerificationConsolePage() {
   });
 
   const { data: associatedContacts = [] } = useQuery<any[]>({
-    queryKey: ["/api/verification-contacts/account", (contact as any)?.account_id, { campaignId }],
+    queryKey: ["/api/verification-contacts/account", (contact as any)?.account_id, { campaignId, includeSuppressed: true }],
     enabled: !!currentContactId && !!(contact as any)?.account_id && !!campaignId,
   });
 
@@ -862,7 +862,7 @@ export default function VerificationConsolePage() {
                         key={assocContact.id}
                         className={`p-3 border rounded-md flex items-center justify-between ${
                           assocContact.id === currentContactId ? 'bg-accent' : 'hover-elevate'
-                        }`}
+                        } ${assocContact.deleted || assocContact.suppressed ? 'opacity-60' : ''}`}
                         data-testid={`contact-card-${index}`}
                       >
                         <div className="flex-1 grid grid-cols-4 gap-4">
@@ -878,10 +878,15 @@ export default function VerificationConsolePage() {
                             <p className="text-xs text-muted-foreground">Phone</p>
                             <p className="text-sm">{assocContact.phone || assocContact.mobile || "-"}</p>
                           </div>
-                          <div>
+                          <div className="flex gap-2">
                             <Badge variant="outline" className="text-xs">
                               {assocContact.verification_status || assocContact.verificationStatus}
                             </Badge>
+                            {(assocContact.deleted || assocContact.suppressed) && (
+                              <Badge variant="destructive" className="text-xs">
+                                {assocContact.deleted ? 'Deleted' : 'Suppressed'}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         {assocContact.id !== currentContactId && (
