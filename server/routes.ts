@@ -4491,7 +4491,7 @@ export function registerRoutes(app: Express) {
       }
       res.status(204).send();
     } catch (error) {
-      res.status(50    .json({ message: "Failed to delete content asset" });
+      res.status(500).json({ message: "Failed to delete content asset" });
     }
   });
 
