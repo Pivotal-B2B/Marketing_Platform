@@ -3583,6 +3583,8 @@ export const verificationAuditLog = pgTable("verification_audit_log", {
 
 export const uploadJobStatusEnum = pgEnum('upload_job_status', ['pending', 'processing', 'completed', 'failed']);
 
+export const emailValidationJobStatusEnum = pgEnum('email_validation_job_status', ['pending', 'processing', 'completed', 'failed', 'cancelled']);
+
 export const verificationUploadJobs = pgTable("verification_upload_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   campaignId: varchar("campaign_id").references(() => verificationCampaigns.id, { onDelete: 'cascade' }).notNull(),
@@ -3604,6 +3606,37 @@ export const verificationUploadJobs = pgTable("verification_upload_jobs", {
   campaignIdx: index("verification_upload_jobs_campaign_idx").on(table.campaignId),
   statusIdx: index("verification_upload_jobs_status_idx").on(table.status),
   createdAtIdx: index("verification_upload_jobs_created_at_idx").on(table.createdAt),
+}));
+
+export const verificationEmailValidationJobs = pgTable("verification_email_validation_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => verificationCampaigns.id, { onDelete: 'cascade' }).notNull(),
+  status: emailValidationJobStatusEnum("status").default('pending').notNull(),
+  totalContacts: integer("total_contacts").default(0).notNull(),
+  processedContacts: integer("processed_contacts").default(0).notNull(),
+  currentBatch: integer("current_batch").default(0).notNull(),
+  totalBatches: integer("total_batches").default(0).notNull(),
+  successCount: integer("success_count").default(0).notNull(),
+  failureCount: integer("failure_count").default(0).notNull(),
+  statusCounts: jsonb("status_counts").$type<{
+    ok: number;
+    invalid: number;
+    risky: number;
+    disposable: number;
+    accept_all: number;
+    unknown: number;
+  }>().default(sql`'{"ok":0,"invalid":0,"risky":0,"disposable":0,"accept_all":0,"unknown":0}'::jsonb`),
+  errorMessage: text("error_message"),
+  contactIds: jsonb("contact_ids").$type<string[]>(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'set null' }),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignIdx: index("verification_email_validation_jobs_campaign_idx").on(table.campaignId),
+  statusIdx: index("verification_email_validation_jobs_status_idx").on(table.status),
+  createdAtIdx: index("verification_email_validation_jobs_created_at_idx").on(table.createdAt),
 }));
 
 export const verificationCampaignsRelations = relations(verificationCampaigns, ({ one, many }) => ({
@@ -3635,6 +3668,7 @@ export const insertVerificationSuppressionListSchema = createInsertSchema(verifi
 export const insertVerificationLeadSubmissionSchema = createInsertSchema(verificationLeadSubmissions).omit({ id: true, createdAt: true });
 export const insertVerificationAuditLogSchema = createInsertSchema(verificationAuditLog).omit({ id: true, at: true });
 export const insertVerificationUploadJobSchema = createInsertSchema(verificationUploadJobs).omit({ id: true, createdAt: true, updatedAt: true, startedAt: true, finishedAt: true });
+export const insertVerificationEmailValidationJobSchema = createInsertSchema(verificationEmailValidationJobs).omit({ id: true, createdAt: true, updatedAt: true, startedAt: true, finishedAt: true });
 
 export type VerificationCampaign = typeof verificationCampaigns.$inferSelect;
 export type InsertVerificationCampaign = z.infer<typeof insertVerificationCampaignSchema>;
@@ -3650,3 +3684,5 @@ export type VerificationAuditLog = typeof verificationAuditLog.$inferSelect;
 export type InsertVerificationAuditLog = z.infer<typeof insertVerificationAuditLogSchema>;
 export type VerificationUploadJob = typeof verificationUploadJobs.$inferSelect;
 export type InsertVerificationUploadJob = z.infer<typeof insertVerificationUploadJobSchema>;
+export type VerificationEmailValidationJob = typeof verificationEmailValidationJobs.$inferSelect;
+export type InsertVerificationEmailValidationJob = z.infer<typeof insertVerificationEmailValidationJobSchema>;
