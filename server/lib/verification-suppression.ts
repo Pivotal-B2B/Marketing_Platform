@@ -15,9 +15,9 @@ export async function applySuppressionForContacts(
     WHERE c.id = ANY(${contactIds}::varchar[])
       AND c.campaign_id = ${campaignId}
       AND (
-        LOWER(c.email) IN (
+        c.email_lower IN (
           SELECT email_lower FROM verification_suppression_list
-          WHERE campaign_id = ${campaignId} OR campaign_id IS NULL
+          WHERE (campaign_id = ${campaignId} OR campaign_id IS NULL) AND email_lower IS NOT NULL
         )
         OR c.cav_id IN (
           SELECT cav_id FROM verification_suppression_list

@@ -106,117 +106,105 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
       errors: [] as string[],
     };
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      
-      try {
-        if (!row.fullName && !row.firstName && !row.lastName) {
-          results.skipped++;
-          results.errors.push(`Row ${i + 1}: Missing name information`);
-          continue;
-        }
-
-        let accountId: string | null = null;
-        const accountName = row.account_name || row.companyName;
-        const domainValue = row.domain || row.companyDomain;
-
-        if (accountName || domainValue) {
-          let whereClause;
-          if (domainValue) {
-            whereClause = eq(accounts.domain, domainValue.toLowerCase());
-          } else if (accountName) {
-            whereClause = sql`LOWER(${accounts.name}) = LOWER(${accountName})`;
+    // Wrap all inserts in a transaction
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        
+        try {
+          if (!row.fullName && !row.firstName && !row.lastName) {
+            results.skipped++;
+            results.errors.push(`Row ${i + 1}: Missing name information`);
+            continue;
           }
 
-          if (whereClause) {
-            const [existingAccount] = await db
+          // Resolve/create account (domain > name)
+          const accountNameCsv = row.account_name || row.companyName || null;
+          const domainValue = (row.domain || row.companyDomain || null)?.toLowerCase() || null;
+
+          let accountId: string | null = null;
+          if (domainValue) {
+            const [a] = await tx
               .select({ id: accounts.id })
               .from(accounts)
-              .where(whereClause)
+              .where(eq(accounts.domain, domainValue))
               .limit(1);
-
-            if (existingAccount) {
-              accountId = existingAccount.id;
-            } else {
-              const accountDataName = accountName || (domainValue ? domainValue.replace(/^www\./, '').split('.')[0] : null);
-              if (accountDataName) {
-                const [newAccount] = await db
-                  .insert(accounts)
-                  .values({
-                    name: accountDataName,
-                    domain: domainValue?.toLowerCase() || null,
-                    hqCity: row.hqCity || null,
-                    hqState: row.hqState || null,
-                    hqCountry: row.hqCountry || null,
-                  })
-                  .returning({ id: accounts.id });
-                
-                accountId = newAccount.id;
-              }
-            }
+            
+            accountId = a?.id ?? (await tx.insert(accounts).values({
+              name: (accountNameCsv ?? domainValue.replace(/^www\./, '').split('.')[0])!,
+              domain: domainValue,
+              hqCity: row.hqCity ?? null,
+              hqState: row.hqState ?? null,
+              hqCountry: row.hqCountry ?? null,
+            }).returning({ id: accounts.id }))[0].id;
+          } else if (accountNameCsv) {
+            const [a] = await tx
+              .select({ id: accounts.id })
+              .from(accounts)
+              .where(sql`LOWER(${accounts.name}) = LOWER(${accountNameCsv})`)
+              .limit(1);
+            
+            accountId = a?.id ?? (await tx.insert(accounts).values({
+              name: accountNameCsv,
+              domain: null,
+              hqCity: row.hqCity ?? null,
+              hqState: row.hqState ?? null,
+              hqCountry: row.hqCountry ?? null,
+            }).returning({ id: accounts.id }))[0].id;
           }
-        }
 
-        const fullName = row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim();
-        const sourceType: 'Client_Provided' | 'New_Sourced' = (row.sourceType?.toLowerCase() === 'client_provided' || row.sourceType?.toLowerCase() === 'client provided')
-          ? 'Client_Provided'
-          : 'New_Sourced';
+          const fullName = row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim();
+          const sourceType: 'Client_Provided' | 'New_Sourced' = (row.sourceType?.toLowerCase() === 'client_provided' || row.sourceType?.toLowerCase() === 'client provided')
+            ? 'Client_Provided'
+            : 'New_Sourced';
 
-        const contactData = {
-          campaignId,
-          accountId,
-          sourceType,
-          fullName,
-          firstName: row.firstName || null,
-          lastName: row.lastName || null,
-          title: row.title || null,
-          email: row.email?.toLowerCase() || null,
-          phone: row.phone || null,
-          mobile: row.mobile || null,
-          linkedinUrl: row.linkedinUrl || null,
-          contactCity: row.contactCity || null,
-          contactState: row.contactState || null,
-          contactCountry: row.contactCountry || null,
-          contactPostal: row.contactPostal || null,
-          cavId: row.cavId || null,
-          cavUserId: row.cavUserId || null,
-        };
+          // Pre-compute eligibility and suppression BEFORE insert
+          const eligibility = evaluateEligibility(
+            row.title || null,
+            row.contactCountry || null,
+            campaign
+          );
 
-        const [contact] = await db
-          .insert(verificationContacts)
-          .values([contactData])
-          .returning();
+          const isSuppressed = await checkSuppression(campaignId, {
+            email: row.email || null,
+            cavId: row.cavId || null,
+            cavUserId: row.cavUserId || null,
+            fullName,
+            account_name: accountNameCsv,
+          });
 
-        const eligibility = evaluateEligibility(
-          contact.title,
-          contact.contactCountry,
-          campaign
-        );
-
-        const isSuppressed = await checkSuppression(campaignId, {
-          email: contact.email,
-          cavId: contact.cavId,
-          cavUserId: contact.cavUserId,
-          fullName: contact.fullName,
-          account_name: accountName || null,
-        });
-
-        await db
-          .update(verificationContacts)
-          .set({
+          // Insert in one go with derived fields
+          await tx.insert(verificationContacts).values({
+            campaignId,
+            accountId,
+            sourceType,
+            fullName,
+            firstName: row.firstName || null,
+            lastName: row.lastName || null,
+            title: row.title || null,
+            email: row.email?.toLowerCase() || null,
+            phone: row.phone || null,
+            mobile: row.mobile || null,
+            linkedinUrl: row.linkedinUrl || null,
+            contactCity: row.contactCity || null,
+            contactState: row.contactState || null,
+            contactCountry: row.contactCountry || null,
+            contactPostal: row.contactPostal || null,
+            cavId: row.cavId || null,
+            cavUserId: row.cavUserId || null,
             eligibilityStatus: eligibility.status,
             eligibilityReason: eligibility.reason,
             suppressed: isSuppressed,
-            updatedAt: new Date(),
-          })
-          .where(eq(verificationContacts.id, contact.id));
+            // email_lower set by trigger
+          });
 
-        results.created++;
-      } catch (error: any) {
-        results.skipped++;
-        results.errors.push(`Row ${i + 1}: ${error.message}`);
+          results.created++;
+        } catch (error: any) {
+          results.skipped++;
+          results.errors.push(`Row ${i + 1}: ${error.message ?? String(error)}`);
+        }
       }
-    }
+    });
 
     res.json(results);
   } catch (error) {

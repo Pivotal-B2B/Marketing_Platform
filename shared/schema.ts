@@ -3435,6 +3435,7 @@ export const verificationContacts = pgTable("verification_contacts", {
   lastName: text("last_name"),
   title: text("title"),
   email: text("email"),
+  emailLower: text("email_lower"),
   phone: text("phone"),
   mobile: text("mobile"),
   linkedinUrl: text("linkedin_url"),

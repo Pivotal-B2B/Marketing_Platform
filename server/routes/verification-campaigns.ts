@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db";
-import { verificationCampaigns, insertVerificationCampaignSchema, verificationLeadSubmissions, verificationContacts } from "@shared/schema";
+import { verificationCampaigns, insertVerificationCampaignSchema, verificationLeadSubmissions, verificationContacts, accounts } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -95,18 +95,24 @@ router.get("/api/verification-campaigns/:campaignId/accounts/:accountName/cap", 
   try {
     const { campaignId, accountName } = req.params;
     
+    // Resolve accountId by case-insensitive name
+    const [acct] = await db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(sql`LOWER(${accounts.name}) = LOWER(${accountName})`)
+      .limit(1);
+
+    if (!acct) {
+      return res.json({ accountName, submitted: 0 });
+    }
+
     const [result] = await db
-      .select({
-        submitted: sql<number>`count(*)`
-      })
+      .select({ submitted: sql<number>`count(*)` })
       .from(verificationLeadSubmissions)
-      .innerJoin(verificationContacts, eq(verificationLeadSubmissions.contactId, verificationContacts.id))
-      .where(
-        and(
-          eq(verificationLeadSubmissions.campaignId, campaignId),
-          eq(verificationContacts.account_name, accountName)
-        )
-      );
+      .where(and(
+        eq(verificationLeadSubmissions.campaignId, campaignId),
+        eq(verificationLeadSubmissions.accountId, acct.id)
+      ));
     
     res.json({
       accountName,
