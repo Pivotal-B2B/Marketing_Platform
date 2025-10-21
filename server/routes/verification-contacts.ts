@@ -12,6 +12,7 @@ import { eq, sql, and, desc, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { evaluateEligibility, computeNormalizedKeys } from "../lib/verification-utils";
 import { applySuppressionForContacts } from "../lib/verification-suppression";
+import { requireAuth } from "../auth";
 
 const router = Router();
 
@@ -656,7 +657,7 @@ router.post("/api/verification-campaigns/:campaignId/flush", async (req, res) =>
   }
 });
 
-router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", async (req, res) => {
+router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", requireAuth, async (req, res) => {
   try {
     const { campaignId } = req.params;
     const bulkDeleteSchema = z.object({
@@ -679,22 +680,50 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", asyn
     
     console.log('[BULK DELETE] Permission check:', { isAdmin, allowClientProvidedDelete });
     
-    const result = await db.execute(sql`
-      UPDATE verification_contacts c
-      SET deleted = TRUE, updated_at = NOW()
-      WHERE c.id IN (${sql.join(contactIds.map(id => sql`${id}`), sql`, `)})
-        AND c.campaign_id = ${campaignId}
-        AND c.deleted = FALSE
-        AND (c.source_type <> 'Client_Provided' OR ${allowClientProvidedDelete})
-        AND c.id NOT IN (
-          SELECT contact_id FROM verification_lead_submissions s 
-          WHERE s.campaign_id = ${campaignId}
+    // Filter out contacts that are already submitted
+    const submittedContactIds = await db
+      .select({ contactId: verificationLeadSubmissions.contactId })
+      .from(verificationLeadSubmissions)
+      .where(
+        and(
+          eq(verificationLeadSubmissions.campaignId, campaignId),
+          inArray(verificationLeadSubmissions.contactId, contactIds)
         )
-        AND c.in_submission_buffer = FALSE
-      RETURNING c.id
-    `);
+      )
+      .then(rows => rows.map(r => r.contactId));
     
-    const deletedIds = result.rows.map((r: any) => r.id);
+    const eligibleContactIds = contactIds.filter(id => !submittedContactIds.includes(id));
+    
+    if (eligibleContactIds.length === 0) {
+      return res.json({
+        success: true,
+        deletedCount: 0,
+        deletedIds: [],
+        skippedCount: contactIds.length,
+        message: "All contacts have already been submitted"
+      });
+    }
+    
+    // Use Drizzle ORM for safe, parameterized updates
+    const conditions = [
+      inArray(verificationContacts.id, eligibleContactIds),
+      eq(verificationContacts.campaignId, campaignId),
+      eq(verificationContacts.deleted, false),
+      eq(verificationContacts.inSubmissionBuffer, false),
+    ];
+    
+    // Only filter out Client_Provided if not allowed
+    if (!allowClientProvidedDelete) {
+      conditions.push(sql`${verificationContacts.sourceType} <> 'Client_Provided'`);
+    }
+    
+    const result = await db
+      .update(verificationContacts)
+      .set({ deleted: true, updatedAt: new Date() })
+      .where(and(...conditions))
+      .returning({ id: verificationContacts.id });
+    
+    const deletedIds = result.map(r => r.id);
     
     console.log('[BULK DELETE] Result:', { 
       requested: contactIds.length, 
