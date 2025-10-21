@@ -1,0 +1,11 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# SQL files should use LF
+*.sql text eol=lf
+
+# Shell scripts should use LF
+*.sh text eol=lf
+
+# Large database exports
+*.sql filter=lfs diff=lfs merge=lfs -text
