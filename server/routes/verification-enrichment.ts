@@ -6,6 +6,44 @@ import { CompanyEnrichmentService } from "../lib/company-enrichment";
 
 const router = Router();
 
+// Helper: Sleep for specified milliseconds
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper: Retry with exponential backoff for 429/5xx errors
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxAttempts: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if it's a rate limit error (429) or server error (5xx)
+      const is429 = error.message?.includes('429') || error.status === 429;
+      const is5xx = error.status >= 500 && error.status < 600;
+      
+      if (!is429 && !is5xx) {
+        // Not a retryable error, throw immediately
+        throw error;
+      }
+      
+      if (attempt < maxAttempts) {
+        // Exponential backoff with jitter
+        const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
+        console.log(`[Retry] Attempt ${attempt} failed (${error.message}), retrying in ${Math.round(delay)}ms...`);
+        await sleep(delay);
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
 interface EnrichmentProgress {
   total: number;
   processed: number;
@@ -28,10 +66,10 @@ interface EnrichmentProgress {
  */
 router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) => {
   const { campaignId } = req.params;
-  const { force = false } = req.body; // Force re-enrichment even if already enriched
+  const { force = false, batchSize = 50, delayMs = 1500 } = req.body; // Configurable batch size and delay
 
   try {
-    console.log(`[Enrichment] Starting enrichment for campaign ${campaignId}`);
+    console.log(`[Enrichment] Starting enrichment for campaign ${campaignId} (batch: ${batchSize}, delay: ${delayMs}ms)`);
 
     // Get eligible contacts that need enrichment
     const query = db
@@ -92,8 +130,12 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
       });
     }
 
+    // Limit batch to prevent overwhelming
+    const effectiveBatchSize = Math.min(batchSize, contactsNeedingEnrichment.length);
+    const contactsToEnrich = contactsNeedingEnrichment.slice(0, effectiveBatchSize);
+
     const progress: EnrichmentProgress = {
-      total: contactsNeedingEnrichment.length,
+      total: contactsToEnrich.length, // Set to actual number being processed, not total eligible
       processed: 0,
       addressEnriched: 0,
       phoneEnriched: 0,
@@ -101,152 +143,191 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
       errors: [],
     };
 
-    console.log(`[Enrichment] Found ${contactsNeedingEnrichment.length} contacts needing enrichment`);
+    console.log(`[Enrichment] Found ${contactsNeedingEnrichment.length} contacts needing enrichment, processing ${contactsToEnrich.length} in this batch`);
 
-    // Process contacts in batches to avoid overwhelming the API
-    const BATCH_SIZE = 5;
-    const DELAY_MS = 1000; // 1 second delay between batches
+    // Circuit breaker: Stop if too many consecutive failures
+    const CIRCUIT_BREAKER_THRESHOLD = 10;
+    let consecutiveFailures = 0;
+    let circuitBroken = false;
 
-    for (let i = 0; i < contactsNeedingEnrichment.length; i += BATCH_SIZE) {
-      const batch = contactsNeedingEnrichment.slice(i, i + BATCH_SIZE);
+    console.log(`[Enrichment] Processing ${contactsToEnrich.length} contacts sequentially with ${delayMs}ms delay`);
+
+    // Process contacts SEQUENTIALLY to avoid rate limits
+    for (let i = 0; i < contactsToEnrich.length; i++) {
+      if (circuitBroken) {
+        console.log(`[Enrichment] Circuit breaker triggered - stopping enrichment`);
+        progress.errors.push({
+          contactId: 'CIRCUIT_BREAKER',
+          name: 'System',
+          error: `Stopped after ${consecutiveFailures} consecutive failures to prevent further rate limiting`,
+        });
+        break;
+      }
+
+      const contact = contactsToEnrich[i];
       
-      await Promise.all(
-        batch.map(async (contact) => {
-          try {
-            if (!contact.accountName) {
-              progress.failed++;
-              progress.errors.push({
-                contactId: contact.id,
-                name: contact.fullName,
-                error: "No company name available",
-              });
-              return;
-            }
+      try {
+        if (!contact.accountName) {
+          progress.failed++;
+          consecutiveFailures++;
+          progress.errors.push({
+            contactId: contact.id,
+            name: contact.fullName,
+            error: "No company name available",
+          });
+          
+          // Check circuit breaker
+          if (consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+            circuitBroken = true;
+          }
+          continue;
+        }
 
-            // Mark as in progress
-            await db.update(verificationContacts)
-              .set({
-                addressEnrichmentStatus: CompanyEnrichmentService.needsAddressEnrichment(contact) 
-                  ? 'in_progress' 
-                  : contact.addressEnrichmentStatus,
-                phoneEnrichmentStatus: CompanyEnrichmentService.needsPhoneEnrichment(contact)
-                  ? 'in_progress'
-                  : contact.phoneEnrichmentStatus,
-                updatedAt: new Date(),
-              })
-              .where(eq(verificationContacts.id, contact.id));
+        // Mark as in progress
+        await db.update(verificationContacts)
+          .set({
+            addressEnrichmentStatus: CompanyEnrichmentService.needsAddressEnrichment(contact) 
+              ? 'in_progress' 
+              : contact.addressEnrichmentStatus,
+            phoneEnrichmentStatus: CompanyEnrichmentService.needsPhoneEnrichment(contact)
+              ? 'in_progress'
+              : contact.phoneEnrichmentStatus,
+            updatedAt: new Date(),
+          })
+          .where(eq(verificationContacts.id, contact.id));
 
-            // Call enrichment service
-            const result = await CompanyEnrichmentService.enrichCompanyData(
-              contact,
-              contact.accountName
-            );
+        // Call enrichment service with retry logic for 429/5xx errors
+        const result = await retryWithBackoff(
+          () => CompanyEnrichmentService.enrichCompanyData(contact, contact.accountName),
+          3, // max attempts
+          1000 // base delay ms
+        );
 
             const updateData: any = {
               updatedAt: new Date(),
             };
 
-            const CONFIDENCE_THRESHOLD = 0.7;
+        const CONFIDENCE_THRESHOLD = 0.7;
 
-            // Handle address enrichment result - only save if addressConfidence >= 0.7
-            // Save to CONTACT-level fields (local office address where the contact works)
-            if (result.address && result.addressConfidence !== undefined) {
-              if (result.addressConfidence >= CONFIDENCE_THRESHOLD) {
-                updateData.contactAddress1 = result.address.address1;
-                updateData.contactAddress2 = result.address.address2 || null;
-                updateData.contactAddress3 = result.address.address3 || null;
-                updateData.contactCity = result.address.city;
-                updateData.contactState = result.address.state;
-                updateData.contactPostal = result.address.postalCode;
-                updateData.contactCountry = result.address.country;
-                updateData.addressEnrichmentStatus = 'completed';
-                updateData.addressEnrichedAt = new Date();
-                updateData.addressEnrichmentError = null;
-                progress.addressEnriched++;
-                console.log(`[Enrichment] Contact address enriched for ${contact.fullName} (confidence: ${result.addressConfidence})`);
-              } else {
-                updateData.addressEnrichmentStatus = 'failed';
-                updateData.addressEnrichmentError = `Low confidence: ${result.addressConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;
-                console.log(`[Enrichment] Rejected low-confidence address for ${contact.fullName} (confidence: ${result.addressConfidence})`);
-              }
-            } else if (result.addressError) {
-              updateData.addressEnrichmentStatus = 'failed';
-              updateData.addressEnrichmentError = result.addressError;
-            }
-
-            // Handle phone enrichment result - only save if phoneConfidence >= 0.7
-            // Save to contact's direct phone (local office phone where the contact works)
-            if (result.phone && result.phoneConfidence !== undefined) {
-              if (result.phoneConfidence >= CONFIDENCE_THRESHOLD) {
-                updateData.directPhone = result.phone;
-                updateData.phoneEnrichmentStatus = 'completed';
-                updateData.phoneEnrichedAt = new Date();
-                updateData.phoneEnrichmentError = null;
-                progress.phoneEnriched++;
-                console.log(`[Enrichment] Contact phone enriched for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
-              } else {
-                updateData.phoneEnrichmentStatus = 'failed';
-                updateData.phoneEnrichmentError = `Low confidence: ${result.phoneConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;
-                console.log(`[Enrichment] Rejected low-confidence phone for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
-              }
-            } else if (result.phoneError) {
-              updateData.phoneEnrichmentStatus = 'failed';
-              updateData.phoneEnrichmentError = result.phoneError;
-            }
-
-            // Update contact with enriched data
-            await db.update(verificationContacts)
-              .set(updateData)
-              .where(eq(verificationContacts.id, contact.id));
-
-            progress.processed++;
-
-            console.log(`[Enrichment] Processed ${contact.fullName}: address=${!!result.address}, phone=${!!result.phone}`);
-
-          } catch (error: any) {
-            console.error(`[Enrichment] Error processing contact ${contact.id}:`, error);
-            
-            // Only mark as failed the enrichment types that were actually attempted
-            // This preserves previously completed enrichments
-            const errorUpdateData: any = {
-              updatedAt: new Date(),
-            };
-
-            if (CompanyEnrichmentService.needsAddressEnrichment(contact)) {
-              errorUpdateData.addressEnrichmentStatus = 'failed';
-              errorUpdateData.addressEnrichmentError = error.message;
-            }
-
-            if (CompanyEnrichmentService.needsPhoneEnrichment(contact)) {
-              errorUpdateData.phoneEnrichmentStatus = 'failed';
-              errorUpdateData.phoneEnrichmentError = error.message;
-            }
-
-            await db.update(verificationContacts)
-              .set(errorUpdateData)
-              .where(eq(verificationContacts.id, contact.id));
-
-            progress.failed++;
-            progress.errors.push({
-              contactId: contact.id,
-              name: contact.fullName,
-              error: error.message || "Unknown error",
-            });
+        // Handle address enrichment result - only save if addressConfidence >= 0.7
+        // Save to CONTACT-level fields (local office address where the contact works)
+        if (result.address && result.addressConfidence !== undefined) {
+          if (result.addressConfidence >= CONFIDENCE_THRESHOLD) {
+            updateData.contactAddress1 = result.address.address1;
+            updateData.contactAddress2 = result.address.address2 || null;
+            updateData.contactAddress3 = result.address.address3 || null;
+            updateData.contactCity = result.address.city;
+            updateData.contactState = result.address.state;
+            updateData.contactPostal = result.address.postalCode;
+            updateData.contactCountry = result.address.country;
+            updateData.addressEnrichmentStatus = 'completed';
+            updateData.addressEnrichedAt = new Date();
+            updateData.addressEnrichmentError = null;
+            progress.addressEnriched++;
+            console.log(`[Enrichment] Contact address enriched for ${contact.fullName} (confidence: ${result.addressConfidence})`);
+          } else {
+            updateData.addressEnrichmentStatus = 'failed';
+            updateData.addressEnrichmentError = `Low confidence: ${result.addressConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;
+            console.log(`[Enrichment] Rejected low-confidence address for ${contact.fullName} (confidence: ${result.addressConfidence})`);
           }
-        })
-      );
+        } else if (result.addressError) {
+          updateData.addressEnrichmentStatus = 'failed';
+          updateData.addressEnrichmentError = result.addressError;
+        }
 
-      // Delay between batches to respect rate limits
-      if (i + BATCH_SIZE < contactsNeedingEnrichment.length) {
-        await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+        // Handle phone enrichment result - only save if phoneConfidence >= 0.7
+        // Save to contact's direct phone (local office phone where the contact works)
+        if (result.phone && result.phoneConfidence !== undefined) {
+          if (result.phoneConfidence >= CONFIDENCE_THRESHOLD) {
+            updateData.directPhone = result.phone;
+            updateData.phoneEnrichmentStatus = 'completed';
+            updateData.phoneEnrichedAt = new Date();
+            updateData.phoneEnrichmentError = null;
+            progress.phoneEnriched++;
+            console.log(`[Enrichment] Contact phone enriched for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
+          } else {
+            updateData.phoneEnrichmentStatus = 'failed';
+            updateData.phoneEnrichmentError = `Low confidence: ${result.phoneConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;
+            console.log(`[Enrichment] Rejected low-confidence phone for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
+          }
+        } else if (result.phoneError) {
+          updateData.phoneEnrichmentStatus = 'failed';
+          updateData.phoneEnrichmentError = result.phoneError;
+        }
+
+        // Update contact with enriched data
+        await db.update(verificationContacts)
+          .set(updateData)
+          .where(eq(verificationContacts.id, contact.id));
+
+        progress.processed++;
+        consecutiveFailures = 0; // Reset on success
+
+        console.log(`[Enrichment] Processed ${contact.fullName}: address=${!!result.address}, phone=${!!result.phone}`);
+
+      } catch (error: any) {
+        console.error(`[Enrichment] Error processing contact ${contact.id}:`, error);
+        consecutiveFailures++;
+        
+        // Only mark as failed the enrichment types that were actually attempted
+        // This preserves previously completed enrichments
+        const errorUpdateData: any = {
+          updatedAt: new Date(),
+        };
+
+        if (CompanyEnrichmentService.needsAddressEnrichment(contact)) {
+          errorUpdateData.addressEnrichmentStatus = 'failed';
+          errorUpdateData.addressEnrichmentError = error.message;
+        }
+
+        if (CompanyEnrichmentService.needsPhoneEnrichment(contact)) {
+          errorUpdateData.phoneEnrichmentStatus = 'failed';
+          errorUpdateData.phoneEnrichmentError = error.message;
+        }
+
+        await db.update(verificationContacts)
+          .set(errorUpdateData)
+          .where(eq(verificationContacts.id, contact.id));
+
+        progress.failed++;
+        progress.errors.push({
+          contactId: contact.id,
+          name: contact.fullName,
+          error: error.message || "Unknown error",
+        });
+
+        // Check circuit breaker
+        if (consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+          circuitBroken = true;
+        }
+      }
+
+      // Delay between contacts to respect rate limits (except after last contact)
+      if (i < contactsToEnrich.length - 1) {
+        await sleep(delayMs);
       }
     }
 
     console.log(`[Enrichment] Completed: ${progress.processed}/${progress.total}, Address: ${progress.addressEnriched}, Phone: ${progress.phoneEnriched}, Failed: ${progress.failed}`);
 
+    // Calculate remaining contacts after this batch (accounting for circuit breaker and early exits)
+    const actualProcessed = progress.processed + progress.failed;
+    const remainingInBatch = contactsToEnrich.length - actualProcessed;
+    const remainingInQueue = contactsNeedingEnrichment.length - actualProcessed;
+    const totalRemaining = remainingInQueue;
+
+    const message = circuitBroken
+      ? `Circuit breaker triggered after ${progress.failed} failures. ${totalRemaining} contacts still need enrichment. Please wait before retrying.`
+      : totalRemaining > 0
+        ? `Batch completed. ${totalRemaining} contacts still need enrichment - click "Enrich Company Data" again to continue.`
+        : "All eligible contacts enriched";
+
     res.json({
-      message: "Enrichment completed",
+      message,
       progress,
+      remainingCount: totalRemaining,
+      totalEligible: contactsNeedingEnrichment.length,
+      circuitBroken,
     });
   } catch (error: any) {
     console.error("[Enrichment] Error:", error);

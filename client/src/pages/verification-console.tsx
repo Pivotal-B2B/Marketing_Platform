@@ -37,6 +37,8 @@ export default function VerificationConsolePage() {
   const [bulkDeleteReason, setBulkDeleteReason] = useState("");
   const [enrichmentDialogOpen, setEnrichmentDialogOpen] = useState(false);
   const [enrichmentProgress, setEnrichmentProgress] = useState<any>(null);
+  const [enrichmentBatchSize, setEnrichmentBatchSize] = useState(50);
+  const [enrichmentDelay, setEnrichmentDelay] = useState(1500);
   const [filters, setFilters] = useState({
     contactSearch: "",
     phoneSearch: "",
@@ -264,14 +266,26 @@ export default function VerificationConsolePage() {
 
   const enrichmentMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/enrich`, {});
+      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/enrich`, {
+        batchSize: enrichmentBatchSize,
+        delayMs: enrichmentDelay,
+      });
       return res.json();
     },
     onSuccess: (data: any) => {
       setEnrichmentProgress(data.progress);
+      const remainingCount = data.remainingCount || 0;
+      const title = remainingCount > 0 
+        ? `Batch Complete - ${remainingCount} Remaining`
+        : "AI Enrichment Complete";
+      const description = remainingCount > 0
+        ? `Enriched ${data.progress.addressEnriched} addresses and ${data.progress.phoneEnriched} phone numbers. ${remainingCount} contacts still need enrichment - click "Enrich Company Data" again to continue.`
+        : `Enriched ${data.progress.addressEnriched} addresses and ${data.progress.phoneEnriched} phone numbers`;
+      
       toast({
-        title: "AI Enrichment Complete",
-        description: `Enriched ${data.progress.addressEnriched} addresses and ${data.progress.phoneEnriched} phone numbers`,
+        title,
+        description,
+        duration: remainingCount > 0 ? 10000 : 5000, // Longer duration if there's more work to do
       });
       queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
       queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
@@ -1389,26 +1403,65 @@ export default function VerificationConsolePage() {
               Only contacts that are eligible, validated, and not suppressed will be processed.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4 space-y-2">
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
-              <span><strong>Stage 1:</strong> AI uses internal knowledge to find LOCAL office info (e.g., "Company Name Singapore office")</span>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
+                <span><strong>Stage 1:</strong> AI uses internal knowledge to find LOCAL office info (e.g., "Company Name Singapore office")</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
+                <span><strong>Stage 2:</strong> If AI lacks data, automatically searches the web (requires BRAVE_SEARCH_API_KEY)</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
+                <span>Enriches local address (Address 1-3, City, State, Postal Code) and local phone number</span>
+              </div>
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
+                <span>Only high-confidence results (≥70%) will be saved</span>
+              </div>
             </div>
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
-              <span><strong>Stage 2:</strong> If AI lacks data, automatically searches the web (requires BRAVE_SEARCH_API_KEY)</span>
-            </div>
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
-              <span>Enriches local address (Address 1-3, City, State, Postal Code) and local phone number</span>
-            </div>
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
-              <span>Only high-confidence results (≥70%) will be saved</span>
-            </div>
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
-              <span>Processing occurs in batches with rate limiting</span>
+            
+            <div className="space-y-3 pt-3 border-t">
+              <div className="space-y-2">
+                <Label htmlFor="batch-size" className="text-sm font-medium">
+                  Batch Size (Recommended: 10-50)
+                </Label>
+                <Input
+                  id="batch-size"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={enrichmentBatchSize}
+                  onChange={(e) => setEnrichmentBatchSize(parseInt(e.target.value) || 50)}
+                  data-testid="input-batch-size"
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum number of contacts to enrich in this session. Lower values reduce rate limit risk.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="delay-ms" className="text-sm font-medium">
+                  Delay Between Contacts (ms)
+                </Label>
+                <Input
+                  id="delay-ms"
+                  type="number"
+                  min="500"
+                  max="5000"
+                  step="100"
+                  value={enrichmentDelay}
+                  onChange={(e) => setEnrichmentDelay(parseInt(e.target.value) || 1500)}
+                  data-testid="input-delay-ms"
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Delay between each contact (1000-2000ms recommended). Higher values prevent rate limiting.
+                </p>
+              </div>
             </div>
           </div>
           <AlertDialogFooter>
