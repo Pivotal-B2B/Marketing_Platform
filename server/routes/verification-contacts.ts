@@ -1153,12 +1153,12 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
       }
       
       // Extract unique emails for this batch (filter out null/empty)
-      const emailsToVerify = [...new Set(
+      const emailsToVerify = Array.from(new Set(
         contacts
           .map(c => c.emailLower || c.email?.toLowerCase())
           .filter((email): email is string => Boolean(email && email.trim()))
           .map(email => email.trim())
-      )];
+      ));
       
       if (emailsToVerify.length === 0) {
         console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1}: No valid emails to verify, skipping`);
