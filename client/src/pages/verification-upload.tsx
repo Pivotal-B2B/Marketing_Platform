@@ -85,6 +85,10 @@ function autoMapVerificationColumn(header: string): string | null {
     'companypostal': 'hqPostal',
     'hqcountry': 'hqCountry',
     'companycountry': 'hqCountry',
+    'hqphone': 'hqPhone',
+    'companyphone': 'hqPhone',
+    'mainphone': 'hqPhone',
+    'companyphonenumber': 'hqPhone',
     'cavid': 'cavId',
     'cavuserid': 'cavUserId',
     'sourcetype': 'sourceType',
@@ -95,7 +99,7 @@ function autoMapVerificationColumn(header: string): string | null {
 }
 
 function getTargetEntity(fieldName: string): "contact" | "account" | null {
-  const accountFields = ['account_name', 'domain', 'hqAddress1', 'hqAddress2', 'hqAddress3', 'hqCity', 'hqState', 'hqPostal', 'hqCountry'];
+  const accountFields = ['account_name', 'domain', 'hqPhone', 'hqAddress1', 'hqAddress2', 'hqAddress3', 'hqCity', 'hqState', 'hqPostal', 'hqCountry'];
   return accountFields.includes(fieldName) ? 'account' : 'contact';
 }
 
@@ -466,6 +470,7 @@ export default function VerificationUploadPage() {
                             </div>
                             <SelectItem value="account_name">Company Name</SelectItem>
                             <SelectItem value="domain">Domain</SelectItem>
+                            <SelectItem value="hqPhone">HQ Phone</SelectItem>
                             <SelectItem value="hqAddress1">HQ Address 1</SelectItem>
                             <SelectItem value="hqAddress2">HQ Address 2</SelectItem>
                             <SelectItem value="hqAddress3">HQ Address 3</SelectItem>

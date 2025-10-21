@@ -1052,6 +1052,10 @@ export default function VerificationConsolePage() {
                     <Label>Domain</Label>
                     <Input value={(contact as any)?.domain || ""} readOnly data-testid="input-domain" />
                   </div>
+                  <div className="col-span-3">
+                    <Label>HQ Phone (Enriched)</Label>
+                    <Input value={(contact as any)?.hqPhone || (contact as any)?.main_phone || ""} readOnly data-testid="input-hq-phone" />
+                  </div>
                 </div>
               </div>
 

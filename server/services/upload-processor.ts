@@ -25,6 +25,7 @@ interface CSVRow {
   account_name?: string;
   companyDomain?: string;
   domain?: string;
+  hqPhone?: string;
   hqAddress1?: string;
   hqAddress2?: string;
   hqAddress3?: string;
@@ -100,6 +101,10 @@ const autoMappings: Record<string, string> = {
   'hqzipcode': 'hqPostal',
   'hqcountry': 'hqCountry',
   'headquarterscountry': 'hqCountry',
+  'hqphone': 'hqPhone',
+  'companyphone': 'hqPhone',
+  'mainphone': 'hqPhone',
+  'companyphonenumber': 'hqPhone',
   'cavid': 'cavId',
   'cav_id': 'cavId',
   'cavuserid': 'cavUserId',
@@ -293,6 +298,7 @@ export async function processUpload(jobId: string) {
                 const newAccount = await tx.insert(accounts).values({
                   name: accountNameCsv ?? (rootDomain ? rootDomain.split('.')[0] : 'Unknown Company'),
                   domain: rootDomain,
+                  mainPhone: row.hqPhone ?? null,
                   hqStreet1: row.hqAddress1 ?? null,
                   hqStreet2: row.hqAddress2 ?? null,
                   hqStreet3: row.hqAddress3 ?? null,
