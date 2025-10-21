@@ -8,8 +8,9 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CSVFieldMapper } from "@/components/csv-field-mapper";
 import { parseCSV } from "@/lib/csv-utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface FieldMapping {
   csvColumn: string;
@@ -18,6 +19,83 @@ interface FieldMapping {
 }
 
 type UploadStage = "select" | "map" | "upload" | "complete";
+
+// Auto-map verification column names
+function autoMapVerificationColumn(header: string): string | null {
+  const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  
+  const mappings: Record<string, string> = {
+    'fullname': 'fullName',
+    'name': 'fullName',
+    'firstname': 'firstName',
+    'lastname': 'lastName',
+    'jobtitle': 'title',
+    'title': 'title',
+    'emailaddress': 'email',
+    'email': 'email',
+    'phonenumber': 'phone',
+    'phone': 'phone',
+    'mobilenumber': 'mobile',
+    'mobile': 'mobile',
+    'linkedin': 'linkedinUrl',
+    'linkedinurl': 'linkedinUrl',
+    'contactaddress1': 'contactAddress1',
+    'contactaddress2': 'contactAddress2',
+    'contactaddress3': 'contactAddress3',
+    'address1': 'contactAddress1',
+    'address2': 'contactAddress2',
+    'address3': 'contactAddress3',
+    'street1': 'contactAddress1',
+    'street2': 'contactAddress2',
+    'street3': 'contactAddress3',
+    'contactcity': 'contactCity',
+    'city': 'contactCity',
+    'contactstate': 'contactState',
+    'state': 'contactState',
+    'contactcountry': 'contactCountry',
+    'country': 'contactCountry',
+    'contactpostalcode': 'contactPostal',
+    'contactpostal': 'contactPostal',
+    'postalcode': 'contactPostal',
+    'postal': 'contactPostal',
+    'zip': 'contactPostal',
+    'zipcode': 'contactPostal',
+    'companyname': 'account_name',
+    'company': 'account_name',
+    'accountname': 'account_name',
+    'companydomain': 'domain',
+    'domain': 'domain',
+    'hqaddress1': 'hqAddress1',
+    'hqaddress2': 'hqAddress2',
+    'hqaddress3': 'hqAddress3',
+    'companyaddress1': 'hqAddress1',
+    'companyaddress2': 'hqAddress2',
+    'companyaddress3': 'hqAddress3',
+    'hqstreet1': 'hqAddress1',
+    'hqstreet2': 'hqAddress2',
+    'hqstreet3': 'hqAddress3',
+    'hqcity': 'hqCity',
+    'hqstate': 'hqState',
+    'hqpostalcode': 'hqPostal',
+    'hqpostal': 'hqPostal',
+    'hqzip': 'hqPostal',
+    'companypostalcode': 'hqPostal',
+    'companypostal': 'hqPostal',
+    'hqcountry': 'hqCountry',
+    'companycountry': 'hqCountry',
+    'cavid': 'cavId',
+    'cavuserid': 'cavUserId',
+    'sourcetype': 'sourceType',
+    'source': 'sourceType',
+  };
+
+  return mappings[normalized] || null;
+}
+
+function getTargetEntity(fieldName: string): "contact" | "account" | null {
+  const accountFields = ['account_name', 'domain', 'hqAddress1', 'hqAddress2', 'hqAddress3', 'hqCity', 'hqState', 'hqPostal', 'hqCountry'];
+  return accountFields.includes(fieldName) ? 'account' : 'contact';
+}
 
 export default function VerificationUploadPage() {
   const { campaignId } = useParams();
@@ -224,21 +302,124 @@ export default function VerificationUploadPage() {
       {stage === "map" && file && (
         <Card>
           <CardHeader>
-            <CardTitle>Map Fields</CardTitle>
-            <CardDescription>Match your CSV columns to contact and company fields</CardDescription>
+            <CardTitle>Map CSV Columns to Fields</CardTitle>
+            <CardDescription>
+              Match your CSV columns to verification contact fields. Auto-mapping has been applied based on column names.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <CSVFieldMapper
-              csvHeaders={csvHeaders}
-              sampleData={csvData.slice(0, 5)}
-              onMappingComplete={handleMappingComplete}
-              onCancel={() => {
-                setStage("select");
-                setFile(null);
-                setCsvHeaders([]);
-                setCsvData([]);
-              }}
-            />
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertDescription className="text-xs">
+                <strong>Tip:</strong> Fields marked in <strong className="text-primary">blue</strong> were auto-mapped. 
+                You can change any mapping or skip unmapped columns.
+              </AlertDescription>
+            </Alert>
+
+            <ScrollArea className="h-[400px] pr-4">
+              <div className="space-y-3">
+                {csvHeaders.map((header, index) => {
+                  const autoMapped = autoMapVerificationColumn(header);
+                  return (
+                    <div key={index} className="flex items-center gap-4 p-3 border rounded-md">
+                      <div className="flex-1">
+                        <div className={`font-medium text-sm ${autoMapped ? 'text-primary' : ''}`}>
+                          {header}
+                        </div>
+                        {csvData.length > 0 && csvData[0][index] && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Sample: {csvData[0][index]?.slice(0, 40)}...
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-64">
+                        <Select
+                          value={fieldMappings.find(m => m.csvColumn === header)?.targetField || autoMapped || "skip"}
+                          onValueChange={(value) => {
+                            const newMappings = fieldMappings.filter(m => m.csvColumn !== header);
+                            if (value !== "skip") {
+                              newMappings.push({
+                                csvColumn: header,
+                                targetField: value,
+                                targetEntity: getTargetEntity(value),
+                              });
+                            }
+                            setFieldMappings(newMappings);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Skip this column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="skip">Skip Column</SelectItem>
+                            
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                              Contact Info
+                            </div>
+                            <SelectItem value="fullName">Full Name</SelectItem>
+                            <SelectItem value="firstName">First Name</SelectItem>
+                            <SelectItem value="lastName">Last Name</SelectItem>
+                            <SelectItem value="title">Job Title</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                            <SelectItem value="phone">Phone</SelectItem>
+                            <SelectItem value="mobile">Mobile</SelectItem>
+                            <SelectItem value="linkedinUrl">LinkedIn URL</SelectItem>
+                            
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                              Contact Address
+                            </div>
+                            <SelectItem value="contactAddress1">Address Line 1</SelectItem>
+                            <SelectItem value="contactAddress2">Address Line 2</SelectItem>
+                            <SelectItem value="contactAddress3">Address Line 3</SelectItem>
+                            <SelectItem value="contactCity">City</SelectItem>
+                            <SelectItem value="contactState">State</SelectItem>
+                            <SelectItem value="contactCountry">Country</SelectItem>
+                            <SelectItem value="contactPostal">Postal Code</SelectItem>
+                            
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                              Company Info
+                            </div>
+                            <SelectItem value="account_name">Company Name</SelectItem>
+                            <SelectItem value="domain">Domain</SelectItem>
+                            <SelectItem value="hqAddress1">HQ Address 1</SelectItem>
+                            <SelectItem value="hqAddress2">HQ Address 2</SelectItem>
+                            <SelectItem value="hqAddress3">HQ Address 3</SelectItem>
+                            <SelectItem value="hqCity">HQ City</SelectItem>
+                            <SelectItem value="hqState">HQ State</SelectItem>
+                            <SelectItem value="hqPostal">HQ Postal Code</SelectItem>
+                            <SelectItem value="hqCountry">HQ Country</SelectItem>
+                            
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                              Other
+                            </div>
+                            <SelectItem value="cavId">CAV ID</SelectItem>
+                            <SelectItem value="cavUserId">CAV User ID</SelectItem>
+                            <SelectItem value="sourceType">Source Type</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+
+            <div className="flex gap-2 pt-4 border-t">
+              <Button onClick={() => handleMappingComplete(fieldMappings)}>
+                Continue to Upload
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStage("select");
+                  setFile(null);
+                  setCsvHeaders([]);
+                  setCsvData([]);
+                  setFieldMappings([]);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

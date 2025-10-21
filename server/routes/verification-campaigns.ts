@@ -101,10 +101,10 @@ router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => 
         COUNT(*) FILTER (WHERE deleted = FALSE) as total_contacts,
         COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = TRUE) as suppressed_count,
         COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE) as active_count,
-        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Ok') as eligible_count,
-        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Ok' AND elv_status = 'Valid') as validated_count,
-        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Ok' AND elv_status = 'Valid' AND elv_deliverability = 'deliverable') as ok_email_count,
-        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Ok' AND elv_status = 'Invalid') as invalid_email_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Eligible') as eligible_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Eligible' AND verification_status = 'Validated') as validated_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Eligible' AND verification_status = 'Validated' AND email_status = 'ok') as ok_email_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Eligible' AND verification_status = 'Invalid') as invalid_email_count,
         COUNT(*) FILTER (WHERE in_submission_buffer = TRUE) as in_buffer_count
       FROM verification_contacts
       WHERE campaign_id = ${campaignId}
