@@ -954,8 +954,12 @@ export default function VerificationConsolePage() {
                         />
                       </th>
                       <th className="text-left p-3 text-sm font-medium">Name</th>
+                      <th className="text-left p-3 text-sm font-medium">Title</th>
                       <th className="text-left p-3 text-sm font-medium">Company</th>
+                      <th className="text-left p-3 text-sm font-medium">Email</th>
                       <th className="text-left p-3 text-sm font-medium">Email Status</th>
+                      <th className="text-left p-3 text-sm font-medium">Phone</th>
+                      <th className="text-left p-3 text-sm font-medium">City</th>
                       <th className="text-left p-3 text-sm font-medium">Country</th>
                       <th className="text-left p-3 text-sm font-medium">Source</th>
                       <th className="text-right p-3 text-sm font-medium">Actions</th>
@@ -979,10 +983,16 @@ export default function VerificationConsolePage() {
                         <td className="p-3 text-sm font-medium" data-testid={`text-name-${index}`}>
                           {contact.full_name || contact.fullName}
                         </td>
+                        <td className="p-3 text-sm text-muted-foreground" data-testid={`text-title-${index}`}>
+                          {contact.title || "-"}
+                        </td>
                         <td className="p-3 text-sm text-muted-foreground" data-testid={`text-company-${index}`}>
                           {contact.account_name || "-"}
                         </td>
-                        <td className="p-3" data-testid={`badge-email-${index}`}>
+                        <td className="p-3 text-sm text-muted-foreground" data-testid={`text-email-${index}`}>
+                          {contact.email || "-"}
+                        </td>
+                        <td className="p-3" data-testid={`badge-email-status-${index}`}>
                           <Badge
                             variant={
                               contact.email_status === "ok" || contact.emailStatus === "ok"
@@ -995,6 +1005,12 @@ export default function VerificationConsolePage() {
                           >
                             {contact.email_status || contact.emailStatus || "unknown"}
                           </Badge>
+                        </td>
+                        <td className="p-3 text-sm text-muted-foreground" data-testid={`text-phone-${index}`}>
+                          {contact.phone || "-"}
+                        </td>
+                        <td className="p-3 text-sm text-muted-foreground" data-testid={`text-city-${index}`}>
+                          {contact.contact_city || contact.contactCity || "-"}
                         </td>
                         <td className="p-3 text-sm text-muted-foreground" data-testid={`text-country-${index}`}>
                           {contact.contact_country || contact.contactCountry || "-"}
