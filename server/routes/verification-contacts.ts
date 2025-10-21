@@ -21,7 +21,6 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
     const contactSearch = req.query.contactSearch as string || "";
     const companySearch = req.query.companySearch as string || "";
     const sourceType = req.query.sourceType as string || "";
-    const suppressionStatus = req.query.suppressionStatus as string || "";
     
     const [campaign] = await db
       .select()
@@ -48,12 +47,6 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
       filterConditions.push(sql`c.source_type = ${sourceType}`);
     }
     
-    if (suppressionStatus === 'matched') {
-      filterConditions.push(sql`c.suppressed = TRUE`);
-    } else if (suppressionStatus === 'unmatched') {
-      filterConditions.push(sql`c.suppressed = FALSE`);
-    }
-    
     const filterSQL = filterConditions.length > 0 
       ? sql`AND ${sql.join(filterConditions, sql` AND `)}`
       : sql``;
@@ -65,7 +58,7 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
         WHERE c.campaign_id = ${campaignId}
           AND c.eligibility_status = 'Eligible'
           AND c.verification_status = 'Pending'
-          ${suppressionStatus === 'matched' || suppressionStatus === 'unmatched' ? sql`` : sql`AND c.suppressed = FALSE`}
+          AND c.suppressed = FALSE
           AND c.in_submission_buffer = FALSE
           AND (
             SELECT COUNT(*) FROM verification_lead_submissions s
@@ -345,8 +338,22 @@ router.post("/api/verification-contacts/:id/validate-email", async (req, res) =>
       return res.status(404).json({ error: "Contact not found" });
     }
     
-    if (!contact.email) {
-      return res.status(400).json({ error: "Contact has no email" });
+    // CAT62542 Preconditions: Manual ELV only for Eligible + Validated + Not Suppressed
+    if (
+      contact.eligibilityStatus !== 'Eligible' ||
+      contact.verificationStatus !== 'Validated' ||
+      contact.suppressed === true ||
+      !contact.email
+    ) {
+      return res.status(409).json({ 
+        error: "Preconditions not met",
+        details: {
+          eligible: contact.eligibilityStatus === 'Eligible',
+          validated: contact.verificationStatus === 'Validated',
+          notSuppressed: contact.suppressed !== true,
+          hasEmail: !!contact.email
+        }
+      });
     }
     
     const emailLower = contact.email.toLowerCase();

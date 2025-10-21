@@ -23,7 +23,6 @@ export default function VerificationConsolePage() {
     contactSearch: "",
     companySearch: "",
     sourceType: "",
-    suppressionStatus: "",
   });
 
   const { data: campaign } = useQuery({
@@ -42,7 +41,6 @@ export default function VerificationConsolePage() {
       if (filters.contactSearch) params.append("contactSearch", filters.contactSearch);
       if (filters.companySearch) params.append("companySearch", filters.companySearch);
       if (filters.sourceType) params.append("sourceType", filters.sourceType);
-      if (filters.suppressionStatus) params.append("suppressionStatus", filters.suppressionStatus);
       
       const url = `/api/verification-campaigns/${campaignId}/queue?${params.toString()}`;
       const res = await fetch(url, {
@@ -274,33 +272,15 @@ export default function VerificationConsolePage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All sources</SelectItem>
+                        <SelectItem value="Client_Provided">Client Provided</SelectItem>
                         <SelectItem value="New_Sourced">New Sourced</SelectItem>
-                        <SelectItem value="Existing_Contact">Existing Contact</SelectItem>
-                        <SelectItem value="ZoomInfo">ZoomInfo</SelectItem>
-                        <SelectItem value="Upload">Upload</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs">Suppression Status</Label>
-                    <Select
-                      value={filters.suppressionStatus || "all"}
-                      onValueChange={(value) => setFilters({ ...filters, suppressionStatus: value === "all" ? "" : value })}
-                    >
-                      <SelectTrigger data-testid="select-suppression-status">
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="matched">Suppressed</SelectItem>
-                        <SelectItem value="unmatched">Not Suppressed</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
-                    {(filters.contactSearch || filters.companySearch || filters.sourceType || filters.suppressionStatus)
+                    {(filters.contactSearch || filters.companySearch || filters.sourceType)
                       ? "Filters active"
                       : "No filters applied"}
                   </p>
@@ -308,7 +288,7 @@ export default function VerificationConsolePage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      setFilters({ contactSearch: "", companySearch: "", sourceType: "", suppressionStatus: "" });
+                      setFilters({ contactSearch: "", companySearch: "", sourceType: "" });
                     }}
                     data-testid="button-clear-filters"
                   >
@@ -554,11 +534,45 @@ export default function VerificationConsolePage() {
                 </div>
               </div>
 
+              {(contact as any)?.suppressed && (
+                <div className="p-3 bg-destructive/10 border border-destructive rounded-md">
+                  <p className="text-sm text-destructive font-semibold">
+                    ⚠️ This contact is suppressed and cannot be processed
+                  </p>
+                </div>
+              )}
+
+              {(contact as any)?.eligibility_status !== 'Eligible' && !(contact as any)?.suppressed && (
+                <div className="p-3 bg-muted border rounded-md">
+                  <p className="text-sm text-muted-foreground">
+                    ℹ️ Not eligible: {(contact as any)?.eligibility_reason || 'Out of scope'}
+                  </p>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-4 border-t">
                 <Button
                   onClick={() => elvMutation.mutate()}
-                  disabled={elvMutation.isPending || (contact as any)?.suppressed || ((contact as any)?.email_status || (contact as any)?.emailStatus) === 'ok'}
+                  disabled={
+                    elvMutation.isPending ||
+                    (contact as any)?.eligibility_status !== 'Eligible' ||
+                    (contact as any)?.verification_status !== 'Validated' ||
+                    (contact as any)?.suppressed === true ||
+                    !(contact as any)?.email ||
+                    ((contact as any)?.email_status || (contact as any)?.emailStatus) === 'ok'
+                  }
                   data-testid="button-validate-email"
+                  title={
+                    (contact as any)?.suppressed
+                      ? "Contact is suppressed"
+                      : (contact as any)?.eligibility_status !== 'Eligible'
+                      ? "Contact must be Eligible"
+                      : (contact as any)?.verification_status !== 'Validated'
+                      ? "Contact must be Validated first"
+                      : !(contact as any)?.email
+                      ? "No email address"
+                      : ""
+                  }
                 >
                   <Mail className="h-4 w-4 mr-2" />
                   {elvMutation.isPending ? "Validating..." : "Validate Email"}
@@ -568,10 +582,15 @@ export default function VerificationConsolePage() {
                   variant="outline"
                   onClick={() => setCurrentContactId(null)}
                   data-testid="button-skip"
+                  disabled={(contact as any)?.suppressed}
                 >
                   Skip
                 </Button>
-                <Button onClick={handleSaveAndNext} data-testid="button-save-next">
+                <Button 
+                  onClick={handleSaveAndNext} 
+                  data-testid="button-save-next"
+                  disabled={(contact as any)?.suppressed || (contact as any)?.eligibility_status !== 'Eligible'}
+                >
                   Save & Next
                 </Button>
               </div>
