@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -301,15 +301,17 @@ export default function VerificationConsolePage() {
 
   const bulkEmailValidationMutation = useMutation({
     mutationFn: async (contactIds: string[]) => {
-      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/contacts/bulk-validate-email`, { 
+      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/contacts/bulk-verify-emails`, { 
         contactIds 
       });
       return res.json();
     },
     onSuccess: (data: any) => {
+      const { statusCounts, successCount } = data;
       toast({
-        title: "Bulk email validation complete",
-        description: `${data.validatedCount} contact(s) validated`,
+        title: "Email Verification Complete",
+        description: `Verified ${successCount} emails: ${statusCounts.ok} OK, ${statusCounts.invalid} Invalid, ${statusCounts.risky} Risky, ${statusCounts.disposable} Disposable`,
+        duration: 8000,
       });
       setSelectedContactIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
@@ -575,15 +577,28 @@ export default function VerificationConsolePage() {
                   {queueLoading ? "Loading..." : `${(queue as any)?.total || 0} contacts ready for verification`}
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                data-testid="button-toggle-filters"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                {showFilters ? "Hide" : "Show"} Filters
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    window.location.href = `/api/verification-campaigns/${campaignId}/contacts/export/validated-verified`;
+                  }}
+                  data-testid="button-export-validated-verified"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Validated+Verified
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  data-testid="button-toggle-filters"
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  {showFilters ? "Hide" : "Show"} Filters
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

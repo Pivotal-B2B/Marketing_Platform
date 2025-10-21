@@ -6,6 +6,7 @@ import {
   verificationLeadSubmissions,
   verificationAuditLog,
   accounts,
+  verificationEmailValidations,
   insertVerificationContactSchema,
 } from "@shared/schema";
 import { eq, sql, and, desc, inArray } from "drizzle-orm";
@@ -14,6 +15,7 @@ import { evaluateEligibility, computeNormalizedKeys } from "../lib/verification-
 import { applySuppressionForContacts } from "../lib/verification-suppression";
 import { requireAuth } from "../auth";
 import { exportVerificationContactsToCsv, createCsvDownloadResponse } from "../lib/csv-export";
+import { verifyEmailsBulk } from "../lib/email-list-verify";
 
 const router = Router();
 
@@ -1103,7 +1105,134 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
   }
 });
 
-// CSV Export endpoint
+// Bulk Email Verification using Email List Verify
+router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails", requireAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const { contactIds } = z.object({
+      contactIds: z.array(z.string()).min(1).max(500), // Max 500 emails per batch
+    }).parse(req.body);
+    
+    console.log(`[BULK EMAIL VERIFY] Starting verification for ${contactIds.length} contacts in campaign ${campaignId}`);
+    
+    // Fetch contacts with emails
+    const contacts = await db
+      .select()
+      .from(verificationContacts)
+      .where(and(
+        eq(verificationContacts.campaignId, campaignId),
+        inArray(verificationContacts.id, contactIds),
+        sql`${verificationContacts.email} IS NOT NULL AND ${verificationContacts.email} != ''`
+      ));
+    
+    if (contacts.length === 0) {
+      return res.status(400).json({ error: "No contacts with valid emails found" });
+    }
+    
+    // Extract unique emails
+    const emailsToVerify = [...new Set(contacts.map(c => c.emailLower || c.email!.toLowerCase()).filter(Boolean))];
+    
+    console.log(`[BULK EMAIL VERIFY] Verifying ${emailsToVerify.length} unique emails`);
+    
+    // Verify emails using Email List Verify API (with rate limiting)
+    const verificationResults = await verifyEmailsBulk(emailsToVerify, {
+      delayMs: 200, // 5 requests per second
+      onProgress: (completed, total, currentEmail) => {
+        if (completed % 10 === 0 || completed === total) {
+          console.log(`[BULK EMAIL VERIFY] Progress: ${completed}/${total} (${currentEmail})`);
+        }
+      },
+    });
+    
+    // Update contacts and cache validation results
+    let successCount = 0;
+    let failureCount = 0;
+    
+    for (const contact of contacts) {
+      const emailKey = (contact.emailLower || contact.email!.toLowerCase()).trim();
+      const result = verificationResults.get(emailKey);
+      
+      if (!result) {
+        console.warn(`[BULK EMAIL VERIFY] No result for ${emailKey}`);
+        failureCount++;
+        continue;
+      }
+      
+      try {
+        // Update contact email status
+        await db
+          .update(verificationContacts)
+          .set({
+            emailStatus: result.status,
+            updatedAt: new Date(),
+          })
+          .where(eq(verificationContacts.id, contact.id));
+        
+        // Cache the validation result
+        await db
+          .insert(verificationEmailValidations)
+          .values({
+            contactId: contact.id,
+            emailLower: emailKey,
+            provider: result.provider,
+            status: result.status,
+            rawJson: result.rawResponse || {},
+            checkedAt: result.checkedAt,
+          })
+          .onConflictDoUpdate({
+            target: [verificationEmailValidations.contactId, verificationEmailValidations.emailLower],
+            set: {
+              provider: result.provider,
+              status: result.status,
+              rawJson: result.rawResponse || {},
+              checkedAt: result.checkedAt,
+            },
+          });
+        
+        successCount++;
+      } catch (error) {
+        console.error(`[BULK EMAIL VERIFY] Error updating contact ${contact.id}:`, error);
+        failureCount++;
+      }
+    }
+    
+    console.log(`[BULK EMAIL VERIFY] Completed: ${successCount} success, ${failureCount} failures`);
+    
+    res.json({
+      success: true,
+      totalContacts: contacts.length,
+      uniqueEmails: emailsToVerify.length,
+      successCount,
+      failureCount,
+      statusCounts: {
+        ok: contacts.filter(c => {
+          const emailKey = (c.emailLower || c.email!.toLowerCase()).trim();
+          return verificationResults.get(emailKey)?.status === 'ok';
+        }).length,
+        invalid: contacts.filter(c => {
+          const emailKey = (c.emailLower || c.email!.toLowerCase()).trim();
+          return verificationResults.get(emailKey)?.status === 'invalid';
+        }).length,
+        risky: contacts.filter(c => {
+          const emailKey = (c.emailLower || c.email!.toLowerCase()).trim();
+          return verificationResults.get(emailKey)?.status === 'risky';
+        }).length,
+        disposable: contacts.filter(c => {
+          const emailKey = (c.emailLower || c.email!.toLowerCase()).trim();
+          return verificationResults.get(emailKey)?.status === 'disposable';
+        }).length,
+      },
+    });
+  } catch (error) {
+    console.error("[BULK EMAIL VERIFY] Error:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    res.status(500).json({ error: "Failed to verify emails", message: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// CSV Export endpoint (all contacts)
 router.get("/api/verification-campaigns/:campaignId/contacts/export/csv", async (req, res) => {
   try {
     const { campaignId } = req.params;
@@ -1145,6 +1274,79 @@ router.get("/api/verification-campaigns/:campaignId/contacts/export/csv", async 
   } catch (error) {
     console.error("Error exporting contacts to CSV:", error);
     res.status(500).json({ error: "Failed to export contacts" });
+  }
+});
+
+// CSV Export endpoint (filtered: Validated + Email Verified contacts only)
+router.get("/api/verification-campaigns/:campaignId/contacts/export/validated-verified", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const includeCompanyFields = req.query.includeCompany !== 'false';
+    
+    console.log(`[EXPORT VALIDATED+VERIFIED] Starting export for campaign ${campaignId}`);
+    
+    // Fetch only contacts that are:
+    // 1. verificationStatus = 'Validated'
+    // 2. emailStatus = 'ok' (verified and deliverable)
+    const contactsData = await db
+      .select({
+        contact: verificationContacts,
+        account: accounts,
+      })
+      .from(verificationContacts)
+      .leftJoin(accounts, eq(verificationContacts.accountId, accounts.id))
+      .where(and(
+        eq(verificationContacts.campaignId, campaignId),
+        eq(verificationContacts.verificationStatus, 'Validated'),
+        eq(verificationContacts.emailStatus, 'ok'),
+        eq(verificationContacts.deleted, false),
+      ))
+      .orderBy(desc(verificationContacts.createdAt));
+    
+    console.log(`[EXPORT VALIDATED+VERIFIED] Found ${contactsData.length} qualified contacts`);
+    
+    // Transform data to include account info
+    const contacts = contactsData.map(row => ({
+      ...row.contact,
+      account: row.account || undefined,
+    }));
+    
+    if (contacts.length === 0) {
+      // Return empty CSV with headers
+      const emptyContent = exportVerificationContactsToCsv([], includeCompanyFields);
+      const { content, headers } = createCsvDownloadResponse(
+        emptyContent,
+        `validated-verified-contacts-${campaignId}-${new Date().toISOString().split('T')[0]}.csv`
+      );
+      
+      Object.entries(headers).forEach(([key, value]) => {
+        res.setHeader(key, value);
+      });
+      
+      return res.send(content);
+    }
+    
+    // Generate CSV with UTF-8 BOM and proper formatting
+    const csvContent = exportVerificationContactsToCsv(contacts, includeCompanyFields);
+    
+    // Create download response with proper headers
+    const { content, headers } = createCsvDownloadResponse(
+      csvContent,
+      `validated-verified-contacts-${campaignId}-${new Date().toISOString().split('T')[0]}.csv`
+    );
+    
+    // Set headers
+    Object.entries(headers).forEach(([key, value]) => {
+      res.setHeader(key, value);
+    });
+    
+    console.log(`[EXPORT VALIDATED+VERIFIED] Export completed successfully`);
+    
+    // Send the file
+    res.send(content);
+  } catch (error) {
+    console.error("[EXPORT VALIDATED+VERIFIED] Error:", error);
+    res.status(500).json({ error: "Failed to export validated and verified contacts" });
   }
 });
 
