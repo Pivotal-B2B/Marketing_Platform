@@ -10,6 +10,55 @@ export const normalize = {
     (s ?? "").toLowerCase().trim(),
   
   /**
+   * Extract domain from email address
+   */
+  extractDomain: (email?: string | null): string => {
+    if (!email) return "";
+    const match = email.toLowerCase().trim().match(/@(.+)$/);
+    return match ? match[1] : "";
+  },
+  
+  /**
+   * Normalize domain for company matching
+   * Removes www, common TLDs, and applies company normalization
+   */
+  domainToCompanyKey: (domain?: string | null): string => {
+    if (!domain) return "";
+    
+    let normalized = domain.toLowerCase().trim();
+    
+    // Remove www prefix
+    normalized = normalized.replace(/^www\./, '');
+    
+    // Remove common TLDs (order matters - longer patterns first)
+    normalized = normalized.replace(/\.(co\.\w{2}|com\.\w{2}|aero|travel)$/, '');
+    normalized = normalized.replace(/\.(com|org|net|co|io|ai|app|dev|qa)$/, '');
+    
+    // Replace hyphens with spaces before applying company normalization
+    // e.g., "singapore-airlines" becomes "singapore airlines"
+    normalized = normalized.replace(/-/g, ' ');
+    
+    // Split compound words: insert space before known company words
+    // e.g., "vietnamairlines" becomes "vietnam airlines"
+    const compoundWords = [
+      'airlines', 'airline', 'airways', 'air',
+      'aviation', 'international', 'global',
+      'technologies', 'technology', 'tech',
+      'systems', 'solutions', 'services',
+      'group', 'holdings', 'corporation', 'company'
+    ];
+    
+    compoundWords.forEach(word => {
+      // Insert space before the word if it's preceded by other letters
+      const pattern = new RegExp(`([a-z])(${word})`, 'g');
+      normalized = normalized.replace(pattern, '$1 $2');
+    });
+    
+    // Apply company normalization rules (handles suffixes, abbreviations, etc.)
+    return normalize.companyKey(normalized);
+  },
+  
+  /**
    * Smart company name normalization that handles:
    * - Legal suffixes (Ltd, Inc, LLC, Corp, etc.)
    * - Punctuation and special characters

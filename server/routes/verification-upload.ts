@@ -201,13 +201,15 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             continue;
           }
 
-          // Resolve/create account (domain > name)
+          // Resolve/create account (domain > name > email domain)
           const accountNameCsv = row.account_name || row.companyName || null;
           const domainValue = (row.domain || row.companyDomain || null)?.toLowerCase() || null;
+          const emailDomain = row.email ? normalize.extractDomain(row.email) : null;
 
           let accountId: string | null = null;
           let accountData: any = null;
           
+          // PRIORITY 1: Try explicit domain match
           if (domainValue) {
             const [a] = await tx
               .select()
@@ -233,12 +235,13 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
               accountId = newAccount[0].id;
               accountData = newAccount[0];
             }
-          } else if (accountNameCsv) {
+          }
+          
+          // PRIORITY 2: Try company name match (if no domain match)
+          if (!accountId && accountNameCsv) {
             // Use smart company name normalization for matching
             const normalizedCsvName = normalize.companyKey(accountNameCsv);
             
-            // Optimize: First filter by similar names using trigram similarity or LIKE
-            // Then do exact normalized match in application code
             // Extract core words from normalized name for initial filter
             const coreWords = normalizedCsvName.split(' ').filter(w => w.length > 2);
             const likePattern = coreWords.length > 0 
@@ -260,21 +263,60 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             if (matchedAccount) {
               accountId = matchedAccount.id;
               accountData = matchedAccount;
-            } else {
-              const newAccount = await tx.insert(accounts).values({
-                name: accountNameCsv,
-                domain: null,
-                hqStreet1: row.hqAddress1 ?? null,
-                hqStreet2: row.hqAddress2 ?? null,
-                hqStreet3: row.hqAddress3 ?? null,
-                hqCity: row.hqCity ?? null,
-                hqState: row.hqState ?? null,
-                hqPostalCode: row.hqPostal ?? null,
-                hqCountry: row.hqCountry ?? null,
-              }).returning();
-              accountId = newAccount[0].id;
-              accountData = newAccount[0];
             }
+          }
+          
+          // PRIORITY 3: Try email domain match (if no explicit domain or company name match)
+          if (!accountId && emailDomain && !domainValue) {
+            // Try direct domain match first
+            const [domainMatch] = await tx
+              .select()
+              .from(accounts)
+              .where(eq(accounts.domain, emailDomain))
+              .limit(1);
+            
+            if (domainMatch) {
+              accountId = domainMatch.id;
+              accountData = domainMatch;
+            } else {
+              // Try fuzzy match: normalize email domain and compare with account names
+              const normalizedEmailDomain = normalize.domainToCompanyKey(emailDomain);
+              
+              if (normalizedEmailDomain) {
+                // Get all accounts to check against normalized domain
+                const allAccounts = await tx
+                  .select()
+                  .from(accounts)
+                  .limit(500); // Safety limit
+                
+                const domainMatchedAccount = allAccounts.find(acc => 
+                  normalize.companyKey(acc.name) === normalizedEmailDomain ||
+                  (acc.domain && normalize.domainToCompanyKey(acc.domain) === normalizedEmailDomain)
+                );
+                
+                if (domainMatchedAccount) {
+                  accountId = domainMatchedAccount.id;
+                  accountData = domainMatchedAccount;
+                }
+              }
+            }
+          }
+          
+          // Create new account if no match found
+          if (!accountId) {
+            const newAccount = await tx.insert(accounts).values({
+              name: accountNameCsv ?? emailDomain?.replace(/^www\./, '').split('.')[0] ?? 'Unknown Company',
+              domain: domainValue ?? emailDomain ?? null,
+              hqStreet1: row.hqAddress1 ?? null,
+              hqStreet2: row.hqAddress2 ?? null,
+              hqStreet3: row.hqAddress3 ?? null,
+              hqCity: row.hqCity ?? null,
+              hqState: row.hqState ?? null,
+              hqPostalCode: row.hqPostal ?? null,
+              hqCountry: row.hqCountry ?? null,
+            }).returning();
+            accountId = newAccount[0].id;
+            accountData = newAccount[0];
           }
 
           const fullName = row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim();
