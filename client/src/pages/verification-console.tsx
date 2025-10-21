@@ -42,6 +42,11 @@ export default function VerificationConsolePage() {
     enabled: !!currentContactId && !!(contact as any)?.account_name,
   });
 
+  const { data: associatedContacts = [] } = useQuery<any[]>({
+    queryKey: ["/api/verification-contacts/account", (contact as any)?.account_id, { campaignId }],
+    enabled: !!currentContactId && !!(contact as any)?.account_id && !!campaignId,
+  });
+
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("PUT", `/api/verification-contacts/${currentContactId}`, data);
@@ -277,15 +282,7 @@ export default function VerificationConsolePage() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="verify" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="verify" data-testid="tab-verify">Verify</TabsTrigger>
-            <TabsTrigger value="company" data-testid="tab-company">Company</TabsTrigger>
-            <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
-            <TabsTrigger value="qa" data-testid="tab-qa">QA</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="verify" className="space-y-4">
+        <div className="space-y-4">
             {(contact as any)?.account_name && (
               <Card>
                 <CardHeader className="pb-2">
@@ -315,18 +312,20 @@ export default function VerificationConsolePage() {
                 </CardContent>
               </Card>
             )}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                <CardTitle>Contact Details</CardTitle>
-                <div className="flex gap-2">
-                  <Badge variant={((contact as any)?.eligibility_status || (contact as any)?.eligibilityStatus) === 'Eligible' ? 'default' : 'secondary'}>
-                    {(contact as any)?.eligibility_status || (contact as any)?.eligibilityStatus}
-                  </Badge>
-                  {(contact as any)?.suppressed && <Badge variant="destructive">Suppressed</Badge>}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle>Contact & Company Information</CardTitle>
+              <div className="flex gap-2">
+                <Badge variant={((contact as any)?.eligibility_status || (contact as any)?.eligibilityStatus) === 'Eligible' ? 'default' : 'secondary'}>
+                  {(contact as any)?.eligibility_status || (contact as any)?.eligibilityStatus}
+                </Badge>
+                {(contact as any)?.suppressed && <Badge variant="destructive">Suppressed</Badge>}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold mb-3">Contact Details</h3>
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label>Full Name</Label>
                     <Input value={(contact as any)?.full_name || (contact as any)?.fullName || ""} readOnly data-testid="input-full-name" />
@@ -363,47 +362,43 @@ export default function VerificationConsolePage() {
                     <Input value={(contact as any)?.phone || ""} readOnly data-testid="input-phone" />
                   </div>
                   <div>
+                    <Label>Mobile</Label>
+                    <Input value={(contact as any)?.mobile || ""} readOnly data-testid="input-mobile" />
+                  </div>
+                  <div>
                     <Label>LinkedIn URL</Label>
                     <Input value={(contact as any)?.linkedin_url || (contact as any)?.linkedinUrl || ""} readOnly data-testid="input-linkedin" />
+                  </div>
+                  <div>
+                    <Label>City</Label>
+                    <Input value={(contact as any)?.contact_city || (contact as any)?.contactCity || ""} readOnly data-testid="input-city" />
+                  </div>
+                  <div>
+                    <Label>State</Label>
+                    <Input value={(contact as any)?.contact_state || (contact as any)?.contactState || ""} readOnly data-testid="input-state" />
                   </div>
                   <div>
                     <Label>Country</Label>
                     <Input value={(contact as any)?.contact_country || (contact as any)?.contactCountry || ""} readOnly data-testid="input-country" />
                   </div>
+                  <div>
+                    <Label>Postal Code</Label>
+                    <Input value={(contact as any)?.contact_postal || (contact as any)?.contactPostal || ""} readOnly data-testid="input-postal" />
+                  </div>
+                  <div>
+                    <Label>CAV ID</Label>
+                    <Input value={(contact as any)?.cav_id || (contact as any)?.cavId || ""} readOnly data-testid="input-cav-id" />
+                  </div>
+                  <div>
+                    <Label>CAV User ID</Label>
+                    <Input value={(contact as any)?.cav_user_id || (contact as any)?.cavUserId || ""} readOnly data-testid="input-cav-user-id" />
+                  </div>
                 </div>
+              </div>
 
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button
-                    onClick={() => elvMutation.mutate()}
-                    disabled={elvMutation.isPending || (contact as any)?.suppressed || (contact as any)?.emailStatus === 'ok'}
-                    data-testid="button-validate-email"
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    {elvMutation.isPending ? "Validating..." : "Validate Email"}
-                  </Button>
-                  <div className="flex-1" />
-                  <Button
-                    variant="outline"
-                    onClick={() => setCurrentContactId(null)}
-                    data-testid="button-skip"
-                  >
-                    Skip
-                  </Button>
-                  <Button onClick={handleSaveAndNext} data-testid="button-save-next">
-                    Save & Next
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="company">
-            <Card>
-              <CardHeader>
-                <CardTitle>Company Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold mb-3">Company Information</h3>
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label>Company Name</Label>
                     <Input value={(contact as any)?.account_name || ""} readOnly data-testid="input-company-name" />
@@ -411,6 +406,10 @@ export default function VerificationConsolePage() {
                   <div>
                     <Label>HQ City</Label>
                     <Input value={(contact as any)?.hq_city || ""} readOnly data-testid="input-hq-city" />
+                  </div>
+                  <div>
+                    <Label>HQ State</Label>
+                    <Input value={(contact as any)?.hq_state || ""} readOnly data-testid="input-hq-state" />
                   </div>
                   <div>
                     <Label>HQ Country</Label>
@@ -421,76 +420,105 @@ export default function VerificationConsolePage() {
                     <Input value={(contact as any)?.domain || ""} readOnly data-testid="input-domain" />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </div>
 
-          <TabsContent value="history">
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold mb-3">Status & Metadata</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>Source Type</Label>
+                    <Input value={(contact as any)?.source_type || (contact as any)?.sourceType || ""} readOnly data-testid="input-source-type" />
+                  </div>
+                  <div>
+                    <Label>Verification Status</Label>
+                    <Input value={(contact as any)?.verification_status || (contact as any)?.verificationStatus || ""} readOnly data-testid="input-verification-status" />
+                  </div>
+                  <div>
+                    <Label>QA Status</Label>
+                    <Input value={(contact as any)?.qa_status || (contact as any)?.qaStatus || ""} readOnly data-testid="input-qa-status" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4 border-t">
+                <Button
+                  onClick={() => elvMutation.mutate()}
+                  disabled={elvMutation.isPending || (contact as any)?.suppressed || ((contact as any)?.email_status || (contact as any)?.emailStatus) === 'ok'}
+                  data-testid="button-validate-email"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  {elvMutation.isPending ? "Validating..." : "Validate Email"}
+                </Button>
+                <div className="flex-1" />
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentContactId(null)}
+                  data-testid="button-skip"
+                >
+                  Skip
+                </Button>
+                <Button onClick={handleSaveAndNext} data-testid="button-save-next">
+                  Save & Next
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {(contact as any)?.account_id && (
             <Card>
               <CardHeader>
-                <CardTitle>Verification History</CardTitle>
+                <CardTitle>Associated Contacts from {(contact as any)?.account_name}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <div className="text-sm">
-                    <span className="font-medium">Source Type:</span>{" "}
-                    <span data-testid="text-source-type">{(contact as any)?.sourceType}</span>
+                {associatedContacts.length > 0 ? (
+                  <div className="space-y-2">
+                    {associatedContacts.map((assocContact: any, index: number) => (
+                      <div
+                        key={assocContact.id}
+                        className={`p-3 border rounded-md flex items-center justify-between ${
+                          assocContact.id === currentContactId ? 'bg-accent' : 'hover-elevate'
+                        }`}
+                        data-testid={`contact-card-${index}`}
+                      >
+                        <div className="flex-1 grid grid-cols-4 gap-4">
+                          <div>
+                            <p className="text-sm font-medium">{assocContact.full_name || assocContact.fullName}</p>
+                            <p className="text-xs text-muted-foreground">{assocContact.title || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Email</p>
+                            <p className="text-sm">{assocContact.email || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Phone</p>
+                            <p className="text-sm">{assocContact.phone || assocContact.mobile || "-"}</p>
+                          </div>
+                          <div>
+                            <Badge variant="outline" className="text-xs">
+                              {assocContact.verification_status || assocContact.verificationStatus}
+                            </Badge>
+                          </div>
+                        </div>
+                        {assocContact.id !== currentContactId && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setCurrentContactId(assocContact.id)}
+                            data-testid={`button-view-contact-${index}`}
+                          >
+                            View
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-sm">
-                    <span className="font-medium">Verification Status:</span>{" "}
-                    <span data-testid="text-verification-status">{(contact as any)?.verificationStatus}</span>
-                  </div>
-                  <div className="text-sm">
-                    <span className="font-medium">QA Status:</span>{" "}
-                    <span data-testid="text-qa-status">{(contact as any)?.qaStatus}</span>
-                  </div>
-                  {(contact as any)?.cavId && (
-                    <div className="text-sm">
-                      <span className="font-medium">CAV ID:</span>{" "}
-                      <span data-testid="text-cav-id">{(contact as any).cavId}</span>
-                    </div>
-                  )}
-                </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No other contacts found for this company.</p>
+                )}
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="qa">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quality Assurance</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-2">Current QA Status:</p>
-                  <Badge data-testid="badge-qa-status">{(contact as any)?.qaStatus || "Unreviewed"}</Badge>
-                </div>
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      await apiRequest("POST", `/api/verification-contacts/${currentContactId}/qa`, { action: "flag" });
-                      queryClient.invalidateQueries({ queryKey: ["/api/verification-contacts", currentContactId] });
-                    }}
-                    data-testid="button-flag"
-                  >
-                    Flag for Review
-                  </Button>
-                  <Button
-                    variant="default"
-                    onClick={async () => {
-                      await apiRequest("POST", `/api/verification-contacts/${currentContactId}/qa`, { resolution: "Passed" });
-                      queryClient.invalidateQueries({ queryKey: ["/api/verification-contacts", currentContactId] });
-                    }}
-                    data-testid="button-approve"
-                  >
-                    Approve
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
       )}
     </div>
   );

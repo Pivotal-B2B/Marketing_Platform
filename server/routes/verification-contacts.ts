@@ -64,6 +64,34 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
   }
 });
 
+router.get("/api/verification-contacts/account/:accountId", async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const campaignId = req.query.campaignId as string;
+
+    if (!campaignId) {
+      return res.status(400).json({ error: "campaignId query parameter is required" });
+    }
+
+    const contacts = await db
+      .select()
+      .from(verificationContacts)
+      .where(
+        and(
+          eq(verificationContacts.accountId, accountId),
+          eq(verificationContacts.campaignId, campaignId)
+        )
+      )
+      .orderBy(desc(verificationContacts.updatedAt))
+      .limit(20);
+
+    res.json(contacts);
+  } catch (error) {
+    console.error("Error fetching associated contacts:", error);
+    res.status(500).json({ error: "Failed to fetch associated contacts" });
+  }
+});
+
 router.get("/api/verification-contacts/:id", async (req, res) => {
   try {
     const result = await db.execute(sql`
