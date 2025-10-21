@@ -162,8 +162,7 @@ router.delete("/api/verification-contacts/:id", async (req, res) => {
     const [deletedContact] = await db
       .update(verificationContacts)
       .set({ 
-        deleted: true, 
-        suppressed: true,
+        deleted: true,
         updatedAt: new Date()
       })
       .where(eq(verificationContacts.id, id))
@@ -668,7 +667,7 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", asyn
     
     const result = await db.execute(sql`
       UPDATE verification_contacts c
-      SET deleted = TRUE, suppressed = TRUE, updated_at = NOW()
+      SET deleted = TRUE, updated_at = NOW()
       WHERE c.id IN (${sql.join(contactIds.map(id => sql`${id}`), sql`, `)})
         AND c.campaign_id = ${campaignId}
         AND c.deleted = FALSE
