@@ -193,23 +193,85 @@ export default function VerificationConsolePage() {
       {!currentContactId ? (
         <Card>
           <CardHeader>
-            <CardTitle>Queue</CardTitle>
+            <CardTitle>Verification Queue</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              {queueLoading ? "Loading..." : `${(queue as any)?.total || 0} contacts ready for verification`}
+            </p>
           </CardHeader>
           <CardContent>
             {queueLoading ? (
               <div className="text-muted-foreground" data-testid="text-loading">Loading queue...</div>
             ) : (queue as any)?.data && (queue as any).data.length > 0 ? (
-              <div className="space-y-4">
-                <p className="text-muted-foreground" data-testid="text-queue-count">
-                  {(queue as any).data.length} contacts ready for verification
-                </p>
-                <Button onClick={loadNextContact} data-testid="button-load-next">
-                  Load Next Contact
-                </Button>
+              <div className="border rounded-md">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 text-sm font-medium">Name</th>
+                      <th className="text-left p-3 text-sm font-medium">Company</th>
+                      <th className="text-left p-3 text-sm font-medium">Email Status</th>
+                      <th className="text-left p-3 text-sm font-medium">Country</th>
+                      <th className="text-left p-3 text-sm font-medium">Source</th>
+                      <th className="text-right p-3 text-sm font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(queue as any).data.map((contact: any, index: number) => (
+                      <tr
+                        key={contact.id}
+                        className="border-b last:border-0 hover-elevate cursor-pointer"
+                        onClick={() => setCurrentContactId(contact.id)}
+                        data-testid={`row-contact-${index}`}
+                      >
+                        <td className="p-3 text-sm font-medium" data-testid={`text-name-${index}`}>
+                          {contact.full_name || contact.fullName}
+                        </td>
+                        <td className="p-3 text-sm text-muted-foreground" data-testid={`text-company-${index}`}>
+                          {contact.account_name || "-"}
+                        </td>
+                        <td className="p-3" data-testid={`badge-email-${index}`}>
+                          <Badge
+                            variant={
+                              contact.email_status === "ok" || contact.emailStatus === "ok"
+                                ? "default"
+                                : contact.email_status === "invalid" || contact.emailStatus === "invalid"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                            className="text-xs"
+                          >
+                            {contact.email_status || contact.emailStatus || "unknown"}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-sm text-muted-foreground" data-testid={`text-country-${index}`}>
+                          {contact.contact_country || contact.contactCountry || "-"}
+                        </td>
+                        <td className="p-3" data-testid={`badge-source-${index}`}>
+                          <Badge variant="outline" className="text-xs">
+                            {contact.source_type || contact.sourceType}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCurrentContactId(contact.id);
+                            }}
+                            data-testid={`button-view-${index}`}
+                          >
+                            View Details
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : (
-              <div className="text-muted-foreground" data-testid="text-queue-empty">
-                Queue is empty. No contacts available for verification.
+              <div className="text-center py-12 text-muted-foreground" data-testid="text-queue-empty">
+                <div className="text-lg font-medium mb-2">Queue is empty</div>
+                <p className="text-sm">No contacts available for verification.</p>
               </div>
             )}
           </CardContent>
