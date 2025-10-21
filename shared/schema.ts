@@ -74,7 +74,7 @@ export const callDispositionEnum = pgEnum('call_disposition', [
   'voicemail',
   'voicemail_left',
   'connected',
-  'not-interested',
+  'not_interested',
   'callback-requested',
   'qualified',
   'dnc-request'

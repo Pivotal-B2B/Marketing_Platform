@@ -40,7 +40,7 @@ function mapEventTypeToActivityType(eventType: string): ActivityItem['type'] {
 function mapEventTypeToStatus(eventType: string, metadata: Record<string, any> | null): ActivityItem['status'] | undefined {
   if (eventType === 'call_ended' && metadata?.disposition) {
     if (metadata.disposition === 'qualified') return 'success';
-    if (metadata.disposition === 'not-interested' || metadata.disposition === 'dnc-request') return 'warning';
+    if (metadata.disposition === 'not_interested' || metadata.disposition === 'dnc-request') return 'warning';
     if (metadata.disposition === 'no-answer' || metadata.disposition === 'busy') return 'info';
   }
   if (eventType.includes('success') || eventType.includes('qualified')) return 'success';
