@@ -239,7 +239,7 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
         // Save to contact's direct phone (local office phone where the contact works)
         if (result.phone && result.phoneConfidence !== undefined) {
           if (result.phoneConfidence >= CONFIDENCE_THRESHOLD) {
-            updateData.directPhone = result.phone;
+            updateData.phone = result.phone; // FIXED: Use 'phone' field for verificationContacts table
             updateData.phoneEnrichmentStatus = 'completed';
             updateData.phoneEnrichedAt = new Date();
             updateData.phoneEnrichmentError = null;
