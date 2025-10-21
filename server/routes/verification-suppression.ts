@@ -86,6 +86,8 @@ router.post("/api/verification-campaigns/:campaignId/suppression/upload", async 
     const parseResult = Papa.parse<SuppressionCSVRow>(csvData, {
       header: true,
       skipEmptyLines: true,
+      delimiter: "",  // Auto-detect delimiter
+      delimitersToGuess: [',', '\t', '|', ';', Papa.RECORD_SEP, Papa.UNIT_SEP],
       transformHeader: (header) => {
         const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
         
@@ -176,6 +178,8 @@ router.post("/api/verification-suppression/global/upload", async (req, res) => {
     const parseResult = Papa.parse<SuppressionCSVRow>(csvData, {
       header: true,
       skipEmptyLines: true,
+      delimiter: "",  // Auto-detect delimiter
+      delimitersToGuess: [',', '\t', '|', ';', Papa.RECORD_SEP, Papa.UNIT_SEP],
       transformHeader: (header) => {
         const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
         

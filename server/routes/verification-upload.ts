@@ -53,6 +53,8 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
     const parseResult = Papa.parse<CSVRow>(csvData, {
       header: true,
       skipEmptyLines: true,
+      delimiter: "",  // Auto-detect delimiter
+      delimitersToGuess: [',', '\t', '|', ';', Papa.RECORD_SEP, Papa.UNIT_SEP],
       transformHeader: (header) => {
         const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
         

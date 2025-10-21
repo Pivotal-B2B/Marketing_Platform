@@ -66,7 +66,7 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
 
 router.get("/api/verification-contacts/:id", async (req, res) => {
   try {
-    const [contact] = await db.execute(sql`
+    const result = await db.execute(sql`
       SELECT 
         c.*,
         a.name as account_name,
@@ -79,11 +79,11 @@ router.get("/api/verification-contacts/:id", async (req, res) => {
       WHERE c.id = ${req.params.id}
     `);
     
-    if (!contact) {
+    if (!result.rows || result.rows.length === 0) {
       return res.status(404).json({ error: "Contact not found" });
     }
     
-    res.json(contact);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error("Error fetching contact:", error);
     res.status(500).json({ error: "Failed to fetch contact" });
@@ -427,7 +427,8 @@ router.post("/api/verification-contacts/:id/submit", async (req, res) => {
       `);
       
       const currentCount = Number(submissionCount.rows[0]?.count || 0);
-      if (currentCount >= campaign.leadCapPerAccount) {
+      const cap = campaign.leadCapPerAccount || 10;
+      if (currentCount >= cap) {
         throw new Error("Account cap reached");
       }
       
