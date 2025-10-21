@@ -665,8 +665,18 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", asyn
     
     const { contactIds, reason } = bulkDeleteSchema.parse(req.body);
     
+    console.log('[BULK DELETE] Request received:', { 
+      campaignId, 
+      contactCount: contactIds.length,
+      user: req.user,
+      userRole: req.user?.role,
+      userRoles: req.user?.roles
+    });
+    
     const isAdmin = req.user?.role === 'admin' || req.user?.roles?.includes('admin');
     const allowClientProvidedDelete = process.env.ALLOW_CLIENT_PROVIDED_DELETE === 'true' || isAdmin;
+    
+    console.log('[BULK DELETE] Permission check:', { isAdmin, allowClientProvidedDelete });
     
     const result = await db.execute(sql`
       UPDATE verification_contacts c
@@ -684,6 +694,12 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", asyn
     `);
     
     const deletedIds = result.rows.map((r: any) => r.id);
+    
+    console.log('[BULK DELETE] Result:', { 
+      requested: contactIds.length, 
+      deleted: deletedIds.length, 
+      skipped: contactIds.length - deletedIds.length 
+    });
     
     if (deletedIds.length > 0 && req.user?.userId) {
       await db.insert(verificationAuditLog).values({
