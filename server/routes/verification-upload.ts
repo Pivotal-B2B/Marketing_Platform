@@ -180,6 +180,13 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
       updated: 0,
       skipped: 0,
       errors: [] as string[],
+      updatedContacts: [] as Array<{
+        id: string;
+        fullName: string;
+        email: string | null;
+        accountName: string | null;
+        fieldsUpdated: string[];
+      }>,
     };
 
     // Wrap all inserts in a transaction
@@ -449,6 +456,15 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
                 .where(eq(verificationContacts.id, existingContact.id));
               
               results.updated++;
+              
+              // Track which contact was updated and which fields changed
+              results.updatedContacts.push({
+                id: existingContact.id,
+                fullName: existingContact.fullName,
+                email: existingContact.email,
+                accountName: accountData?.name || null,
+                fieldsUpdated: Object.keys(updateData).filter(k => !['emailLower', 'fullNameLower'].includes(k)),
+              });
             } else {
               results.skipped++;
             }

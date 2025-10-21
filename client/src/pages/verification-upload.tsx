@@ -560,6 +560,31 @@ export default function VerificationUploadPage() {
               </div>
             </div>
 
+            {uploadResult.updatedContacts && uploadResult.updatedContacts.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  Updated Contacts ({uploadResult.updatedContacts.length})
+                </h4>
+                <div className="max-h-60 overflow-y-auto space-y-1 border rounded-md p-2" data-testid="container-updated-contacts">
+                  {uploadResult.updatedContacts.map((contact: any, i: number) => (
+                    <div key={i} className="text-sm bg-green-500/10 p-2 rounded border border-green-500/20">
+                      <div className="font-medium">{contact.fullName}</div>
+                      {contact.email && (
+                        <div className="text-xs text-muted-foreground">{contact.email}</div>
+                      )}
+                      {contact.accountName && (
+                        <div className="text-xs text-muted-foreground">Company: {contact.accountName}</div>
+                      )}
+                      <div className="text-xs text-green-700 mt-1">
+                        Updated: {contact.fieldsUpdated.join(', ')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {uploadResult.errors && uploadResult.errors.length > 0 && (
               <div className="space-y-2">
                 <h4 className="font-medium flex items-center gap-2">
