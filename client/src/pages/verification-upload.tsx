@@ -11,6 +11,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { parseCSV } from "@/lib/csv-utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface FieldMapping {
   csvColumn: string;
@@ -108,16 +110,18 @@ export default function VerificationUploadPage() {
   const [rawCSVContent, setRawCSVContent] = useState<string>("");
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [uploadResult, setUploadResult] = useState<any>(null);
+  const [updateMode, setUpdateMode] = useState<boolean>(false);
 
   const { data: campaign } = useQuery({
     queryKey: ["/api/verification-campaigns", campaignId],
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async ({ csvData, fieldMappings }: { csvData: string; fieldMappings: FieldMapping[] }) => {
+    mutationFn: async ({ csvData, fieldMappings, updateMode }: { csvData: string; fieldMappings: FieldMapping[]; updateMode: boolean }) => {
       const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/upload`, {
         csvData,
         fieldMappings,
+        updateMode,
       });
       return res.json();
     },
@@ -126,9 +130,14 @@ export default function VerificationUploadPage() {
       setStage("complete");
       queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
       queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+      
+      const message = updateMode
+        ? `Updated ${data.updated || 0} contacts, created ${data.created || 0} new, skipped ${data.skipped || 0}`
+        : `Created ${data.created} contacts, skipped ${data.skipped}`;
+      
       toast({
         title: "Upload Complete",
-        description: `Created ${data.created} contacts, skipped ${data.skipped}`,
+        description: message,
       });
     },
     onError: (error: any) => {
@@ -179,7 +188,7 @@ export default function VerificationUploadPage() {
   const handleUpload = async () => {
     if (!file || !rawCSVContent) return;
 
-    uploadMutation.mutate({ csvData: rawCSVContent, fieldMappings });
+    uploadMutation.mutate({ csvData: rawCSVContent, fieldMappings, updateMode });
   };
 
   return (
@@ -272,28 +281,55 @@ export default function VerificationUploadPage() {
             <CardDescription>Select your CSV file to begin</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-4">
-              <label
-                htmlFor="csv-file"
-                className="flex items-center gap-2 px-4 py-2 bg-secondary hover-elevate active-elevate-2 rounded-md cursor-pointer"
-                data-testid="button-select-file"
-              >
-                <FileText className="h-4 w-4" />
-                <span>Select CSV File</span>
-                <input
-                  id="csv-file"
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  data-testid="input-file"
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
+                <Checkbox
+                  id="update-mode"
+                  checked={updateMode}
+                  onCheckedChange={(checked) => setUpdateMode(checked === true)}
+                  data-testid="checkbox-update-mode"
                 />
-              </label>
+                <Label htmlFor="update-mode" className="cursor-pointer flex-1">
+                  <div className="font-medium">Update Existing Contacts</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Match by Name + Country + Company and update CAV IDs or other fields
+                  </div>
+                </Label>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <label
+                  htmlFor="csv-file"
+                  className="flex items-center gap-2 px-4 py-2 bg-secondary hover-elevate active-elevate-2 rounded-md cursor-pointer"
+                  data-testid="button-select-file"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>Select CSV File</span>
+                  <input
+                    id="csv-file"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    data-testid="input-file"
+                  />
+                </label>
+              </div>
             </div>
             
             <Alert>
               <AlertDescription className="text-xs">
-                <strong>Next Step:</strong> After selecting a file, you'll be able to map CSV columns to contact fields manually.
+                {updateMode ? (
+                  <>
+                    <strong>Update Mode:</strong> Contacts will be matched by Name + Country + Company. 
+                    If CSV has CAV IDs, they'll be added to matching contacts. 
+                    If existing contacts have CAV IDs, all other fields will be updated from CSV.
+                  </>
+                ) : (
+                  <>
+                    <strong>Next Step:</strong> After selecting a file, you'll be able to map CSV columns to contact fields manually.
+                  </>
+                )}
               </AlertDescription>
             </Alert>
           </CardContent>

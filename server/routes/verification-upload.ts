@@ -42,7 +42,7 @@ interface CSVRow {
 router.post("/api/verification-campaigns/:campaignId/upload", async (req: Request, res: Response) => {
   try {
     const { campaignId } = req.params;
-    const { csvData, fieldMappings } = req.body;
+    const { csvData, fieldMappings, updateMode } = req.body;
 
     if (!csvData) {
       return res.status(400).json({ error: "csvData is required" });
@@ -177,6 +177,7 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
     const results = {
       total: rows.length,
       created: 0,
+      updated: 0,
       skipped: 0,
       errors: [] as string[],
     };
@@ -304,42 +305,144 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             }
           }
 
-          // Insert in one go with derived fields
-          await tx.insert(verificationContacts).values({
-            campaignId,
-            accountId,
-            sourceType,
-            fullName,
-            firstName: row.firstName || null,
-            lastName: row.lastName || null,
-            title: row.title || null,
-            email: row.email || null,
-            phone: row.phone || null,
-            mobile: row.mobile || null,
-            linkedinUrl: row.linkedinUrl || null,
-            contactAddress1,
-            contactAddress2,
-            contactAddress3,
-            contactCity,
-            contactState,
-            contactCountry: row.contactCountry || null,
-            contactPostal,
-            hqAddress1: row.hqAddress1 || null,
-            hqAddress2: row.hqAddress2 || null,
-            hqAddress3: row.hqAddress3 || null,
-            hqCity: row.hqCity || null,
-            hqState: row.hqState || null,
-            hqCountry: row.hqCountry || null,
-            hqPostal: row.hqPostal || null,
-            cavId: row.cavId || null,
-            cavUserId: row.cavUserId || null,
-            eligibilityStatus: eligibility.status,
-            eligibilityReason: eligibility.reason,
-            suppressed: isSuppressed,
-            ...normalizedKeys,
-          });
+          // Check for existing contact if update mode is enabled
+          let existingContact = null;
+          if (updateMode) {
+            // Match by fullName + contactCountry + accountName (fuzzy case-insensitive)
+            const matchConditions = [
+              eq(verificationContacts.campaignId, campaignId),
+              eq(verificationContacts.deleted, false),
+              sql`LOWER(${verificationContacts.fullName}) = LOWER(${fullName})`,
+            ];
+            
+            if (row.contactCountry) {
+              matchConditions.push(sql`LOWER(${verificationContacts.contactCountry}) = LOWER(${row.contactCountry})`);
+            }
+            
+            if (accountNameCsv && accountData) {
+              matchConditions.push(eq(verificationContacts.accountId, accountData.id));
+            }
+            
+            const matches = await tx
+              .select()
+              .from(verificationContacts)
+              .where(and(...matchConditions))
+              .limit(1);
+            
+            if (matches.length > 0) {
+              existingContact = matches[0];
+            }
+          }
 
-          results.created++;
+          if (existingContact) {
+            // Update existing contact based on CAV ID logic
+            const csvHasCavId = !!(row.cavId || row.cavUserId);
+            const dbHasCavId = !!(existingContact.cavId || existingContact.cavUserId);
+            
+            const updateData: any = {};
+            
+            if (csvHasCavId) {
+              // CSV has CAV IDs -> update only CAV ID fields
+              if (row.cavId) updateData.cavId = row.cavId;
+              if (row.cavUserId) updateData.cavUserId = row.cavUserId;
+            } else if (dbHasCavId) {
+              // DB has CAV IDs -> update all other fields from CSV
+              updateData.firstName = row.firstName || existingContact.firstName;
+              updateData.lastName = row.lastName || existingContact.lastName;
+              updateData.title = row.title || existingContact.title;
+              updateData.email = row.email || existingContact.email;
+              updateData.phone = row.phone || existingContact.phone;
+              updateData.mobile = row.mobile || existingContact.mobile;
+              updateData.linkedinUrl = row.linkedinUrl || existingContact.linkedinUrl;
+              updateData.contactAddress1 = contactAddress1 || existingContact.contactAddress1;
+              updateData.contactAddress2 = contactAddress2 || existingContact.contactAddress2;
+              updateData.contactAddress3 = contactAddress3 || existingContact.contactAddress3;
+              updateData.contactCity = contactCity || existingContact.contactCity;
+              updateData.contactState = contactState || existingContact.contactState;
+              updateData.contactCountry = row.contactCountry || existingContact.contactCountry;
+              updateData.contactPostal = contactPostal || existingContact.contactPostal;
+              updateData.hqAddress1 = row.hqAddress1 || existingContact.hqAddress1;
+              updateData.hqAddress2 = row.hqAddress2 || existingContact.hqAddress2;
+              updateData.hqAddress3 = row.hqAddress3 || existingContact.hqAddress3;
+              updateData.hqCity = row.hqCity || existingContact.hqCity;
+              updateData.hqState = row.hqState || existingContact.hqState;
+              updateData.hqCountry = row.hqCountry || existingContact.hqCountry;
+              updateData.hqPostal = row.hqPostal || existingContact.hqPostal;
+            } else {
+              // Neither has CAV IDs -> update all fields from CSV
+              updateData.firstName = row.firstName || existingContact.firstName;
+              updateData.lastName = row.lastName || existingContact.lastName;
+              updateData.title = row.title || existingContact.title;
+              updateData.email = row.email || existingContact.email;
+              updateData.phone = row.phone || existingContact.phone;
+              updateData.mobile = row.mobile || existingContact.mobile;
+              updateData.linkedinUrl = row.linkedinUrl || existingContact.linkedinUrl;
+              updateData.contactAddress1 = contactAddress1 || existingContact.contactAddress1;
+              updateData.contactAddress2 = contactAddress2 || existingContact.contactAddress2;
+              updateData.contactAddress3 = contactAddress3 || existingContact.contactAddress3;
+              updateData.contactCity = contactCity || existingContact.contactCity;
+              updateData.contactState = contactState || existingContact.contactState;
+              updateData.contactCountry = row.contactCountry || existingContact.contactCountry;
+              updateData.contactPostal = contactPostal || existingContact.contactPostal;
+              updateData.hqAddress1 = row.hqAddress1 || existingContact.hqAddress1;
+              updateData.hqAddress2 = row.hqAddress2 || existingContact.hqAddress2;
+              updateData.hqAddress3 = row.hqAddress3 || existingContact.hqAddress3;
+              updateData.hqCity = row.hqCity || existingContact.hqCity;
+              updateData.hqState = row.hqState || existingContact.hqState;
+              updateData.hqCountry = row.hqCountry || existingContact.hqCountry;
+              updateData.hqPostal = row.hqPostal || existingContact.hqPostal;
+            }
+            
+            // Re-evaluate eligibility and suppression on update
+            updateData.eligibilityStatus = eligibility.status;
+            updateData.eligibilityReason = eligibility.reason;
+            updateData.suppressed = isSuppressed;
+            Object.assign(updateData, normalizedKeys);
+            
+            await tx
+              .update(verificationContacts)
+              .set(updateData)
+              .where(eq(verificationContacts.id, existingContact.id));
+            
+            results.updated++;
+          } else {
+            // Insert new contact
+            await tx.insert(verificationContacts).values({
+              campaignId,
+              accountId,
+              sourceType,
+              fullName,
+              firstName: row.firstName || null,
+              lastName: row.lastName || null,
+              title: row.title || null,
+              email: row.email || null,
+              phone: row.phone || null,
+              mobile: row.mobile || null,
+              linkedinUrl: row.linkedinUrl || null,
+              contactAddress1,
+              contactAddress2,
+              contactAddress3,
+              contactCity,
+              contactState,
+              contactCountry: row.contactCountry || null,
+              contactPostal,
+              hqAddress1: row.hqAddress1 || null,
+              hqAddress2: row.hqAddress2 || null,
+              hqAddress3: row.hqAddress3 || null,
+              hqCity: row.hqCity || null,
+              hqState: row.hqState || null,
+              hqCountry: row.hqCountry || null,
+              hqPostal: row.hqPostal || null,
+              cavId: row.cavId || null,
+              cavUserId: row.cavUserId || null,
+              eligibilityStatus: eligibility.status,
+              eligibilityReason: eligibility.reason,
+              suppressed: isSuppressed,
+              ...normalizedKeys,
+            });
+
+            results.created++;
+          }
         } catch (error: any) {
           results.skipped++;
           results.errors.push(`Row ${i + 1}: ${error.message ?? String(error)}`);
