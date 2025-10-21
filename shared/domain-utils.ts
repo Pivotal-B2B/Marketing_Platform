@@ -1,3 +1,5 @@
+import { getDomain } from 'tldts';
+
 /**
  * Domain normalization and matching utilities for Phase 21 Domain Sets
  */
@@ -37,6 +39,30 @@ export function normalizeDomain(domain: string): string {
   }
   
   return normalized;
+}
+
+/**
+ * Extract the root domain using Mozilla Public Suffix List
+ * Correctly handles multi-level TLDs (gov.uk, ac.uk, k12.ca.us, etc.)
+ * 
+ * Examples:
+ * - "portal.mail.microsoft.com" → "microsoft.com"
+ * - "department.gov.uk" → "department.gov.uk" (NOT "gov.uk"!)
+ * - "university.ac.uk" → "university.ac.uk"
+ * - "www.example.co.uk" → "example.co.uk"
+ * - "mail.acme.org" → "acme.org"
+ * 
+ * Uses tldts library for accurate public suffix list parsing.
+ */
+export function extractRootDomain(input: string): string {
+  if (!input) return '';
+  
+  // tldts.getDomain() correctly extracts the root domain using public suffix list
+  // It handles URLs, hostnames, and normalized domains
+  const rootDomain = getDomain(input);
+  
+  // Return the extracted domain or empty string if invalid
+  return rootDomain || '';
 }
 
 /**

@@ -71,6 +71,62 @@ router.post("/api/verification-campaigns/:campaignId/submission/prepare", async 
   }
 });
 
+router.get("/api/verification-campaigns/:campaignId/submission/company-stats", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    const leadCapPerAccount = campaign.leadCapPerAccount;
+    
+    // Get per-company submission stats
+    const stats = await db.execute(sql`
+      SELECT 
+        a.id as account_id,
+        a.name as account_name,
+        a.domain as account_domain,
+        COUNT(DISTINCT s.id) as submitted_count,
+        COUNT(DISTINCT c.id) FILTER (WHERE c.eligibility_status = 'Eligible' AND c.suppressed = FALSE AND c.email_status = 'ok' AND c.verification_status = 'Validated' AND c.in_submission_buffer = FALSE) as eligible_remaining,
+        ${leadCapPerAccount} as lead_cap,
+        CASE 
+          WHEN COUNT(DISTINCT s.id) >= ${leadCapPerAccount} THEN 'At Cap'
+          WHEN COUNT(DISTINCT s.id) >= ${leadCapPerAccount} * 0.8 THEN 'Near Cap'
+          ELSE 'Below Cap'
+        END as cap_status
+      FROM accounts a
+      LEFT JOIN verification_contacts c ON c.account_id = a.id AND c.campaign_id = ${campaignId} AND c.deleted = FALSE
+      LEFT JOIN verification_lead_submissions s ON s.account_id = a.id AND s.campaign_id = ${campaignId}
+      WHERE a.id IN (
+        SELECT DISTINCT account_id FROM verification_contacts 
+        WHERE campaign_id = ${campaignId} AND account_id IS NOT NULL
+      )
+      GROUP BY a.id, a.name, a.domain
+      HAVING COUNT(DISTINCT s.id) > 0 OR COUNT(DISTINCT c.id) > 0
+      ORDER BY COUNT(DISTINCT s.id) DESC, a.name
+    `);
+    
+    res.json({ 
+      stats: stats.rows,
+      leadCapPerAccount,
+      summary: {
+        totalCompanies: stats.rows.length,
+        companiesAtCap: stats.rows.filter((r: any) => r.cap_status === 'At Cap').length,
+        companiesNearCap: stats.rows.filter((r: any) => r.cap_status === 'Near Cap').length,
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching company submission stats:", error);
+    res.status(500).json({ error: "Failed to fetch company submission stats" });
+  }
+});
+
 router.get("/api/verification-campaigns/:campaignId/submission/export", async (req, res) => {
   try {
     const { campaignId } = req.params;

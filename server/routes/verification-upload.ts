@@ -4,6 +4,7 @@ import { verificationContacts, verificationCampaigns, accounts } from "@shared/s
 import { eq, and, or, sql } from "drizzle-orm";
 import Papa from "papaparse";
 import { evaluateEligibility, checkSuppression, computeNormalizedKeys, normalize } from "../lib/verification-utils";
+import { getMatchTypeAndConfidence, normalizeDomain, extractRootDomain } from "@shared/domain-utils";
 
 const router = Router();
 
@@ -201,112 +202,121 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             continue;
           }
 
-          // Resolve/create account (domain > name > email domain)
+          // Resolve/create account using advanced fuzzy matching
           const accountNameCsv = row.account_name || row.companyName || null;
           const domainValue = (row.domain || row.companyDomain || null)?.toLowerCase() || null;
           const emailDomain = row.email ? normalize.extractDomain(row.email) : null;
 
           let accountId: string | null = null;
           let accountData: any = null;
+          let matchConfidence = 0;
+          let matchedBy = '';
           
-          // PRIORITY 1: Try explicit domain match
-          if (domainValue) {
-            const [a] = await tx
+          // Get input domain (prioritize explicit domain, fallback to email domain)
+          const inputDomain = domainValue || emailDomain || '';
+          
+          // STEP 1: Try exact domain match on ROOT DOMAIN (fast path)
+          // Normalize input domain to handle protocol/prefix variations
+          const normalizedInput = inputDomain ? normalizeDomain(inputDomain) : '';
+          const rootDomain = normalizedInput ? extractRootDomain(normalizedInput) : '';
+          
+          if (rootDomain) {
+            // Match on ROOT DOMAIN to catch all subdomain variations
+            // e.g., "portal.microsoft.com", "www.microsoft.com", "mail.microsoft.com" all match "microsoft.com"
+            const exactMatch = await tx
               .select()
               .from(accounts)
-              .where(eq(accounts.domain, domainValue))
+              .where(sql`
+                ${accounts.domain} IS NOT NULL 
+                AND LOWER(TRIM(${accounts.domain})) = ${rootDomain.toLowerCase()}
+              `)
               .limit(1);
             
-            if (a) {
-              accountId = a.id;
-              accountData = a;
-            } else {
-              const newAccount = await tx.insert(accounts).values({
-                name: (accountNameCsv ?? domainValue.replace(/^www\./, '').split('.')[0])!,
-                domain: domainValue,
-                hqStreet1: row.hqAddress1 ?? null,
-                hqStreet2: row.hqAddress2 ?? null,
-                hqStreet3: row.hqAddress3 ?? null,
-                hqCity: row.hqCity ?? null,
-                hqState: row.hqState ?? null,
-                hqPostalCode: row.hqPostal ?? null,
-                hqCountry: row.hqCountry ?? null,
-              }).returning();
-              accountId = newAccount[0].id;
-              accountData = newAccount[0];
+            if (exactMatch.length > 0) {
+              accountId = exactMatch[0].id;
+              accountData = exactMatch[0];
+              matchConfidence = 1.0;
+              matchedBy = 'exact_root_domain';
+              console.log(`[CompanyMatch] Row ${i + 1}: Exact root domain match - ${exactMatch[0].name} (root: ${rootDomain})`);
             }
           }
           
-          // PRIORITY 2: Try company name match (if no domain match)
-          if (!accountId && accountNameCsv) {
-            // Use smart company name normalization for matching
-            const normalizedCsvName = normalize.companyKey(accountNameCsv);
+          // STEP 2: If no exact match, try fuzzy matching with domain + name
+          if (!accountId && (inputDomain || accountNameCsv)) {
+            // Get candidate accounts for fuzzy matching (limit search space)
+            let candidateAccounts: typeof accounts.$inferSelect[] = [];
             
-            // Extract core words from normalized name for initial filter
-            const coreWords = normalizedCsvName.split(' ').filter(w => w.length > 2);
-            const likePattern = coreWords.length > 0 
-              ? `%${coreWords[0]}%` 
-              : `%${accountNameCsv}%`;
-            
-            // Get candidate accounts (pre-filter to reduce dataset)
-            const candidateAccounts = await tx
-              .select()
-              .from(accounts)
-              .where(sql`LOWER(${accounts.name}) LIKE LOWER(${likePattern})`)
-              .limit(100); // Safety limit
-            
-            // Find exact match using smart normalization
-            const matchedAccount = candidateAccounts.find(acc => 
-              normalize.companyKey(acc.name) === normalizedCsvName
-            );
-            
-            if (matchedAccount) {
-              accountId = matchedAccount.id;
-              accountData = matchedAccount;
-            }
-          }
-          
-          // PRIORITY 3: Try email domain match (if no explicit domain or company name match)
-          if (!accountId && emailDomain && !domainValue) {
-            // Try direct domain match first
-            const [domainMatch] = await tx
-              .select()
-              .from(accounts)
-              .where(eq(accounts.domain, emailDomain))
-              .limit(1);
-            
-            if (domainMatch) {
-              accountId = domainMatch.id;
-              accountData = domainMatch;
-            } else {
-              // Try fuzzy match: normalize email domain and compare with account names
-              const normalizedEmailDomain = normalize.domainToCompanyKey(emailDomain);
+            if (accountNameCsv) {
+              // Pre-filter by company name similarity
+              const coreWords = normalize.companyKey(accountNameCsv).split(' ').filter(w => w.length > 2);
+              const likePattern = coreWords.length > 0 ? `%${coreWords[0]}%` : `%${accountNameCsv}%`;
               
-              if (normalizedEmailDomain) {
-                // Get all accounts to check against normalized domain
-                const allAccounts = await tx
-                  .select()
-                  .from(accounts)
-                  .limit(500); // Safety limit
-                
-                const domainMatchedAccount = allAccounts.find(acc => 
-                  normalize.companyKey(acc.name) === normalizedEmailDomain ||
-                  (acc.domain && normalize.domainToCompanyKey(acc.domain) === normalizedEmailDomain)
-                );
-                
-                if (domainMatchedAccount) {
-                  accountId = domainMatchedAccount.id;
-                  accountData = domainMatchedAccount;
-                }
+              candidateAccounts = await tx
+                .select()
+                .from(accounts)
+                .where(sql`LOWER(${accounts.name}) LIKE LOWER(${likePattern})`)
+                .limit(200);
+            }
+            
+            // If no name-based candidates, get accounts by domain similarity
+            if (candidateAccounts.length === 0 && normalizedInput) {
+              const domainRoot = normalizedInput.split('.')[0]; // Get domain root for matching from NORMALIZED input
+              candidateAccounts = await tx
+                .select()
+                .from(accounts)
+                .where(sql`${accounts.domain} IS NOT NULL AND ${accounts.domain} LIKE ${`%${domainRoot}%`}`)
+                .limit(200);
+            }
+            
+            // If still no candidates, get a sample of all accounts
+            if (candidateAccounts.length === 0) {
+              candidateAccounts = await tx
+                .select()
+                .from(accounts)
+                .limit(500);
+            }
+            
+            // Find best fuzzy match using advanced matching algorithm
+            let bestMatch: { account: typeof accounts.$inferSelect; confidence: number; matchedBy: string } | null = null;
+            
+            for (const account of candidateAccounts) {
+              const matchResult = getMatchTypeAndConfidence(
+                normalizedInput, // Use NORMALIZED input domain for matching
+                accountNameCsv || undefined,
+                account.domain || '',
+                account.name
+              );
+              
+              // Accept fuzzy matches with confidence >= 0.75
+              if ((matchResult.matchType === 'exact' || matchResult.matchType === 'fuzzy') && 
+                  matchResult.confidence >= 0.75 &&
+                  (!bestMatch || matchResult.confidence > bestMatch.confidence)) {
+                bestMatch = {
+                  account,
+                  confidence: matchResult.confidence,
+                  matchedBy: matchResult.matchedBy || 'unknown'
+                };
               }
             }
+            
+            if (bestMatch) {
+              accountId = bestMatch.account.id;
+              accountData = bestMatch.account;
+              matchConfidence = bestMatch.confidence;
+              matchedBy = bestMatch.matchedBy;
+              console.log(`[CompanyMatch] Row ${i + 1}: Fuzzy match - ${bestMatch.account.name} (confidence: ${matchConfidence.toFixed(2)}, matched by: ${matchedBy})`);
+            }
           }
           
-          // Create new account if no match found
+          // STEP 3: Create new account if no match found
           if (!accountId) {
+            // Extract ROOT DOMAIN to prevent subdomain duplicates
+            // e.g., "portal.microsoft.com" → "microsoft.com"
+            const rootDomain = normalizedInput ? extractRootDomain(normalizedInput) : null;
+            
             const newAccount = await tx.insert(accounts).values({
-              name: accountNameCsv ?? emailDomain?.replace(/^www\./, '').split('.')[0] ?? 'Unknown Company',
-              domain: domainValue ?? emailDomain ?? null,
+              name: accountNameCsv ?? (rootDomain ? rootDomain.split('.')[0] : 'Unknown Company'),
+              domain: rootDomain, // Store ROOT DOMAIN to ensure all subdomains match
               hqStreet1: row.hqAddress1 ?? null,
               hqStreet2: row.hqAddress2 ?? null,
               hqStreet3: row.hqAddress3 ?? null,
@@ -317,6 +327,7 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             }).returning();
             accountId = newAccount[0].id;
             accountData = newAccount[0];
+            console.log(`[CompanyMatch] Row ${i + 1}: Created new account - ${newAccount[0].name} (root domain: ${rootDomain})`);
           }
 
           const fullName = row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim();

@@ -57,6 +57,11 @@ export default function VerificationConsolePage() {
     refetchInterval: 10000,
   });
 
+  const { data: companyStats } = useQuery({
+    queryKey: ["/api/verification-campaigns", campaignId, "submission", "company-stats"],
+    refetchInterval: 30000,
+  });
+
   const { data: queue, isLoading: queueLoading } = useQuery({
     queryKey: ["/api/verification-campaigns", campaignId, "queue", filters],
     queryFn: async () => {
@@ -414,6 +419,73 @@ export default function VerificationConsolePage() {
           </CardContent>
         </Card>
       </div>
+
+      {companyStats && (companyStats as any).stats && (companyStats as any).stats.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Company Lead Cap Status</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              {(companyStats as any).summary?.totalCompanies || 0} companies tracked • 
+              Cap per company: {(companyStats as any).leadCapPerAccount || 10} leads
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-md">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-3 text-sm font-medium">Company</th>
+                    <th className="text-left p-3 text-sm font-medium">Domain</th>
+                    <th className="text-center p-3 text-sm font-medium">Submitted</th>
+                    <th className="text-center p-3 text-sm font-medium">Remaining Eligible</th>
+                    <th className="text-left p-3 text-sm font-medium">Progress</th>
+                    <th className="text-center p-3 text-sm font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {((companyStats as any).stats as any[]).slice(0, 10).map((company: any, index: number) => {
+                    const progress = (Number(company.submitted_count) / Number(company.lead_cap)) * 100;
+                    return (
+                      <tr key={company.account_id} className="border-b last:border-0">
+                        <td className="p-3 text-sm font-medium">{company.account_name}</td>
+                        <td className="p-3 text-sm text-muted-foreground">{company.account_domain || '-'}</td>
+                        <td className="p-3 text-center text-sm font-medium">{company.submitted_count}</td>
+                        <td className="p-3 text-center text-sm text-muted-foreground">{company.eligible_remaining}</td>
+                        <td className="p-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">{company.submitted_count} / {company.lead_cap}</span>
+                              <span className="font-medium">{progress.toFixed(0)}%</span>
+                            </div>
+                            <Progress value={progress} className="h-1.5" />
+                          </div>
+                        </td>
+                        <td className="p-3 text-center">
+                          <Badge 
+                            variant={
+                              company.cap_status === 'At Cap' ? 'destructive' :
+                              company.cap_status === 'Near Cap' ? 'secondary' :
+                              'default'
+                            }
+                            className="text-xs"
+                          >
+                            {company.cap_status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {((companyStats as any).stats as any[]).length > 10 && (
+              <div className="mt-3 text-center text-xs text-muted-foreground">
+                Showing 10 of {((companyStats as any).stats as any[]).length} companies
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {!currentContactId ? (
         <Card>
