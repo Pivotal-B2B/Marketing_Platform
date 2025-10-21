@@ -307,11 +307,12 @@ export default function VerificationConsolePage() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      const { statusCounts, successCount } = data;
+      const { statusCounts, successCount, processedBatches, totalContacts } = data;
+      const batchInfo = processedBatches > 1 ? ` (${processedBatches} batches)` : '';
       toast({
-        title: "Email Verification Complete",
-        description: `Verified ${successCount} emails: ${statusCounts.ok} OK, ${statusCounts.invalid} Invalid, ${statusCounts.risky} Risky, ${statusCounts.disposable} Disposable`,
-        duration: 8000,
+        title: `Email Verification Complete${batchInfo}`,
+        description: `Verified ${successCount}/${totalContacts} contacts: ${statusCounts.ok || 0} OK, ${statusCounts.invalid || 0} Invalid, ${statusCounts.risky || 0} Risky, ${statusCounts.disposable || 0} Disposable, ${statusCounts.accept_all || 0} Accept-All`,
+        duration: 10000,
       });
       setSelectedContactIds(new Set());
       queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });

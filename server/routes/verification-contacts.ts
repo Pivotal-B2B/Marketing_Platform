@@ -1105,115 +1105,154 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
   }
 });
 
-// Bulk Email Verification using Email List Verify
+// Bulk Email Verification using Email List Verify - Processes ALL contacts in batches
 router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails", requireAuth, async (req, res) => {
   try {
     const { campaignId } = req.params;
     const { contactIds } = z.object({
-      contactIds: z.array(z.string()).min(1).max(500), // Max 500 emails per batch
+      contactIds: z.array(z.string()).min(1), // No limit - process all contacts in batches
     }).parse(req.body);
     
     console.log(`[BULK EMAIL VERIFY] Starting verification for ${contactIds.length} contacts in campaign ${campaignId}`);
     
-    // Fetch contacts with emails
-    const contacts = await db
-      .select()
-      .from(verificationContacts)
-      .where(and(
-        eq(verificationContacts.campaignId, campaignId),
-        inArray(verificationContacts.id, contactIds),
-        sql`${verificationContacts.email} IS NOT NULL AND ${verificationContacts.email} != ''`
-      ));
+    // Process contacts in batches of 500 to avoid memory issues
+    const BATCH_SIZE = 500;
+    const totalBatches = Math.ceil(contactIds.length / BATCH_SIZE);
     
-    if (contacts.length === 0) {
-      return res.status(400).json({ error: "No contacts with valid emails found" });
-    }
+    let totalSuccessCount = 0;
+    let totalFailureCount = 0;
+    const totalStatusCounts = {
+      ok: 0,
+      invalid: 0,
+      risky: 0,
+      disposable: 0,
+      accept_all: 0,
+      unknown: 0,
+    };
     
-    // Extract unique emails
-    const emailsToVerify = [...new Set(contacts.map(c => c.emailLower || c.email!.toLowerCase()).filter(Boolean))];
-    
-    console.log(`[BULK EMAIL VERIFY] Verifying ${emailsToVerify.length} unique emails`);
-    
-    // Verify emails using Email List Verify API (with rate limiting)
-    const verificationResults = await verifyEmailsBulk(emailsToVerify, {
-      delayMs: 200, // 5 requests per second
-      onProgress: (completed, total, currentEmail) => {
-        if (completed % 10 === 0 || completed === total) {
-          console.log(`[BULK EMAIL VERIFY] Progress: ${completed}/${total} (${currentEmail})`);
-        }
-      },
-    });
-    
-    // Update contacts and cache validation results
-    let successCount = 0;
-    let failureCount = 0;
-    
-    for (const contact of contacts) {
-      const emailKey = (contact.emailLower || contact.email!.toLowerCase()).trim();
-      const result = verificationResults.get(emailKey);
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const batchStart = batchIndex * BATCH_SIZE;
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, contactIds.length);
+      const batchContactIds = contactIds.slice(batchStart, batchEnd);
       
-      if (!result) {
-        console.warn(`[BULK EMAIL VERIFY] No result for ${emailKey}`);
-        failureCount++;
+      console.log(`[BULK EMAIL VERIFY] Processing batch ${batchIndex + 1}/${totalBatches} (${batchContactIds.length} contact IDs)`);
+      
+      // Fetch contacts with valid emails for this batch
+      const contacts = await db
+        .select()
+        .from(verificationContacts)
+        .where(and(
+          eq(verificationContacts.campaignId, campaignId),
+          inArray(verificationContacts.id, batchContactIds),
+          sql`${verificationContacts.email} IS NOT NULL AND ${verificationContacts.email} != ''`
+        ));
+      
+      if (contacts.length === 0) {
+        console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1}: No contacts with valid emails, skipping`);
         continue;
       }
       
-      try {
-        // Update contact email status
-        await db
-          .update(verificationContacts)
-          .set({
-            emailStatus: result.status,
-            updatedAt: new Date(),
-          })
-          .where(eq(verificationContacts.id, contact.id));
-        
-        // Cache the validation result (using composite key upsert)
-        await db
-          .insert(verificationEmailValidations)
-          .values({
-            contactId: contact.id,
-            emailLower: emailKey,
-            provider: result.provider,
-            status: result.status,
-            rawJson: result.rawResponse || {},
-            checkedAt: result.checkedAt,
-          })
-          .onConflictDoNothing();
-        
-        successCount++;
-      } catch (error) {
-        console.error(`[BULK EMAIL VERIFY] Error updating contact ${contact.id}:`, error);
-        failureCount++;
+      // Extract unique emails for this batch (filter out null/empty)
+      const emailsToVerify = [...new Set(
+        contacts
+          .map(c => c.emailLower || c.email?.toLowerCase())
+          .filter((email): email is string => Boolean(email && email.trim()))
+          .map(email => email.trim())
+      )];
+      
+      if (emailsToVerify.length === 0) {
+        console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1}: No valid emails to verify, skipping`);
+        continue;
       }
+      
+      console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1}: Verifying ${emailsToVerify.length} unique emails for ${contacts.length} contacts`);
+      
+      // Verify emails using Email List Verify API (with rate limiting)
+      const verificationResults = await verifyEmailsBulk(emailsToVerify, {
+        delayMs: 200, // 5 requests per second
+        onProgress: (completed, total, currentEmail) => {
+          if (completed % 10 === 0 || completed === total) {
+            console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1} Progress: ${completed}/${total} (${currentEmail})`);
+          }
+        },
+      });
+      
+      // Update contacts and cache validation results for this batch
+      let batchSuccessCount = 0;
+      let batchFailureCount = 0;
+      
+      for (const contact of contacts) {
+        // Get email key for this contact
+        const emailRaw = contact.emailLower || contact.email?.toLowerCase();
+        if (!emailRaw || !emailRaw.trim()) {
+          console.warn(`[BULK EMAIL VERIFY] Contact ${contact.id} has no valid email, skipping`);
+          batchFailureCount++;
+          continue;
+        }
+        
+        const emailKey = emailRaw.trim();
+        const result = verificationResults.get(emailKey);
+        
+        if (!result) {
+          console.warn(`[BULK EMAIL VERIFY] No verification result for ${emailKey} (contact ${contact.id})`);
+          batchFailureCount++;
+          continue;
+        }
+        
+        try {
+          // Update contact email status
+          await db
+            .update(verificationContacts)
+            .set({
+              emailStatus: result.status,
+              updatedAt: new Date(),
+            })
+            .where(eq(verificationContacts.id, contact.id));
+          
+          // Cache the validation result
+          await db
+            .insert(verificationEmailValidations)
+            .values({
+              contactId: contact.id,
+              emailLower: emailKey,
+              provider: result.provider,
+              status: result.status,
+              rawJson: result.rawResponse || {},
+              checkedAt: result.checkedAt,
+            })
+            .onConflictDoNothing();
+          
+          // Track status counts ONLY after successful update
+          if (result.status in totalStatusCounts) {
+            totalStatusCounts[result.status]++;
+          } else {
+            console.warn(`[BULK EMAIL VERIFY] Unknown status '${result.status}' for ${emailKey}, counting as unknown`);
+            totalStatusCounts.unknown++;
+          }
+          
+          batchSuccessCount++;
+        } catch (error) {
+          console.error(`[BULK EMAIL VERIFY] Error updating contact ${contact.id} (${emailKey}):`, error);
+          batchFailureCount++;
+        }
+      }
+      
+      totalSuccessCount += batchSuccessCount;
+      totalFailureCount += batchFailureCount;
+      
+      console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1} Complete: ${batchSuccessCount} success, ${batchFailureCount} failures`);
     }
     
-    console.log(`[BULK EMAIL VERIFY] Completed: ${successCount} success, ${failureCount} failures`);
+    console.log(`[BULK EMAIL VERIFY] All Batches Complete: ${totalSuccessCount} total success, ${totalFailureCount} total failures`);
+    console.log(`[BULK EMAIL VERIFY] Status breakdown: OK=${totalStatusCounts.ok}, Invalid=${totalStatusCounts.invalid}, Risky=${totalStatusCounts.risky}, Disposable=${totalStatusCounts.disposable}, Accept-All=${totalStatusCounts.accept_all}, Unknown=${totalStatusCounts.unknown}`);
     
     res.json({
       success: true,
-      totalContacts: contacts.length,
-      uniqueEmails: emailsToVerify.length,
-      successCount,
-      failureCount,
-      statusCounts: {
-        ok: contacts.filter(c => {
-          const emailKey = (c.emailLower || c.email!.toLowerCase()).trim();
-          return verificationResults.get(emailKey)?.status === 'ok';
-        }).length,
-        invalid: contacts.filter(c => {
-          const emailKey = (c.emailLower || c.email!.toLowerCase()).trim();
-          return verificationResults.get(emailKey)?.status === 'invalid';
-        }).length,
-        risky: contacts.filter(c => {
-          const emailKey = (c.emailLower || c.email!.toLowerCase()).trim();
-          return verificationResults.get(emailKey)?.status === 'risky';
-        }).length,
-        disposable: contacts.filter(c => {
-          const emailKey = (c.emailLower || c.email!.toLowerCase()).trim();
-          return verificationResults.get(emailKey)?.status === 'disposable';
-        }).length,
-      },
+      totalContacts: contactIds.length,
+      processedBatches: totalBatches,
+      successCount: totalSuccessCount,
+      failureCount: totalFailureCount,
+      statusCounts: totalStatusCounts,
     });
   } catch (error) {
     console.error("[BULK EMAIL VERIFY] Error:", error);
