@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { VerificationContact } from "@shared/schema";
+import { searchWeb, formatSearchResultsForAI } from "./web-search";
 
 // Referenced from blueprint:javascript_openai_ai_integrations
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
@@ -109,8 +110,9 @@ export class CompanyEnrichmentService {
   }
 
   /**
-   * Extract company data (address + phone) using web search + AI extraction
-   * UPGRADED: Now performs real web searches instead of relying only on training data
+   * HYBRID ENRICHMENT: Two-stage approach
+   * Stage 1: Try AI's internal training data
+   * Stage 2: If no results, fall back to web search (if API key configured)
    */
   private static async extractCompanyDataWithAI(
     companyName: string,
@@ -119,38 +121,111 @@ export class CompanyEnrichmentService {
     needsPhone: boolean
   ): Promise<EnrichmentResult> {
     try {
-      // First, search the web for company information
-      const searchQuery = `${companyName} ${country} office address phone number`;
-      console.log(`[CompanyEnrichment] Web searching: "${searchQuery}"`);
+      // STAGE 1: Try AI's internal knowledge first
+      console.log(`[CompanyEnrichment] Stage 1: Trying AI internal knowledge for "${companyName}" in ${country}`);
       
-      // Build the prompt with web search context
-      const prompt = this.buildEnrichmentPrompt(
-        companyName, 
-        country, 
-        needsAddress, 
-        needsPhone,
-        searchQuery
+      const aiResult = await this.tryAIInternalKnowledge(
+        companyName,
+        country,
+        needsAddress,
+        needsPhone
       );
+
+      // Check if we got good results from AI
+      const hasGoodAddress = aiResult.address && (aiResult.addressConfidence || 0) >= 0.7;
+      const hasGoodPhone = aiResult.phone && (aiResult.phoneConfidence || 0) >= 0.7;
+      
+      if ((needsAddress && hasGoodAddress) || (needsPhone && hasGoodPhone)) {
+        console.log(`[CompanyEnrichment] Stage 1 SUCCESS - AI found data (address: ${hasGoodAddress}, phone: ${hasGoodPhone})`);
+        return aiResult;
+      }
+
+      // STAGE 2: Fall back to web search if available
+      const hasApiKey = !!process.env.BRAVE_SEARCH_API_KEY;
+      
+      if (!hasApiKey) {
+        console.log(`[CompanyEnrichment] Stage 2 SKIPPED - No web search API key configured`);
+        return aiResult; // Return AI result even if low confidence
+      }
+
+      console.log(`[CompanyEnrichment] Stage 2: Trying web search fallback`);
+      
+      const webResult = await this.tryWebSearchEnrichment(
+        companyName,
+        country,
+        needsAddress,
+        needsPhone
+      );
+
+      // Merge results: Use web search data for fields that AI couldn't provide
+      const mergedResult: EnrichmentResult = { success: false };
+
+      if (hasGoodAddress) {
+        mergedResult.address = aiResult.address;
+        mergedResult.addressConfidence = aiResult.addressConfidence;
+      } else if (webResult.address && (webResult.addressConfidence || 0) >= 0.7) {
+        mergedResult.address = webResult.address;
+        mergedResult.addressConfidence = webResult.addressConfidence;
+        console.log(`[CompanyEnrichment] Using web search result for address`);
+      } else {
+        mergedResult.addressError = webResult.addressError || aiResult.addressError;
+        mergedResult.addressConfidence = 0;
+      }
+
+      if (hasGoodPhone) {
+        mergedResult.phone = aiResult.phone;
+        mergedResult.phoneConfidence = aiResult.phoneConfidence;
+      } else if (webResult.phone && (webResult.phoneConfidence || 0) >= 0.7) {
+        mergedResult.phone = webResult.phone;
+        mergedResult.phoneConfidence = webResult.phoneConfidence;
+        console.log(`[CompanyEnrichment] Using web search result for phone`);
+      } else {
+        mergedResult.phoneError = webResult.phoneError || aiResult.phoneError;
+        mergedResult.phoneConfidence = 0;
+      }
+
+      mergedResult.success = !!(mergedResult.address || mergedResult.phone);
+      
+      console.log(`[CompanyEnrichment] Final result - address: ${!!mergedResult.address}, phone: ${!!mergedResult.phone}`);
+      
+      return mergedResult;
+    } catch (error: any) {
+      console.error("[CompanyEnrichment] Error:", error);
+      return {
+        success: false,
+        addressError: error.message,
+        phoneError: error.message,
+      };
+    }
+  }
+
+  /**
+   * Stage 1: Try to extract data from AI's internal training data
+   */
+  private static async tryAIInternalKnowledge(
+    companyName: string,
+    country: string,
+    needsAddress: boolean,
+    needsPhone: boolean
+  ): Promise<EnrichmentResult> {
+    try {
+      const prompt = this.buildAIPrompt(companyName, country, needsAddress, needsPhone);
       
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o", // Using gpt-4o with web search capabilities
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: `You are a precise company data extraction expert with web search capabilities. Your task is to find and extract accurate, official LOCAL/REGIONAL company office information.
+            content: `You are a precise company data extraction expert. Extract LOCAL/REGIONAL office information from your training data.
 
 CRITICAL REQUIREMENTS:
-- Use web search to find CURRENT information about the company's LOCAL office/branch in the SPECIFIED COUNTRY
-- Search the web for: "Company Name" + "Country" + "office" + "address" + "phone"
+- Find the company's LOCAL office/branch in the SPECIFIED COUNTRY from your knowledge
 - Do NOT return global HQ information unless it's located in the specified country
-- Extract information from company websites, business directories (Google Business, LinkedIn, etc.)
-- Never fabricate or guess information - only use what you find from web sources
-- Ensure country-specific formatting for addresses and phone numbers
+- Only return data you are CERTAIN about from your training data
+- Never fabricate or guess information
 - Return SEPARATE confidence scores for address and phone data (0.0-1.0)
-- Confidence 0.9-1.0: Found on official company website or verified business listing
-- Confidence 0.7-0.89: Found on reputable business directories
-- Confidence <0.7: Inconsistent or uncertain sources
-- If the company has no web presence in the specified country, mark as not found
+- Confidence should reflect how certain you are based on your training data
+- If you don't have information about this company in this country, mark as not found
 
 Output valid JSON only.`
           },
@@ -161,8 +236,6 @@ Output valid JSON only.`
         ],
         response_format: { type: "json_object" },
         max_completion_tokens: 1500,
-        // Enable web search (model will search the web for current information)
-        store: false,
       });
 
       const responseText = completion.choices[0]?.message?.content;
@@ -229,10 +302,202 @@ Output valid JSON only.`
   }
 
   /**
+   * Stage 2: Try web search enrichment using Brave Search API
+   */
+  private static async tryWebSearchEnrichment(
+    companyName: string,
+    country: string,
+    needsAddress: boolean,
+    needsPhone: boolean
+  ): Promise<EnrichmentResult> {
+    try {
+      // Search the web
+      const searchQuery = `${companyName} ${country} office address phone number`;
+      const searchResults = await searchWeb(searchQuery);
+
+      if (!searchResults.success || searchResults.results.length === 0) {
+        return {
+          success: false,
+          addressError: searchResults.error || "No web search results found",
+          phoneError: searchResults.error || "No web search results found",
+        };
+      }
+
+      // Format search results for AI to analyze
+      const searchContext = formatSearchResultsForAI(searchResults.results);
+      
+      const prompt = this.buildWebSearchPrompt(
+        companyName,
+        country,
+        needsAddress,
+        needsPhone,
+        searchContext
+      );
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a precise data extraction expert. Extract LOCAL office information from the provided web search results.
+
+CRITICAL REQUIREMENTS:
+- Analyze the web search results provided
+- Extract the company's LOCAL office information in the SPECIFIED COUNTRY
+- Do NOT return global HQ data unless it's in the specified country
+- Only extract information explicitly stated in the search results
+- Return SEPARATE confidence scores for address and phone (0.0-1.0)
+- Confidence 0.9-1.0: Found on official company website or verified Google Business
+- Confidence 0.7-0.89: Found on reputable directories
+- Never guess or fabricate - only use provided search results
+
+Output valid JSON only.`
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 1500,
+      });
+
+      const responseText = completion.choices[0]?.message?.content;
+      if (!responseText) {
+        return {
+          success: false,
+          addressError: "No response from AI",
+          phoneError: "No response from AI",
+        };
+      }
+
+      const parsed = JSON.parse(responseText);
+      const result: EnrichmentResult = { success: false };
+
+      // Extract address
+      if (needsAddress) {
+        if (parsed.addressFound && parsed.address) {
+          const address = this.normalizeAddress(parsed.address, country);
+          if (this.validateAddress(address, country)) {
+            result.address = address;
+            result.addressConfidence = parsed.addressConfidence || 0.8;
+          } else {
+            result.addressError = "Invalid address format";
+            result.addressConfidence = 0;
+          }
+        } else {
+          result.addressError = parsed.addressReason || "Address not found in search results";
+          result.addressConfidence = 0;
+        }
+      }
+
+      // Extract phone
+      if (needsPhone) {
+        if (parsed.phoneFound && parsed.phone) {
+          const phone = this.normalizePhone(parsed.phone, country);
+          if (phone) {
+            result.phone = phone;
+            result.phoneConfidence = parsed.phoneConfidence || 0.8;
+          } else {
+            result.phoneError = "Invalid phone format";
+            result.phoneConfidence = 0;
+          }
+        } else {
+          result.phoneError = parsed.phoneReason || "Phone not found in search results";
+          result.phoneConfidence = 0;
+        }
+      }
+
+      result.success = !!(result.address || result.phone);
+      return result;
+    } catch (error: any) {
+      console.error("[CompanyEnrichment] Web search error:", error);
+      return {
+        success: false,
+        addressError: `Web search failed: ${error.message}`,
+        phoneError: `Web search failed: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Build AI-only prompt (Stage 1)
+   */
+  private static buildAIPrompt(
+    companyName: string,
+    country: string,
+    needsAddress: boolean,
+    needsPhone: boolean
+  ): string {
+    const parts: string[] = [];
+    parts.push(`Find LOCAL office information for "${companyName}" in ${country} from your training data.\n`);
+
+    if (needsAddress) {
+      parts.push(`Address: Complete local office address in ${country} (Street, City, State, Postal Code)`);
+    }
+    if (needsPhone) {
+      parts.push(`Phone: Local office phone number in ${country} with country code`);
+    }
+
+    parts.push(this.getJSONFormat(needsAddress, needsPhone));
+    return parts.join('\n\n');
+  }
+
+  /**
+   * Build web search prompt (Stage 2)
+   */
+  private static buildWebSearchPrompt(
+    companyName: string,
+    country: string,
+    needsAddress: boolean,
+    needsPhone: boolean,
+    searchContext: string
+  ): string {
+    const parts: string[] = [];
+    
+    parts.push(`Extract LOCAL office information for "${companyName}" in ${country} from these web search results:\n\n${searchContext}\n`);
+
+    if (needsAddress) {
+      parts.push(`Address: Extract the complete local office address in ${country}`);
+    }
+    if (needsPhone) {
+      parts.push(`Phone: Extract the local office phone number in ${country}`);
+    }
+
+    parts.push(this.getJSONFormat(needsAddress, needsPhone));
+    return parts.join('\n\n');
+  }
+
+  /**
+   * Get JSON format template
+   */
+  private static getJSONFormat(needsAddress: boolean, needsPhone: boolean): string {
+    return `Return JSON in this format:
+{
+  ${needsAddress ? `"addressFound": true/false,
+  "addressConfidence": 0.0-1.0,
+  "addressReason": "explanation if not found",
+  "address": {
+    "address1": "street address",
+    "address2": "suite/floor (optional)",
+    "city": "city name",
+    "state": "state/province",
+    "postalCode": "postal code",
+    "country": "country name"
+  },` : ''}
+  ${needsPhone ? `"phoneFound": true/false,
+  "phoneConfidence": 0.0-1.0,
+  "phoneReason": "explanation if not found",
+  "phone": "phone with country code"` : ''}
+}`;
+  }
+
+  /**
+   * DEPRECATED: Old method kept for reference
    * Build GPT prompt for LOCAL office company data extraction with web search
    * Provides specific search query and instructions for web-based research
    */
-  private static buildEnrichmentPrompt(
+  private static buildEnrichmentPrompt_DEPRECATED(
     companyName: string,
     country: string,
     needsAddress: boolean,

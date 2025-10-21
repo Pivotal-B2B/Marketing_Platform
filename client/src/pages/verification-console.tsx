@@ -1047,17 +1047,20 @@ export default function VerificationConsolePage() {
       <AlertDialog open={enrichmentDialogOpen} onOpenChange={setEnrichmentDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Enrich Company Data</AlertDialogTitle>
+            <AlertDialogTitle>Enrich Company Data (Hybrid AI + Web Search)</AlertDialogTitle>
             <AlertDialogDescription>
-              This will use AI to find and enrich LOCAL office addresses and phone numbers based on each contact's location.
-              The system searches for regional/local office information in the contact's country, not global HQ data.
+              This uses a two-stage intelligent enrichment process to find LOCAL office addresses and phone numbers based on each contact's location.
               Only contacts that are eligible, validated, and not suppressed will be processed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4 space-y-2">
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
-              <span>AI searches for LOCAL office in contact's country (e.g., "Company Name Singapore office address phone")</span>
+              <span><strong>Stage 1:</strong> AI uses internal knowledge to find LOCAL office info (e.g., "Company Name Singapore office")</span>
+            </div>
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
+              <span><strong>Stage 2:</strong> If AI lacks data, automatically searches the web (requires BRAVE_SEARCH_API_KEY)</span>
             </div>
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="h-4 w-4 mt-0.5 text-green-600" />
@@ -1065,11 +1068,11 @@ export default function VerificationConsolePage() {
             </div>
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
-              <span>Processing occurs in batches with rate limiting</span>
+              <span>Only high-confidence results (≥70%) will be saved</span>
             </div>
             <div className="flex items-start gap-2 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
-              <span>Only high-confidence results (≥70%) will be saved</span>
+              <span>Processing occurs in batches with rate limiting</span>
             </div>
           </div>
           <AlertDialogFooter>
