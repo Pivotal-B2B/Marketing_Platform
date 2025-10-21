@@ -8,12 +8,27 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { CSVFieldMapper } from "@/components/csv-field-mapper";
+import { parseCSV } from "@/lib/csv-utils";
+
+interface FieldMapping {
+  csvColumn: string;
+  targetField: string | null;
+  targetEntity: "contact" | "account" | null;
+}
+
+type UploadStage = "select" | "map" | "upload" | "complete";
 
 export default function VerificationUploadPage() {
   const { campaignId } = useParams();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [stage, setStage] = useState<UploadStage>("select");
   const [file, setFile] = useState<File | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvData, setCsvData] = useState<string[][]>([]);
+  const [rawCSVContent, setRawCSVContent] = useState<string>("");
+  const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([]);
   const [uploadResult, setUploadResult] = useState<any>(null);
 
   const { data: campaign } = useQuery({
@@ -29,7 +44,9 @@ export default function VerificationUploadPage() {
     },
     onSuccess: (data) => {
       setUploadResult(data);
+      setStage("complete");
       queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
       toast({
         title: "Upload Complete",
         description: `Created ${data.created} contacts, skipped ${data.skipped}`,
@@ -57,18 +74,33 @@ export default function VerificationUploadPage() {
       }
       setFile(selectedFile);
       setUploadResult(null);
+      
+      // Parse CSV to extract headers
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        setRawCSVContent(content);
+        const parsed = parseCSV(content);
+        
+        if (parsed.length > 0) {
+          setCsvHeaders(parsed[0]);
+          setCsvData(parsed.slice(1));
+          setStage("map");
+        }
+      };
+      reader.readAsText(selectedFile);
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const handleMappingComplete = (mappings: FieldMapping[]) => {
+    setFieldMappings(mappings);
+    setStage("upload");
+  };
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const csvData = e.target?.result as string;
-      uploadMutation.mutate(csvData);
-    };
-    reader.readAsText(file);
+  const handleUpload = async () => {
+    if (!file || !rawCSVContent) return;
+
+    uploadMutation.mutate(rawCSVContent);
   };
 
   return (
@@ -154,62 +186,113 @@ export default function VerificationUploadPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload File</CardTitle>
-          <CardDescription>Select and upload your CSV file</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <label
-              htmlFor="csv-file"
-              className="flex items-center gap-2 px-4 py-2 bg-secondary hover-elevate active-elevate-2 rounded-md cursor-pointer"
-              data-testid="button-select-file"
-            >
-              <FileText className="h-4 w-4" />
-              <span>Select CSV File</span>
-              <input
-                id="csv-file"
-                type="file"
-                accept=".csv"
-                onChange={handleFileSelect}
-                className="hidden"
-                data-testid="input-file"
-              />
-            </label>
+      {stage === "select" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Upload File</CardTitle>
+            <CardDescription>Select your CSV file to begin</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4">
+              <label
+                htmlFor="csv-file"
+                className="flex items-center gap-2 px-4 py-2 bg-secondary hover-elevate active-elevate-2 rounded-md cursor-pointer"
+                data-testid="button-select-file"
+              >
+                <FileText className="h-4 w-4" />
+                <span>Select CSV File</span>
+                <input
+                  id="csv-file"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  data-testid="input-file"
+                />
+              </label>
+            </div>
             
-            {file && (
-              <div className="flex items-center gap-2 text-sm" data-testid="text-selected-file">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>{file.name}</span>
-                <span className="text-muted-foreground">
-                  ({(file.size / 1024).toFixed(1)} KB)
-                </span>
+            <Alert>
+              <AlertDescription className="text-xs">
+                <strong>Next Step:</strong> After selecting a file, you'll be able to map CSV columns to contact fields manually.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      )}
+
+      {stage === "map" && file && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Map Fields</CardTitle>
+            <CardDescription>Match your CSV columns to contact and company fields</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CSVFieldMapper
+              csvHeaders={csvHeaders}
+              sampleData={csvData.slice(0, 5)}
+              onMappingComplete={handleMappingComplete}
+              onCancel={() => {
+                setStage("select");
+                setFile(null);
+                setCsvHeaders([]);
+                setCsvData([]);
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {stage === "upload" && file && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Ready to Upload</CardTitle>
+            <CardDescription>Review and confirm your upload</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 text-sm mb-4" data-testid="text-selected-file">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              <span className="font-medium">{file.name}</span>
+              <span className="text-muted-foreground">
+                ({(file.size / 1024).toFixed(1)} KB)
+              </span>
+            </div>
+
+            <Alert>
+              <AlertDescription>
+                <strong>{csvData.length} rows</strong> will be uploaded with your custom field mappings.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={handleUpload}
+                disabled={uploadMutation.isPending}
+                data-testid="button-upload"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {uploadMutation.isPending ? "Uploading..." : "Upload and Process"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setStage("map")}
+                disabled={uploadMutation.isPending}
+              >
+                Back to Mapping
+              </Button>
+            </div>
+
+            {uploadMutation.isPending && (
+              <div className="space-y-2">
+                <Progress value={50} data-testid="progress-upload" />
+                <p className="text-sm text-muted-foreground" data-testid="text-processing">
+                  Processing contacts... This may take a moment.
+                </p>
               </div>
             )}
-          </div>
-
-          {file && (
-            <Button
-              onClick={handleUpload}
-              disabled={uploadMutation.isPending}
-              data-testid="button-upload"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {uploadMutation.isPending ? "Uploading..." : "Upload and Process"}
-            </Button>
-          )}
-
-          {uploadMutation.isPending && (
-            <div className="space-y-2">
-              <Progress value={50} data-testid="progress-upload" />
-              <p className="text-sm text-muted-foreground" data-testid="text-processing">
-                Processing contacts... This may take a moment.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {uploadResult && (
         <Card>
@@ -269,6 +352,10 @@ export default function VerificationUploadPage() {
                 onClick={() => {
                   setFile(null);
                   setUploadResult(null);
+                  setStage("select");
+                  setCsvHeaders([]);
+                  setCsvData([]);
+                  setFieldMappings([]);
                 }}
                 data-testid="button-upload-more"
               >

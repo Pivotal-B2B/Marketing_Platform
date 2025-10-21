@@ -40,7 +40,7 @@ router.post("/api/verification-campaigns", async (req, res) => {
     
     const [campaign] = await db
       .insert(verificationCampaigns)
-      .values(validatedData)
+      .values([validatedData])
       .returning();
     
     res.status(201).json(campaign);
@@ -96,15 +96,15 @@ router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => 
     const { campaignId } = req.params;
     
     // Get all counts in a single query for efficiency
-    const [stats] = await db.execute(sql`
+    const stats = await db.execute(sql`
       SELECT
         COUNT(*) FILTER (WHERE deleted = FALSE) as total_contacts,
         COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = TRUE) as suppressed_count,
         COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE) as active_count,
-        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'OK') as eligible_count,
-        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'OK' AND elv_status = 'Valid') as validated_count,
-        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'OK' AND elv_status = 'Valid' AND elv_deliverability = 'deliverable') as ok_email_count,
-        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'OK' AND elv_status = 'Invalid') as invalid_email_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Ok') as eligible_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Ok' AND elv_status = 'Valid') as validated_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Ok' AND elv_status = 'Valid' AND elv_deliverability = 'deliverable') as ok_email_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Ok' AND elv_status = 'Invalid') as invalid_email_count,
         COUNT(*) FILTER (WHERE in_submission_buffer = TRUE) as in_buffer_count
       FROM verification_contacts
       WHERE campaign_id = ${campaignId}
