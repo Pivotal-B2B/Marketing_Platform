@@ -894,6 +894,10 @@ export default function VerificationConsolePage() {
                     <Label>HQ Country</Label>
                     <Input value={(contact as any)?.hq_country || (contact as any)?.hqCountry || ""} readOnly data-testid="input-hq-country" />
                   </div>
+                  <div className="col-span-3">
+                    <Label>HQ Phone</Label>
+                    <Input value={(contact as any)?.hq_phone || (contact as any)?.hqPhone || ""} readOnly data-testid="input-hq-phone" />
+                  </div>
                 </div>
               </div>
 

@@ -220,14 +220,17 @@ router.get("/api/verification-contacts/:id", async (req, res) => {
       SELECT 
         c.*,
         a.name as account_name,
-        a.hq_street_1,
-        a.hq_street_2,
-        a.hq_street_3,
-        a.hq_city,
-        a.hq_state,
-        a.hq_postal_code,
-        a.hq_country,
-        a.domain
+        a.domain,
+        -- Use enriched data from verification_contacts table (from AI enrichment)
+        -- Falls back to account table data if not enriched
+        COALESCE(c.hq_address_1, a.hq_street_1) as hq_address_1,
+        COALESCE(c.hq_address_2, a.hq_street_2) as hq_address_2,
+        COALESCE(c.hq_address_3, a.hq_street_3) as hq_address_3,
+        COALESCE(c.hq_city, a.hq_city) as hq_city,
+        COALESCE(c.hq_state, a.hq_state) as hq_state,
+        COALESCE(c.hq_postal, a.hq_postal_code) as hq_postal,
+        COALESCE(c.hq_country, a.hq_country) as hq_country,
+        c.hq_phone as hq_phone
       FROM verification_contacts c
       LEFT JOIN accounts a ON a.id = c.account_id
       WHERE c.id = ${req.params.id}
