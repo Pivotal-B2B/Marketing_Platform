@@ -681,16 +681,18 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", requ
     console.log('[BULK DELETE] Permission check:', { isAdmin, allowClientProvidedDelete });
     
     // Filter out contacts that are already submitted
-    const submittedContactIds = await db
-      .select({ contactId: verificationLeadSubmissions.contactId })
-      .from(verificationLeadSubmissions)
-      .where(
-        and(
-          eq(verificationLeadSubmissions.campaignId, campaignId),
-          inArray(verificationLeadSubmissions.contactId, contactIds)
-        )
-      )
-      .then(rows => rows.map(r => r.contactId));
+    const submittedContactIds = contactIds.length > 0
+      ? await db
+          .select({ contactId: verificationLeadSubmissions.contactId })
+          .from(verificationLeadSubmissions)
+          .where(
+            and(
+              eq(verificationLeadSubmissions.campaignId, campaignId),
+              inArray(verificationLeadSubmissions.contactId, contactIds)
+            )
+          )
+          .then(rows => (rows || []).map(r => r.contactId))
+      : [];
     
     const eligibleContactIds = contactIds.filter(id => !submittedContactIds.includes(id));
     
@@ -723,7 +725,7 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", requ
       .where(and(...conditions))
       .returning({ id: verificationContacts.id });
     
-    const deletedIds = result.map(r => r.id);
+    const deletedIds = (result || []).map(r => r.id);
     
     console.log('[BULK DELETE] Result:', { 
       requested: contactIds.length, 
