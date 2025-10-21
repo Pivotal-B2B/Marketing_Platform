@@ -39,7 +39,7 @@ export function evaluateEligibility(
     t.includes(keyword.toLowerCase())
   );
   
-  const seniorMatch = seniorDmFallback.length === 0 || seniorDmFallback.some(senior => 
+  const seniorMatch = seniorDmFallback.length > 0 && seniorDmFallback.some(senior => 
     t.includes(senior.toLowerCase())
   );
   
