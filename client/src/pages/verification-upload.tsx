@@ -642,7 +642,7 @@ export default function VerificationUploadPage() {
 
             <div className="mt-4 flex gap-2">
               <Button
-                onClick={() => navigate(`/verification/console/${campaignId}`)}
+                onClick={() => navigate(`/verification/${campaignId}/console`)}
                 data-testid="button-start-verification"
               >
                 Start Verification

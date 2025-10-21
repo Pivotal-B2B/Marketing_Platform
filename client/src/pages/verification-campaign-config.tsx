@@ -262,13 +262,13 @@ export default function VerificationCampaignConfigPage() {
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
-              <Link href={`/verification/suppression-upload/${id}`}>
+              <Link href={`/verification/${id}/suppression-upload`}>
                 <Button variant="outline" data-testid="button-upload-suppression">
                   <Upload className="h-4 w-4 mr-2" />
                   Upload Suppression File
                 </Button>
               </Link>
-              <Link href={`/verification/console/${id}`}>
+              <Link href={`/verification/${id}/console`}>
                 <Button variant="outline" data-testid="button-view-console">
                   <Eye className="h-4 w-4 mr-2" />
                   View Console
