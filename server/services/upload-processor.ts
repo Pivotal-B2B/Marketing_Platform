@@ -320,9 +320,14 @@ export async function processUpload(jobId: string) {
             }
 
             const fullName = row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim();
-            const sourceType: 'Client_Provided' | 'New_Sourced' = (row.sourceType?.toLowerCase() === 'client_provided' || row.sourceType?.toLowerCase() === 'client provided')
+            
+            // Contacts with CAV data are always Client_Provided
+            const hasCavData = !!((row.cavId?.trim()) || (row.cavUserId?.trim()));
+            const sourceType: 'Client_Provided' | 'New_Sourced' = hasCavData
               ? 'Client_Provided'
-              : 'New_Sourced';
+              : (row.sourceType?.toLowerCase() === 'client_provided' || row.sourceType?.toLowerCase() === 'client provided')
+                ? 'Client_Provided'
+                : 'New_Sourced';
 
             const normalizedKeys = computeNormalizedKeys({
               email: row.email || null,
@@ -416,8 +421,8 @@ export async function processUpload(jobId: string) {
             }
 
             if (existingContact) {
-              const csvHasCavId = !!(row.cavId || row.cavUserId);
-              const dbHasCavId = !!(existingContact.cavId || existingContact.cavUserId);
+              const csvHasCavId = !!((row.cavId?.trim()) || (row.cavUserId?.trim()));
+              const dbHasCavId = !!((existingContact.cavId?.trim()) || (existingContact.cavUserId?.trim()));
 
               const updateData: any = {};
 
@@ -473,6 +478,12 @@ export async function processUpload(jobId: string) {
               updateData.eligibilityStatus = eligibility.status;
               updateData.eligibilityReason = eligibility.reason;
               updateData.suppressed = isSuppressed;
+              
+              // Contacts with CAV data must always be Client_Provided
+              if (csvHasCavId || dbHasCavId) {
+                updateData.sourceType = 'Client_Provided';
+              }
+              
               Object.assign(updateData, normalizedKeys);
 
               if (Object.keys(updateData).length > 0) {
