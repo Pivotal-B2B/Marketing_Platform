@@ -58,6 +58,7 @@ import VerificationCampaignsPage from "@/pages/verification-campaigns";
 import VerificationCampaignConfigPage from "@/pages/verification-campaign-config";
 import VerificationConsolePage from "@/pages/verification-console";
 import VerificationUploadPage from "@/pages/verification-upload";
+import VerificationSuppressionUploadPage from "@/pages/verification-suppression-upload";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -138,6 +139,7 @@ function AuthenticatedApp() {
               <Route path="/dv/projects" component={DvProjectsPage} />
               <Route path="/verification/console/:campaignId" component={VerificationConsolePage} />
               <Route path="/verification/upload/:campaignId" component={VerificationUploadPage} />
+              <Route path="/verification/suppression-upload/:campaignId?" component={VerificationSuppressionUploadPage} />
               <Route path="/verification/campaigns/:id" component={VerificationCampaignConfigPage} />
               <Route path="/verification/campaigns" component={VerificationCampaignsPage} />
               <Route component={NotFound} />

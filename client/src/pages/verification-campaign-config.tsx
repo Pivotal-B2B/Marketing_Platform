@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
-import { ArrowLeft, Save } from "lucide-react";
+import { useParams, useLocation, Link } from "wouter";
+import { ArrowLeft, Save, ShieldX, Upload, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -250,6 +250,34 @@ export default function VerificationCampaignConfigPage() {
           </div>
         </CardContent>
       </Card>
+
+      {!isNew && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldX className="h-5 w-5" />
+              Suppression Management
+            </CardTitle>
+            <CardDescription>Upload and manage suppression lists for this campaign</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Link href={`/verification/suppression-upload/${id}`}>
+                <Button variant="outline" data-testid="button-upload-suppression">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Suppression File
+                </Button>
+              </Link>
+              <Link href={`/verification/console/${id}`}>
+                <Button variant="outline" data-testid="button-view-console">
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Console
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex justify-end gap-2">
         <Button
