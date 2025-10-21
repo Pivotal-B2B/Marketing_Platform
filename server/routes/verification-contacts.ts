@@ -7,6 +7,7 @@ import {
   verificationAuditLog,
   accounts,
   verificationEmailValidations,
+  verificationEmailValidationJobs,
   insertVerificationContactSchema,
 } from "@shared/schema";
 import { eq, sql, and, desc, inArray } from "drizzle-orm";
@@ -1105,19 +1106,39 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
   }
 });
 
-// Bulk Email Verification using Email List Verify - Processes ALL contacts in batches
-router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails", requireAuth, async (req, res) => {
+// Background processing function for email validation jobs
+async function processEmailValidationJob(jobId: string) {
+  console.log(`[EMAIL VALIDATION JOB] Starting job ${jobId}`);
+  
   try {
-    const { campaignId } = req.params;
-    const { contactIds } = z.object({
-      contactIds: z.array(z.string()).min(1), // No limit - process all contacts in batches
-    }).parse(req.body);
+    // Fetch the job details
+    const [job] = await db
+      .select()
+      .from(verificationEmailValidationJobs)
+      .where(eq(verificationEmailValidationJobs.id, jobId));
     
-    console.log(`[BULK EMAIL VERIFY] Starting verification for ${contactIds.length} contacts in campaign ${campaignId}`);
+    if (!job) {
+      console.error(`[EMAIL VALIDATION JOB] Job ${jobId} not found`);
+      return;
+    }
     
-    // Process contacts in batches of 500 to avoid memory issues
+    const { campaignId, contactIds: allContactIds } = job;
+    
+    if (!allContactIds || allContactIds.length === 0) {
+      console.log(`[EMAIL VALIDATION JOB] Job ${jobId} has no contacts to process`);
+      await db
+        .update(verificationEmailValidationJobs)
+        .set({
+          status: 'completed',
+          finishedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(verificationEmailValidationJobs.id, jobId));
+      return;
+    }
+    
     const BATCH_SIZE = 500;
-    const totalBatches = Math.ceil(contactIds.length / BATCH_SIZE);
+    const totalBatches = Math.ceil(allContactIds.length / BATCH_SIZE);
     
     let totalSuccessCount = 0;
     let totalFailureCount = 0;
@@ -1130,25 +1151,39 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
       unknown: 0,
     };
     
+    console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Processing ${allContactIds.length} contacts in ${totalBatches} batches`);
+    
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
       const batchStart = batchIndex * BATCH_SIZE;
-      const batchEnd = Math.min(batchStart + BATCH_SIZE, contactIds.length);
-      const batchContactIds = contactIds.slice(batchStart, batchEnd);
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, allContactIds.length);
+      const batchContactIds = allContactIds.slice(batchStart, batchEnd);
       
-      console.log(`[BULK EMAIL VERIFY] Processing batch ${batchIndex + 1}/${totalBatches} (${batchContactIds.length} contact IDs)`);
+      console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Processing batch ${batchIndex + 1}/${totalBatches} (${batchContactIds.length} contact IDs)`);
       
-      // Fetch contacts with valid emails for this batch
+      // Fetch contacts with valid emails for this batch - SKIP already verified contacts
       const contacts = await db
         .select()
         .from(verificationContacts)
         .where(and(
           eq(verificationContacts.campaignId, campaignId),
           inArray(verificationContacts.id, batchContactIds),
-          sql`${verificationContacts.email} IS NOT NULL AND ${verificationContacts.email} != ''`
+          sql`${verificationContacts.email} IS NOT NULL AND ${verificationContacts.email} != ''`,
+          eq(verificationContacts.emailStatus, 'unknown') // ONLY process unknown status (resume capability)
         ));
       
       if (contacts.length === 0) {
-        console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1}: No contacts with valid emails, skipping`);
+        console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1} has no contacts needing verification, skipping`);
+        
+        // Update progress even for skipped batches
+        await db
+          .update(verificationEmailValidationJobs)
+          .set({
+            currentBatch: batchIndex + 1,
+            processedContacts: batchEnd,
+            updatedAt: new Date(),
+          })
+          .where(eq(verificationEmailValidationJobs.id, jobId));
+        
         continue;
       }
       
@@ -1161,18 +1196,29 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
       ));
       
       if (emailsToVerify.length === 0) {
-        console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1}: No valid emails to verify, skipping`);
+        console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1} has no valid emails to verify, skipping`);
+        
+        // Update progress
+        await db
+          .update(verificationEmailValidationJobs)
+          .set({
+            currentBatch: batchIndex + 1,
+            processedContacts: batchEnd,
+            updatedAt: new Date(),
+          })
+          .where(eq(verificationEmailValidationJobs.id, jobId));
+        
         continue;
       }
       
-      console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1}: Verifying ${emailsToVerify.length} unique emails for ${contacts.length} contacts`);
+      console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1}: Verifying ${emailsToVerify.length} unique emails for ${contacts.length} contacts`);
       
       // Verify emails using Email List Verify API (with rate limiting)
       const verificationResults = await verifyEmailsBulk(emailsToVerify, {
         delayMs: 200, // 5 requests per second
         onProgress: (completed, total, currentEmail) => {
           if (completed % 10 === 0 || completed === total) {
-            console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1} Progress: ${completed}/${total} (${currentEmail})`);
+            console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1} Progress: ${completed}/${total} (${currentEmail})`);
           }
         },
       });
@@ -1185,7 +1231,7 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
         // Get email key for this contact
         const emailRaw = contact.emailLower || contact.email?.toLowerCase();
         if (!emailRaw || !emailRaw.trim()) {
-          console.warn(`[BULK EMAIL VERIFY] Contact ${contact.id} has no valid email, skipping`);
+          console.warn(`[EMAIL VALIDATION JOB] Job ${jobId}: Contact ${contact.id} has no valid email, skipping`);
           batchFailureCount++;
           continue;
         }
@@ -1194,7 +1240,7 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
         const result = verificationResults.get(emailKey);
         
         if (!result) {
-          console.warn(`[BULK EMAIL VERIFY] No verification result for ${emailKey} (contact ${contact.id})`);
+          console.warn(`[EMAIL VALIDATION JOB] Job ${jobId}: No verification result for ${emailKey} (contact ${contact.id})`);
           batchFailureCount++;
           continue;
         }
@@ -1226,13 +1272,13 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
           if (result.status in totalStatusCounts) {
             totalStatusCounts[result.status]++;
           } else {
-            console.warn(`[BULK EMAIL VERIFY] Unknown status '${result.status}' for ${emailKey}, counting as unknown`);
+            console.warn(`[EMAIL VALIDATION JOB] Job ${jobId}: Unknown status '${result.status}' for ${emailKey}, counting as unknown`);
             totalStatusCounts.unknown++;
           }
           
           batchSuccessCount++;
         } catch (error) {
-          console.error(`[BULK EMAIL VERIFY] Error updating contact ${contact.id} (${emailKey}):`, error);
+          console.error(`[EMAIL VALIDATION JOB] Job ${jobId}: Error updating contact ${contact.id} (${emailKey}):`, error);
           batchFailureCount++;
         }
       }
@@ -1240,26 +1286,163 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails
       totalSuccessCount += batchSuccessCount;
       totalFailureCount += batchFailureCount;
       
-      console.log(`[BULK EMAIL VERIFY] Batch ${batchIndex + 1} Complete: ${batchSuccessCount} success, ${batchFailureCount} failures`);
+      console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1} Complete: ${batchSuccessCount} success, ${batchFailureCount} failures`);
+      
+      // Update job progress after EACH batch
+      await db
+        .update(verificationEmailValidationJobs)
+        .set({
+          currentBatch: batchIndex + 1,
+          processedContacts: batchEnd,
+          successCount: totalSuccessCount,
+          failureCount: totalFailureCount,
+          statusCounts: totalStatusCounts,
+          updatedAt: new Date(),
+        })
+        .where(eq(verificationEmailValidationJobs.id, jobId));
+      
+      console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Updated progress - Batch ${batchIndex + 1}/${totalBatches}, Processed ${batchEnd}/${allContactIds.length}`);
     }
     
-    console.log(`[BULK EMAIL VERIFY] All Batches Complete: ${totalSuccessCount} total success, ${totalFailureCount} total failures`);
-    console.log(`[BULK EMAIL VERIFY] Status breakdown: OK=${totalStatusCounts.ok}, Invalid=${totalStatusCounts.invalid}, Risky=${totalStatusCounts.risky}, Disposable=${totalStatusCounts.disposable}, Accept-All=${totalStatusCounts.accept_all}, Unknown=${totalStatusCounts.unknown}`);
+    // Mark job as completed
+    await db
+      .update(verificationEmailValidationJobs)
+      .set({
+        status: 'completed',
+        finishedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(verificationEmailValidationJobs.id, jobId));
     
-    res.json({
-      success: true,
-      totalContacts: contactIds.length,
-      processedBatches: totalBatches,
-      successCount: totalSuccessCount,
-      failureCount: totalFailureCount,
-      statusCounts: totalStatusCounts,
-    });
+    console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: COMPLETED - ${totalSuccessCount} success, ${totalFailureCount} failures`);
+    console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Status breakdown: OK=${totalStatusCounts.ok}, Invalid=${totalStatusCounts.invalid}, Risky=${totalStatusCounts.risky}, Disposable=${totalStatusCounts.disposable}, Accept-All=${totalStatusCounts.accept_all}, Unknown=${totalStatusCounts.unknown}`);
+    
   } catch (error) {
-    console.error("[BULK EMAIL VERIFY] Error:", error);
+    console.error(`[EMAIL VALIDATION JOB] Job ${jobId}: FATAL ERROR:`, error);
+    
+    // Mark job as failed
+    await db
+      .update(verificationEmailValidationJobs)
+      .set({
+        status: 'failed',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        finishedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(verificationEmailValidationJobs.id, jobId));
+  }
+}
+
+// Bulk Email Verification using Email List Verify - Now uses job persistence
+router.post("/api/verification-campaigns/:campaignId/contacts/bulk-verify-emails", requireAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = (req.user as any)?.id;
+    const { contactIds } = z.object({
+      contactIds: z.array(z.string()).min(1),
+    }).parse(req.body);
+    
+    console.log(`[BULK EMAIL VERIFY] Creating job for ${contactIds.length} contacts in campaign ${campaignId}`);
+    
+    // Calculate total batches
+    const BATCH_SIZE = 500;
+    const totalBatches = Math.ceil(contactIds.length / BATCH_SIZE);
+    
+    // Create job record BEFORE starting background processing
+    const [job] = await db
+      .insert(verificationEmailValidationJobs)
+      .values({
+        campaignId,
+        status: 'processing',
+        totalContacts: contactIds.length,
+        totalBatches,
+        contactIds,
+        createdBy: userId,
+        startedAt: new Date(),
+      })
+      .returning();
+    
+    console.log(`[BULK EMAIL VERIFY] Job ${job.id} created, starting background processing`);
+    
+    // Start background processing WITHOUT awaiting (fire and forget)
+    Promise.resolve().then(() => processEmailValidationJob(job.id));
+    
+    // Return immediately with job ID
+    res.json({
+      jobId: job.id,
+      message: "Email validation started",
+      totalContacts: contactIds.length,
+      totalBatches,
+    });
+    
+  } catch (error) {
+    console.error("[BULK EMAIL VERIFY] Error creating job:", error);
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
-    res.status(500).json({ error: "Failed to verify emails", message: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "Failed to start email validation", message: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// Get email validation job status
+router.get("/api/verification-campaigns/:campaignId/email-validation-jobs/:jobId", requireAuth, async (req, res) => {
+  try {
+    const { campaignId, jobId } = req.params;
+    
+    const [job] = await db
+      .select()
+      .from(verificationEmailValidationJobs)
+      .where(and(
+        eq(verificationEmailValidationJobs.id, jobId),
+        eq(verificationEmailValidationJobs.campaignId, campaignId)
+      ));
+    
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    // Calculate progress percentage
+    const progressPercent = job.totalContacts > 0 
+      ? Math.round((job.processedContacts / job.totalContacts) * 100)
+      : 0;
+    
+    res.json({
+      ...job,
+      progressPercent,
+    });
+  } catch (error) {
+    console.error("[EMAIL VALIDATION JOB STATUS] Error:", error);
+    res.status(500).json({ error: "Failed to fetch job status" });
+  }
+});
+
+// List all email validation jobs for a campaign
+router.get("/api/verification-campaigns/:campaignId/email-validation-jobs", requireAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const limit = Number(req.query.limit) || 20;
+    const offset = Number(req.query.offset) || 0;
+    
+    const jobs = await db
+      .select()
+      .from(verificationEmailValidationJobs)
+      .where(eq(verificationEmailValidationJobs.campaignId, campaignId))
+      .orderBy(desc(verificationEmailValidationJobs.createdAt))
+      .limit(limit)
+      .offset(offset);
+    
+    // Calculate progress for each job
+    const jobsWithProgress = jobs.map(job => ({
+      ...job,
+      progressPercent: job.totalContacts > 0 
+        ? Math.round((job.processedContacts / job.totalContacts) * 100)
+        : 0,
+    }));
+    
+    res.json(jobsWithProgress);
+  } catch (error) {
+    console.error("[EMAIL VALIDATION JOBS LIST] Error:", error);
+    res.status(500).json({ error: "Failed to fetch jobs" });
   }
 });
 
