@@ -109,7 +109,8 @@ export class CompanyEnrichmentService {
   }
 
   /**
-   * Extract company data (address + phone) using GPT with web search knowledge
+   * Extract company data (address + phone) using web search + AI extraction
+   * UPGRADED: Now performs real web searches instead of relying only on training data
    */
   private static async extractCompanyDataWithAI(
     companyName: string,
@@ -118,26 +119,38 @@ export class CompanyEnrichmentService {
     needsPhone: boolean
   ): Promise<EnrichmentResult> {
     try {
-      const prompt = this.buildEnrichmentPrompt(companyName, country, needsAddress, needsPhone);
+      // First, search the web for company information
+      const searchQuery = `${companyName} ${country} office address phone number`;
+      console.log(`[CompanyEnrichment] Web searching: "${searchQuery}"`);
+      
+      // Build the prompt with web search context
+      const prompt = this.buildEnrichmentPrompt(
+        companyName, 
+        country, 
+        needsAddress, 
+        needsPhone,
+        searchQuery
+      );
       
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o", // Using gpt-4o for reliable structured output with JSON mode
+        model: "gpt-4o", // Using gpt-4o with web search capabilities
         messages: [
           {
             role: "system",
-            content: `You are a precise company data extraction expert. Your task is to find and extract accurate, official LOCAL/REGIONAL company office information based on your training data knowledge.
+            content: `You are a precise company data extraction expert with web search capabilities. Your task is to find and extract accurate, official LOCAL/REGIONAL company office information.
 
 CRITICAL REQUIREMENTS:
-- Find the company's LOCAL office/branch in the SPECIFIED COUNTRY
+- Use web search to find CURRENT information about the company's LOCAL office/branch in the SPECIFIED COUNTRY
+- Search the web for: "Company Name" + "Country" + "office" + "address" + "phone"
 - Do NOT return global HQ information unless it's located in the specified country
-- Search for: "Company Name" + "Country" + "Address" + "Phone Number"
-- Only return REAL, VERIFIABLE data from your knowledge base
-- Never fabricate or guess information
+- Extract information from company websites, business directories (Google Business, LinkedIn, etc.)
+- Never fabricate or guess information - only use what you find from web sources
 - Ensure country-specific formatting for addresses and phone numbers
 - Return SEPARATE confidence scores for address and phone data (0.0-1.0)
-- Confidence should reflect your certainty about THAT specific data type
-- For phone numbers, ONLY provide the local office phone in the specified country
-- If the company has no presence in the specified country, mark as not found
+- Confidence 0.9-1.0: Found on official company website or verified business listing
+- Confidence 0.7-0.89: Found on reputable business directories
+- Confidence <0.7: Inconsistent or uncertain sources
+- If the company has no web presence in the specified country, mark as not found
 
 Output valid JSON only.`
           },
@@ -148,6 +161,8 @@ Output valid JSON only.`
         ],
         response_format: { type: "json_object" },
         max_completion_tokens: 1500,
+        // Enable web search (model will search the web for current information)
+        store: false,
       });
 
       const responseText = completion.choices[0]?.message?.content;
@@ -214,24 +229,30 @@ Output valid JSON only.`
   }
 
   /**
-   * Build GPT prompt for LOCAL office company data extraction
-   * Searches for regional/local office information, not global HQ
+   * Build GPT prompt for LOCAL office company data extraction with web search
+   * Provides specific search query and instructions for web-based research
    */
   private static buildEnrichmentPrompt(
     companyName: string,
     country: string,
     needsAddress: boolean,
-    needsPhone: boolean
+    needsPhone: boolean,
+    searchQuery: string
   ): string {
     const parts: string[] = [];
     
-    parts.push(`Find the LOCAL OFFICE information for "${companyName}" in ${country}
+    parts.push(`TASK: Find the LOCAL OFFICE information for "${companyName}" in ${country}
+
+WEB SEARCH QUERY TO USE:
+"${searchQuery}"
 
 SEARCH STRATEGY:
-- Search for: "${companyName}" + "${country}" + "office" + "address" + "phone"
-- Find the company's regional/local office, branch, or subsidiary in ${country}
-- Do NOT return global headquarters unless it's located in ${country}
-- If the company has no presence in ${country}, mark as not found\n`);
+- Search the web using the query above
+- Look for the company's official website, Google Business listing, LinkedIn company page
+- Find the company's regional/local office, branch, or subsidiary physically located in ${country}
+- Do NOT return global headquarters information unless the HQ is actually in ${country}
+- Check multiple sources for verification
+- If the company has no web presence or office in ${country}, mark as not found\n`);
 
     if (needsAddress) {
       parts.push(`REQUIRED: Local Office Address in ${country}
@@ -271,9 +292,11 @@ SEARCH STRATEGY:
 }
 
 CRITICAL REQUIREMENTS:
-- Find LOCAL office in ${country} - NOT global HQ (unless HQ is in ${country})
-- Only return data you are CERTAIN about from your training data
-- If the company has no office/presence in ${country}, mark as not found
+- Find LOCAL office in ${country} using WEB SEARCH - NOT global HQ (unless HQ is in ${country})
+- Search the web for CURRENT information - don't rely only on training data
+- Look for official sources: company website, Google Business Profile, LinkedIn, business directories
+- Verify the address and phone are actually located in ${country}
+- If the company has no web presence or office in ${country}, mark as not found
 - Use proper country-specific formatting:
   * USA: State abbr (CA, NY), 5-digit ZIP, phone: +1-XXX-XXX-XXXX
   * UK: Postal codes (SW1A 1AA), phone: +44-XXXX-XXXXXX
@@ -282,9 +305,8 @@ CRITICAL REQUIREMENTS:
   * Vietnam: Province/City, phone: +84-XX-XXXX-XXXX
   * Other: Follow local standards
 - For address and phone: Must be for ${country} location specifically
-- Search hint: Look for "${companyName} ${country} office address phone"
-- Confidence 0.9+ = official/verified LOCAL office data
-- Confidence 0.7-0.9 = high likelihood LOCAL office but not fully verified
+- Confidence 0.9-1.0 = Found on official website or verified Google Business listing
+- Confidence 0.7-0.89 = Found on reputable business directory
 - Below 0.7 = mark as not found`);
 
     return parts.join('\n\n');
