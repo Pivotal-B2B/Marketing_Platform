@@ -76,6 +76,27 @@ export default function VerificationConsolePage() {
     enabled: !currentContactId,
   });
 
+  const { data: allIds, refetch: fetchAllIds } = useQuery({
+    queryKey: ["/api/verification-campaigns", campaignId, "queue/all-ids", filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.contactSearch) params.append("contactSearch", filters.contactSearch);
+      if (filters.companySearch) params.append("companySearch", filters.companySearch);
+      if (filters.sourceType) params.append("sourceType", filters.sourceType);
+      
+      const url = `/api/verification-campaigns/${campaignId}/queue/all-ids?${params.toString()}`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch all IDs");
+      return res.json();
+    },
+    enabled: false,
+  });
+
   const { data: contact } = useQuery({
     queryKey: ["/api/verification-contacts", currentContactId],
     enabled: !!currentContactId,
@@ -205,6 +226,17 @@ export default function VerificationConsolePage() {
       setSelectedContactIds(allIds);
     } else {
       setSelectedContactIds(new Set<string>());
+    }
+  };
+
+  const handleSelectAllRecords = async () => {
+    const result = await fetchAllIds();
+    if (result.data?.ids) {
+      setSelectedContactIds(new Set<string>(result.data.ids));
+      toast({
+        title: "All records selected",
+        description: `${result.data.total} eligible contact(s) selected for bulk operation`,
+      });
     }
   };
 
@@ -425,34 +457,48 @@ export default function VerificationConsolePage() {
                 </div>
               </div>
             )}
-            {selectedContactIds.size > 0 && (
-              <div className="mb-4 p-3 border rounded-md bg-primary/10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Badge variant="default" className="px-3 py-1">
-                    {selectedContactIds.size} selected
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setSelectedContactIds(new Set())}
-                    disabled={bulkDeleteMutation.isPending}
-                    data-testid="button-clear-selection"
-                  >
-                    Clear Selection
-                  </Button>
-                </div>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              {(queue as any)?.data?.length === 50 && (
                 <Button
                   size="sm"
-                  variant="destructive"
-                  onClick={handleBulkDelete}
+                  variant="outline"
+                  onClick={handleSelectAllRecords}
                   disabled={bulkDeleteMutation.isPending}
-                  data-testid="button-bulk-delete"
+                  data-testid="button-select-all-records"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {bulkDeleteMutation.isPending ? "Deleting..." : `Delete Selected (${selectedContactIds.size})`}
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Select All Records{allIds?.total ? ` (${allIds.total})` : ''}
                 </Button>
-              </div>
-            )}
+              )}
+              {selectedContactIds.size > 0 && (
+                <div className="flex-1 p-3 border rounded-md bg-primary/10 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="default" className="px-3 py-1">
+                      {selectedContactIds.size} selected
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedContactIds(new Set())}
+                      disabled={bulkDeleteMutation.isPending}
+                      data-testid="button-clear-selection"
+                    >
+                      Clear Selection
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleteMutation.isPending}
+                    data-testid="button-bulk-delete"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {bulkDeleteMutation.isPending ? "Deleting..." : `Delete Selected (${selectedContactIds.size})`}
+                  </Button>
+                </div>
+              )}
+            </div>
             {queueLoading ? (
               <div className="text-muted-foreground" data-testid="text-loading">Loading queue...</div>
             ) : (queue as any)?.data && (queue as any).data.length > 0 ? (

@@ -91,6 +91,70 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
   }
 });
 
+router.get("/api/verification-campaigns/:campaignId/queue/all-ids", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const contactSearch = req.query.contactSearch as string || "";
+    const companySearch = req.query.companySearch as string || "";
+    const sourceType = req.query.sourceType as string || "";
+    
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    const cap = campaign.leadCapPerAccount;
+    
+    // Build dynamic filter conditions
+    const filterConditions = [];
+    
+    if (contactSearch) {
+      filterConditions.push(sql`(
+        LOWER(c.full_name) LIKE ${`%${contactSearch.toLowerCase()}%`}
+        OR LOWER(c.email) LIKE ${`%${contactSearch.toLowerCase()}%`}
+      )`);
+    }
+    
+    if (sourceType) {
+      filterConditions.push(sql`c.source_type = ${sourceType}`);
+    }
+    
+    const filterSQL = filterConditions.length > 0 
+      ? sql`AND ${sql.join(filterConditions, sql` AND `)}`
+      : sql``;
+    
+    const result = await db.execute(sql`
+      SELECT c.id
+      FROM verification_contacts c
+      WHERE c.campaign_id = ${campaignId}
+        AND c.eligibility_status = 'Eligible'
+        AND c.verification_status = 'Pending'
+        AND c.suppressed = FALSE
+        AND c.deleted = FALSE
+        AND c.in_submission_buffer = FALSE
+        AND (
+          SELECT COUNT(*) FROM verification_lead_submissions s
+          WHERE s.account_id = c.account_id AND s.campaign_id = ${campaignId}
+        ) < ${cap}
+        ${filterSQL}
+        ${companySearch ? sql`AND c.account_id IN (
+          SELECT id FROM accounts WHERE LOWER(name) LIKE ${`%${companySearch.toLowerCase()}%`}
+        )` : sql``}
+      ORDER BY c.priority_score DESC NULLS LAST, c.updated_at ASC
+    `);
+    
+    const ids = result.rows.map((r: any) => r.id);
+    res.json({ ids, total: ids.length });
+  } catch (error) {
+    console.error("Error fetching all eligible IDs:", error);
+    res.status(500).json({ error: "Failed to fetch eligible contact IDs" });
+  }
+});
+
 router.delete("/api/verification-contacts/:id", async (req, res) => {
   try {
     const { id } = req.params;
