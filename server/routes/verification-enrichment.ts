@@ -71,7 +71,7 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
   try {
     console.log(`[Enrichment] Starting enrichment for campaign ${campaignId} (batch: ${batchSize}, delay: ${delayMs}ms)`);
 
-    // Get eligible contacts that need enrichment
+    // Get eligible contacts that need enrichment (only OK emails)
     const query = db
       .select({
         id: verificationContacts.id,
@@ -94,6 +94,7 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
         and(
           eq(verificationContacts.campaignId, campaignId),
           eq(verificationContacts.eligibilityStatus, 'Eligible'),
+          eq(verificationContacts.emailStatus, 'ok'), // Only enrich contacts with valid emails
           eq(verificationContacts.deleted, false),
           eq(verificationContacts.suppressed, false)
         )
@@ -366,6 +367,7 @@ router.post("/api/verification-contacts/:contactId/enrich", async (req, res) => 
         addressEnrichmentStatus: verificationContacts.addressEnrichmentStatus,
         phoneEnrichmentStatus: verificationContacts.phoneEnrichmentStatus,
         eligibilityStatus: verificationContacts.eligibilityStatus,
+        emailStatus: verificationContacts.emailStatus,
         deleted: verificationContacts.deleted,
         suppressed: verificationContacts.suppressed,
       })
@@ -379,7 +381,7 @@ router.post("/api/verification-contacts/:contactId/enrich", async (req, res) => 
 
     const contact = contactResult[0];
 
-    // Server-side guards: only enrich eligible, non-suppressed, non-deleted contacts
+    // Server-side guards: only enrich eligible, non-suppressed, non-deleted contacts with valid emails
     if (contact.deleted) {
       return res.status(400).json({ error: "Cannot enrich deleted contact" });
     }
@@ -390,6 +392,10 @@ router.post("/api/verification-contacts/:contactId/enrich", async (req, res) => 
 
     if (contact.eligibilityStatus !== 'Eligible' && !force) {
       return res.status(400).json({ error: "Contact must be eligible for enrichment" });
+    }
+
+    if (contact.emailStatus !== 'ok' && !force) {
+      return res.status(400).json({ error: "Contact must have a valid email (OK status) for enrichment" });
     }
 
     // Check if contact needs enrichment
