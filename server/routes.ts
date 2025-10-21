@@ -3095,12 +3095,21 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const validated = insertCallSchema.parse({
-        ...req.body,
-        agentId, // Ensure agentId matches the logged-in user
-      });
+      // Build the call data object manually to avoid schema validation issues
+      const callData = {
+        agentId,
+        campaignId: req.body.campaignId,
+        contactId: req.body.contactId,
+        queueItemId: req.body.queueItemId,
+        disposition: req.body.disposition,
+        duration: req.body.duration || 0,
+        notes: req.body.notes || null,
+        qualificationData: req.body.qualificationData || null,
+        callbackRequested: req.body.callbackRequested || false,
+        telnyxCallId: req.body.telnyxCallId || null,
+      };
 
-      const call = await storage.createCallDisposition(validated);
+      const call = await storage.createCallDisposition(callData);
 
       // Handle DNC requests - add to global suppression list
       if (req.body.disposition === 'dnc_request' && req.body.contactId) {
@@ -3165,10 +3174,12 @@ export function registerRoutes(app: Express) {
       res.status(201).json(call);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error('[DISPOSITION VALIDATION ERROR]', error.errors);
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
       console.error('[DISPOSITION ERROR]', error);
       console.error('[DISPOSITION ERROR] Stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('[DISPOSITION ERROR] Request body:', req.body);
       res.status(500).json({ message: "Failed to create call disposition", error: error instanceof Error ? error.message : String(error) });
     }
   });
