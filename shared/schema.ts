@@ -3454,6 +3454,9 @@ export const verificationContacts = pgTable("verification_contacts", {
   mobile: text("mobile"),
   linkedinUrl: text("linkedin_url"),
 
+  contactAddress1: text("contact_address1"),
+  contactAddress2: text("contact_address2"),
+  contactAddress3: text("contact_address3"),
   contactCity: text("contact_city"),
   contactState: text("contact_state"),
   contactCountry: text("contact_country"),

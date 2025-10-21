@@ -16,6 +16,9 @@ interface CSVRow {
   phone?: string;
   mobile?: string;
   linkedinUrl?: string;
+  contactAddress1?: string;
+  contactAddress2?: string;
+  contactAddress3?: string;
   contactCity?: string;
   contactState?: string;
   contactCountry?: string;
@@ -24,6 +27,9 @@ interface CSVRow {
   account_name?: string;
   companyDomain?: string;
   domain?: string;
+  hqAddress1?: string;
+  hqAddress2?: string;
+  hqAddress3?: string;
   hqCity?: string;
   hqState?: string;
   hqCountry?: string;
@@ -69,6 +75,15 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
           'mobilenumber': 'mobile',
           'mobile': 'mobile',
           'linkedin': 'linkedinUrl',
+          'contactaddress1': 'contactAddress1',
+          'contactaddress2': 'contactAddress2',
+          'contactaddress3': 'contactAddress3',
+          'address1': 'contactAddress1',
+          'address2': 'contactAddress2',
+          'address3': 'contactAddress3',
+          'street1': 'contactAddress1',
+          'street2': 'contactAddress2',
+          'street3': 'contactAddress3',
           'city': 'contactCity',
           'state': 'contactState',
           'country': 'contactCountry',
@@ -80,6 +95,15 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
           'accountname': 'account_name',
           'companydomain': 'domain',
           'domain': 'domain',
+          'hqaddress1': 'hqAddress1',
+          'hqaddress2': 'hqAddress2',
+          'hqaddress3': 'hqAddress3',
+          'companyaddress1': 'hqAddress1',
+          'companyaddress2': 'hqAddress2',
+          'companyaddress3': 'hqAddress3',
+          'hqstreet1': 'hqAddress1',
+          'hqstreet2': 'hqAddress2',
+          'hqstreet3': 'hqAddress3',
           'hqcity': 'hqCity',
           'hqstate': 'hqState',
           'hqcountry': 'hqCountry',
@@ -135,6 +159,9 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             accountId = a?.id ?? (await tx.insert(accounts).values({
               name: (accountNameCsv ?? domainValue.replace(/^www\./, '').split('.')[0])!,
               domain: domainValue,
+              hqStreet1: row.hqAddress1 ?? null,
+              hqStreet2: row.hqAddress2 ?? null,
+              hqStreet3: row.hqAddress3 ?? null,
               hqCity: row.hqCity ?? null,
               hqState: row.hqState ?? null,
               hqCountry: row.hqCountry ?? null,
@@ -149,6 +176,9 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             accountId = a?.id ?? (await tx.insert(accounts).values({
               name: accountNameCsv,
               domain: null,
+              hqStreet1: row.hqAddress1 ?? null,
+              hqStreet2: row.hqAddress2 ?? null,
+              hqStreet3: row.hqAddress3 ?? null,
               hqCity: row.hqCity ?? null,
               hqState: row.hqState ?? null,
               hqCountry: row.hqCountry ?? null,
@@ -197,6 +227,9 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             phone: row.phone || null,
             mobile: row.mobile || null,
             linkedinUrl: row.linkedinUrl || null,
+            contactAddress1: row.contactAddress1 || null,
+            contactAddress2: row.contactAddress2 || null,
+            contactAddress3: row.contactAddress3 || null,
             contactCity: row.contactCity || null,
             contactState: row.contactState || null,
             contactCountry: row.contactCountry || null,
