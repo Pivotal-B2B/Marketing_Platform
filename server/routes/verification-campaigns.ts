@@ -91,6 +91,50 @@ router.delete("/api/verification-campaigns/:id", async (req, res) => {
   }
 });
 
+router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    
+    // Get all counts in a single query for efficiency
+    const [stats] = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE deleted = FALSE) as total_contacts,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = TRUE) as suppressed_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE) as active_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'OK') as eligible_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'OK' AND elv_status = 'Valid') as validated_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'OK' AND elv_status = 'Valid' AND elv_deliverability = 'deliverable') as ok_email_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'OK' AND elv_status = 'Invalid') as invalid_email_count,
+        COUNT(*) FILTER (WHERE in_submission_buffer = TRUE) as in_buffer_count
+      FROM verification_contacts
+      WHERE campaign_id = ${campaignId}
+    `);
+    
+    // Get submitted count separately
+    const [submittedResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(verificationLeadSubmissions)
+      .where(eq(verificationLeadSubmissions.campaignId, campaignId));
+    
+    const row = stats.rows[0] as any;
+    
+    res.json({
+      totalContacts: Number(row.total_contacts || 0),
+      suppressedCount: Number(row.suppressed_count || 0),
+      activeCount: Number(row.active_count || 0),
+      eligibleCount: Number(row.eligible_count || 0),
+      validatedCount: Number(row.validated_count || 0),
+      okEmailCount: Number(row.ok_email_count || 0),
+      invalidEmailCount: Number(row.invalid_email_count || 0),
+      submittedCount: Number(submittedResult?.count || 0),
+      inBufferCount: Number(row.in_buffer_count || 0),
+    });
+  } catch (error) {
+    console.error("Error fetching campaign stats:", error);
+    res.status(500).json({ error: "Failed to fetch campaign stats" });
+  }
+});
+
 router.get("/api/verification-campaigns/:campaignId/accounts/:accountName/cap", async (req, res) => {
   try {
     const { campaignId, accountName } = req.params;
