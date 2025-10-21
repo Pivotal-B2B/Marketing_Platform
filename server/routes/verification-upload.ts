@@ -32,6 +32,7 @@ interface CSVRow {
   hqAddress3?: string;
   hqCity?: string;
   hqState?: string;
+  hqPostal?: string;
   hqCountry?: string;
   cavId?: string;
   cavUserId?: string;
@@ -106,6 +107,11 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
           'hqstreet3': 'hqAddress3',
           'hqcity': 'hqCity',
           'hqstate': 'hqState',
+          'hqpostalcode': 'hqPostal',
+          'hqpostal': 'hqPostal',
+          'hqzip': 'hqPostal',
+          'companypostalcode': 'hqPostal',
+          'companypostal': 'hqPostal',
           'hqcountry': 'hqCountry',
           'cavid': 'cavId',
           'cavuserid': 'cavUserId',
@@ -149,40 +155,58 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
           const domainValue = (row.domain || row.companyDomain || null)?.toLowerCase() || null;
 
           let accountId: string | null = null;
+          let accountData: any = null;
+          
           if (domainValue) {
             const [a] = await tx
-              .select({ id: accounts.id })
+              .select()
               .from(accounts)
               .where(eq(accounts.domain, domainValue))
               .limit(1);
             
-            accountId = a?.id ?? (await tx.insert(accounts).values({
-              name: (accountNameCsv ?? domainValue.replace(/^www\./, '').split('.')[0])!,
-              domain: domainValue,
-              hqStreet1: row.hqAddress1 ?? null,
-              hqStreet2: row.hqAddress2 ?? null,
-              hqStreet3: row.hqAddress3 ?? null,
-              hqCity: row.hqCity ?? null,
-              hqState: row.hqState ?? null,
-              hqCountry: row.hqCountry ?? null,
-            }).returning({ id: accounts.id }))[0].id;
+            if (a) {
+              accountId = a.id;
+              accountData = a;
+            } else {
+              const newAccount = await tx.insert(accounts).values({
+                name: (accountNameCsv ?? domainValue.replace(/^www\./, '').split('.')[0])!,
+                domain: domainValue,
+                hqStreet1: row.hqAddress1 ?? null,
+                hqStreet2: row.hqAddress2 ?? null,
+                hqStreet3: row.hqAddress3 ?? null,
+                hqCity: row.hqCity ?? null,
+                hqState: row.hqState ?? null,
+                hqPostalCode: row.hqPostal ?? null,
+                hqCountry: row.hqCountry ?? null,
+              }).returning();
+              accountId = newAccount[0].id;
+              accountData = newAccount[0];
+            }
           } else if (accountNameCsv) {
             const [a] = await tx
-              .select({ id: accounts.id })
+              .select()
               .from(accounts)
               .where(sql`LOWER(${accounts.name}) = LOWER(${accountNameCsv})`)
               .limit(1);
             
-            accountId = a?.id ?? (await tx.insert(accounts).values({
-              name: accountNameCsv,
-              domain: null,
-              hqStreet1: row.hqAddress1 ?? null,
-              hqStreet2: row.hqAddress2 ?? null,
-              hqStreet3: row.hqAddress3 ?? null,
-              hqCity: row.hqCity ?? null,
-              hqState: row.hqState ?? null,
-              hqCountry: row.hqCountry ?? null,
-            }).returning({ id: accounts.id }))[0].id;
+            if (a) {
+              accountId = a.id;
+              accountData = a;
+            } else {
+              const newAccount = await tx.insert(accounts).values({
+                name: accountNameCsv,
+                domain: null,
+                hqStreet1: row.hqAddress1 ?? null,
+                hqStreet2: row.hqAddress2 ?? null,
+                hqStreet3: row.hqAddress3 ?? null,
+                hqCity: row.hqCity ?? null,
+                hqState: row.hqState ?? null,
+                hqPostalCode: row.hqPostal ?? null,
+                hqCountry: row.hqCountry ?? null,
+              }).returning();
+              accountId = newAccount[0].id;
+              accountData = newAccount[0];
+            }
           }
 
           const fullName = row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim();
@@ -214,6 +238,29 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             account_name: accountNameCsv,
           });
 
+          // Auto-populate contact address from company HQ if countries match
+          let contactAddress1 = row.contactAddress1 || null;
+          let contactAddress2 = row.contactAddress2 || null;
+          let contactAddress3 = row.contactAddress3 || null;
+          let contactCity = row.contactCity || null;
+          let contactState = row.contactState || null;
+          let contactPostal = row.contactPostal || null;
+          
+          if (accountData && row.contactCountry && accountData.hqCountry) {
+            const contactCountryNorm = row.contactCountry.trim().toLowerCase();
+            const hqCountryNorm = accountData.hqCountry.trim().toLowerCase();
+            
+            if (contactCountryNorm === hqCountryNorm) {
+              // Auto-populate contact address fields if empty
+              contactAddress1 = contactAddress1 || accountData.hqStreet1;
+              contactAddress2 = contactAddress2 || accountData.hqStreet2;
+              contactAddress3 = contactAddress3 || accountData.hqStreet3;
+              contactCity = contactCity || accountData.hqCity;
+              contactState = contactState || accountData.hqState;
+              contactPostal = contactPostal || accountData.hqPostalCode;
+            }
+          }
+
           // Insert in one go with derived fields
           await tx.insert(verificationContacts).values({
             campaignId,
@@ -227,13 +274,13 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             phone: row.phone || null,
             mobile: row.mobile || null,
             linkedinUrl: row.linkedinUrl || null,
-            contactAddress1: row.contactAddress1 || null,
-            contactAddress2: row.contactAddress2 || null,
-            contactAddress3: row.contactAddress3 || null,
-            contactCity: row.contactCity || null,
-            contactState: row.contactState || null,
+            contactAddress1,
+            contactAddress2,
+            contactAddress3,
+            contactCity,
+            contactState,
             contactCountry: row.contactCountry || null,
-            contactPostal: row.contactPostal || null,
+            contactPostal,
             cavId: row.cavId || null,
             cavUserId: row.cavUserId || null,
             eligibilityStatus: eligibility.status,
