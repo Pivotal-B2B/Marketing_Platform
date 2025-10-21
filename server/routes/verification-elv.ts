@@ -10,7 +10,7 @@ import { runELV } from "../lib/verification-elv";
 
 const router = Router();
 
-const ELV_API_KEY = process.env.ELV_API_KEY || "";
+const ELV_API_KEY = process.env.EMAIL_LIST_VERIFY_API_KEY || "";
 const CACHE_DAYS = 60;
 
 router.post("/api/verification-contacts/:id/email/verify", async (req, res) => {

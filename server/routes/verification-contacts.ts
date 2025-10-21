@@ -602,7 +602,7 @@ router.post("/api/verification-contacts/:id/validate-email", async (req, res) =>
       });
     }
     
-    const apiKey = process.env.ELV_API_KEY;
+    const apiKey = process.env.EMAIL_LIST_VERIFY_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: "Email validation not configured" });
     }
@@ -913,7 +913,7 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-validate-emai
         }
         
         // Call EmailListVerify API
-        const response = await fetch(`https://apps.emaillistverify.com/api/verifyEmail?secret=${process.env.ELV_API_KEY}&email=${encodeURIComponent(contact.email)}`);
+        const response = await fetch(`https://apps.emaillistverify.com/api/verifyEmail?secret=${process.env.EMAIL_LIST_VERIFY_API_KEY}&email=${encodeURIComponent(contact.email)}`);
         
         if (!response.ok) {
           console.error(`[BULK EMAIL VALIDATION] EmailListVerify API error for ${contact.email}`);
