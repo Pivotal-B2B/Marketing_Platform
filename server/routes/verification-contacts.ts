@@ -21,8 +21,15 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
     const { campaignId } = req.params;
     const limit = Number(req.query.limit) || 50;
     const contactSearch = req.query.contactSearch as string || "";
+    const phoneSearch = req.query.phoneSearch as string || "";
     const companySearch = req.query.companySearch as string || "";
     const sourceType = req.query.sourceType as string || "";
+    const country = req.query.country as string || "";
+    const eligibilityStatus = req.query.eligibilityStatus as string || "";
+    const emailStatus = req.query.emailStatus as string || "";
+    const verificationStatus = req.query.verificationStatus as string || "";
+    const hasPhone = req.query.hasPhone as string || "";
+    const hasAddress = req.query.hasAddress as string || "";
     
     const [campaign] = await db
       .select()
@@ -42,6 +49,15 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
       filterConditions.push(sql`(
         LOWER(c.full_name) LIKE ${`%${contactSearch.toLowerCase()}%`}
         OR LOWER(c.email) LIKE ${`%${contactSearch.toLowerCase()}%`}
+        OR LOWER(c.phone) LIKE ${`%${contactSearch.toLowerCase()}%`}
+        OR LOWER(c.mobile) LIKE ${`%${contactSearch.toLowerCase()}%`}
+      )`);
+    }
+    
+    if (phoneSearch) {
+      filterConditions.push(sql`(
+        LOWER(c.phone) LIKE ${`%${phoneSearch.toLowerCase()}%`}
+        OR LOWER(c.mobile) LIKE ${`%${phoneSearch.toLowerCase()}%`}
       )`);
     }
     
@@ -49,20 +65,56 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
       filterConditions.push(sql`c.source_type = ${sourceType}`);
     }
     
+    if (country) {
+      filterConditions.push(sql`LOWER(c.contact_country) LIKE ${`%${country.toLowerCase()}%`}`);
+    }
+    
+    if (eligibilityStatus) {
+      filterConditions.push(sql`c.eligibility_status = ${eligibilityStatus}`);
+    }
+    
+    if (emailStatus) {
+      filterConditions.push(sql`c.email_status = ${emailStatus}`);
+    }
+    
+    if (verificationStatus) {
+      filterConditions.push(sql`c.verification_status = ${verificationStatus}`);
+    }
+    
+    if (hasPhone === 'yes') {
+      filterConditions.push(sql`c.phone IS NOT NULL AND c.phone != ''`);
+    } else if (hasPhone === 'no') {
+      filterConditions.push(sql`(c.phone IS NULL OR c.phone = '')`);
+    }
+    
+    if (hasAddress === 'yes') {
+      filterConditions.push(sql`c.contact_address1 IS NOT NULL AND c.contact_address1 != '' AND c.contact_city IS NOT NULL AND c.contact_city != ''`);
+    } else if (hasAddress === 'no') {
+      filterConditions.push(sql`(c.contact_address1 IS NULL OR c.contact_address1 = '' OR c.contact_city IS NULL OR c.contact_city = '')`);
+    }
+    
     const filterSQL = filterConditions.length > 0 
       ? sql`AND ${sql.join(filterConditions, sql` AND `)}`
       : sql``;
+    
+    // Base WHERE conditions (can be overridden by filters)
+    let baseConditions = sql`c.campaign_id = ${campaignId}
+      AND c.suppressed = FALSE
+      AND c.deleted = FALSE
+      AND c.in_submission_buffer = FALSE`;
+    
+    // If no specific eligibility or verification filters, apply defaults
+    if (!eligibilityStatus && !verificationStatus) {
+      baseConditions = sql`${baseConditions}
+        AND c.eligibility_status = 'Eligible'
+        AND c.verification_status = 'Pending'`;
+    }
     
     const queueItems = await db.execute(sql`
       WITH next_batch AS (
         SELECT c.id
         FROM verification_contacts c
-        WHERE c.campaign_id = ${campaignId}
-          AND c.eligibility_status = 'Eligible'
-          AND c.verification_status = 'Pending'
-          AND c.suppressed = FALSE
-          AND c.deleted = FALSE
-          AND c.in_submission_buffer = FALSE
+        WHERE ${baseConditions}
           AND (
             SELECT COUNT(*) FROM verification_lead_submissions s
             WHERE s.account_id = c.account_id AND s.campaign_id = ${campaignId}
@@ -96,8 +148,15 @@ router.get("/api/verification-campaigns/:campaignId/queue/all-ids", async (req, 
   try {
     const { campaignId } = req.params;
     const contactSearch = req.query.contactSearch as string || "";
+    const phoneSearch = req.query.phoneSearch as string || "";
     const companySearch = req.query.companySearch as string || "";
     const sourceType = req.query.sourceType as string || "";
+    const country = req.query.country as string || "";
+    const eligibilityStatus = req.query.eligibilityStatus as string || "";
+    const emailStatus = req.query.emailStatus as string || "";
+    const verificationStatus = req.query.verificationStatus as string || "";
+    const hasPhone = req.query.hasPhone as string || "";
+    const hasAddress = req.query.hasAddress as string || "";
     
     const [campaign] = await db
       .select()
@@ -117,6 +176,15 @@ router.get("/api/verification-campaigns/:campaignId/queue/all-ids", async (req, 
       filterConditions.push(sql`(
         LOWER(c.full_name) LIKE ${`%${contactSearch.toLowerCase()}%`}
         OR LOWER(c.email) LIKE ${`%${contactSearch.toLowerCase()}%`}
+        OR LOWER(c.phone) LIKE ${`%${contactSearch.toLowerCase()}%`}
+        OR LOWER(c.mobile) LIKE ${`%${contactSearch.toLowerCase()}%`}
+      )`);
+    }
+    
+    if (phoneSearch) {
+      filterConditions.push(sql`(
+        LOWER(c.phone) LIKE ${`%${phoneSearch.toLowerCase()}%`}
+        OR LOWER(c.mobile) LIKE ${`%${phoneSearch.toLowerCase()}%`}
       )`);
     }
     
@@ -124,19 +192,55 @@ router.get("/api/verification-campaigns/:campaignId/queue/all-ids", async (req, 
       filterConditions.push(sql`c.source_type = ${sourceType}`);
     }
     
+    if (country) {
+      filterConditions.push(sql`LOWER(c.contact_country) LIKE ${`%${country.toLowerCase()}%`}`);
+    }
+    
+    if (eligibilityStatus) {
+      filterConditions.push(sql`c.eligibility_status = ${eligibilityStatus}`);
+    }
+    
+    if (emailStatus) {
+      filterConditions.push(sql`c.email_status = ${emailStatus}`);
+    }
+    
+    if (verificationStatus) {
+      filterConditions.push(sql`c.verification_status = ${verificationStatus}`);
+    }
+    
+    if (hasPhone === 'yes') {
+      filterConditions.push(sql`c.phone IS NOT NULL AND c.phone != ''`);
+    } else if (hasPhone === 'no') {
+      filterConditions.push(sql`(c.phone IS NULL OR c.phone = '')`);
+    }
+    
+    if (hasAddress === 'yes') {
+      filterConditions.push(sql`c.contact_address1 IS NOT NULL AND c.contact_address1 != '' AND c.contact_city IS NOT NULL AND c.contact_city != ''`);
+    } else if (hasAddress === 'no') {
+      filterConditions.push(sql`(c.contact_address1 IS NULL OR c.contact_address1 = '' OR c.contact_city IS NULL OR c.contact_city = '')`);
+    }
+    
     const filterSQL = filterConditions.length > 0 
       ? sql`AND ${sql.join(filterConditions, sql` AND `)}`
       : sql``;
     
+    // Base WHERE conditions (can be overridden by filters)
+    let baseConditions = sql`c.campaign_id = ${campaignId}
+      AND c.suppressed = FALSE
+      AND c.deleted = FALSE
+      AND c.in_submission_buffer = FALSE`;
+    
+    // If no specific eligibility or verification filters, apply defaults
+    if (!eligibilityStatus && !verificationStatus) {
+      baseConditions = sql`${baseConditions}
+        AND c.eligibility_status = 'Eligible'
+        AND c.verification_status = 'Pending'`;
+    }
+    
     const result = await db.execute(sql`
       SELECT c.id
       FROM verification_contacts c
-      WHERE c.campaign_id = ${campaignId}
-        AND c.eligibility_status = 'Eligible'
-        AND c.verification_status = 'Pending'
-        AND c.suppressed = FALSE
-        AND c.deleted = FALSE
-        AND c.in_submission_buffer = FALSE
+      WHERE ${baseConditions}
         AND (
           SELECT COUNT(*) FROM verification_lead_submissions s
           WHERE s.account_id = c.account_id AND s.campaign_id = ${campaignId}
@@ -749,6 +853,238 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-delete", requ
       return res.status(400).json({ error: "Validation error", details: error.errors });
     }
     res.status(500).json({ error: "Failed to bulk delete contacts" });
+  }
+});
+
+// Bulk Email Validation endpoint
+router.post("/api/verification-campaigns/:campaignId/contacts/bulk-validate-email", requireAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const bulkValidateSchema = z.object({
+      contactIds: z.array(z.string().uuid()).nonempty(),
+    });
+    
+    const { contactIds } = bulkValidateSchema.parse(req.body);
+    
+    console.log('[BULK EMAIL VALIDATION] Request received:', { 
+      campaignId, 
+      contactCount: contactIds.length 
+    });
+    
+    let validatedCount = 0;
+    const results = [];
+    
+    for (const contactId of contactIds) {
+      try {
+        const contact = await db.query.verificationContacts.findFirst({
+          where: and(
+            eq(verificationContacts.id, contactId),
+            eq(verificationContacts.campaignId, campaignId)
+          ),
+        });
+        
+        if (!contact || !contact.email) {
+          console.log(`[BULK EMAIL VALIDATION] Skipping contact ${contactId} - no email`);
+          continue;
+        }
+        
+        // Skip if already validated (has a status other than 'unknown')
+        if (contact.emailStatus && contact.emailStatus !== 'unknown') {
+          console.log(`[BULK EMAIL VALIDATION] Skipping contact ${contactId} - already validated (${contact.emailStatus})`);
+          continue;
+        }
+        
+        // Call EmailListVerify API
+        const response = await fetch(`https://apps.emaillistverify.com/api/verifyEmail?secret=${process.env.ELV_API_KEY}&email=${encodeURIComponent(contact.email)}`);
+        
+        if (!response.ok) {
+          console.error(`[BULK EMAIL VALIDATION] EmailListVerify API error for ${contact.email}`);
+          continue;
+        }
+        
+        const result = await response.text();
+        const rawStatus = result.trim().toLowerCase();
+        
+        // Map ELV result to our enum values (unknown, ok, invalid, risky)
+        let emailStatus: 'unknown' | 'ok' | 'invalid' | 'risky' = 'unknown';
+        if (rawStatus === 'ok' || rawStatus === 'valid') {
+          emailStatus = 'ok';
+        } else if (rawStatus === 'invalid' || rawStatus === 'bad' || rawStatus === 'email_disabled') {
+          emailStatus = 'invalid';
+        } else if (rawStatus === 'accept_all' || rawStatus === 'disposable' || rawStatus === 'unknown') {
+          emailStatus = 'risky';
+        }
+        
+        // Update contact with validation result
+        await db
+          .update(verificationContacts)
+          .set({
+            emailStatus,
+          })
+          .where(eq(verificationContacts.id, contactId));
+        
+        validatedCount++;
+        results.push({ contactId, email: contact.email, status: emailStatus });
+        
+        console.log(`[BULK EMAIL VALIDATION] Validated ${contact.email} - Status: ${emailStatus}`);
+      } catch (error) {
+        console.error(`[BULK EMAIL VALIDATION] Error validating contact ${contactId}:`, error);
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      validatedCount,
+      results,
+    });
+  } catch (error) {
+    console.error("Error bulk validating emails:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    res.status(500).json({ error: "Failed to bulk validate emails" });
+  }
+});
+
+// Bulk Mark as Validated endpoint
+router.post("/api/verification-campaigns/:campaignId/contacts/bulk-mark-validated", requireAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const bulkMarkSchema = z.object({
+      contactIds: z.array(z.string().uuid()).nonempty(),
+    });
+    
+    const { contactIds } = bulkMarkSchema.parse(req.body);
+    
+    console.log('[BULK MARK VALIDATED] Request received:', { 
+      campaignId, 
+      contactCount: contactIds.length 
+    });
+    
+    const result = await db
+      .update(verificationContacts)
+      .set({ 
+        verificationStatus: 'Validated',
+        updatedAt: new Date() 
+      })
+      .where(
+        and(
+          inArray(verificationContacts.id, contactIds),
+          eq(verificationContacts.campaignId, campaignId),
+          eq(verificationContacts.deleted, false)
+        )
+      )
+      .returning({ id: verificationContacts.id });
+    
+    const updatedIds = result.map(r => r.id);
+    
+    console.log('[BULK MARK VALIDATED] Updated:', { 
+      updated: updatedIds.length, 
+      skipped: contactIds.length - updatedIds.length 
+    });
+    
+    if (updatedIds.length > 0 && req.user?.userId) {
+      await db.insert(verificationAuditLog).values({
+        actorId: req.user.userId,
+        entityType: 'contact',
+        action: 'bulk_mark_validated',
+        entityId: campaignId,
+        before: null,
+        after: { contactIds: updatedIds, requestedIds: contactIds },
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      updatedCount: updatedIds.length,
+      updatedIds,
+      skippedCount: contactIds.length - updatedIds.length,
+    });
+  } catch (error) {
+    console.error("Error bulk marking as validated:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    res.status(500).json({ error: "Failed to bulk mark as validated" });
+  }
+});
+
+// Bulk Enrichment endpoint
+router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requireAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const bulkEnrichSchema = z.object({
+      contactIds: z.array(z.string().uuid()).nonempty(),
+    });
+    
+    const { contactIds } = bulkEnrichSchema.parse(req.body);
+    
+    console.log('[BULK ENRICHMENT] Request received:', { 
+      campaignId, 
+      contactCount: contactIds.length 
+    });
+    
+    let addressEnriched = 0;
+    let phoneEnriched = 0;
+    
+    for (const contactId of contactIds) {
+      try {
+        const contact = await db.query.verificationContacts.findFirst({
+          where: and(
+            eq(verificationContacts.id, contactId),
+            eq(verificationContacts.campaignId, campaignId)
+          ),
+          with: {
+            account: true,
+          },
+        });
+        
+        if (!contact || !contact.account) {
+          console.log(`[BULK ENRICHMENT] Skipping contact ${contactId} - no account`);
+          continue;
+        }
+        
+        // Only enrich if contact is missing address or phone
+        const needsAddress = !contact.contactAddress1 || !contact.contactCity;
+        const needsPhone = !contact.phone;
+        
+        if (!needsAddress && !needsPhone) {
+          console.log(`[BULK ENRICHMENT] Skipping contact ${contactId} - already has address and phone`);
+          continue;
+        }
+        
+        // Call the enrichment service (similar to the single contact enrichment)
+        const response = await fetch(`http://localhost:5000/api/verification-campaigns/${campaignId}/contacts/${contactId}/enrich`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': req.headers.authorization || '',
+          },
+          body: JSON.stringify({}),
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.addressEnriched) addressEnriched++;
+          if (result.phoneEnriched) phoneEnriched++;
+          console.log(`[BULK ENRICHMENT] Enriched contact ${contactId}`);
+        }
+      } catch (error) {
+        console.error(`[BULK ENRICHMENT] Error enriching contact ${contactId}:`, error);
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      addressEnriched,
+      phoneEnriched,
+    });
+  } catch (error) {
+    console.error("Error bulk enriching contacts:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    res.status(500).json({ error: "Failed to bulk enrich contacts" });
   }
 });
 

@@ -39,8 +39,15 @@ export default function VerificationConsolePage() {
   const [enrichmentProgress, setEnrichmentProgress] = useState<any>(null);
   const [filters, setFilters] = useState({
     contactSearch: "",
+    phoneSearch: "",
     companySearch: "",
     sourceType: "",
+    country: "",
+    eligibilityStatus: "",
+    emailStatus: "",
+    verificationStatus: "",
+    hasPhone: "",
+    hasAddress: "",
   });
 
   const updateFilters = (newFilters: typeof filters) => {
@@ -62,8 +69,15 @@ export default function VerificationConsolePage() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters.contactSearch) params.append("contactSearch", filters.contactSearch);
+      if (filters.phoneSearch) params.append("phoneSearch", filters.phoneSearch);
       if (filters.companySearch) params.append("companySearch", filters.companySearch);
       if (filters.sourceType) params.append("sourceType", filters.sourceType);
+      if (filters.country) params.append("country", filters.country);
+      if (filters.eligibilityStatus) params.append("eligibilityStatus", filters.eligibilityStatus);
+      if (filters.emailStatus) params.append("emailStatus", filters.emailStatus);
+      if (filters.verificationStatus) params.append("verificationStatus", filters.verificationStatus);
+      if (filters.hasPhone) params.append("hasPhone", filters.hasPhone);
+      if (filters.hasAddress) params.append("hasAddress", filters.hasAddress);
       
       const url = `/api/verification-campaigns/${campaignId}/queue?${params.toString()}`;
       const res = await fetch(url, {
@@ -83,8 +97,15 @@ export default function VerificationConsolePage() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters.contactSearch) params.append("contactSearch", filters.contactSearch);
+      if (filters.phoneSearch) params.append("phoneSearch", filters.phoneSearch);
       if (filters.companySearch) params.append("companySearch", filters.companySearch);
       if (filters.sourceType) params.append("sourceType", filters.sourceType);
+      if (filters.country) params.append("country", filters.country);
+      if (filters.eligibilityStatus) params.append("eligibilityStatus", filters.eligibilityStatus);
+      if (filters.emailStatus) params.append("emailStatus", filters.emailStatus);
+      if (filters.verificationStatus) params.append("verificationStatus", filters.verificationStatus);
+      if (filters.hasPhone) params.append("hasPhone", filters.hasPhone);
+      if (filters.hasAddress) params.append("hasAddress", filters.hasAddress);
       
       const url = `/api/verification-campaigns/${campaignId}/queue/all-ids?${params.toString()}`;
       const res = await fetch(url, {
@@ -239,6 +260,81 @@ export default function VerificationConsolePage() {
     },
   });
 
+  const bulkEmailValidationMutation = useMutation({
+    mutationFn: async (contactIds: string[]) => {
+      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/contacts/bulk-validate-email`, { 
+        contactIds 
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Bulk email validation complete",
+        description: `${data.validatedCount} contact(s) validated`,
+      });
+      setSelectedContactIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Bulk validation failed",
+        description: error.message || "Failed to validate emails",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkMarkValidatedMutation = useMutation({
+    mutationFn: async (contactIds: string[]) => {
+      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/contacts/bulk-mark-validated`, { 
+        contactIds 
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Bulk mark validated complete",
+        description: `${data.updatedCount} contact(s) marked as validated`,
+      });
+      setSelectedContactIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Bulk mark validated failed",
+        description: error.message || "Failed to mark contacts as validated",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkEnrichmentMutation = useMutation({
+    mutationFn: async (contactIds: string[]) => {
+      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/contacts/bulk-enrich`, { 
+        contactIds 
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Bulk enrichment complete",
+        description: `Enriched ${data.addressEnriched} addresses and ${data.phoneEnriched} phone numbers`,
+      });
+      setSelectedContactIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Bulk enrichment failed",
+        description: error.message || "Failed to enrich contacts",
+        variant: "destructive",
+      });
+    },
+  });
+
   const loadNextContact = () => {
     if ((queue as any)?.data && (queue as any).data.length > 0) {
       setCurrentContactId((queue as any).data[0].id);
@@ -291,6 +387,21 @@ export default function VerificationConsolePage() {
   const handleEnrichCompanyData = () => {
     setEnrichmentDialogOpen(false);
     enrichmentMutation.mutate();
+  };
+
+  const handleBulkEmailValidation = () => {
+    if (selectedContactIds.size === 0) return;
+    bulkEmailValidationMutation.mutate(Array.from(selectedContactIds));
+  };
+
+  const handleBulkEnrichment = () => {
+    if (selectedContactIds.size === 0) return;
+    bulkEnrichmentMutation.mutate(Array.from(selectedContactIds));
+  };
+
+  const handleBulkMarkValidated = () => {
+    if (selectedContactIds.size === 0) return;
+    bulkMarkValidatedMutation.mutate(Array.from(selectedContactIds));
   };
 
   const handleSaveAndNext = async () => {
@@ -450,12 +561,30 @@ export default function VerificationConsolePage() {
                     />
                   </div>
                   <div>
+                    <Label className="text-xs">Phone Search</Label>
+                    <Input
+                      placeholder="Phone number..."
+                      value={filters.phoneSearch}
+                      onChange={(e) => updateFilters({ ...filters, phoneSearch: e.target.value })}
+                      data-testid="input-phone-search"
+                    />
+                  </div>
+                  <div>
                     <Label className="text-xs">Company Search</Label>
                     <Input
                       placeholder="Company name..."
                       value={filters.companySearch}
                       onChange={(e) => updateFilters({ ...filters, companySearch: e.target.value })}
                       data-testid="input-company-search"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Country</Label>
+                    <Input
+                      placeholder="e.g. Vietnam"
+                      value={filters.country}
+                      onChange={(e) => updateFilters({ ...filters, country: e.target.value })}
+                      data-testid="input-country"
                     />
                   </div>
                   <div>
@@ -474,10 +603,94 @@ export default function VerificationConsolePage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label className="text-xs">Eligibility Status</Label>
+                    <Select
+                      value={filters.eligibilityStatus || "all"}
+                      onValueChange={(value) => updateFilters({ ...filters, eligibilityStatus: value === "all" ? "" : value })}
+                    >
+                      <SelectTrigger data-testid="select-eligibility-status">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="Eligible">Eligible</SelectItem>
+                        <SelectItem value="Not_Eligible">Not Eligible</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Email Status</Label>
+                    <Select
+                      value={filters.emailStatus || "all"}
+                      onValueChange={(value) => updateFilters({ ...filters, emailStatus: value === "all" ? "" : value })}
+                    >
+                      <SelectTrigger data-testid="select-email-status">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="ok">OK</SelectItem>
+                        <SelectItem value="unknown">Unknown</SelectItem>
+                        <SelectItem value="invalid">Invalid</SelectItem>
+                        <SelectItem value="accept_all">Accept All</SelectItem>
+                        <SelectItem value="disposable">Disposable</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Verification Status</Label>
+                    <Select
+                      value={filters.verificationStatus || "all"}
+                      onValueChange={(value) => updateFilters({ ...filters, verificationStatus: value === "all" ? "" : value })}
+                    >
+                      <SelectTrigger data-testid="select-verification-status">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        <SelectItem value="Pending">Pending</SelectItem>
+                        <SelectItem value="Validated">Validated</SelectItem>
+                        <SelectItem value="Rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Has Phone</Label>
+                    <Select
+                      value={filters.hasPhone || "all"}
+                      onValueChange={(value) => updateFilters({ ...filters, hasPhone: value === "all" ? "" : value })}
+                    >
+                      <SelectTrigger data-testid="select-has-phone">
+                        <SelectValue placeholder="All" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Has Address</Label>
+                    <Select
+                      value={filters.hasAddress || "all"}
+                      onValueChange={(value) => updateFilters({ ...filters, hasAddress: value === "all" ? "" : value })}
+                    >
+                      <SelectTrigger data-testid="select-has-address">
+                        <SelectValue placeholder="All" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
-                    {(filters.contactSearch || filters.companySearch || filters.sourceType)
+                    {(filters.contactSearch || filters.phoneSearch || filters.companySearch || filters.sourceType || filters.country || filters.eligibilityStatus || filters.emailStatus || filters.verificationStatus || filters.hasPhone || filters.hasAddress)
                       ? "Filters active"
                       : "No filters applied"}
                   </p>
@@ -485,7 +698,18 @@ export default function VerificationConsolePage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      updateFilters({ contactSearch: "", companySearch: "", sourceType: "" });
+                      updateFilters({ 
+                        contactSearch: "", 
+                        phoneSearch: "",
+                        companySearch: "", 
+                        sourceType: "", 
+                        country: "", 
+                        eligibilityStatus: "", 
+                        emailStatus: "", 
+                        verificationStatus: "",
+                        hasPhone: "",
+                        hasAddress: ""
+                      });
                     }}
                     data-testid="button-clear-filters"
                   >
@@ -509,31 +733,65 @@ export default function VerificationConsolePage() {
                 </Button>
               )}
               {selectedContactIds.size > 0 && (
-                <div className="flex-1 p-3 border rounded-md bg-primary/10 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="default" className="px-3 py-1">
-                      {selectedContactIds.size} selected
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setSelectedContactIds(new Set())}
-                      disabled={bulkDeleteMutation.isPending}
-                      data-testid="button-clear-selection"
-                    >
-                      Clear Selection
-                    </Button>
+                <div className="flex-1 p-3 border rounded-md bg-primary/10">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="default" className="px-3 py-1">
+                        {selectedContactIds.size} selected
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedContactIds(new Set())}
+                        disabled={bulkDeleteMutation.isPending || bulkEmailValidationMutation.isPending || bulkEnrichmentMutation.isPending || bulkMarkValidatedMutation.isPending}
+                        data-testid="button-clear-selection"
+                      >
+                        Clear Selection
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={handleBulkEmailValidation}
+                        disabled={bulkEmailValidationMutation.isPending || bulkEnrichmentMutation.isPending || bulkMarkValidatedMutation.isPending || bulkDeleteMutation.isPending}
+                        data-testid="button-bulk-email-validation"
+                      >
+                        <Mail className="h-4 w-4 mr-2" />
+                        {bulkEmailValidationMutation.isPending ? "Validating..." : "Validate Emails"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={handleBulkEnrichment}
+                        disabled={bulkEnrichmentMutation.isPending || bulkEmailValidationMutation.isPending || bulkMarkValidatedMutation.isPending || bulkDeleteMutation.isPending}
+                        data-testid="button-bulk-enrichment"
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        {bulkEnrichmentMutation.isPending ? "Enriching..." : "Enrich Data"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={handleBulkMarkValidated}
+                        disabled={bulkMarkValidatedMutation.isPending || bulkEmailValidationMutation.isPending || bulkEnrichmentMutation.isPending || bulkDeleteMutation.isPending}
+                        data-testid="button-bulk-mark-validated"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        {bulkMarkValidatedMutation.isPending ? "Marking..." : "Mark Validated"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleBulkDelete}
+                        disabled={bulkDeleteMutation.isPending || bulkEmailValidationMutation.isPending || bulkEnrichmentMutation.isPending || bulkMarkValidatedMutation.isPending}
+                        data-testid="button-bulk-delete"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {bulkDeleteMutation.isPending ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={handleBulkDelete}
-                    disabled={bulkDeleteMutation.isPending}
-                    data-testid="button-bulk-delete"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {bulkDeleteMutation.isPending ? "Deleting..." : `Delete Selected (${selectedContactIds.size})`}
-                  </Button>
                 </div>
               )}
             </div>
