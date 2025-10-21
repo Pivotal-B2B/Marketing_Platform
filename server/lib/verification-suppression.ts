@@ -48,19 +48,30 @@ export async function addToSuppressionList(
 ) {
   if (entries.length === 0) return;
 
-  // Insert records individually - most reliable approach
-  for (const entry of entries) {
-    const emailLower = entry.email ? normalize.emailLower(entry.email) : null;
-    const cavId = entry.cavId || null;
-    const cavUserId = entry.cavUserId || null;
-    const nameCompanyHash = (entry.firstName || entry.lastName || entry.companyKey)
-      ? computeNameCompanyHash(entry.firstName, entry.lastName, entry.companyKey)
-      : null;
+  // Batch insert using Drizzle insert API for performance
+  const BATCH_SIZE = 500;
+  
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const batch = entries.slice(i, i + BATCH_SIZE);
     
-    await db.execute(sql`
-      INSERT INTO verification_suppression_list 
-        (campaign_id, email_lower, cav_id, cav_user_id, name_company_hash)
-      VALUES (${campaignId}, ${emailLower}, ${cavId}, ${cavUserId}, ${nameCompanyHash})
-    `);
+    // Prepare values for batch insert
+    const values = batch.map(entry => {
+      const emailLower = entry.email ? normalize.emailLower(entry.email) : null;
+      const cavId = entry.cavId || null;
+      const cavUserId = entry.cavUserId || null;
+      const nameCompanyHash = (entry.firstName || entry.lastName || entry.companyKey)
+        ? computeNameCompanyHash(entry.firstName, entry.lastName, entry.companyKey)
+        : null;
+      
+      return {
+        campaignId,
+        emailLower,
+        cavId,
+        cavUserId,
+        nameCompanyHash,
+      };
+    });
+    
+    await db.insert(verificationSuppressionList).values(values);
   }
 }

@@ -37,6 +37,23 @@ export default function VerificationConsolePage() {
 
   const { data: queue, isLoading: queueLoading } = useQuery({
     queryKey: ["/api/verification-campaigns", campaignId, "queue", filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.contactSearch) params.append("contactSearch", filters.contactSearch);
+      if (filters.companySearch) params.append("companySearch", filters.companySearch);
+      if (filters.sourceType) params.append("sourceType", filters.sourceType);
+      if (filters.suppressionStatus) params.append("suppressionStatus", filters.suppressionStatus);
+      
+      const url = `/api/verification-campaigns/${campaignId}/queue?${params.toString()}`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+        },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch queue");
+      return res.json();
+    },
     enabled: !currentContactId,
   });
 
