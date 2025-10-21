@@ -56,5 +56,10 @@ export async function addToSuppressionList(
       : null,
   }));
   
-  await db.insert(verificationSuppressionList).values(insertData);
+  // Batch insert to prevent stack overflow with large datasets
+  const BATCH_SIZE = 1000;
+  for (let i = 0; i < insertData.length; i += BATCH_SIZE) {
+    const batch = insertData.slice(i, i + BATCH_SIZE);
+    await db.insert(verificationSuppressionList).values(batch);
+  }
 }
