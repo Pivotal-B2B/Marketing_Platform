@@ -17,14 +17,14 @@ import verificationUploadRouter from './routes/verification-upload';
 import verificationUploadJobsRouter from './routes/verification-upload-jobs';
 import verificationEnrichmentRouter from './routes/verification-enrichment';
 import { z } from "zod";
-import { 
-  apiLimiter, 
-  authLimiter, 
-  writeLimiter, 
+import {
+  apiLimiter,
+  authLimiter,
+  writeLimiter,
   expensiveOperationLimiter,
-  validate 
+  validate
 } from "./middleware/security";
-import { 
+import {
   loginSchema,
   createUserSchema,
   updateUserSchema,
@@ -469,7 +469,7 @@ export function registerRoutes(app: Express) {
 
       // Step 1: Validate all accounts and collect domains
       const accountsToProcess: Array<{ validated: any; originalIndex: number }> = [];
-      
+
       for (let i = 0; i < accountsData.length; i++) {
         try {
           const validated = insertAccountSchema.parse(accountsData[i]);
@@ -487,7 +487,7 @@ export function registerRoutes(app: Express) {
       const domainsToCheck = accountsToProcess
         .filter(a => a.validated.domain)
         .map(a => a.validated.domain.toLowerCase().trim());
-      
+
       const existingAccounts = await storage.getAccountsByDomains(domainsToCheck);
       const accountsByDomain = new Map(existingAccounts.map(a => [a.domain!.toLowerCase().trim(), a]));
 
@@ -794,10 +794,10 @@ export function registerRoutes(app: Express) {
 
       for (const { validated, originalIndex } of contactsToProcess) {
         const normalizedEmail = validated.email.toLowerCase().trim();
-        
+
         // CRITICAL: Populate emailNormalized field for deduplication
         validated.emailNormalized = normalizedEmail;
-        
+
         const existingContact = contactsByEmail.get(normalizedEmail);
 
         if (existingContact) {
@@ -940,7 +940,7 @@ export function registerRoutes(app: Express) {
 
       // Normalize email for deduplication
       contactData.emailNormalized = contactData.email.toLowerCase().trim();
-      
+
       // Normalize phone numbers
       if (contactData.directPhone) {
         const normalized = normalizePhoneE164(contactData.directPhone, contactData.country || undefined);
@@ -1280,7 +1280,7 @@ export function registerRoutes(app: Express) {
     try {
       const contacts = await storage.getContacts();
       const emailGroups = new Map<string, any[]>();
-      
+
       // Group contacts by normalized email
       contacts.forEach(contact => {
         if (contact.emailNormalized) {
@@ -1298,8 +1298,8 @@ export function registerRoutes(app: Express) {
         .map(([email, group]) => ({
           email,
           count: group.length,
-          contacts: group.sort((a, b) => 
-            new Date(b.updatedAt || b.createdAt || 0).getTime() - 
+          contacts: group.sort((a, b) =>
+            new Date(b.updatedAt || b.createdAt || 0).getTime() -
             new Date(a.updatedAt || a.createdAt || 0).getTime()
           )
         }));
@@ -1320,7 +1320,7 @@ export function registerRoutes(app: Express) {
     try {
       const accounts = await storage.getAccounts();
       const domainGroups = new Map<string, any[]>();
-      
+
       // Group accounts by normalized domain
       accounts.forEach(account => {
         if (account.domainNormalized) {
@@ -1338,8 +1338,8 @@ export function registerRoutes(app: Express) {
         .map(([domain, group]) => ({
           domain,
           count: group.length,
-          accounts: group.sort((a, b) => 
-            new Date(b.updatedAt || b.createdAt || 0).getTime() - 
+          accounts: group.sort((a, b) =>
+            new Date(b.updatedAt || b.createdAt || 0).getTime() -
             new Date(a.updatedAt || a.createdAt || 0).getTime()
           )
         }));
@@ -1359,7 +1359,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/accounts/data-completeness", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const accounts = await storage.getAccounts();
-      
+
       if (accounts.length === 0) {
         return res.json({
           totalAccounts: 0,
@@ -1383,7 +1383,7 @@ export function registerRoutes(app: Express) {
           const value = (account as any)[field];
           return value !== null && value !== undefined && value !== '';
         }).length;
-        
+
         const blank = accounts.length - populated;
         const percentage = (populated / accounts.length) * 100;
 
@@ -1409,7 +1409,7 @@ export function registerRoutes(app: Express) {
           const value = (account as any)[field];
           return value !== null && value !== undefined && value !== '';
         }).length;
-        
+
         return {
           id: account.id,
           name: account.name,
@@ -1437,7 +1437,7 @@ export function registerRoutes(app: Express) {
   app.get("/api/contacts/data-completeness", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {
       const contacts = await storage.getContacts();
-      
+
       if (contacts.length === 0) {
         return res.json({
           totalContacts: 0,
@@ -1460,7 +1460,7 @@ export function registerRoutes(app: Express) {
           const value = (contact as any)[field];
           return value !== null && value !== undefined && value !== '';
         }).length;
-        
+
         const blank = contacts.length - populated;
         const percentage = (populated / contacts.length) * 100;
 
@@ -1486,9 +1486,9 @@ export function registerRoutes(app: Express) {
           const value = (contact as any)[field];
           return value !== null && value !== undefined && value !== '';
         }).length;
-        
+
         const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-        
+
         return {
           id: contact.id,
           name: fullName || 'No name',
@@ -1853,7 +1853,7 @@ export function registerRoutes(app: Express) {
       // Deduplicate by domain, keeping first occurrence (which includes account name)
       const uniqueDomainMap = new Map<string, typeof fixedDomains[0]>();
       const duplicates: string[] = [];
-      
+
       for (const item of fixedDomains) {
         const normalizedDomain = normalizeDomain(item.domain);
         if (!uniqueDomainMap.has(normalizedDomain)) {
@@ -1862,7 +1862,7 @@ export function registerRoutes(app: Express) {
           duplicates.push(item.domain);
         }
       }
-      
+
       const uniqueItems = Array.from(uniqueDomainMap.values());
 
       // Create domain set
@@ -2310,36 +2310,90 @@ export function registerRoutes(app: Express) {
       await storage.assignAgentsToCampaign(req.params.id, agentIds, userId);
 
       // Automatically populate queue from campaign audience if not already populated
-      const campaign = await storage.getCampaign(req.params.id);
-      if (campaign && campaign.audienceRefs) {
-        const audienceRefs = campaign.audienceRefs as any;
-        let contacts: any[] = [];
+      const [campaign] = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.id, req.params.id))
+        .limit(1);
 
-        // Resolve contacts from segments
-        if (audienceRefs.segments && Array.isArray(audienceRefs.segments)) {
-          for (const segmentId of audienceRefs.segments) {
-            const segment = await storage.getSegment(segmentId);
-            if (segment && segment.definitionJson) {
-              const segmentContacts = await storage.getContacts(segment.definitionJson as any);
-              contacts.push(...segmentContacts);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      // Default to 'manual' if dialMode is not set
+      const dialMode = campaign.dialMode || 'manual';
+
+      // Check if campaign has audience defined
+      let contacts: any[] = [];
+      if (campaign.audienceRefs) {
+        const audienceRefs = campaign.audienceRefs as any;
+        const uniqueContactIds = new Set<string>();
+
+        // Resolve from filterGroup (advanced filters)
+        if (audienceRefs.filterGroup) {
+          const filterSQL = buildFilterQuery(audienceRefs.filterGroup as FilterGroup, contacts as any);
+          if (filterSQL) {
+            const audienceContacts = await db.select()
+              .from(contacts as any)
+              .where(filterSQL);
+            audienceContacts.forEach(c => uniqueContactIds.add(c.id));
+          }
+        }
+
+        // Resolve from lists
+        if (audienceRefs.lists && Array.isArray(audienceRefs.lists)) {
+          for (const listId of audienceRefs.lists) {
+            const [list] = await db.select()
+              .from(lists)
+              .where(eq(lists.id, listId))
+              .limit(1);
+
+            if (list && list.recordIds && list.recordIds.length > 0) {
+              list.recordIds.forEach((id: string) => uniqueContactIds.add(id));
             }
           }
         }
 
-        // Resolve contacts from lists (with batching for large lists)
-        if (audienceRefs.lists && Array.isArray(audienceRefs.lists)) {
-          for (const listId of audienceRefs.lists) {
-            const list = await storage.getList(listId);
+        // Resolve from selectedLists (alternate field name)
+        if (audienceRefs.selectedLists && Array.isArray(audienceRefs.selectedLists)) {
+          for (const listId of audienceRefs.selectedLists) {
+            const [list] = await db.select()
+              .from(lists)
+              .where(eq(lists.id, listId))
+              .limit(1);
+
             if (list && list.recordIds && list.recordIds.length > 0) {
-              // Batch large lists to avoid SQL query limits
-              const batchSize = 1000;
-              for (let i = 0; i < list.recordIds.length; i += batchSize) {
-                const batch = list.recordIds.slice(i, i + batchSize);
-                const listContacts = await storage.getContactsByIds(batch);
-                contacts.push(...listContacts);
+              list.recordIds.forEach((id: string) => uniqueContactIds.add(id));
+            }
+          }
+        }
+
+        // Resolve from segments
+        if (audienceRefs.segments && Array.isArray(audienceRefs.segments)) {
+          for (const segmentId of audienceRefs.segments) {
+            const [segment] = await db.select()
+              .from(segments)
+              .where(eq(segments.id, segmentId))
+              .limit(1);
+
+            if (segment && segment.definitionJson) {
+              const filterSQL = buildFilterQuery(segment.definitionJson as FilterGroup, contacts as any);
+              if (filterSQL) {
+                const segmentContacts = await db.select()
+                  .from(contacts as any)
+                  .where(filterSQL);
+                segmentContacts.forEach(c => uniqueContactIds.add(c.id));
               }
             }
           }
+        }
+
+        // Convert contact IDs to full contact objects
+        if (uniqueContactIds.size > 0) {
+          contacts = await db.select()
+            .from(contacts as any)
+            .where(sql`${(contacts as any).id} IN (${sql.join(Array.from(uniqueContactIds).map(id => sql`${id}`), sql`, `)})`)
+            .limit(10000);
         }
 
         // Remove duplicates and filter valid contacts
@@ -2348,87 +2402,101 @@ export function registerRoutes(app: Express) {
         );
         const validContacts = uniqueContacts.filter(c => c.accountId);
 
-        // DUAL QUEUE STRATEGY: Different behavior for manual vs power dial
-        if (campaign.dialMode === 'manual') {
-          // MANUAL DIAL: Populate agent_queue with ALL campaign contacts for each agent
-          // Build all queue items for bulk insert (much faster than individual inserts)
-          const queueItems: any[] = [];
-          const now = new Date();
+        console.log(`[ASSIGN AGENTS] Campaign has audienceRefs: ${!!campaign.audienceRefs}, Valid contacts: ${validContacts.length}, Dial mode: ${dialMode}`);
 
-          for (const agentId of agentIds) {
-            for (const contact of validContacts) {
-              queueItems.push({
-                id: sql`gen_random_uuid()`,
-                agentId,
-                campaignId: req.params.id,
-                contactId: contact.id,
-                accountId: contact.accountId!,
-                queueState: 'queued',
-                priority: 0,
-                createdAt: now,
-                updatedAt: now,
-              });
+        if (campaign.audienceRefs && validContacts.length > 0) {
+          // DUAL QUEUE STRATEGY: Different behavior for manual vs power dial
+          if (dialMode === 'manual') {
+            console.log(`[ASSIGN AGENTS] MANUAL mode - populating agent queues with ${validContacts.length} contacts for ${agentIds.length} agents`);
+            // MANUAL DIAL: Populate agent_queue with ALL campaign contacts for each agent
+            // Build all queue items for bulk insert (much faster than individual inserts)
+            const queueItems: any[] = [];
+            const now = new Date();
+
+            for (const agentId of agentIds) {
+              for (const contact of validContacts) {
+                queueItems.push({
+                  id: sql`gen_random_uuid()`,
+                  agentId,
+                  campaignId: req.params.id,
+                  contactId: contact.id,
+                  accountId: contact.accountId!,
+                  queueState: 'queued',
+                  priority: 0,
+                  createdAt: now,
+                  updatedAt: now,
+                });
+              }
             }
-          }
 
-          // Bulk insert in batches - simplified without conflict handling for now
-          let totalAdded = 0;
-          const insertBatchSize = 500; // Smaller batches for stability
+            console.log(`[ASSIGN AGENTS] Prepared ${queueItems.length} queue items for bulk insert`);
+            // Bulk insert in batches - simplified without conflict handling for now
+            let totalAdded = 0;
+            const insertBatchSize = 500; // Smaller batches for stability
 
-          // Clear existing queue items for these agents first
-          for (const agentId of agentIds) {
-            await db.delete(agentQueue).where(
-              and(
-                eq(agentQueue.agentId, agentId),
-                eq(agentQueue.campaignId, req.params.id)
-              )
-            );
-          }
-
-          for (let i = 0; i < queueItems.length; i += insertBatchSize) {
-            const batch = queueItems.slice(i, i + insertBatchSize);
-            try {
-              const result = await db.insert(agentQueue).values(batch).returning({ id: agentQueue.id });
-              totalAdded += result.length;
-              console.log(`[Manual Queue] Batch ${Math.floor(i / insertBatchSize) + 1}: ${result.length} items inserted`);
-            } catch (error) {
-              console.error(`Error inserting batch ${Math.floor(i / insertBatchSize) + 1}:`, error);
-            }
-          }
-
-          res.status(201).json({
-            message: "Agents assigned to manual dial campaign. All campaign contacts added to each agent's queue.",
-            agentsAssigned: agentIds.length,
-            contactsPerAgent: validContacts.length,
-            totalQueueItemsCreated: totalAdded,
-            mode: 'manual'
-          });
-        } else {
-          // POWER DIAL: Populate campaign_queue and assign to agents via round-robin
-          let enqueuedCount = 0;
-          for (const contact of validContacts) {
-            try {
-              await storage.enqueueContact(
-                req.params.id,
-                contact.id,
-                contact.accountId!,
-                0
+            // Clear existing queue items for these agents first
+            for (const agentId of agentIds) {
+              await db.delete(agentQueue).where(
+                and(
+                  eq(agentQueue.agentId, agentId),
+                  eq(agentQueue.campaignId, req.params.id)
+                )
               );
-              enqueuedCount++;
-            } catch (error) {
-              // Skip contacts that can't be enqueued (e.g., already in queue)
             }
+
+            for (let i = 0; i < queueItems.length; i += insertBatchSize) {
+              const batch = queueItems.slice(i, i + insertBatchSize);
+              try {
+                const result = await db.insert(agentQueue).values(batch).returning({ id: agentQueue.id });
+                totalAdded += result.length;
+                console.log(`[Manual Queue] Batch ${Math.floor(i / insertBatchSize) + 1}: ${result.length} items inserted`);
+              } catch (error) {
+                console.error(`Error inserting batch ${Math.floor(i / insertBatchSize) + 1}:`, error);
+              }
+            }
+
+            res.status(201).json({
+              message: "Agents assigned to manual dial campaign. All campaign contacts added to each agent's queue.",
+              agentsAssigned: agentIds.length,
+              contactsPerAgent: validContacts.length,
+              totalQueueItemsCreated: totalAdded,
+              mode: 'manual'
+            });
+          } else {
+            // POWER DIAL: Populate campaign_queue and assign to agents via round-robin
+            let enqueuedCount = 0;
+            for (const contact of validContacts) {
+              try {
+                await storage.enqueueContact(
+                  req.params.id,
+                  contact.id,
+                  contact.accountId!,
+                  0
+                );
+                enqueuedCount++;
+              } catch (error) {
+                // Skip contacts that can't be enqueued (e.g., already in queue)
+              }
+            }
+
+            // Assign queue items to the newly assigned agents
+            const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
+
+            res.status(201).json({
+              message: "Agents assigned to power dial campaign and queue populated successfully",
+              queueItemsAssigned: assignResult.assigned,
+              contactsEnqueued: enqueuedCount,
+              totalContactsProcessed: validContacts.length,
+              mode: 'power'
+            });
           }
-
-          // Assign queue items to the newly assigned agents
+        } else {
+          // No audience defined, just assign agents
           const assignResult = await storage.assignQueueToAgents(req.params.id, agentIds, 'round_robin');
-
           res.status(201).json({
-            message: "Agents assigned to power dial campaign and queue populated successfully",
+            message: "Agents assigned successfully",
             queueItemsAssigned: assignResult.assigned,
-            contactsEnqueued: enqueuedCount,
-            totalContactsProcessed: validContacts.length,
-            mode: 'power'
+            note: "Campaign has no audience defined. Please configure audience first."
           });
         }
       } else {
@@ -2440,10 +2508,13 @@ export function registerRoutes(app: Express) {
           note: "Campaign has no audience defined. Please configure audience first."
         });
       }
-    } catch (error) {
-      console.error('Agent assignment error:', error);
+    } catch (error: any) {
+      console.error('[ASSIGN AGENTS] ERROR:', error);
+      console.error('[ASSIGN AGENTS] Error stack:', error?.stack);
       res.status(400).json({
-        message: error instanceof Error ? error.message : "Failed to assign agents"
+        message: error instanceof Error ? error.message : "Failed to assign agents",
+        error: error?.message || String(error),
+        details: error?.stack
       });
     }
   });
@@ -3035,16 +3106,16 @@ export function registerRoutes(app: Express) {
       if (req.body.disposition === 'dnc_request' && req.body.contactId) {
         try {
           console.log(`[DISPOSITION] DNC request for contact ${req.body.contactId}`);
-          
+
           // Get contact details to add phone to suppression list
           const contact = await storage.getContact(req.body.contactId);
-          
+
           if (contact) {
             // Add phone numbers to global DNC list
             const phonesToSuppress: string[] = [];
             if (contact.directPhoneE164) phonesToSuppress.push(contact.directPhoneE164);
             if (contact.mobilePhoneE164) phonesToSuppress.push(contact.mobilePhoneE164);
-            
+
             for (const phone of phonesToSuppress) {
               try {
                 await storage.addPhoneSuppression({
@@ -3918,11 +3989,11 @@ export function registerRoutes(app: Express) {
   app.get("/api/dashboard/agent-stats", requireAuth, async (req, res) => {
     try {
       const agentId = req.user!.userId;
-      
+
       // Get today and this month dates for filtering
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       const thisMonth = new Date();
       thisMonth.setDate(1);
       thisMonth.setHours(0, 0, 0, 0);
@@ -3960,22 +4031,22 @@ export function registerRoutes(app: Express) {
       }
 
       // Calculate stats
-      const todaySessions = callSessions.filter((s: any) => 
+      const todaySessions = callSessions.filter((s: any) =>
         s.startedAt && new Date(s.startedAt) >= today
       );
-      const thisMonthSessions = callSessions.filter((s: any) => 
+      const thisMonthSessions = callSessions.filter((s: any) =>
         s.startedAt && new Date(s.startedAt) >= thisMonth
       );
 
-      const totalDuration = callSessions.reduce((sum: number, s: any) => 
+      const totalDuration = callSessions.reduce((sum: number, s: any) =>
         sum + (s.durationSec || 0), 0
       );
-      const avgDuration = callSessions.length > 0 
-        ? Math.round(totalDuration / callSessions.length) 
+      const avgDuration = callSessions.length > 0
+        ? Math.round(totalDuration / callSessions.length)
         : 0;
 
       // Count qualified leads (dispositions with converted_qualified action)
-      const qualifiedCount = dispositionsData.filter(d => 
+      const qualifiedCount = dispositionsData.filter(d =>
         d.systemAction === 'converted_qualified'
       ).length;
 
@@ -3986,7 +4057,7 @@ export function registerRoutes(app: Express) {
         .where(eq(leads.agentId, agentId));
 
       const approvedLeads = agentLeads.filter(l => l.qaStatus === 'approved').length;
-      const pendingLeads = agentLeads.filter(l => 
+      const pendingLeads = agentLeads.filter(l =>
         l.qaStatus === 'new' || l.qaStatus === 'under_review'
       ).length;
 
@@ -4420,7 +4491,7 @@ export function registerRoutes(app: Express) {
       }
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Failed to delete content asset" });
+      res.status(50    .json({ message: "Failed to delete content asset" });
     }
   });
 
@@ -5149,7 +5220,7 @@ export function registerRoutes(app: Express) {
       if (!recordingUrl && attempt.telnyxCallId) {
         const { fetchTelnyxRecording } = await import("./services/telnyx-recordings");
         recordingUrl = await fetchTelnyxRecording(attempt.telnyxCallId);
-        
+
         // Update the call attempt with the fetched URL for future use
         if (recordingUrl) {
           await storage.updateCallAttempt(attemptId, { recordingUrl });
@@ -5157,8 +5228,8 @@ export function registerRoutes(app: Express) {
       }
 
       if (!recordingUrl) {
-        return res.status(404).json({ 
-          message: "Recording not available yet. Recordings may take a few minutes to process after the call ends." 
+        return res.status(404).json({
+          message: "Recording not available yet. Recordings may take a few minutes to process after the call ends."
         });
       }
 
@@ -5241,7 +5312,7 @@ export function registerRoutes(app: Express) {
           // Recording is ready for download
           const callControlId = payload?.call_control_id;
           const recordingId = payload?.recording_id;
-          
+
           console.log(`[Telnyx Webhook] Recording saved:`, {
             callControlId,
             recordingId,
@@ -5252,23 +5323,23 @@ export function registerRoutes(app: Express) {
           if (callControlId) {
             try {
               const { fetchTelnyxRecording } = await import("./services/telnyx-recordings");
-              
+
               // Get the recording URL from Telnyx
               const recordingUrl = await fetchTelnyxRecording(callControlId);
-              
+
               if (recordingUrl) {
                 // Find call attempt by Telnyx call ID
                 const attempts = await storage.getCallAttemptsByTelnyxId(callControlId);
-                
+
                 if (attempts && attempts.length > 0) {
                   for (const attempt of attempts) {
                     // Update call attempt with recording URL
                     await storage.updateCallAttempt(attempt.id, {
                       recordingUrl,
                     });
-                    
+
                     console.log(`[Telnyx Webhook] ✅ Updated call attempt ${attempt.id} with recording URL`);
-                    
+
                     // If this attempt has an associated lead, update it too
                     const lead = await storage.getLeadByCallAttemptId(attempt.id);
                     if (lead) {
@@ -5811,7 +5882,7 @@ export function registerRoutes(app: Express) {
 
   // ==================== CAMPAIGN SUPPRESSION LISTS ====================
   app.use('/api/campaigns', requireAuth, campaignSuppressionRouter);
-  
+
   app.use(verificationCampaignsRouter);
   app.use(verificationContactsRouter);
   app.use(verificationElvRouter);

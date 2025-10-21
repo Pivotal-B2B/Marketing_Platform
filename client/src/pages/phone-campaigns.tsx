@@ -226,9 +226,13 @@ export default function PhoneCampaignsPage() {
 
   const assignAgentsMutation = useMutation({
     mutationFn: async ({ campaignId, agentIds }: { campaignId: string; agentIds: string[] }) => {
-      return await apiRequest('POST', `/api/campaigns/${campaignId}/agents`, { agentIds });
+      console.log('[ASSIGN AGENTS] Sending request:', { campaignId, agentIds });
+      const result = await apiRequest('POST', `/api/campaigns/${campaignId}/agents`, { agentIds });
+      console.log('[ASSIGN AGENTS] Response:', result);
+      return result;
     },
     onSuccess: (data: any) => {
+      console.log('[ASSIGN AGENTS] Success data:', data);
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns/queue-stats"] });
       setAssignAgentsDialogOpen(false);
@@ -237,10 +241,13 @@ export default function PhoneCampaignsPage() {
       const messages = [];
       messages.push("Agents assigned successfully");
       if (data.queuePopulated) {
-        messages.push(`Queue auto-populated with ${data.contactsEnqueued} contacts`);
+        messages.push(`Queue populated with ${data.totalQueueItemsCreated || data.contactsEnqueued || 0} contacts`);
       }
       if (data.queueItemsAssigned > 0) {
         messages.push(`${data.queueItemsAssigned} contacts assigned to agents`);
+      }
+      if (data.mode) {
+        messages.push(`Mode: ${data.mode}`);
       }
 
       toast({
@@ -249,9 +256,10 @@ export default function PhoneCampaignsPage() {
       });
     },
     onError: (error: any) => {
+      console.error('[ASSIGN AGENTS] Error:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to assign agents",
+        description: error.message || error.error || "Failed to assign agents",
         variant: "destructive",
       });
     },
