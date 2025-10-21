@@ -54,6 +54,12 @@ export default function PhoneCampaignsPage() {
   const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
   const [assignAgentsDialogOpen, setAssignAgentsDialogOpen] = useState(false);
 
+  // State for disposition form, assuming these are defined elsewhere or need to be added
+  const [disposition, setDisposition] = useState('');
+  const [callNotes, setCallNotes] = useState('');
+  const [callStatus, setCallStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [currentContact, setCurrentContact] = useState<any>(null); // Assuming currentContact has id, accountId, queueItemId
+  const refetchQueue = () => {}; // Placeholder for queue refetch function
 
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery<Campaign[]>({
     queryKey: ["/api/campaigns", { type: "call" }],
@@ -308,6 +314,54 @@ export default function PhoneCampaignsPage() {
     },
   });
 
+  const dispositionMutation = useMutation({
+    mutationFn: async (data: {
+      disposition: string;
+      notes: string;
+      contactId?: string;
+      accountId?: string; // Added accountId
+      campaignId?: string;
+      queueItemId?: string;
+    }) => {
+      const res = await fetch('/api/calls/disposition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Failed to save disposition');
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Disposition Saved",
+        description: "Call outcome recorded successfully",
+      });
+
+      // Reset form
+      setDisposition('');
+      setCallNotes('');
+      setCallStatus('idle');
+
+      // Refresh queue
+      refetchQueue();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Save Disposition",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleAssignAgents = () => {
     if (!selectedCampaign) return;
 
@@ -355,6 +409,26 @@ export default function PhoneCampaignsPage() {
   const filteredCampaigns = campaigns?.filter((campaign: any) =>
     campaign.name.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
+
+  const handleSaveDisposition = () => {
+    if (!disposition) {
+      toast({
+        title: "Disposition Required",
+        description: "Please select a call outcome before continuing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    dispositionMutation.mutate({
+      disposition,
+      notes: callNotes,
+      contactId: currentContact?.id,
+      accountId: currentContact?.accountId, // Added accountId
+      campaignId: selectedCampaign?.id.toString(), // Ensure selectedCampaign is not null
+      queueItemId: currentContact?.queueItemId,
+    });
+  };
 
   return (
     <div className="space-y-6">
