@@ -8,6 +8,72 @@ export const normalize = {
     (s ?? "").toLowerCase().replace(/\./g, "").trim(),
   emailLower: (s?: string | null) =>
     (s ?? "").toLowerCase().trim(),
+  
+  /**
+   * Smart company name normalization that handles:
+   * - Legal suffixes (Ltd, Inc, LLC, Corp, etc.)
+   * - Punctuation and special characters
+   * - Common abbreviations
+   * - Extra words (The, Group, Holdings)
+   * - International variations
+   */
+  companyKey: (s?: string | null): string => {
+    if (!s) return "";
+    
+    let normalized = s.toLowerCase().trim();
+    
+    // Remove common legal suffixes (must be at end of string)
+    const legalSuffixes = [
+      'limited', 'ltd', 'llc', 'inc', 'incorporated', 'corp', 'corporation',
+      'plc', 'sa', 'gmbh', 'ag', 'nv', 'bv', 'spa', 'srl', 'kg', 'oy',
+      'co', 'company', 'group', 'holdings', 'holding', 'international',
+      'intl', 'global', 'worldwide', 'pvt', 'pte', 'pty', 'sdn bhd',
+      'public company', 'joint stock company', 'jsc', 'ojsc', 'pjsc'
+    ];
+    
+    // Remove suffixes at the end (with optional period/comma)
+    for (const suffix of legalSuffixes) {
+      const patterns = [
+        new RegExp(`[,.]?\\s+${suffix}[,.]?$`, 'gi'),
+        new RegExp(`\\s+${suffix}[,.]?$`, 'gi'),
+      ];
+      for (const pattern of patterns) {
+        normalized = normalized.replace(pattern, '');
+      }
+    }
+    
+    // Remove "The" at the beginning
+    normalized = normalized.replace(/^the\s+/i, '');
+    
+    // Remove all punctuation and special characters (keep spaces, letters, numbers)
+    normalized = normalized.replace(/[^\w\s]/g, '');
+    
+    // Normalize common company name patterns
+    const abbreviations: Record<string, string> = {
+      'airways': 'air',
+      'airline': 'air',
+      'airlines': 'air',
+      'international': 'intl',
+      'aviation': 'avia',
+      'technologies': 'tech',
+      'technology': 'tech',
+      'systems': 'sys',
+      'solutions': 'sol',
+      'services': 'svc',
+      'manufacturing': 'mfg',
+    };
+    
+    // Apply abbreviation normalization (optional - can make matching more aggressive)
+    for (const [full, abbr] of Object.entries(abbreviations)) {
+      normalized = normalized.replace(new RegExp(`\\b${full}\\b`, 'g'), abbr);
+      normalized = normalized.replace(new RegExp(`\\b${abbr}\\b`, 'g'), abbr);
+    }
+    
+    // Normalize whitespace
+    normalized = normalized.replace(/\s+/g, ' ').trim();
+    
+    return normalized;
+  }
 };
 
 export function evaluateEligibility(
@@ -62,7 +128,7 @@ export function computeNameCompanyHash(
   const normalized = [
     normalize.toKey(firstName),
     normalize.toKey(lastName),
-    normalize.toKey(companyKey)
+    normalize.companyKey(companyKey) // Use smart company normalization
   ].join('');
   
   return crypto.createHash('md5').update(normalized).digest('hex');
@@ -80,7 +146,7 @@ export function computeNormalizedKeys(contact: {
     firstNameNorm: normalize.toKey(contact.firstName),
     lastNameNorm: normalize.toKey(contact.lastName),
     contactCountryKey: normalize.countryKey(contact.contactCountry),
-    companyKey: normalize.toKey(contact.accountName),
+    companyKey: normalize.companyKey(contact.accountName), // Use smart company normalization
   };
 }
 

@@ -3,7 +3,7 @@ import { db } from "../db";
 import { verificationContacts, verificationCampaigns, accounts } from "@shared/schema";
 import { eq, and, or, sql } from "drizzle-orm";
 import Papa from "papaparse";
-import { evaluateEligibility, checkSuppression, computeNormalizedKeys } from "../lib/verification-utils";
+import { evaluateEligibility, checkSuppression, computeNormalizedKeys, normalize } from "../lib/verification-utils";
 
 const router = Router();
 
@@ -234,15 +234,32 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
               accountData = newAccount[0];
             }
           } else if (accountNameCsv) {
-            const [a] = await tx
+            // Use smart company name normalization for matching
+            const normalizedCsvName = normalize.companyKey(accountNameCsv);
+            
+            // Optimize: First filter by similar names using trigram similarity or LIKE
+            // Then do exact normalized match in application code
+            // Extract core words from normalized name for initial filter
+            const coreWords = normalizedCsvName.split(' ').filter(w => w.length > 2);
+            const likePattern = coreWords.length > 0 
+              ? `%${coreWords[0]}%` 
+              : `%${accountNameCsv}%`;
+            
+            // Get candidate accounts (pre-filter to reduce dataset)
+            const candidateAccounts = await tx
               .select()
               .from(accounts)
-              .where(sql`LOWER(${accounts.name}) = LOWER(${accountNameCsv})`)
-              .limit(1);
+              .where(sql`LOWER(${accounts.name}) LIKE LOWER(${likePattern})`)
+              .limit(100); // Safety limit
             
-            if (a) {
-              accountId = a.id;
-              accountData = a;
+            // Find exact match using smart normalization
+            const matchedAccount = candidateAccounts.find(acc => 
+              normalize.companyKey(acc.name) === normalizedCsvName
+            );
+            
+            if (matchedAccount) {
+              accountId = matchedAccount.id;
+              accountData = matchedAccount;
             } else {
               const newAccount = await tx.insert(accounts).values({
                 name: accountNameCsv,
