@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,11 +32,19 @@ export default function VerificationConsolePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [contactToDelete, setContactToDelete] = useState<{ id: string; name: string; accountId?: string; accountName?: string } | null>(null);
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkDeleteReason, setBulkDeleteReason] = useState("");
   const [filters, setFilters] = useState({
     contactSearch: "",
     companySearch: "",
     sourceType: "",
   });
+
+  const updateFilters = (newFilters: typeof filters) => {
+    setFilters(newFilters);
+    setSelectedContactIds(new Set<string>());
+  };
 
   const { data: campaign } = useQuery({
     queryKey: ["/api/verification-campaigns", campaignId],
@@ -155,10 +164,71 @@ export default function VerificationConsolePage() {
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async ({ contactIds, reason }: { contactIds: string[]; reason?: string }) => {
+      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/contacts/bulk-delete`, { 
+        contactIds, 
+        reason 
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Bulk delete successful",
+        description: `${data.deletedCount} contact(s) have been deleted`,
+      });
+      setSelectedContactIds(new Set());
+      setBulkDeleteDialogOpen(false);
+      setBulkDeleteReason("");
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Bulk delete failed",
+        description: error.message || "Failed to delete contacts",
+        variant: "destructive",
+      });
+    },
+  });
+
   const loadNextContact = () => {
     if ((queue as any)?.data && (queue as any).data.length > 0) {
       setCurrentContactId((queue as any).data[0].id);
     }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked && (queue as any)?.data) {
+      const allIds = new Set<string>((queue as any).data.map((c: any) => c.id as string));
+      setSelectedContactIds(allIds);
+    } else {
+      setSelectedContactIds(new Set<string>());
+    }
+  };
+
+  const handleSelectContact = (contactId: string, checked: boolean) => {
+    const newSelection = new Set(selectedContactIds);
+    if (checked) {
+      newSelection.add(contactId);
+    } else {
+      newSelection.delete(contactId);
+    }
+    setSelectedContactIds(newSelection);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedContactIds.size === 0) return;
+    setBulkDeleteDialogOpen(true);
+  };
+
+  const confirmBulkDelete = () => {
+    if (selectedContactIds.size === 0) return;
+    bulkDeleteMutation.mutate({ 
+      contactIds: Array.from(selectedContactIds), 
+      reason: bulkDeleteReason || "Bulk delete via console" 
+    });
   };
 
   const handleSaveAndNext = async () => {
@@ -305,7 +375,7 @@ export default function VerificationConsolePage() {
                     <Input
                       placeholder="Name or email..."
                       value={filters.contactSearch}
-                      onChange={(e) => setFilters({ ...filters, contactSearch: e.target.value })}
+                      onChange={(e) => updateFilters({ ...filters, contactSearch: e.target.value })}
                       data-testid="input-contact-search"
                     />
                   </div>
@@ -314,7 +384,7 @@ export default function VerificationConsolePage() {
                     <Input
                       placeholder="Company name..."
                       value={filters.companySearch}
-                      onChange={(e) => setFilters({ ...filters, companySearch: e.target.value })}
+                      onChange={(e) => updateFilters({ ...filters, companySearch: e.target.value })}
                       data-testid="input-company-search"
                     />
                   </div>
@@ -322,7 +392,7 @@ export default function VerificationConsolePage() {
                     <Label className="text-xs">Source Type</Label>
                     <Select
                       value={filters.sourceType || "all"}
-                      onValueChange={(value) => setFilters({ ...filters, sourceType: value === "all" ? "" : value })}
+                      onValueChange={(value) => updateFilters({ ...filters, sourceType: value === "all" ? "" : value })}
                     >
                       <SelectTrigger data-testid="select-source-type">
                         <SelectValue placeholder="All sources" />
@@ -345,7 +415,7 @@ export default function VerificationConsolePage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      setFilters({ contactSearch: "", companySearch: "", sourceType: "" });
+                      updateFilters({ contactSearch: "", companySearch: "", sourceType: "" });
                     }}
                     data-testid="button-clear-filters"
                   >
@@ -355,6 +425,34 @@ export default function VerificationConsolePage() {
                 </div>
               </div>
             )}
+            {selectedContactIds.size > 0 && (
+              <div className="mb-4 p-3 border rounded-md bg-primary/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Badge variant="default" className="px-3 py-1">
+                    {selectedContactIds.size} selected
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedContactIds(new Set())}
+                    disabled={bulkDeleteMutation.isPending}
+                    data-testid="button-clear-selection"
+                  >
+                    Clear Selection
+                  </Button>
+                </div>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleteMutation.isPending}
+                  data-testid="button-bulk-delete"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {bulkDeleteMutation.isPending ? "Deleting..." : `Delete Selected (${selectedContactIds.size})`}
+                </Button>
+              </div>
+            )}
             {queueLoading ? (
               <div className="text-muted-foreground" data-testid="text-loading">Loading queue...</div>
             ) : (queue as any)?.data && (queue as any).data.length > 0 ? (
@@ -362,6 +460,13 @@ export default function VerificationConsolePage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-muted/50">
+                      <th className="w-12 p-3">
+                        <Checkbox
+                          checked={selectedContactIds.size === (queue as any).data.length && (queue as any).data.length > 0}
+                          onCheckedChange={handleSelectAll}
+                          data-testid="checkbox-select-all"
+                        />
+                      </th>
                       <th className="text-left p-3 text-sm font-medium">Name</th>
                       <th className="text-left p-3 text-sm font-medium">Company</th>
                       <th className="text-left p-3 text-sm font-medium">Email Status</th>
@@ -378,6 +483,13 @@ export default function VerificationConsolePage() {
                         onClick={() => setCurrentContactId(contact.id)}
                         data-testid={`row-contact-${index}`}
                       >
+                        <td className="w-12 p-3" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedContactIds.has(contact.id)}
+                            onCheckedChange={(checked) => handleSelectContact(contact.id, !!checked)}
+                            data-testid={`checkbox-select-${index}`}
+                          />
+                        </td>
                         <td className="p-3 text-sm font-medium" data-testid={`text-name-${index}`}>
                           {contact.full_name || contact.fullName}
                         </td>
@@ -769,6 +881,39 @@ export default function VerificationConsolePage() {
               data-testid="button-confirm-delete"
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bulk Delete Contacts</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to delete {selectedContactIds.size} contact(s). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="bulk-delete-reason">Reason (optional)</Label>
+            <Input
+              id="bulk-delete-reason"
+              placeholder="e.g., Duplicate records, Invalid data..."
+              value={bulkDeleteReason}
+              onChange={(e) => setBulkDeleteReason(e.target.value)}
+              data-testid="input-bulk-delete-reason"
+              className="mt-2"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDelete}
+              disabled={bulkDeleteMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-bulk-delete"
+            >
+              {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedContactIds.size} Contact(s)`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
