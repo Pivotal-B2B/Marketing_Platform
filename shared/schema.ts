@@ -3405,6 +3405,8 @@ export const verificationStatusEnum = pgEnum('verification_status', ['Pending', 
 export const verificationQaStatusEnum = pgEnum('verification_qa_status', ['Unreviewed', 'Flagged', 'Passed', 'Rejected']);
 export const verificationEmailStatusEnum = pgEnum('verification_email_status', ['unknown', 'ok', 'invalid', 'risky']);
 export const verificationSourceTypeEnum = pgEnum('verification_source_type', ['Client_Provided', 'New_Sourced']);
+export const addressEnrichmentStatusEnum = pgEnum('address_enrichment_status', ['not_needed', 'pending', 'in_progress', 'completed', 'failed']);
+export const phoneEnrichmentStatusEnum = pgEnum('phone_enrichment_status', ['not_needed', 'pending', 'in_progress', 'completed', 'failed']);
 
 export const verificationCampaigns = pgTable("verification_campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -3469,6 +3471,7 @@ export const verificationContacts = pgTable("verification_contacts", {
   hqState: text("hq_state"),
   hqCountry: text("hq_country"),
   hqPostal: text("hq_postal"),
+  hqPhone: text("hq_phone"),
 
   cavId: text("cav_id"),
   cavUserId: text("cav_user_id"),
@@ -3489,6 +3492,13 @@ export const verificationContacts = pgTable("verification_contacts", {
   lastNameNorm: text("last_name_norm"),
   companyKey: text("company_key"),
   contactCountryKey: text("contact_country_key"),
+
+  addressEnrichmentStatus: addressEnrichmentStatusEnum("address_enrichment_status").default('not_needed'),
+  addressEnrichedAt: timestamp("address_enriched_at"),
+  addressEnrichmentError: text("address_enrichment_error"),
+  phoneEnrichmentStatus: phoneEnrichmentStatusEnum("phone_enrichment_status").default('not_needed'),
+  phoneEnrichedAt: timestamp("phone_enriched_at"),
+  phoneEnrichmentError: text("phone_enrichment_error"),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

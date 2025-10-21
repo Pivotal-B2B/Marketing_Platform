@@ -14,6 +14,7 @@ import verificationElvRouter from './routes/verification-elv';
 import verificationSubmissionsRouter from './routes/verification-submissions';
 import verificationSuppressionRouter from './routes/verification-suppression';
 import verificationUploadRouter from './routes/verification-upload';
+import verificationEnrichmentRouter from './routes/verification-enrichment';
 import { z } from "zod";
 import { 
   apiLimiter, 
@@ -5816,4 +5817,5 @@ export function registerRoutes(app: Express) {
   app.use(verificationSubmissionsRouter);
   app.use(verificationSuppressionRouter);
   app.use(verificationUploadRouter);
+  app.use(verificationEnrichmentRouter);
 }

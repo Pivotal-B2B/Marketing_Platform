@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,6 +35,8 @@ export default function VerificationConsolePage() {
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [bulkDeleteReason, setBulkDeleteReason] = useState("");
+  const [enrichmentDialogOpen, setEnrichmentDialogOpen] = useState(false);
+  const [enrichmentProgress, setEnrichmentProgress] = useState<any>(null);
   const [filters, setFilters] = useState({
     contactSearch: "",
     companySearch: "",
@@ -209,6 +211,29 @@ export default function VerificationConsolePage() {
       toast({
         title: "Bulk delete failed",
         description: error.message || "Failed to delete contacts",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const enrichmentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/enrich`, {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setEnrichmentProgress(data.progress);
+      toast({
+        title: "AI Enrichment Complete",
+        description: `Enriched ${data.progress.addressEnriched} addresses and ${data.progress.phoneEnriched} phone numbers`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Enrichment failed",
+        description: error.message || "Failed to enrich company data",
         variant: "destructive",
       });
     },
