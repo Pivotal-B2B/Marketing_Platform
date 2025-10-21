@@ -1042,10 +1042,23 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
       contactCount: contactIds.length 
     });
     
+    // Track detailed results
     let addressEnriched = 0;
     let phoneEnriched = 0;
+    let processed = 0;
+    let skipped = 0;
+    let failed = 0;
+    const skippedReasons: Record<string, number> = {
+      noAccount: 0,
+      noOkEmail: 0,
+      alreadyEnriched: 0,
+    };
     
-    for (const contactId of contactIds) {
+    console.log(`[BULK ENRICHMENT] Processing ${contactIds.length} contacts with OK emails`);
+    
+    for (let i = 0; i < contactIds.length; i++) {
+      const contactId = contactIds[i];
+      
       try {
         const contact = await db.query.verificationContacts.findFirst({
           where: and(
@@ -1059,6 +1072,16 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
         
         if (!contact || !contact.account) {
           console.log(`[BULK ENRICHMENT] Skipping contact ${contactId} - no account`);
+          skipped++;
+          skippedReasons.noAccount++;
+          continue;
+        }
+        
+        // CRITICAL: Filter for OK emails only
+        if (contact.emailStatus !== 'ok') {
+          console.log(`[BULK ENRICHMENT] Skipping contact ${contactId} - email status is ${contact.emailStatus}, not 'ok'`);
+          skipped++;
+          skippedReasons.noOkEmail++;
           continue;
         }
         
@@ -1068,11 +1091,13 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
         
         if (!needsAddress && !needsPhone) {
           console.log(`[BULK ENRICHMENT] Skipping contact ${contactId} - already has address and phone`);
+          skipped++;
+          skippedReasons.alreadyEnriched++;
           continue;
         }
         
-        // Call the enrichment service (similar to the single contact enrichment)
-        const response = await fetch(`http://localhost:5000/api/verification-campaigns/${campaignId}/contacts/${contactId}/enrich`, {
+        // Call the enrichment service (correct endpoint)
+        const response = await fetch(`http://localhost:5000/api/verification-contacts/${contactId}/enrich`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1085,17 +1110,33 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
           const result = await response.json();
           if (result.addressEnriched) addressEnriched++;
           if (result.phoneEnriched) phoneEnriched++;
-          console.log(`[BULK ENRICHMENT] Enriched contact ${contactId}`);
+          processed++;
+          
+          // Real-time progress logging
+          if ((i + 1) % 10 === 0 || i === contactIds.length - 1) {
+            console.log(`[BULK ENRICHMENT] Progress: ${processed}/${contactIds.length} | Address: ${addressEnriched} | Phone: ${phoneEnriched} | Skipped: ${skipped} | Failed: ${failed}`);
+          }
+        } else {
+          console.error(`[BULK ENRICHMENT] Failed to enrich contact ${contactId}: ${response.status}`);
+          failed++;
         }
       } catch (error) {
         console.error(`[BULK ENRICHMENT] Error enriching contact ${contactId}:`, error);
+        failed++;
       }
     }
+    
+    console.log(`[BULK ENRICHMENT] Complete: ${addressEnriched} addresses, ${phoneEnriched} phones enriched | Processed: ${processed} | Skipped: ${skipped} (No account: ${skippedReasons.noAccount}, No OK email: ${skippedReasons.noOkEmail}, Already enriched: ${skippedReasons.alreadyEnriched}) | Failed: ${failed}`);
     
     res.json({ 
       success: true, 
       addressEnriched,
       phoneEnriched,
+      processed,
+      skipped,
+      failed,
+      skippedReasons,
+      total: contactIds.length,
     });
   } catch (error) {
     console.error("Error bulk enriching contacts:", error);

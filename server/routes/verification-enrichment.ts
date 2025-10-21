@@ -198,7 +198,7 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
 
         // Call enrichment service with retry logic for 429/5xx errors
         const result = await retryWithBackoff(
-          () => CompanyEnrichmentService.enrichCompanyData(contact, contact.accountName),
+          () => CompanyEnrichmentService.enrichCompanyData(contact, contact.accountName!),
           3, // max attempts
           1000 // base delay ms
         );
@@ -471,6 +471,60 @@ router.post("/api/verification-contacts/:contactId/enrich", async (req, res) => 
     await db.update(verificationContacts)
       .set(updateData)
       .where(eq(verificationContacts.id, contactId));
+
+    // CRITICAL: After updating contact, also update account fields if they're empty
+    if (contact.accountId && (result.address || result.phone)) {
+      // Fetch current account data to check which fields are empty
+      const [account] = await db
+        .select({
+          id: accounts.id,
+          hqStreet1: accounts.hqStreet1,
+          hqCity: accounts.hqCity,
+          hqState: accounts.hqState,
+          hqPostalCode: accounts.hqPostalCode,
+          hqCountry: accounts.hqCountry,
+          mainPhone: accounts.mainPhone,
+        })
+        .from(accounts)
+        .where(eq(accounts.id, contact.accountId));
+
+      if (account) {
+        const accountUpdates: any = {};
+
+        // Update account address if empty and we got enriched address with sufficient confidence
+        if (result.address && result.addressConfidence !== undefined && result.addressConfidence >= CONFIDENCE_THRESHOLD) {
+          if (!account.hqStreet1 && result.address.address1) {
+            accountUpdates.hqStreet1 = result.address.address1;
+          }
+          if (!account.hqCity && result.address.city) {
+            accountUpdates.hqCity = result.address.city;
+          }
+          if (!account.hqState && result.address.state) {
+            accountUpdates.hqState = result.address.state;
+          }
+          if (!account.hqPostalCode && result.address.postalCode) {
+            accountUpdates.hqPostalCode = result.address.postalCode;
+          }
+          if (!account.hqCountry && result.address.country) {
+            accountUpdates.hqCountry = result.address.country;
+          }
+        }
+
+        // Update account phone if empty and we got enriched phone with sufficient confidence
+        if (result.phone && result.phoneConfidence !== undefined && result.phoneConfidence >= CONFIDENCE_THRESHOLD && !account.mainPhone) {
+          accountUpdates.mainPhone = result.phone;
+        }
+
+        // Apply updates if any
+        if (Object.keys(accountUpdates).length > 0) {
+          await db.update(accounts)
+            .set({ ...accountUpdates, updatedAt: new Date() })
+            .where(eq(accounts.id, contact.accountId));
+          
+          console.log(`[Enrichment] Updated account ${contact.accountId} with enriched data:`, Object.keys(accountUpdates));
+        }
+      }
+    }
 
     console.log(`[Enrichment] Single contact enriched: ${contact.fullName}, address=${addressEnriched}, phone=${phoneEnriched}`);
 

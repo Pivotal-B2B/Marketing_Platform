@@ -9,31 +9,33 @@ export async function applySuppressionForContacts(
 ) {
   if (contactIds.length === 0) return;
   
-  await db.execute(sql`
-    UPDATE verification_contacts c
-    SET suppressed = TRUE
-    WHERE c.id = ANY(${contactIds}::varchar[])
-      AND c.campaign_id = ${campaignId}
-      AND c.deleted = FALSE
-      AND (
-        c.email_lower IN (
-          SELECT email_lower FROM verification_suppression_list
-          WHERE (campaign_id = ${campaignId} OR campaign_id IS NULL) AND email_lower IS NOT NULL
-        )
-        OR c.cav_id IN (
-          SELECT cav_id FROM verification_suppression_list
-          WHERE (campaign_id = ${campaignId} OR campaign_id IS NULL) AND cav_id IS NOT NULL
-        )
-        OR c.cav_user_id IN (
-          SELECT cav_user_id FROM verification_suppression_list
-          WHERE (campaign_id = ${campaignId} OR campaign_id IS NULL) AND cav_user_id IS NOT NULL
-        )
-        OR MD5(LOWER(COALESCE(c.first_name, '')) || LOWER(COALESCE(c.last_name, '')) || LOWER(COALESCE(c.company_key, ''))) IN (
-          SELECT name_company_hash FROM verification_suppression_list
-          WHERE (campaign_id = ${campaignId} OR campaign_id IS NULL) AND name_company_hash IS NOT NULL
-        )
-      )
-  `);
+  // Get suppressed contacts matching the criteria
+  const result = await db
+    .select({ id: verificationContacts.id })
+    .from(verificationContacts)
+    .leftJoin(verificationSuppressionList, 
+      sql`(
+        (${verificationContacts.emailLower} = ${verificationSuppressionList.emailLower} AND ${verificationSuppressionList.emailLower} IS NOT NULL)
+        OR (${verificationContacts.cavId} = ${verificationSuppressionList.cavId} AND ${verificationSuppressionList.cavId} IS NOT NULL)
+        OR (${verificationContacts.cavUserId} = ${verificationSuppressionList.cavUserId} AND ${verificationSuppressionList.cavUserId} IS NOT NULL)
+        OR (MD5(LOWER(COALESCE(${verificationContacts.firstName}, '')) || LOWER(COALESCE(${verificationContacts.lastName}, '')) || LOWER(COALESCE(${verificationContacts.companyKey}, ''))) = ${verificationSuppressionList.nameCompanyHash} AND ${verificationSuppressionList.nameCompanyHash} IS NOT NULL)
+      ) AND (${verificationSuppressionList.campaignId} = ${campaignId} OR ${verificationSuppressionList.campaignId} IS NULL)`
+    )
+    .where(
+      sql`${inArray(verificationContacts.id, contactIds)} 
+        AND ${eq(verificationContacts.campaignId, campaignId)}
+        AND ${eq(verificationContacts.deleted, false)}
+        AND ${verificationSuppressionList.id} IS NOT NULL`
+    );
+  
+  // Update only the contacts that matched suppression criteria
+  if (result.length > 0) {
+    const suppressedIds = result.map(r => r.id);
+    await db
+      .update(verificationContacts)
+      .set({ suppressed: true })
+      .where(inArray(verificationContacts.id, suppressedIds));
+  }
 }
 
 export async function addToSuppressionList(
