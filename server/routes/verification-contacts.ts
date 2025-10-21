@@ -224,6 +224,7 @@ router.get("/api/verification-contacts/:id", async (req, res) => {
         a.hq_street_3,
         a.hq_city,
         a.hq_state,
+        a.hq_postal_code,
         a.hq_country,
         a.domain
       FROM verification_contacts c

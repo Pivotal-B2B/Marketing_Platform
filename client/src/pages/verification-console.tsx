@@ -777,6 +777,10 @@ export default function VerificationConsolePage() {
                     <Input value={(contact as any)?.hq_state || ""} readOnly data-testid="input-hq-state" />
                   </div>
                   <div>
+                    <Label>HQ Postal Code</Label>
+                    <Input value={(contact as any)?.hq_postal_code || ""} readOnly data-testid="input-hq-postal" />
+                  </div>
+                  <div>
                     <Label>HQ Country</Label>
                     <Input value={(contact as any)?.hq_country || ""} readOnly data-testid="input-hq-country" />
                   </div>
