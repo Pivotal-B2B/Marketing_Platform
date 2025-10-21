@@ -866,37 +866,43 @@ export default function VerificationConsolePage() {
                     <Label>Domain</Label>
                     <Input value={(contact as any)?.domain || ""} readOnly data-testid="input-domain" />
                   </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold mb-3">Contact Address & Phone (Enriched)</h3>
+                <div className="grid grid-cols-3 gap-4">
                   <div className="col-span-3">
-                    <Label>HQ Address 1</Label>
-                    <Input value={(contact as any)?.hq_address_1 || (contact as any)?.hqAddress1 || ""} readOnly data-testid="input-hq-address1" />
-                  </div>
-                  <div className="col-span-3">
-                    <Label>HQ Address 2</Label>
-                    <Input value={(contact as any)?.hq_address_2 || (contact as any)?.hqAddress2 || ""} readOnly data-testid="input-hq-address2" />
-                  </div>
-                  <div className="col-span-3">
-                    <Label>HQ Address 3</Label>
-                    <Input value={(contact as any)?.hq_address_3 || (contact as any)?.hqAddress3 || ""} readOnly data-testid="input-hq-address3" />
-                  </div>
-                  <div>
-                    <Label>HQ City</Label>
-                    <Input value={(contact as any)?.hq_city || (contact as any)?.hqCity || ""} readOnly data-testid="input-hq-city" />
-                  </div>
-                  <div>
-                    <Label>HQ State</Label>
-                    <Input value={(contact as any)?.hq_state || (contact as any)?.hqState || ""} readOnly data-testid="input-hq-state" />
-                  </div>
-                  <div>
-                    <Label>HQ Postal Code</Label>
-                    <Input value={(contact as any)?.hq_postal || (contact as any)?.hqPostal || ""} readOnly data-testid="input-hq-postal" />
-                  </div>
-                  <div>
-                    <Label>HQ Country</Label>
-                    <Input value={(contact as any)?.hq_country || (contact as any)?.hqCountry || ""} readOnly data-testid="input-hq-country" />
+                    <Label>Phone</Label>
+                    <Input value={(contact as any)?.direct_phone || (contact as any)?.directPhone || ""} readOnly data-testid="input-contact-phone" />
                   </div>
                   <div className="col-span-3">
-                    <Label>HQ Phone</Label>
-                    <Input value={(contact as any)?.hq_phone || (contact as any)?.hqPhone || ""} readOnly data-testid="input-hq-phone" />
+                    <Label>Address 1</Label>
+                    <Input value={(contact as any)?.contact_address1 || (contact as any)?.contactAddress1 || ""} readOnly data-testid="input-contact-address1" />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>Address 2</Label>
+                    <Input value={(contact as any)?.contact_address2 || (contact as any)?.contactAddress2 || ""} readOnly data-testid="input-contact-address2" />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>Address 3</Label>
+                    <Input value={(contact as any)?.contact_address3 || (contact as any)?.contactAddress3 || ""} readOnly data-testid="input-contact-address3" />
+                  </div>
+                  <div>
+                    <Label>City</Label>
+                    <Input value={(contact as any)?.contact_city || (contact as any)?.contactCity || ""} readOnly data-testid="input-contact-city" />
+                  </div>
+                  <div>
+                    <Label>State</Label>
+                    <Input value={(contact as any)?.contact_state || (contact as any)?.contactState || ""} readOnly data-testid="input-contact-state" />
+                  </div>
+                  <div>
+                    <Label>Postal Code</Label>
+                    <Input value={(contact as any)?.contact_postal || (contact as any)?.contactPostal || ""} readOnly data-testid="input-contact-postal" />
+                  </div>
+                  <div className="col-span-3">
+                    <Label>Country</Label>
+                    <Input value={(contact as any)?.contact_country || (contact as any)?.contactCountry || ""} readOnly data-testid="input-contact-country" />
                   </div>
                 </div>
               </div>
