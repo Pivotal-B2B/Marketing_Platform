@@ -85,7 +85,7 @@ CREATE TABLE "accounts" (
 	"industry_ai_reviewed_by" varchar,
 	"industry_ai_reviewed_at" timestamp,
 	"industry_ai_status" "industry_ai_status",
-	"annual_revenue" numeric(20, 2),
+	"annual_revenue" numeric,
 	"revenue_range" "revenue_range",
 	"employees_size_range" "staff_count_range",
 	"staff_count" integer,

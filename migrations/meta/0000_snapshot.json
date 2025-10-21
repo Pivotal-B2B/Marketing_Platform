@@ -1,5 +1,5 @@
 {
-  "id": "a8df48c1-1680-4faf-bc33-235e0642f996",
+  "id": "096035a2-efe1-4507-b215-e828cfff514c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -218,7 +218,7 @@
         },
         "annual_revenue": {
           "name": "annual_revenue",
-          "type": "numeric(20, 2)",
+          "type": "numeric",
           "primaryKey": false,
           "notNull": false
         },
