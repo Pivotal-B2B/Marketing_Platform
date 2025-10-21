@@ -319,8 +319,8 @@ export default function VerificationConsolePage() {
               <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
                 <CardTitle>Contact Details</CardTitle>
                 <div className="flex gap-2">
-                  <Badge variant={(contact as any)?.eligibilityStatus === 'Eligible' ? 'default' : 'secondary'}>
-                    {(contact as any)?.eligibilityStatus}
+                  <Badge variant={((contact as any)?.eligibility_status || (contact as any)?.eligibilityStatus) === 'Eligible' ? 'default' : 'secondary'}>
+                    {(contact as any)?.eligibility_status || (contact as any)?.eligibilityStatus}
                   </Badge>
                   {(contact as any)?.suppressed && <Badge variant="destructive">Suppressed</Badge>}
                 </div>
@@ -329,7 +329,7 @@ export default function VerificationConsolePage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Full Name</Label>
-                    <Input value={(contact as any)?.fullName || ""} readOnly data-testid="input-full-name" />
+                    <Input value={(contact as any)?.full_name || (contact as any)?.fullName || ""} readOnly data-testid="input-full-name" />
                   </div>
                   <div>
                     <Label>Title</Label>
@@ -339,21 +339,21 @@ export default function VerificationConsolePage() {
                     <Label>Email</Label>
                     <div className="flex gap-2">
                       <Input value={(contact as any)?.email || ""} readOnly data-testid="input-email" />
-                      {(contact as any)?.emailStatus && (
+                      {((contact as any)?.email_status || (contact as any)?.emailStatus) && (
                         <Badge
                           variant={
-                            (contact as any).emailStatus === 'ok'
+                            ((contact as any).email_status || (contact as any).emailStatus) === 'ok'
                               ? 'default'
-                              : (contact as any).emailStatus === 'invalid'
+                              : ((contact as any).email_status || (contact as any).emailStatus) === 'invalid'
                               ? 'destructive'
                               : 'secondary'
                           }
                           data-testid="badge-email-status"
                         >
-                          {(contact as any).emailStatus === 'ok' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                          {(contact as any).emailStatus === 'invalid' && <XCircle className="h-3 w-3 mr-1" />}
-                          {(contact as any).emailStatus === 'risky' && <AlertCircle className="h-3 w-3 mr-1" />}
-                          {(contact as any).emailStatus}
+                          {((contact as any).email_status || (contact as any).emailStatus) === 'ok' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                          {((contact as any).email_status || (contact as any).emailStatus) === 'invalid' && <XCircle className="h-3 w-3 mr-1" />}
+                          {((contact as any).email_status || (contact as any).emailStatus) === 'risky' && <AlertCircle className="h-3 w-3 mr-1" />}
+                          {(contact as any).email_status || (contact as any).emailStatus}
                         </Badge>
                       )}
                     </div>
@@ -364,11 +364,11 @@ export default function VerificationConsolePage() {
                   </div>
                   <div>
                     <Label>LinkedIn URL</Label>
-                    <Input value={(contact as any)?.linkedinUrl || ""} readOnly data-testid="input-linkedin" />
+                    <Input value={(contact as any)?.linkedin_url || (contact as any)?.linkedinUrl || ""} readOnly data-testid="input-linkedin" />
                   </div>
                   <div>
                     <Label>Country</Label>
-                    <Input value={(contact as any)?.contactCountry || ""} readOnly data-testid="input-country" />
+                    <Input value={(contact as any)?.contact_country || (contact as any)?.contactCountry || ""} readOnly data-testid="input-country" />
                   </div>
                 </div>
 
