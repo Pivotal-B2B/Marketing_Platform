@@ -57,86 +57,12 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
       return res.status(404).json({ error: "Campaign not found" });
     }
 
-    // Build mapping lookup from user's custom mappings
-    const userMappingLookup: Record<string, string> = {};
-    if (fieldMappings && Array.isArray(fieldMappings)) {
-      fieldMappings.forEach((mapping: any) => {
-        if (mapping.csvColumn && mapping.targetField && mapping.targetField !== 'skip') {
-          userMappingLookup[mapping.csvColumn] = mapping.targetField;
-        }
-      });
-    }
-
-    const parseResult = Papa.parse<CSVRow>(csvData, {
+    // Parse CSV WITHOUT transforming headers first - keep original headers
+    const parseResult = Papa.parse(csvData, {
       header: true,
       skipEmptyLines: true,
       delimiter: "",  // Auto-detect delimiter
       delimitersToGuess: [',', '\t', '|', ';', Papa.RECORD_SEP, Papa.UNIT_SEP],
-      transformHeader: (header) => {
-        // First, check if user provided a custom mapping for this exact header
-        if (userMappingLookup[header]) {
-          return userMappingLookup[header];
-        }
-
-        // Fall back to auto-mapping
-        const normalized = header.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-        
-        const mappings: Record<string, string> = {
-          'fullname': 'fullName',
-          'name': 'fullName',
-          'firstname': 'firstName',
-          'lastname': 'lastName',
-          'jobtitle': 'title',
-          'emailaddress': 'email',
-          'phonenumber': 'phone',
-          'mobilenumber': 'mobile',
-          'mobile': 'mobile',
-          'linkedin': 'linkedinUrl',
-          'contactaddress1': 'contactAddress1',
-          'contactaddress2': 'contactAddress2',
-          'contactaddress3': 'contactAddress3',
-          'address1': 'contactAddress1',
-          'address2': 'contactAddress2',
-          'address3': 'contactAddress3',
-          'street1': 'contactAddress1',
-          'street2': 'contactAddress2',
-          'street3': 'contactAddress3',
-          'city': 'contactCity',
-          'state': 'contactState',
-          'country': 'contactCountry',
-          'postalcode': 'contactPostal',
-          'postal': 'contactPostal',
-          'zip': 'contactPostal',
-          'companyname': 'account_name',
-          'company': 'account_name',
-          'accountname': 'account_name',
-          'companydomain': 'domain',
-          'domain': 'domain',
-          'hqaddress1': 'hqAddress1',
-          'hqaddress2': 'hqAddress2',
-          'hqaddress3': 'hqAddress3',
-          'companyaddress1': 'hqAddress1',
-          'companyaddress2': 'hqAddress2',
-          'companyaddress3': 'hqAddress3',
-          'hqstreet1': 'hqAddress1',
-          'hqstreet2': 'hqAddress2',
-          'hqstreet3': 'hqAddress3',
-          'hqcity': 'hqCity',
-          'hqstate': 'hqState',
-          'hqpostalcode': 'hqPostal',
-          'hqpostal': 'hqPostal',
-          'hqzip': 'hqPostal',
-          'companypostalcode': 'hqPostal',
-          'companypostal': 'hqPostal',
-          'hqcountry': 'hqCountry',
-          'cavid': 'cavId',
-          'cavuserid': 'cavUserId',
-          'sourcetype': 'sourceType',
-          'source': 'sourceType',
-        };
-
-        return mappings[normalized] || header;
-      },
     });
 
     if (parseResult.errors.length > 0) {
@@ -146,7 +72,108 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
       });
     }
 
-    const rows = parseResult.data;
+    // Build field mapping lookup
+    const userMappingLookup: Record<string, string> = {};
+    if (fieldMappings && Array.isArray(fieldMappings)) {
+      fieldMappings.forEach((mapping: any) => {
+        if (mapping.csvColumn && mapping.targetField && mapping.targetField !== 'skip') {
+          userMappingLookup[mapping.csvColumn] = mapping.targetField;
+        }
+      });
+    }
+
+    // Auto-mapping fallback
+    const autoMappings: Record<string, string> = {
+      'fullname': 'fullName',
+      'name': 'fullName',
+      'firstname': 'firstName',
+      'lastname': 'lastName',
+      'jobtitle': 'title',
+      'title': 'title',
+      'emailaddress': 'email',
+      'email': 'email',
+      'phonenumber': 'phone',
+      'phone': 'phone',
+      'mobilenumber': 'mobile',
+      'mobile': 'mobile',
+      'linkedin': 'linkedinUrl',
+      'linkedinurl': 'linkedinUrl',
+      'contactaddress1': 'contactAddress1',
+      'contactaddress2': 'contactAddress2',
+      'contactaddress3': 'contactAddress3',
+      'address1': 'contactAddress1',
+      'address2': 'contactAddress2',
+      'address3': 'contactAddress3',
+      'street1': 'contactAddress1',
+      'street2': 'contactAddress2',
+      'street3': 'contactAddress3',
+      'contactcity': 'contactCity',
+      'city': 'contactCity',
+      'contactstate': 'contactState',
+      'state': 'contactState',
+      'contactcountry': 'contactCountry',
+      'country': 'contactCountry',
+      'contactpostalcode': 'contactPostal',
+      'contactpostal': 'contactPostal',
+      'postalcode': 'contactPostal',
+      'postal': 'contactPostal',
+      'zip': 'contactPostal',
+      'zipcode': 'contactPostal',
+      'companyname': 'account_name',
+      'company': 'account_name',
+      'accountname': 'account_name',
+      'account': 'account_name',
+      'companydomain': 'domain',
+      'domain': 'domain',
+      'websiteurl': 'domain',
+      'hqaddress1': 'hqAddress1',
+      'hqaddress2': 'hqAddress2',
+      'hqaddress3': 'hqAddress3',
+      'companyaddress1': 'hqAddress1',
+      'companyaddress2': 'hqAddress2',
+      'companyaddress3': 'hqAddress3',
+      'hqstreet1': 'hqAddress1',
+      'hqstreet2': 'hqAddress2',
+      'hqstreet3': 'hqAddress3',
+      'hqcity': 'hqCity',
+      'hqstate': 'hqState',
+      'hqpostalcode': 'hqPostal',
+      'hqpostal': 'hqPostal',
+      'hqzip': 'hqPostal',
+      'companypostalcode': 'hqPostal',
+      'companypostal': 'hqPostal',
+      'hqcountry': 'hqCountry',
+      'companycountry': 'hqCountry',
+      'cavid': 'cavId',
+      'cavuserid': 'cavUserId',
+      'sourcetype': 'sourceType',
+      'source': 'sourceType',
+    };
+
+    // Map each row's data to expected fields
+    const mappedRows = parseResult.data.map((rawRow: any) => {
+      const mappedRow: any = {};
+      
+      Object.keys(rawRow).forEach(csvHeader => {
+        // First check user's custom mapping
+        let targetField = userMappingLookup[csvHeader];
+        
+        // Fall back to auto-mapping
+        if (!targetField) {
+          const normalized = csvHeader.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          targetField = autoMappings[normalized];
+        }
+        
+        // If we found a target field, copy the value
+        if (targetField && rawRow[csvHeader]) {
+          mappedRow[targetField] = rawRow[csvHeader];
+        }
+      });
+      
+      return mappedRow;
+    }) as CSVRow[];
+
+    const rows = mappedRows;
     const results = {
       total: rows.length,
       created: 0,
