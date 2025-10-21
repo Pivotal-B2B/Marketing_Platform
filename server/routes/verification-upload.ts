@@ -308,29 +308,42 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
           // Check for existing contact if update mode is enabled
           let existingContact = null;
           if (updateMode) {
-            // Match by fullName + contactCountry + accountName (fuzzy case-insensitive)
-            const matchConditions = [
-              eq(verificationContacts.campaignId, campaignId),
-              eq(verificationContacts.deleted, false),
-              sql`LOWER(${verificationContacts.fullName}) = LOWER(${fullName})`,
-            ];
-            
-            if (row.contactCountry) {
-              matchConditions.push(sql`LOWER(${verificationContacts.contactCountry}) = LOWER(${row.contactCountry})`);
+            // Try email match first (strongest signal)
+            if (row.email && normalizedKeys.emailLower) {
+              const emailMatches = await tx
+                .select()
+                .from(verificationContacts)
+                .where(and(
+                  eq(verificationContacts.campaignId, campaignId),
+                  eq(verificationContacts.deleted, false),
+                  eq(verificationContacts.emailLower, normalizedKeys.emailLower)
+                ))
+                .limit(2);  // Check for duplicates
+              
+              if (emailMatches.length === 1) {
+                existingContact = emailMatches[0];
+              }
+              // If multiple matches, skip to avoid ambiguity
             }
             
-            if (accountNameCsv && accountData) {
-              matchConditions.push(eq(verificationContacts.accountId, accountData.id));
-            }
-            
-            const matches = await tx
-              .select()
-              .from(verificationContacts)
-              .where(and(...matchConditions))
-              .limit(1);
-            
-            if (matches.length > 0) {
-              existingContact = matches[0];
+            // If no email match, try name + country + account match (require all three)
+            if (!existingContact && row.contactCountry && accountData) {
+              const nameMatches = await tx
+                .select()
+                .from(verificationContacts)
+                .where(and(
+                  eq(verificationContacts.campaignId, campaignId),
+                  eq(verificationContacts.deleted, false),
+                  sql`LOWER(TRIM(${verificationContacts.fullName})) = LOWER(TRIM(${fullName}))`,
+                  sql`LOWER(TRIM(${verificationContacts.contactCountry})) = LOWER(TRIM(${row.contactCountry}))`,
+                  eq(verificationContacts.accountId, accountData.id)
+                ))
+                .limit(2);  // Check for duplicates
+              
+              if (nameMatches.length === 1) {
+                existingContact = nameMatches[0];
+              }
+              // If multiple matches or missing criteria, don't match (create new instead)
             }
           }
 
@@ -341,70 +354,104 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             
             const updateData: any = {};
             
-            if (csvHasCavId) {
-              // CSV has CAV IDs -> update only CAV ID fields
+            if (csvHasCavId && !dbHasCavId) {
+              // CSV has CAV IDs but DB doesn't -> ONLY update CAV ID fields
               if (row.cavId) updateData.cavId = row.cavId;
               if (row.cavUserId) updateData.cavUserId = row.cavUserId;
-            } else if (dbHasCavId) {
-              // DB has CAV IDs -> update all other fields from CSV
-              updateData.firstName = row.firstName || existingContact.firstName;
-              updateData.lastName = row.lastName || existingContact.lastName;
-              updateData.title = row.title || existingContact.title;
-              updateData.email = row.email || existingContact.email;
-              updateData.phone = row.phone || existingContact.phone;
-              updateData.mobile = row.mobile || existingContact.mobile;
-              updateData.linkedinUrl = row.linkedinUrl || existingContact.linkedinUrl;
-              updateData.contactAddress1 = contactAddress1 || existingContact.contactAddress1;
-              updateData.contactAddress2 = contactAddress2 || existingContact.contactAddress2;
-              updateData.contactAddress3 = contactAddress3 || existingContact.contactAddress3;
-              updateData.contactCity = contactCity || existingContact.contactCity;
-              updateData.contactState = contactState || existingContact.contactState;
-              updateData.contactCountry = row.contactCountry || existingContact.contactCountry;
-              updateData.contactPostal = contactPostal || existingContact.contactPostal;
-              updateData.hqAddress1 = row.hqAddress1 || existingContact.hqAddress1;
-              updateData.hqAddress2 = row.hqAddress2 || existingContact.hqAddress2;
-              updateData.hqAddress3 = row.hqAddress3 || existingContact.hqAddress3;
-              updateData.hqCity = row.hqCity || existingContact.hqCity;
-              updateData.hqState = row.hqState || existingContact.hqState;
-              updateData.hqCountry = row.hqCountry || existingContact.hqCountry;
-              updateData.hqPostal = row.hqPostal || existingContact.hqPostal;
+              
+            } else if (!csvHasCavId && dbHasCavId) {
+              // DB has CAV IDs but CSV doesn't -> update ALL non-CAV fields
+              // Only overwrite if CSV provides non-empty values
+              if (row.firstName) updateData.firstName = row.firstName;
+              if (row.lastName) updateData.lastName = row.lastName;
+              if (row.title) updateData.title = row.title;
+              if (row.email) updateData.email = row.email;
+              if (row.phone) updateData.phone = row.phone;
+              if (row.mobile) updateData.mobile = row.mobile;
+              if (row.linkedinUrl) updateData.linkedinUrl = row.linkedinUrl;
+              if (contactAddress1) updateData.contactAddress1 = contactAddress1;
+              if (contactAddress2) updateData.contactAddress2 = contactAddress2;
+              if (contactAddress3) updateData.contactAddress3 = contactAddress3;
+              if (contactCity) updateData.contactCity = contactCity;
+              if (contactState) updateData.contactState = contactState;
+              if (row.contactCountry) updateData.contactCountry = row.contactCountry;
+              if (contactPostal) updateData.contactPostal = contactPostal;
+              if (row.hqAddress1) updateData.hqAddress1 = row.hqAddress1;
+              if (row.hqAddress2) updateData.hqAddress2 = row.hqAddress2;
+              if (row.hqAddress3) updateData.hqAddress3 = row.hqAddress3;
+              if (row.hqCity) updateData.hqCity = row.hqCity;
+              if (row.hqState) updateData.hqState = row.hqState;
+              if (row.hqCountry) updateData.hqCountry = row.hqCountry;
+              if (row.hqPostal) updateData.hqPostal = row.hqPostal;
+              
+            } else if (csvHasCavId && dbHasCavId) {
+              // Both have CAV IDs -> update CAV IDs + all other fields with non-empty CSV values
+              if (row.cavId) updateData.cavId = row.cavId;
+              if (row.cavUserId) updateData.cavUserId = row.cavUserId;
+              if (row.firstName) updateData.firstName = row.firstName;
+              if (row.lastName) updateData.lastName = row.lastName;
+              if (row.title) updateData.title = row.title;
+              if (row.email) updateData.email = row.email;
+              if (row.phone) updateData.phone = row.phone;
+              if (row.mobile) updateData.mobile = row.mobile;
+              if (row.linkedinUrl) updateData.linkedinUrl = row.linkedinUrl;
+              if (contactAddress1) updateData.contactAddress1 = contactAddress1;
+              if (contactAddress2) updateData.contactAddress2 = contactAddress2;
+              if (contactAddress3) updateData.contactAddress3 = contactAddress3;
+              if (contactCity) updateData.contactCity = contactCity;
+              if (contactState) updateData.contactState = contactState;
+              if (row.contactCountry) updateData.contactCountry = row.contactCountry;
+              if (contactPostal) updateData.contactPostal = contactPostal;
+              if (row.hqAddress1) updateData.hqAddress1 = row.hqAddress1;
+              if (row.hqAddress2) updateData.hqAddress2 = row.hqAddress2;
+              if (row.hqAddress3) updateData.hqAddress3 = row.hqAddress3;
+              if (row.hqCity) updateData.hqCity = row.hqCity;
+              if (row.hqState) updateData.hqState = row.hqState;
+              if (row.hqCountry) updateData.hqCountry = row.hqCountry;
+              if (row.hqPostal) updateData.hqPostal = row.hqPostal;
+              
             } else {
-              // Neither has CAV IDs -> update all fields from CSV
-              updateData.firstName = row.firstName || existingContact.firstName;
-              updateData.lastName = row.lastName || existingContact.lastName;
-              updateData.title = row.title || existingContact.title;
-              updateData.email = row.email || existingContact.email;
-              updateData.phone = row.phone || existingContact.phone;
-              updateData.mobile = row.mobile || existingContact.mobile;
-              updateData.linkedinUrl = row.linkedinUrl || existingContact.linkedinUrl;
-              updateData.contactAddress1 = contactAddress1 || existingContact.contactAddress1;
-              updateData.contactAddress2 = contactAddress2 || existingContact.contactAddress2;
-              updateData.contactAddress3 = contactAddress3 || existingContact.contactAddress3;
-              updateData.contactCity = contactCity || existingContact.contactCity;
-              updateData.contactState = contactState || existingContact.contactState;
-              updateData.contactCountry = row.contactCountry || existingContact.contactCountry;
-              updateData.contactPostal = contactPostal || existingContact.contactPostal;
-              updateData.hqAddress1 = row.hqAddress1 || existingContact.hqAddress1;
-              updateData.hqAddress2 = row.hqAddress2 || existingContact.hqAddress2;
-              updateData.hqAddress3 = row.hqAddress3 || existingContact.hqAddress3;
-              updateData.hqCity = row.hqCity || existingContact.hqCity;
-              updateData.hqState = row.hqState || existingContact.hqState;
-              updateData.hqCountry = row.hqCountry || existingContact.hqCountry;
-              updateData.hqPostal = row.hqPostal || existingContact.hqPostal;
+              // Neither has CAV IDs -> update all fields with non-empty CSV values
+              if (row.firstName) updateData.firstName = row.firstName;
+              if (row.lastName) updateData.lastName = row.lastName;
+              if (row.title) updateData.title = row.title;
+              if (row.email) updateData.email = row.email;
+              if (row.phone) updateData.phone = row.phone;
+              if (row.mobile) updateData.mobile = row.mobile;
+              if (row.linkedinUrl) updateData.linkedinUrl = row.linkedinUrl;
+              if (contactAddress1) updateData.contactAddress1 = contactAddress1;
+              if (contactAddress2) updateData.contactAddress2 = contactAddress2;
+              if (contactAddress3) updateData.contactAddress3 = contactAddress3;
+              if (contactCity) updateData.contactCity = contactCity;
+              if (contactState) updateData.contactState = contactState;
+              if (row.contactCountry) updateData.contactCountry = row.contactCountry;
+              if (contactPostal) updateData.contactPostal = contactPostal;
+              if (row.hqAddress1) updateData.hqAddress1 = row.hqAddress1;
+              if (row.hqAddress2) updateData.hqAddress2 = row.hqAddress2;
+              if (row.hqAddress3) updateData.hqAddress3 = row.hqAddress3;
+              if (row.hqCity) updateData.hqCity = row.hqCity;
+              if (row.hqState) updateData.hqState = row.hqState;
+              if (row.hqCountry) updateData.hqCountry = row.hqCountry;
+              if (row.hqPostal) updateData.hqPostal = row.hqPostal;
             }
             
-            // Re-evaluate eligibility and suppression on update
+            // Always re-evaluate eligibility and suppression on update
             updateData.eligibilityStatus = eligibility.status;
             updateData.eligibilityReason = eligibility.reason;
             updateData.suppressed = isSuppressed;
             Object.assign(updateData, normalizedKeys);
             
-            await tx
-              .update(verificationContacts)
-              .set(updateData)
-              .where(eq(verificationContacts.id, existingContact.id));
-            
-            results.updated++;
+            // Only update if there are changes
+            if (Object.keys(updateData).length > 0) {
+              await tx
+                .update(verificationContacts)
+                .set(updateData)
+                .where(eq(verificationContacts.id, existingContact.id));
+              
+              results.updated++;
+            } else {
+              results.skipped++;
+            }
           } else {
             // Insert new contact
             await tx.insert(verificationContacts).values({

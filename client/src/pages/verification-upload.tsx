@@ -318,12 +318,22 @@ export default function VerificationUploadPage() {
             </div>
             
             <Alert>
-              <AlertDescription className="text-xs">
+              <AlertDescription className="text-xs space-y-2">
                 {updateMode ? (
                   <>
-                    <strong>Update Mode:</strong> Contacts will be matched by Name + Country + Company. 
-                    If CSV has CAV IDs, they'll be added to matching contacts. 
-                    If existing contacts have CAV IDs, all other fields will be updated from CSV.
+                    <p><strong>Update Mode:</strong> Matching criteria (in order):</p>
+                    <ol className="list-decimal list-inside pl-2 space-y-1">
+                      <li>Exact email match (strongest signal)</li>
+                      <li>Name + Country + Company (all three required)</li>
+                      <li>If multiple matches found, will create new instead of updating</li>
+                    </ol>
+                    <p className="mt-2"><strong>Update rules:</strong></p>
+                    <ul className="list-disc list-inside pl-2 space-y-1">
+                      <li>If CSV has CAV IDs → only CAV ID fields updated</li>
+                      <li>If DB has CAV IDs → all non-CAV fields updated</li>
+                      <li>If neither/both have CAV IDs → all fields updated</li>
+                      <li>Empty CSV values never overwrite existing data</li>
+                    </ul>
                   </>
                 ) : (
                   <>
