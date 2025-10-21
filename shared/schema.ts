@@ -3454,6 +3454,7 @@ export const verificationContacts = pgTable("verification_contacts", {
   qaStatus: verificationQaStatusEnum("qa_status").default('Unreviewed'),
   emailStatus: verificationEmailStatusEnum("email_status").default('unknown'),
   suppressed: boolean("suppressed").default(false),
+  deleted: boolean("deleted").default(false),
 
   assigneeId: varchar("assignee_id").references(() => users.id, { onDelete: 'set null' }),
   priorityScore: numeric("priority_score", { precision: 10, scale: 2 }),
@@ -3470,9 +3471,11 @@ export const verificationContacts = pgTable("verification_contacts", {
   campaignIdx: index("verification_contacts_campaign_idx").on(table.campaignId),
   eligibilityIdx: index("verification_contacts_eligibility_idx").on(table.eligibilityStatus),
   suppressedIdx: index("verification_contacts_suppressed_idx").on(table.suppressed),
+  deletedIdx: index("verification_contacts_deleted_idx").on(table.deleted),
   normKeysIdx: index("verification_contacts_norm_keys_idx").on(table.firstNameNorm, table.lastNameNorm, table.companyKey, table.contactCountryKey),
   cavIdIdx: index("verification_contacts_cav_id_idx").on(table.cavId),
   emailIdx: index("verification_contacts_email_idx").on(table.email),
+  emailLowerIdx: index("verification_contacts_email_lower_idx").on(table.emailLower),
 }));
 
 export const verificationEmailValidations = pgTable("verification_email_validations", {
