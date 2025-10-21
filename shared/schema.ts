@@ -3462,6 +3462,14 @@ export const verificationContacts = pgTable("verification_contacts", {
   contactCountry: text("contact_country"),
   contactPostal: text("contact_postal"),
 
+  hqAddress1: text("hq_address_1"),
+  hqAddress2: text("hq_address_2"),
+  hqAddress3: text("hq_address_3"),
+  hqCity: text("hq_city"),
+  hqState: text("hq_state"),
+  hqCountry: text("hq_country"),
+  hqPostal: text("hq_postal"),
+
   cavId: text("cav_id"),
   cavUserId: text("cav_user_id"),
 
