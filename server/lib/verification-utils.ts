@@ -1,4 +1,5 @@
 import type { VerificationCampaign } from "@shared/schema";
+import crypto from 'crypto';
 
 export const normalize = {
   toKey: (s?: string | null) =>
@@ -52,7 +53,6 @@ export function computeNameCompanyHash(
   lastName: string | null | undefined,
   companyKey: string | null | undefined
 ): string {
-  const crypto = require('crypto');
   const normalized = [
     normalize.toKey(firstName),
     normalize.toKey(lastName),
