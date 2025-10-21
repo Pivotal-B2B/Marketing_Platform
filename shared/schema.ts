@@ -3567,6 +3567,31 @@ export const verificationAuditLog = pgTable("verification_audit_log", {
   atIdx: index("verification_audit_at_idx").on(table.at),
 }));
 
+export const uploadJobStatusEnum = pgEnum('upload_job_status', ['pending', 'processing', 'completed', 'failed']);
+
+export const verificationUploadJobs = pgTable("verification_upload_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => verificationCampaigns.id, { onDelete: 'cascade' }).notNull(),
+  status: uploadJobStatusEnum("status").default('pending').notNull(),
+  totalRows: integer("total_rows").default(0).notNull(),
+  processedRows: integer("processed_rows").default(0).notNull(),
+  successCount: integer("success_count").default(0).notNull(),
+  errorCount: integer("error_count").default(0).notNull(),
+  errors: jsonb("errors").$type<Array<{row: number, message: string}>>().default(sql`'[]'::jsonb`),
+  csvData: text("csv_data"),
+  fieldMappings: jsonb("field_mappings"),
+  updateMode: boolean("update_mode").default(false),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'set null' }),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignIdx: index("verification_upload_jobs_campaign_idx").on(table.campaignId),
+  statusIdx: index("verification_upload_jobs_status_idx").on(table.status),
+  createdAtIdx: index("verification_upload_jobs_created_at_idx").on(table.createdAt),
+}));
+
 export const verificationCampaignsRelations = relations(verificationCampaigns, ({ one, many }) => ({
   createdBy: one(users, { fields: [verificationCampaigns.createdBy], references: [users.id] }),
   contacts: many(verificationContacts),
@@ -3595,6 +3620,7 @@ export const insertVerificationEmailValidationSchema = createInsertSchema(verifi
 export const insertVerificationSuppressionListSchema = createInsertSchema(verificationSuppressionList).omit({ id: true, addedAt: true });
 export const insertVerificationLeadSubmissionSchema = createInsertSchema(verificationLeadSubmissions).omit({ id: true, createdAt: true });
 export const insertVerificationAuditLogSchema = createInsertSchema(verificationAuditLog).omit({ id: true, at: true });
+export const insertVerificationUploadJobSchema = createInsertSchema(verificationUploadJobs).omit({ id: true, createdAt: true, updatedAt: true, startedAt: true, finishedAt: true });
 
 export type VerificationCampaign = typeof verificationCampaigns.$inferSelect;
 export type InsertVerificationCampaign = z.infer<typeof insertVerificationCampaignSchema>;
@@ -3608,3 +3634,5 @@ export type VerificationLeadSubmission = typeof verificationLeadSubmissions.$inf
 export type InsertVerificationLeadSubmission = z.infer<typeof insertVerificationLeadSubmissionSchema>;
 export type VerificationAuditLog = typeof verificationAuditLog.$inferSelect;
 export type InsertVerificationAuditLog = z.infer<typeof insertVerificationAuditLogSchema>;
+export type VerificationUploadJob = typeof verificationUploadJobs.$inferSelect;
+export type InsertVerificationUploadJob = z.infer<typeof insertVerificationUploadJobSchema>;
