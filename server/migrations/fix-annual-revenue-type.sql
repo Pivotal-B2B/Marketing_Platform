@@ -8,12 +8,12 @@ ALTER TABLE accounts ADD COLUMN IF NOT EXISTS annual_revenue_temp numeric(20, 2)
 -- Step 2: Convert existing text values to numeric, handling invalid data
 UPDATE accounts
 SET annual_revenue_temp = CASE
-  -- Handle NULL or empty strings
-  WHEN annual_revenue IS NULL OR TRIM(annual_revenue) = '' THEN NULL
+  -- Handle NULL or empty strings (annual_revenue is still text here)
+  WHEN annual_revenue IS NULL OR TRIM(CAST(annual_revenue AS text)) = '' THEN NULL
   -- Handle scientific notation (reject it)
-  WHEN annual_revenue ~ '[eE]' THEN NULL
+  WHEN CAST(annual_revenue AS text) ~ '[eE]' THEN NULL
   -- Clean currency symbols, commas, and convert to numeric
-  ELSE CAST(REGEXP_REPLACE(annual_revenue, '[^0-9.-]', '', 'g') AS numeric(20, 2))
+  ELSE CAST(REGEXP_REPLACE(CAST(annual_revenue AS text), '[^0-9.-]', '', 'g') AS numeric(20, 2))
 END;
 
 -- Step 3: Drop the old text column
