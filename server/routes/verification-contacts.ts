@@ -34,7 +34,6 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
       WITH next_batch AS (
         SELECT c.id
         FROM verification_contacts c
-        LEFT JOIN accounts a ON a.id = c.account_id
         WHERE c.campaign_id = ${campaignId}
           AND c.eligibility_status = 'Eligible'
           AND c.verification_status = 'Pending'
