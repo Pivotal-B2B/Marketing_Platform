@@ -3476,12 +3476,19 @@ export const verificationContacts = pgTable("verification_contacts", {
 }));
 
 export const verificationEmailValidations = pgTable("verification_email_validations", {
-  contactId: varchar("contact_id").primaryKey().references(() => verificationContacts.id, { onDelete: 'cascade' }),
+  contactId: varchar("contact_id").references(() => verificationContacts.id, { onDelete: 'cascade' }).notNull(),
+  emailLower: varchar("email_lower").notNull(),
   provider: text("provider").default("ELV").notNull(),
   status: verificationEmailStatusEnum("status").notNull(),
   rawJson: jsonb("raw_json"),
   checkedAt: timestamp("checked_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  pk: {
+    name: 'verification_email_validations_pkey',
+    columns: [table.contactId, table.emailLower],
+  },
+  emailCacheIdx: index("verification_email_validations_cache_idx").on(table.emailLower, table.checkedAt),
+}));
 
 export const verificationSuppressionList = pgTable("verification_suppression_list", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -3499,7 +3506,7 @@ export const verificationSuppressionList = pgTable("verification_suppression_lis
 
 export const verificationLeadSubmissions = pgTable("verification_lead_submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  contactId: varchar("contact_id").references(() => verificationContacts.id, { onDelete: 'cascade' }).notNull(),
+  contactId: varchar("contact_id").references(() => verificationContacts.id, { onDelete: 'cascade' }).notNull().unique(),
   accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'set null' }),
   campaignId: varchar("campaign_id").references(() => verificationCampaigns.id, { onDelete: 'cascade' }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),

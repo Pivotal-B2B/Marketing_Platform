@@ -272,4 +272,216 @@ router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => 
   }
 });
 
+router.post("/api/verification-contacts/:id/validate-email", async (req, res) => {
+  try {
+    const { runELV } = await import("../lib/verification-elv");
+    const { verificationEmailValidations } = await import("@shared/schema");
+    
+    const [contact] = await db
+      .select()
+      .from(verificationContacts)
+      .where(eq(verificationContacts.id, req.params.id));
+    
+    if (!contact) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
+    
+    if (!contact.email) {
+      return res.status(400).json({ error: "Contact has no email" });
+    }
+    
+    const emailLower = contact.email.toLowerCase();
+    
+    const existingValidation = await db.execute(sql`
+      SELECT * FROM verification_email_validations
+      WHERE email_lower = ${emailLower}
+        AND checked_at > NOW() - INTERVAL '60 days'
+      ORDER BY checked_at DESC
+      LIMIT 1
+    `);
+    
+    if (existingValidation.rowCount && existingValidation.rowCount > 0) {
+      const cached = existingValidation.rows[0];
+      
+      await db
+        .update(verificationContacts)
+        .set({ emailStatus: cached.status as any, updatedAt: new Date() })
+        .where(eq(verificationContacts.id, contact.id));
+      
+      return res.json({
+        cached: true,
+        status: cached.status,
+        checkedAt: cached.checked_at,
+      });
+    }
+    
+    const apiKey = process.env.ELV_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "Email validation not configured" });
+    }
+    
+    const result = await runELV(contact.email, apiKey);
+    
+    await db.insert(verificationEmailValidations).values({
+      contactId: contact.id,
+      emailLower: emailLower,
+      provider: "ELV",
+      status: result.status,
+      rawJson: result.raw,
+    }).onConflictDoUpdate({
+      target: [verificationEmailValidations.contactId, verificationEmailValidations.emailLower],
+      set: {
+        status: result.status,
+        rawJson: result.raw,
+        checkedAt: new Date(),
+      },
+    });
+    
+    await db
+      .update(verificationContacts)
+      .set({ emailStatus: result.status, updatedAt: new Date() })
+      .where(eq(verificationContacts.id, contact.id));
+    
+    res.json({
+      cached: false,
+      status: result.status,
+      checkedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Error validating email:", error);
+    res.status(500).json({ error: "Failed to validate email" });
+  }
+});
+
+router.post("/api/verification-contacts/:id/verify", async (req, res) => {
+  try {
+    const [contact] = await db
+      .update(verificationContacts)
+      .set({ 
+        verificationStatus: 'Validated' as any, 
+        updatedAt: new Date() 
+      })
+      .where(eq(verificationContacts.id, req.params.id))
+      .returning();
+    
+    if (!contact) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
+    
+    res.json({ verificationStatus: contact.verificationStatus });
+  } catch (error) {
+    console.error("Error verifying contact:", error);
+    res.status(500).json({ error: "Failed to verify contact" });
+  }
+});
+
+router.post("/api/verification-contacts/:id/submit", async (req, res) => {
+  try {
+    const [contact] = await db
+      .select()
+      .from(verificationContacts)
+      .where(eq(verificationContacts.id, req.params.id));
+    
+    if (!contact) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
+    
+    if (contact.verificationStatus !== 'Validated') {
+      return res.status(400).json({ error: "Contact must be validated before submission" });
+    }
+    
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, contact.campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    const result = await db.transaction(async (tx) => {
+      const lockKey = Math.abs(
+        parseInt(contact.campaignId.replace(/-/g, '').slice(0, 8), 16) ^
+        parseInt((contact.accountId || '00000000').replace(/-/g, '').slice(0, 8), 16)
+      ) % 2147483647;
+      
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockKey})`);
+      
+      const existingSubmission = await tx.execute(sql`
+        SELECT id FROM verification_lead_submissions
+        WHERE contact_id = ${contact.id}
+        LIMIT 1
+      `);
+      
+      if (existingSubmission.rowCount && existingSubmission.rowCount > 0) {
+        return { 
+          success: true, 
+          submissionId: existingSubmission.rows[0].id,
+          alreadySubmitted: true 
+        };
+      }
+      
+      const submissionCount = await tx.execute(sql`
+        SELECT COUNT(*) as count
+        FROM verification_lead_submissions
+        WHERE account_id = ${contact.accountId} AND campaign_id = ${contact.campaignId}
+      `);
+      
+      const currentCount = Number(submissionCount.rows[0]?.count || 0);
+      if (currentCount >= campaign.leadCapPerAccount) {
+        throw new Error("Account cap reached");
+      }
+      
+      const [submission] = await tx
+        .insert(verificationLeadSubmissions)
+        .values({
+          campaignId: contact.campaignId,
+          contactId: contact.id,
+          accountId: contact.accountId,
+        })
+        .returning();
+      
+      await tx
+        .update(verificationContacts)
+        .set({ inSubmissionBuffer: true, updatedAt: new Date() })
+        .where(eq(verificationContacts.id, contact.id));
+      
+      return { success: true, submissionId: submission.id, alreadySubmitted: false };
+    });
+    
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error submitting contact:", error);
+    if (error.message === "Account cap reached") {
+      return res.status(400).json({ error: "Account cap reached" });
+    }
+    res.status(500).json({ error: "Failed to submit contact" });
+  }
+});
+
+router.post("/api/verification-campaigns/:campaignId/flush", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    
+    const flushedContacts = await db
+      .update(verificationContacts)
+      .set({ inSubmissionBuffer: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(verificationContacts.campaignId, campaignId),
+          eq(verificationContacts.inSubmissionBuffer, true)
+        )
+      )
+      .returning();
+    
+    res.json({ 
+      success: true, 
+      flushedCount: flushedContacts.length 
+    });
+  } catch (error) {
+    console.error("Error flushing buffer:", error);
+    res.status(500).json({ error: "Failed to flush buffer" });
+  }
+});
+
 export default router;
