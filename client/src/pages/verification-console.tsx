@@ -84,7 +84,7 @@ export default function VerificationConsolePage() {
 
   const elvMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/verification-contacts/${currentContactId}/email/verify`, undefined);
+      const res = await apiRequest("POST", `/api/verification-contacts/${currentContactId}/validate-email`, undefined);
       return res.json();
     },
     onSuccess: (data: any) => {
