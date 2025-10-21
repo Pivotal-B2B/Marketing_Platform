@@ -48,37 +48,19 @@ export async function addToSuppressionList(
 ) {
   if (entries.length === 0) return;
 
-  // Use UNNEST with PostgreSQL arrays for efficient bulk insert
-  const BATCH_SIZE = 100;
-  
-  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-    const batch = entries.slice(i, i + BATCH_SIZE);
-    
-    const emailLowers: (string | null)[] = [];
-    const cavIds: (string | null)[] = [];
-    const cavUserIds: (string | null)[] = [];
-    const nameCompanyHashes: (string | null)[] = [];
-    
-    for (const entry of batch) {
-      emailLowers.push(entry.email ? normalize.emailLower(entry.email) : null);
-      cavIds.push(entry.cavId || null);
-      cavUserIds.push(entry.cavUserId || null);
-      nameCompanyHashes.push(
-        (entry.firstName || entry.lastName || entry.companyKey)
-          ? computeNameCompanyHash(entry.firstName, entry.lastName, entry.companyKey)
-          : null
-      );
-    }
+  // Insert records individually - most reliable approach
+  for (const entry of entries) {
+    const emailLower = entry.email ? normalize.emailLower(entry.email) : null;
+    const cavId = entry.cavId || null;
+    const cavUserId = entry.cavUserId || null;
+    const nameCompanyHash = (entry.firstName || entry.lastName || entry.companyKey)
+      ? computeNameCompanyHash(entry.firstName, entry.lastName, entry.companyKey)
+      : null;
     
     await db.execute(sql`
       INSERT INTO verification_suppression_list 
         (campaign_id, email_lower, cav_id, cav_user_id, name_company_hash)
-      SELECT 
-        ${campaignId},
-        unnest(${emailLowers}::text[]),
-        unnest(${cavIds}::text[]),
-        unnest(${cavUserIds}::text[]),
-        unnest(${nameCompanyHashes}::text[])
+      VALUES (${campaignId}, ${emailLower}, ${cavId}, ${cavUserId}, ${nameCompanyHash})
     `);
   }
 }
