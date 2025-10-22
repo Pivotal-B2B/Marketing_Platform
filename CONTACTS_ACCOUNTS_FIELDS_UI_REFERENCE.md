@@ -679,3 +679,43 @@ Complete export includes all database fields:
 - Suppression management
 - Data quality scoring
 - RFC4180 compliant CSV format
+
+---
+
+## ⚠️ Known Issues & Gaps
+
+### **Missing Fields in CSV Export** 
+
+#### Contact Export (2 missing fields)
+- ❌ `timeInCurrentPositionMonths` - Computed integer for filtering
+- ❌ `timeInCurrentCompanyMonths` - Computed integer for filtering
+
+**Impact:** Numeric tenure fields for advanced filtering not exported.
+
+#### Account Export (11 missing fields)
+- ❌ `canonicalName` - Standardized company name
+- ❌ `websiteDomain` - Naked domain (e.g., aircanada.com)
+- ❌ `foundedDate` - YYYY-MM-DD founding date
+- ❌ `foundedDatePrecision` - 'year' or 'full'
+- ❌ `industryAiCandidates` - Full AI candidate suggestions (JSON)
+- ❌ `industryAiReviewedBy` - User ID who reviewed AI
+- ❌ `industryAiReviewedAt` - AI review timestamp
+- ❌ `webTechnologies` - BuiltWith URL/list
+- ❌ `webTechnologiesJson` - Normalized tech array (JSON)
+- ❌ `aiEnrichmentData` - Full AI research results (JSON)
+
+**Impact:** Critical data loss during export/reimport cycles including:
+- AI review workflow data
+- Company canonicalization for deduplication
+- Complete technology information
+- AI enrichment audit trail
+
+**See:** `FIELD_ISSUES_ANALYSIS.md` for detailed analysis and fixes.
+
+---
+
+## 📚 Related Documentation
+
+- **FIELD_ISSUES_ANALYSIS.md** - Comprehensive analysis of missing export fields, UI conditional rendering logic, and CSV mapping edge cases
+- **replit.md** - System architecture and technical implementation details
+- **shared/schema.ts** - Complete database schema definitions
