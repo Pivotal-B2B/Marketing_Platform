@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Sparkles, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import type { CustomFieldDefinition } from "@shared/schema";
 
 interface FieldMapping {
@@ -275,6 +275,7 @@ export function CSVFieldMapper({
 
   const mappedCount = mappings.filter(m => m.targetField !== null).length;
   const unmappedCount = mappings.length - mappedCount;
+  const unmappedColumns = mappings.filter(m => m.targetField === null).map(m => m.csvColumn);
 
   return (
     <div className="space-y-4">
@@ -283,6 +284,24 @@ export function CSVFieldMapper({
           <Sparkles className="h-4 w-4" />
           <AlertDescription>
             We automatically mapped {mappedCount} field(s) based on column names. Please review and adjust as needed.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {unmappedCount > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Warning: {unmappedCount} Unmapped Column{unmappedCount > 1 ? 's' : ''}</AlertTitle>
+          <AlertDescription>
+            <p className="mb-2">The following CSV columns are not mapped and will be skipped during import:</p>
+            <div className="flex flex-wrap gap-1">
+              {unmappedColumns.map(col => (
+                <Badge key={col} variant="outline" className="font-mono text-xs">
+                  {col}
+                </Badge>
+              ))}
+            </div>
+            <p className="mt-2 text-xs">Map them above or select "Skip Column" to dismiss this warning.</p>
           </AlertDescription>
         </Alert>
       )}
