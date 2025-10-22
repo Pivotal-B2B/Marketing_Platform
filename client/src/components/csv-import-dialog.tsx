@@ -106,6 +106,30 @@ export function CSVImportDialog({
     // Check if this is unified format (has account fields) or contacts-only
     const hasAccountFields = mappings.some(m => m.targetEntity === "account");
     
+    // Validate that critical fields are mapped
+    const contactEmailMapped = mappings.some(m => m.targetEntity === "contact" && m.targetField === "email");
+    const accountNameMapped = hasAccountFields ? mappings.some(m => m.targetEntity === "account" && m.targetField === "name") : true;
+    
+    // For contacts-only imports, email is required
+    if (!hasAccountFields && !contactEmailMapped) {
+      toast({
+        title: "Required Field Missing",
+        description: "The 'email' field must be mapped for contact imports. Please map a CSV column to the email field.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // For unified imports with accounts, account name is required
+    if (hasAccountFields && !accountNameMapped) {
+      toast({
+        title: "Required Field Missing",
+        description: "The 'name' field must be mapped for account imports. Please map a CSV column to the account name field.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (hasAccountFields) {
       // Unified format - validate with mapping
       setStage("validate");
