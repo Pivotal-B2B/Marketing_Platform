@@ -110,8 +110,8 @@ export function CSVImportDialog({
     const contactEmailMapped = mappings.some(m => m.targetEntity === "contact" && m.targetField === "email");
     const accountNameMapped = hasAccountFields ? mappings.some(m => m.targetEntity === "account" && m.targetField === "name") : true;
     
-    // For contacts-only imports, email is required
-    if (!hasAccountFields && !contactEmailMapped) {
+    // Email is ALWAYS required for contact imports (both contact-only and unified)
+    if (!contactEmailMapped) {
       toast({
         title: "Required Field Missing",
         description: "The 'email' field must be mapped for contact imports. Please map a CSV column to the email field.",
