@@ -413,6 +413,240 @@ Displayed as percentage with color-coded badges.
 
 ---
 
+## 📤 CSV Import/Export Fields
+
+### **Contact CSV Import Template** (Unified Format)
+Supports both contacts-only and unified contacts+accounts format with automatic detection.
+
+#### **Contact Import Fields** (20 base fields + custom)
+1. `firstName` - First name
+2. `lastName` - Last name
+3. `fullName` - Full name (auto-computed if not provided)
+4. `email` - Email address (required)
+5. `directPhone` - Direct work phone
+6. `mobilePhone` - Mobile direct phone
+7. `jobTitle` - Job title
+8. `department` - Department
+9. `seniorityLevel` - Seniority level
+10. `city` - City
+11. `state` - State
+12. `county` - County
+13. `postalCode` - Postal/ZIP code
+14. `country` - Country
+15. `contactLocation` - Full formatted location
+16. `linkedinUrl` - LinkedIn profile URL
+17. `consentBasis` - Consent basis (e.g., "legitimate_interest")
+18. `consentSource` - Consent source (e.g., "Website Form")
+19. `tags` - Comma-separated tags (e.g., "enterprise,vip")
+20. `customFields` - JSON string for custom fields
+
+#### **Account Import Fields** (Prefixed with `account_`)
+21. `account_name` - Company name
+22. `account_domain` - Company domain
+23. `account_industry` - Industry
+24. `account_employeesSize` - Employee size range
+25. `account_revenue` - Revenue range
+26. `account_hqStreet1` - HQ street address 1
+27. `account_hqStreet2` - HQ street address 2
+28. `account_hqStreet3` - HQ street address 3
+29. `account_hqCity` - HQ city
+30. `account_hqState` - HQ state
+31. `account_hqPostalCode` - HQ postal code
+32. `account_hqCountry` - HQ country
+33. `account_companyLocation` - Full formatted HQ location
+34. `account_phone` - Main HQ phone
+35. `account_linkedinUrl` - Company LinkedIn URL
+36. `account_description` - Company description
+37. `account_techStack` - Comma-separated technologies
+38. `account_tags` - Comma-separated account tags
+39. `account_customFields` - JSON string for account custom fields
+
+**Features:**
+- ✅ Automatic format detection (unified vs contacts-only)
+- ✅ Smart field mapping with CSV field mapper
+- ✅ Flexible column name matching (handles variations)
+- ✅ Batch processing (50 contacts per batch)
+- ✅ Duplicate detection via email
+- ✅ Automatic account linking
+- ✅ Custom fields support (dynamic)
+- ✅ Phone number formatting by country
+- ✅ Email normalization
+- ✅ Tags array parsing
+- ✅ Validation with error reporting
+
+---
+
+### **Contact CSV Export Fields** (56 fields)
+
+Complete export includes all database fields for full data portability:
+
+1. `id` - Contact UUID
+2. `accountId` - Linked account UUID
+3. `firstName` - First name
+4. `lastName` - Last name
+5. `fullName` - Full name
+6. `email` - Email address
+7. `emailNormalized` - Normalized email
+8. `emailVerificationStatus` - Verification status (unknown/valid/invalid/risky)
+9. `emailAiConfidence` - AI confidence score (0-100%)
+10. `directPhone` - Direct work phone (formatted)
+11. `directPhoneE164` - E.164 phone format
+12. `phoneExtension` - Phone extension
+13. `phoneVerifiedAt` - Phone verification timestamp
+14. `phoneAiConfidence` - Phone AI confidence (0-100%)
+15. `mobilePhone` - Mobile phone (formatted)
+16. `mobilePhoneE164` - Mobile E.164 format
+17. `jobTitle` - Job title
+18. `department` - Department
+19. `seniorityLevel` - Seniority level
+20. `formerPosition` - Previous position
+21. `timeInCurrentPosition` - Time in current role
+22. `timeInCurrentCompany` - Time at company
+23. `linkedinUrl` - LinkedIn profile URL
+24. `address` - Street address
+25. `city` - City
+26. `state` - State
+27. `stateAbbr` - State abbreviation
+28. `county` - County
+29. `postalCode` - Postal/ZIP code
+30. `country` - Country
+31. `contactLocation` - Full formatted location
+32. `timezone` - IANA timezone
+33. `intentTopics` - Comma-separated intent topics
+34. `tags` - Comma-separated tags
+35. `consentBasis` - Consent basis
+36. `consentSource` - Consent source
+37. `consentTimestamp` - Consent timestamp
+38. `ownerId` - Owner user ID
+39. `customFields` - JSON custom fields
+40. `emailStatus` - Email status
+41. `phoneStatus` - Phone status
+42. `sourceSystem` - Source system
+43. `sourceRecordId` - Source record ID
+44. `sourceUpdatedAt` - Source update timestamp
+45. `researchDate` - Research/enrichment date
+46. `list` - Source list identifier
+47. `isInvalid` - Invalid flag (boolean)
+48. `invalidReason` - Invalid reason
+49. `invalidatedAt` - Invalidation timestamp
+50. `invalidatedBy` - Invalidated by user ID
+51. `deletedAt` - Soft delete timestamp
+52. `createdAt` - Creation timestamp
+53. `updatedAt` - Last update timestamp
+
+**Export Features:**
+- ✅ RFC4180 compliant CSV format
+- ✅ Proper escaping for commas, quotes, newlines
+- ✅ Array fields as comma-separated values
+- ✅ JSON custom fields preserved
+- ✅ All timestamps included
+- ✅ Bulk export of filtered results
+- ✅ Admin-only export access
+
+---
+
+### **Account CSV Import Template** (19 fields + custom)
+
+1. `name` - Company name (required)
+2. `domain` - Company domain
+3. `industryStandardized` - Standardized industry
+4. `employeesSizeRange` - Employee size range (e.g., "1000-5000")
+5. `annualRevenue` - Annual revenue
+6. `hqStreet1` - HQ street address 1
+7. `hqStreet2` - HQ street address 2
+8. `hqStreet3` - HQ street address 3
+9. `hqCity` - HQ city
+10. `hqState` - HQ state
+11. `hqPostalCode` - HQ postal code
+12. `hqCountry` - HQ country
+13. `companyLocation` - Full formatted HQ location
+14. `mainPhone` - Main HQ phone
+15. `linkedinUrl` - Company LinkedIn URL
+16. `description` - Company description
+17. `techStack` - Comma-separated technologies
+18. `tags` - Comma-separated tags
+19. `customFields` - JSON string for custom fields
+
+**Features:**
+- ✅ Batch processing (100 accounts per batch)
+- ✅ Duplicate detection via domain
+- ✅ Fuzzy name matching for deduplication
+- ✅ Custom fields support
+- ✅ Phone number formatting
+- ✅ Validation with error reporting
+- ✅ CSV template generator
+
+---
+
+### **Account CSV Export Fields** (51 fields)
+
+Complete export includes all database fields:
+
+1. `id` - Account UUID
+2. `name` - Company name
+3. `nameNormalized` - Normalized name
+4. `domain` - Company domain
+5. `domainNormalized` - Normalized domain
+6. `industryStandardized` - Primary industry
+7. `industrySecondary` - Comma-separated secondary industries
+8. `industryCode` - Industry code
+9. `industryRaw` - Original industry value
+10. `industryAiSuggested` - AI suggested industry
+11. `industryAiTopk` - Comma-separated AI top K suggestions
+12. `industryAiConfidence` - AI confidence score
+13. `industryAiSource` - AI source
+14. `industryAiSuggestedAt` - AI suggestion timestamp
+15. `industryAiStatus` - AI review status
+16. `annualRevenue` - Annual revenue
+17. `revenueRange` - Revenue range
+18. `employeesSizeRange` - Employee size range
+19. `staffCount` - Exact staff count
+20. `description` - Company description
+21. `hqStreet1` - HQ street 1
+22. `hqStreet2` - HQ street 2
+23. `hqStreet3` - HQ street 3
+24. `hqAddress` - Legacy combined address
+25. `hqCity` - HQ city
+26. `hqState` - HQ state
+27. `hqStateAbbr` - HQ state abbreviation
+28. `hqPostalCode` - HQ postal code
+29. `hqCountry` - HQ country
+30. `companyLocation` - Full formatted location
+31. `yearFounded` - Year founded
+32. `sicCode` - SIC code
+33. `naicsCode` - NAICS code
+34. `previousNames` - Comma-separated previous names
+35. `linkedinUrl` - LinkedIn company URL
+36. `linkedinId` - LinkedIn numeric ID
+37. `linkedinSpecialties` - Comma-separated specialties
+38. `mainPhone` - Main phone (formatted)
+39. `mainPhoneE164` - E.164 phone format
+40. `mainPhoneExtension` - Phone extension
+41. `intentTopics` - Comma-separated intent topics
+42. `techStack` - Comma-separated technologies
+43. `parentAccountId` - Parent company UUID
+44. `tags` - Comma-separated tags
+45. `ownerId` - Owner user ID
+46. `customFields` - JSON custom fields
+47. `sourceSystem` - Source system
+48. `sourceRecordId` - Source record ID
+49. `sourceUpdatedAt` - Source update timestamp
+50. `aiEnrichmentDate` - AI enrichment timestamp
+51. `deletedAt` - Soft delete timestamp
+52. `createdAt` - Creation timestamp
+53. `updatedAt` - Last update timestamp
+
+**Export Features:**
+- ✅ RFC4180 compliant CSV format
+- ✅ All AI enrichment fields included
+- ✅ Complete industry classification data
+- ✅ Array fields as comma-separated values
+- ✅ JSON custom fields preserved
+- ✅ Hierarchy support (parent accounts)
+- ✅ Bulk export with filters
+
+---
+
 ## 🎯 Summary
 
 **Total UI Files:**
@@ -424,13 +658,24 @@ Displayed as percentage with color-coded badges.
 - Accounts: 70+ fields
 - Custom Fields: Unlimited via JSONB
 
+**CSV Import/Export:**
+- Contact Import: 20 base fields + account fields + custom fields
+- Contact Export: 56 fields (complete data)
+- Account Import: 19 fields + custom fields
+- Account Export: 51 fields (complete data)
+
 **Total Features:**
 - Full CRUD operations
-- Advanced filtering
-- Bulk operations
-- CSV Import/Export
-- AI enrichment
-- Custom fields system
+- Advanced filtering & search
+- Bulk operations (update, delete, export, add to list)
+- CSV Import/Export with field mapping
+- Unified contacts+accounts import
+- Automatic deduplication
+- Phone number formatting
+- Email normalization
+- AI enrichment integration
+- Custom fields system (9 field types)
 - Activity tracking
 - Suppression management
 - Data quality scoring
+- RFC4180 compliant CSV format
