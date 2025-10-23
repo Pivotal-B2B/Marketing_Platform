@@ -4,19 +4,40 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, Plus, BarChart, Settings, Play, Pause, StopCircle } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Mail, Phone, Plus, BarChart, Settings, Play, Pause, Edit, Trash2, MoreVertical } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function CampaignsPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [, setLocation] = useLocation();
-  const { getToken } = useAuth(); // Use the getToken function from useAuth
+  const { getToken } = useAuth();
+  const { toast } = useToast();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<any>(null);
 
   const { data: campaigns = [], isLoading } = useQuery({
     queryKey: ["/api/campaigns"],
     queryFn: async () => {
-      const token = getToken(); // Retrieve token using getToken
+      const token = getToken();
       const response = await fetch("/api/campaigns", {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -27,43 +48,52 @@ export default function CampaignsPage() {
     },
   });
 
-  // Mock data for demonstration
-  const mockCampaigns = [
-    {
-      id: "1",
-      name: "Q4 Product Launch - Email",
-      type: "email",
-      status: "active",
-      sent: 15420,
-      opened: 4326,
-      clicked: 892,
-      startDate: "2025-10-01",
+  const deleteMutation = useMutation({
+    mutationFn: async (campaignId: number) => {
+      const response = await apiRequest("DELETE", `/api/campaigns/${campaignId}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to delete campaign");
+      }
+      // DELETE returns 204 No Content, so don't try to parse JSON
+      return null;
     },
-    {
-      id: "2",
-      name: "Enterprise Outreach - Phone",
-      type: "telemarketing",
-      status: "active",
-      calls: 342,
-      connected: 128,
-      qualified: 42,
-      startDate: "2025-10-05",
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+      toast({
+        title: "Campaign deleted",
+        description: "The campaign has been successfully deleted.",
+      });
+      setDeleteDialogOpen(false);
+      setCampaignToDelete(null);
     },
-    {
-      id: "3",
-      name: "Newsletter October - Email",
-      type: "email",
-      status: "completed",
-      sent: 8920,
-      opened: 2456,
-      clicked: 534,
-      startDate: "2025-10-10",
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive",
+      });
     },
-  ];
+  });
+
+  const handleDeleteClick = (campaign: any) => {
+    setCampaignToDelete(campaign);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (campaignToDelete) {
+      deleteMutation.mutate(campaignToDelete.id);
+    }
+  };
+
+  const handleEditClick = (campaign: any) => {
+    setLocation(`/campaigns/${campaign.type}/edit/${campaign.id}`);
+  };
 
   const filteredCampaigns = activeTab === "all" 
-    ? mockCampaigns 
-    : mockCampaigns.filter(c => c.type === activeTab);
+    ? campaigns 
+    : campaigns.filter((c: any) => c.type === activeTab);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -111,7 +141,7 @@ export default function CampaignsPage() {
             <Mail className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockCampaigns.length}</div>
+            <div className="text-2xl font-bold">{campaigns.length}</div>
             <p className="text-xs text-muted-foreground">
               All active and completed
             </p>
@@ -124,7 +154,7 @@ export default function CampaignsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockCampaigns.filter(c => c.type === "email").length}
+              {campaigns.filter((c: any) => c.type === "email").length}
             </div>
             <p className="text-xs text-muted-foreground">
               Active email campaigns
@@ -138,7 +168,7 @@ export default function CampaignsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockCampaigns.filter(c => c.type === "telemarketing").length}
+              {campaigns.filter((c: any) => c.type === "telemarketing").length}
             </div>
             <p className="text-xs text-muted-foreground">
               Active phone campaigns
@@ -227,17 +257,34 @@ export default function CampaignsPage() {
                           <Badge className={getStatusColor(campaign.status)}>
                             {campaign.status}
                           </Badge>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            data-testid={`button-pause-${campaign.id}`}
-                          >
-                            {campaign.status === "active" ? (
-                              <Pause className="h-4 w-4" />
-                            ) : (
-                              <Play className="h-4 w-4" />
-                            )}
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                data-testid={`button-actions-${campaign.id}`}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handleEditClick(campaign)}
+                                data-testid={`button-edit-${campaign.id}`}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit Campaign
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteClick(campaign)}
+                                className="text-red-600 dark:text-red-400"
+                                data-testid={`button-delete-${campaign.id}`}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Campaign
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     </CardHeader>
@@ -307,6 +354,30 @@ export default function CampaignsPage() {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-delete-campaign">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Campaign</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{campaignToDelete?.name}"? This action cannot be undone.
+              All campaign data including results and analytics will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Campaign"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
