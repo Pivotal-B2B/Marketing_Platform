@@ -1090,6 +1090,7 @@ export const calls = pgTable("calls", {
   duration: integer("duration"),
   recordingUrl: text("recording_url"),
   callbackRequested: boolean("callback_requested").default(false),
+  telnyxCallId: text("telnyx_call_id"),
   notes: text("notes"),
   qualificationData: jsonb("qualification_data"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
