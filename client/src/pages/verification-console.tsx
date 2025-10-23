@@ -1352,11 +1352,11 @@ export default function VerificationConsolePage() {
                 </div>
               </div>
 
-              {(contact as any)?.customFields && Object.keys((contact as any).customFields).length > 0 && (
+              {((contact as any)?.custom_fields || (contact as any)?.customFields) && Object.keys((contact as any)?.custom_fields || (contact as any)?.customFields || {}).length > 0 && (
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-semibold mb-3">Custom Fields</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    {Object.entries((contact as any).customFields).map(([key, value]) => (
+                    {Object.entries((contact as any)?.custom_fields || (contact as any)?.customFields || {}).map(([key, value]) => (
                       <div key={key}>
                         <Label className="capitalize">
                           {key.replace(/_/g, ' ')}
