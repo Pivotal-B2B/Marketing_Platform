@@ -119,12 +119,12 @@ export function validate(schemas: ValidationSchemas) {
  * Prevents DOS attacks via large payloads
  */
 export const PAYLOAD_LIMITS = {
-  // Standard JSON request limit: 10MB
-  json: '10mb',
+  // Standard JSON request limit: 50MB (increased for CSV uploads)
+  json: '50mb',
   // File upload limit: 50MB
   upload: '50mb',
-  // URL encoded data limit: 10MB
-  urlencoded: '10mb',
+  // URL encoded data limit: 50MB (increased for CSV uploads)
+  urlencoded: '50mb',
 };
 
 /**
