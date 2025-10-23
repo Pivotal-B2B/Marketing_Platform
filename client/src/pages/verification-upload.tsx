@@ -1,17 +1,21 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Upload, FileText, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, FileText, ArrowLeft, CheckCircle2, AlertCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { parseCSV } from "@/lib/csv-utils";
-import { CSVFieldMapper } from "@/components/csv-field-mapper";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import type { CustomFieldDefinition } from "@shared/schema";
 
 interface FieldMapping {
   csvColumn: string;
@@ -117,9 +121,23 @@ export default function VerificationUploadPage() {
   const [uploadJobId, setUploadJobId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadStatus, setUploadStatus] = useState<string>("idle");
+  
+  // Custom field creation state
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createFieldForColumn, setCreateFieldForColumn] = useState<string | null>(null);
+  const [createFieldEntity, setCreateFieldEntity] = useState<"contact" | "account" | null>(null);
+  const [newFieldKey, setNewFieldKey] = useState("");
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState<"text" | "number" | "date" | "boolean">("text");
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: campaign } = useQuery({
     queryKey: ["/api/verification-campaigns", campaignId],
+  });
+
+  // Fetch custom fields
+  const { data: customFields } = useQuery<CustomFieldDefinition[]>({
+    queryKey: ['/api/custom-fields'],
   });
 
   const uploadMutation = useMutation({
@@ -219,6 +237,73 @@ export default function VerificationUploadPage() {
         }
       };
       reader.readAsText(selectedFile);
+    }
+  };
+
+  const openCreateDialog = (csvColumn: string, entity: "contact" | "account") => {
+    setCreateFieldForColumn(csvColumn);
+    setCreateFieldEntity(entity);
+    // Auto-suggest field key from CSV column name
+    const suggestedKey = csvColumn.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    setNewFieldKey(suggestedKey);
+    setNewFieldLabel(csvColumn);
+    setShowCreateDialog(true);
+  };
+
+  const handleCreateCustomField = async () => {
+    if (!newFieldKey || !newFieldLabel || !createFieldEntity) return;
+
+    setIsCreating(true);
+    try {
+      const response = await apiRequest("POST", "/api/custom-fields", {
+        entityType: createFieldEntity,
+        fieldKey: newFieldKey,
+        displayLabel: newFieldLabel,
+        fieldType: newFieldType,
+        active: true,
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to create custom field");
+      }
+
+      // Refresh custom fields
+      await queryClient.invalidateQueries({ queryKey: ['/api/custom-fields'] });
+
+      // Auto-map the column to the newly created field
+      if (createFieldForColumn) {
+        const customFieldValue = `custom_${newFieldKey}`;
+        const newMappings = fieldMappings.filter(m => m.csvColumn !== createFieldForColumn);
+        newMappings.push({
+          csvColumn: createFieldForColumn,
+          targetField: customFieldValue,
+          targetEntity: createFieldEntity,
+        });
+        setFieldMappings(newMappings);
+      }
+
+      toast({
+        title: "Custom Field Created",
+        description: `Created "${newFieldLabel}" and mapped it to column "${createFieldForColumn}"`,
+      });
+
+      // Reset dialog state
+      setShowCreateDialog(false);
+      setCreateFieldForColumn(null);
+      setCreateFieldEntity(null);
+      setNewFieldKey("");
+      setNewFieldLabel("");
+      setNewFieldType("text");
+    } catch (error) {
+      console.error("Failed to create custom field:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create custom field",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -393,22 +478,172 @@ export default function VerificationUploadPage() {
           <CardHeader>
             <CardTitle>Map CSV Columns to Fields</CardTitle>
             <CardDescription>
-              Match your CSV columns to verification contact fields. You can also create custom fields on the fly.
+              Match your CSV columns to verification contact fields. Auto-mapping has been applied based on column names.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <CSVFieldMapper
-              csvHeaders={csvHeaders}
-              sampleData={csvData.slice(0, 3)}
-              onMappingComplete={handleMappingComplete}
-              onCancel={() => {
-                setStage("select");
-                setFile(null);
-                setCsvHeaders([]);
-                setCsvData([]);
-                setFieldMappings([]);
-              }}
-            />
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertDescription className="text-xs">
+                <strong>Tip:</strong> Fields marked in <strong className="text-primary">blue</strong> were auto-mapped. 
+                You can change any mapping, skip unmapped columns, or create custom fields.
+              </AlertDescription>
+            </Alert>
+
+            <ScrollArea className="h-[400px] pr-4">
+              <div className="space-y-3">
+                {csvHeaders.map((header, index) => {
+                  const autoMapped = autoMapVerificationColumn(header);
+                  const contactCustomFields = customFields?.filter(f => f.entityType === 'contact' && f.active) || [];
+                  const accountCustomFields = customFields?.filter(f => f.entityType === 'account' && f.active) || [];
+                  
+                  return (
+                    <div key={index} className="flex items-center gap-4 p-3 border rounded-md">
+                      <div className="flex-1">
+                        <div className={`font-medium text-sm ${autoMapped ? 'text-primary' : ''}`}>
+                          {header}
+                        </div>
+                        {csvData.length > 0 && csvData[0][index] && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Sample: {csvData[0][index]?.slice(0, 40)}...
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-64">
+                        <Select
+                          value={fieldMappings.find(m => m.csvColumn === header)?.targetField || autoMapped || "skip"}
+                          onValueChange={(value) => {
+                            if (value === "__CREATE_CONTACT__") {
+                              openCreateDialog(header, "contact");
+                            } else if (value === "__CREATE_ACCOUNT__") {
+                              openCreateDialog(header, "account");
+                            } else {
+                              const newMappings = fieldMappings.filter(m => m.csvColumn !== header);
+                              if (value !== "skip") {
+                                newMappings.push({
+                                  csvColumn: header,
+                                  targetField: value,
+                                  targetEntity: getTargetEntity(value),
+                                });
+                              }
+                              setFieldMappings(newMappings);
+                            }
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Skip this column" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="skip">Skip Column</SelectItem>
+                            
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                              Contact Info
+                            </div>
+                            <SelectItem value="fullName">Full Name</SelectItem>
+                            <SelectItem value="firstName">First Name</SelectItem>
+                            <SelectItem value="lastName">Last Name</SelectItem>
+                            <SelectItem value="title">Job Title</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                            <SelectItem value="phone">Phone</SelectItem>
+                            <SelectItem value="mobile">Mobile</SelectItem>
+                            <SelectItem value="linkedinUrl">LinkedIn URL</SelectItem>
+                            
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                              Contact Address
+                            </div>
+                            <SelectItem value="contactAddress1">Address Line 1</SelectItem>
+                            <SelectItem value="contactAddress2">Address Line 2</SelectItem>
+                            <SelectItem value="contactAddress3">Address Line 3</SelectItem>
+                            <SelectItem value="contactCity">City</SelectItem>
+                            <SelectItem value="contactState">State</SelectItem>
+                            <SelectItem value="contactCountry">Country</SelectItem>
+                            <SelectItem value="contactPostal">Postal Code</SelectItem>
+                            
+                            {contactCustomFields.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                                  Contact Custom Fields
+                                </div>
+                                {contactCustomFields.map(field => (
+                                  <SelectItem key={field.id} value={`custom_${field.fieldKey}`}>
+                                    {field.displayLabel}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+                            
+                            <SelectItem value="__CREATE_CONTACT__" className="font-medium text-primary">
+                              <div className="flex items-center gap-2">
+                                <Plus className="h-3 w-3" />
+                                <span>Create Contact Custom Field</span>
+                              </div>
+                            </SelectItem>
+                            
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                              Company Info
+                            </div>
+                            <SelectItem value="account_name">Company Name</SelectItem>
+                            <SelectItem value="domain">Domain</SelectItem>
+                            <SelectItem value="hqPhone">HQ Phone</SelectItem>
+                            <SelectItem value="hqAddress1">HQ Address 1</SelectItem>
+                            <SelectItem value="hqAddress2">HQ Address 2</SelectItem>
+                            <SelectItem value="hqAddress3">HQ Address 3</SelectItem>
+                            <SelectItem value="hqCity">HQ City</SelectItem>
+                            <SelectItem value="hqState">HQ State</SelectItem>
+                            <SelectItem value="hqPostal">HQ Postal Code</SelectItem>
+                            <SelectItem value="hqCountry">HQ Country</SelectItem>
+                            
+                            {accountCustomFields.length > 0 && (
+                              <>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                                  Account Custom Fields
+                                </div>
+                                {accountCustomFields.map(field => (
+                                  <SelectItem key={field.id} value={`custom_${field.fieldKey}`}>
+                                    {field.displayLabel}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
+                            
+                            <SelectItem value="__CREATE_ACCOUNT__" className="font-medium text-primary">
+                              <div className="flex items-center gap-2">
+                                <Plus className="h-3 w-3" />
+                                <span>Create Account Custom Field</span>
+                              </div>
+                            </SelectItem>
+                            
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+                              Other
+                            </div>
+                            <SelectItem value="cavId">CAV ID</SelectItem>
+                            <SelectItem value="cavUserId">CAV User ID</SelectItem>
+                            <SelectItem value="sourceType">Source Type</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+
+            <div className="flex gap-2 pt-4 border-t">
+              <Button onClick={() => handleMappingComplete(fieldMappings)}>
+                Continue to Upload
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStage("select");
+                  setFile(null);
+                  setCsvHeaders([]);
+                  setCsvData([]);
+                  setFieldMappings([]);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -568,6 +803,80 @@ export default function VerificationUploadPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Create Custom Field Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Custom Field</DialogTitle>
+            <DialogDescription>
+              Create a new custom {createFieldEntity} field and map column "{createFieldForColumn}" to it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="field-key">Field Key*</Label>
+              <Input
+                id="field-key"
+                value={newFieldKey}
+                onChange={(e) => setNewFieldKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))}
+                placeholder="e.g., custom_field_name"
+                data-testid="input-field-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                Unique identifier for this field (lowercase, numbers, underscores only)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="field-label">Display Label*</Label>
+              <Input
+                id="field-label"
+                value={newFieldLabel}
+                onChange={(e) => setNewFieldLabel(e.target.value)}
+                placeholder="e.g., Custom Field Name"
+                data-testid="input-field-label"
+              />
+              <p className="text-xs text-muted-foreground">
+                Human-readable name shown in the UI
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="field-type">Field Type*</Label>
+              <Select value={newFieldType} onValueChange={(value: any) => setNewFieldType(value)}>
+                <SelectTrigger id="field-type" data-testid="select-field-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="number">Number</SelectItem>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="boolean">Boolean</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateDialog(false)}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateCustomField}
+              disabled={!newFieldKey || !newFieldLabel || isCreating}
+              data-testid="button-create-field"
+            >
+              {isCreating ? "Creating..." : "Create & Map"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
