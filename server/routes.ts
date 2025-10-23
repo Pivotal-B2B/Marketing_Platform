@@ -2464,13 +2464,80 @@ export function registerRoutes(app: Express) {
           // DUAL QUEUE STRATEGY: Different behavior for manual vs power dial
           if (dialMode === 'manual') {
             console.log(`[ASSIGN AGENTS] MANUAL mode - populating agent queues with ${validContacts.length} contacts for ${agentIds.length} agents`);
-            // MANUAL DIAL: Populate agent_queue with ALL campaign contacts for each agent
+            
+            // ==================== INTELLIGENT SUPPRESSION FILTERING ====================
+            // Filter out contacts that are on global suppression lists using BULK operations
+            const { checkSuppressionBulk } = await import('./lib/suppression.service');
+            
+            // Bulk check global suppression list (email + name/company hash)
+            const contactIds = validContacts.map(c => c.id);
+            const suppressionResults = await checkSuppressionBulk(contactIds);
+            const suppressedContactIds = new Set<string>();
+            
+            // checkSuppressionBulk returns a Map, iterate properly
+            for (const [contactId, reason] of suppressionResults.entries()) {
+              if (reason !== null) {
+                suppressedContactIds.add(contactId);
+              }
+            }
+            
+            console.log(`[ASSIGN AGENTS] Global suppression check: ${suppressedContactIds.size} contacts suppressed out of ${validContacts.length}`);
+            
+            // Bulk check global phone DNC list
+            const uniquePhones = new Set<string>();
+            const contactPhoneMap = new Map<string, Set<string>>(); // phone -> Set of contactIds
+            
+            for (const contact of validContacts) {
+              if (contact.directPhoneE164) {
+                uniquePhones.add(contact.directPhoneE164);
+                if (!contactPhoneMap.has(contact.directPhoneE164)) {
+                  contactPhoneMap.set(contact.directPhoneE164, new Set());
+                }
+                contactPhoneMap.get(contact.directPhoneE164)!.add(contact.id);
+              }
+              if (contact.mobilePhoneE164) {
+                uniquePhones.add(contact.mobilePhoneE164);
+                if (!contactPhoneMap.has(contact.mobilePhoneE164)) {
+                  contactPhoneMap.set(contact.mobilePhoneE164, new Set());
+                }
+                contactPhoneMap.get(contact.mobilePhoneE164)!.add(contact.id);
+              }
+            }
+            
+            const dncContactIds = new Set<string>();
+            if (uniquePhones.size > 0) {
+              const suppressedPhones = await db.select({ phoneE164: suppressionPhones.phoneE164 })
+                .from(suppressionPhones)
+                .where(inArray(suppressionPhones.phoneE164, Array.from(uniquePhones)));
+              
+              for (const row of suppressedPhones) {
+                const contactIds = contactPhoneMap.get(row.phoneE164);
+                if (contactIds) {
+                  for (const contactId of contactIds) {
+                    dncContactIds.add(contactId);
+                  }
+                }
+              }
+              
+              console.log(`[ASSIGN AGENTS] Phone DNC check: ${dncContactIds.size} contacts have phones on DNC list`);
+            }
+            
+            // Combine both suppression sets
+            const allSuppressedIds = new Set([...suppressedContactIds, ...dncContactIds]);
+            
+            // Filter to eligible contacts only
+            const eligibleContacts = validContacts.filter(c => !allSuppressedIds.has(c.id));
+            const suppressedCount = allSuppressedIds.size;
+            
+            console.log(`[ASSIGN AGENTS] Filtered ${validContacts.length} contacts: ${eligibleContacts.length} eligible, ${suppressedCount} suppressed`);
+            
+            // MANUAL DIAL: Populate agent_queue with eligible campaign contacts for each agent
             // Build all queue items for bulk insert (much faster than individual inserts)
             const queueItems: any[] = [];
             const now = new Date();
 
             for (const agentId of agentIds) {
-              for (const contact of validContacts) {
+              for (const contact of eligibleContacts) {
                 queueItems.push({
                   id: sql`gen_random_uuid()`,
                   agentId,
@@ -2512,9 +2579,10 @@ export function registerRoutes(app: Express) {
             }
 
             res.status(201).json({
-              message: "Agents assigned to manual dial campaign. All campaign contacts added to each agent's queue.",
+              message: "Agents assigned to manual dial campaign. Eligible contacts added to each agent's queue.",
               agentsAssigned: agentIds.length,
-              contactsPerAgent: validContacts.length,
+              contactsPerAgent: eligibleContacts.length,
+              suppressedContacts: suppressedCount,
               totalQueueItemsCreated: totalAdded,
               mode: 'manual'
             });
