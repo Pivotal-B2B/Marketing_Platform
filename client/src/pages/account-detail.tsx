@@ -624,6 +624,34 @@ export default function AccountDetailPage() {
               )}
             </SectionCard>
 
+            {/* Custom Fields */}
+            {account.customFields && Object.keys(account.customFields).length > 0 && (
+              <SectionCard
+                title="Custom Fields"
+                icon={FileText}
+                description="Additional custom data fields"
+              >
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Field Name</TableHead>
+                        <TableHead>Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {Object.entries(account.customFields as Record<string, any>).map(([key, value]) => (
+                        <TableRow key={key} data-testid={`row-custom-field-${key}`}>
+                          <TableCell className="font-medium">{key}</TableCell>
+                          <TableCell className="font-mono text-sm">{String(value)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </SectionCard>
+            )}
+
             {/* AI Enrichment Section */}
             {account.industryAiCandidates && Array.isArray(account.industryAiCandidates) && account.industryAiCandidates.length > 0 && (
               <SectionCard
