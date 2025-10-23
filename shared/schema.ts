@@ -3559,6 +3559,7 @@ export const verificationContacts = pgTable("verification_contacts", {
   lastNameNorm: text("last_name_norm"),
   companyKey: text("company_key"),
   contactCountryKey: text("contact_country_key"),
+  nameCompanyHash: text("name_company_hash"),
 
   addressEnrichmentStatus: addressEnrichmentStatusEnum("address_enrichment_status").default('not_needed'),
   addressEnrichedAt: timestamp("address_enriched_at"),

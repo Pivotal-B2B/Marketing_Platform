@@ -169,18 +169,37 @@ export function evaluateEligibility(
   return { status: 'Eligible' as const, reason: 'eligible' };
 }
 
+/**
+ * Compute SHA256 hash for full name + company combination
+ * Uses "|" separator to prevent collisions
+ * Returns hex string for compatibility with PostgreSQL ENCODE(DIGEST(...), 'hex')
+ * 
+ * CRITICAL: Must use SAME normalization and hash algorithm as verification-suppression.ts
+ * MUST match the SQL: ENCODE(DIGEST(LOWER(TRIM(...)) || '|' || LOWER(TRIM(...)), 'sha256'), 'hex')
+ */
 export function computeNameCompanyHash(
   firstName: string | null | undefined,
   lastName: string | null | undefined,
   companyKey: string | null | undefined
-): string {
-  const normalized = [
-    normalize.toKey(firstName),
-    normalize.toKey(lastName),
-    normalize.companyKey(companyKey) // Use smart company normalization
-  ].join('');
+): string | null {
+  // CRITICAL: All three fields must be non-empty
+  if (!firstName || !lastName || !companyKey) {
+    return null;
+  }
   
-  return crypto.createHash('md5').update(normalized).digest('hex');
+  // Use SAME normalization as contact storage
+  const firstNorm = normalize.toKey(firstName);
+  const lastNorm = normalize.toKey(lastName);
+  const companyNorm = normalize.companyKey(companyKey);
+  
+  // Construct full name from normalized first/last
+  const fullName = `${firstNorm} ${lastNorm}`.trim().replace(/\s+/g, ' ').toLowerCase();
+  
+  // Use separator to prevent collision: "John Smith|Acme" vs "John|SmithAcme"
+  const hashInput = `${fullName}|${companyNorm.toLowerCase()}`;
+  
+  // SHA256 hex digest (matches PostgreSQL and verification-suppression.ts)
+  return crypto.createHash('sha256').update(hashInput).digest('hex');
 }
 
 export function computeNormalizedKeys(contact: {
@@ -190,12 +209,24 @@ export function computeNormalizedKeys(contact: {
   contactCountry?: string | null;
   accountName?: string | null;
 }) {
+  const firstNameNorm = normalize.toKey(contact.firstName);
+  const lastNameNorm = normalize.toKey(contact.lastName);
+  const companyKey = normalize.companyKey(contact.accountName);
+  
+  // Compute hash for name+company matching (returns null if any field is missing)
+  const nameCompanyHash = computeNameCompanyHash(
+    contact.firstName,
+    contact.lastName,
+    contact.accountName
+  );
+  
   return {
     emailLower: normalize.emailLower(contact.email),
-    firstNameNorm: normalize.toKey(contact.firstName),
-    lastNameNorm: normalize.toKey(contact.lastName),
+    firstNameNorm,
+    lastNameNorm,
     contactCountryKey: normalize.countryKey(contact.contactCountry),
-    companyKey: normalize.companyKey(contact.accountName), // Use smart company normalization
+    companyKey,
+    nameCompanyHash, // Include the hash for suppression matching
   };
 }
 
