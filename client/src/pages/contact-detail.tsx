@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +60,7 @@ export default function ContactDetailPage() {
     jobTitle: "",
     department: "",
     seniorityLevel: "",
+    customFields: "", // JSON string for custom fields
   });
 
   const { data: contact, isLoading: contactLoading } = useQuery<Contact>({
@@ -112,13 +114,30 @@ export default function ContactDetailPage() {
         jobTitle: contact.jobTitle || "",
         department: contact.department || "",
         seniorityLevel: contact.seniorityLevel || "",
+        customFields: contact.customFields ? JSON.stringify(contact.customFields, null, 2) : "",
       });
       setEditDialogOpen(true);
     }
   };
 
   const handleSaveEdit = () => {
-    updateContactMutation.mutate(editForm);
+    const updateData: any = { ...editForm };
+    // Parse custom fields JSON
+    if (editForm.customFields && editForm.customFields.trim()) {
+      try {
+        updateData.customFields = JSON.parse(editForm.customFields);
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Invalid Custom Fields",
+          description: "Custom fields must be valid JSON format",
+        });
+        return;
+      }
+    } else {
+      updateData.customFields = null;
+    }
+    updateContactMutation.mutate(updateData);
   };
 
   if (contactLoading) {
@@ -838,6 +857,24 @@ export default function ContactDetailPage() {
                 value={editForm.seniorityLevel}
                 onChange={(e) => setEditForm({ ...editForm, seniorityLevel: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customFields">
+                Custom Fields 
+                <span className="text-xs text-muted-foreground ml-2">(JSON format)</span>
+              </Label>
+              <Textarea
+                id="customFields"
+                value={editForm.customFields}
+                onChange={(e) => setEditForm({ ...editForm, customFields: e.target.value })}
+                rows={6}
+                className="font-mono text-sm"
+                placeholder='{"field_name": "value", "another_field": "another value"}'
+                data-testid="input-custom-fields"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter custom fields as JSON key-value pairs
+              </p>
             </div>
           </div>
           <DialogFooter>
