@@ -135,6 +135,66 @@ router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => 
   }
 });
 
+router.get("/api/verification-campaigns/:campaignId/account-caps", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    
+    // Get campaign to retrieve lead cap setting
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    const leadCap = campaign.leadCapPerAccount;
+    
+    // If no cap is configured, return empty array (uncapped campaign)
+    if (!leadCap || leadCap <= 0) {
+      return res.json([]);
+    }
+    
+    // Get contact counts per account for this campaign
+    const accountCapStats = await db.execute(sql`
+      SELECT
+        a.id as account_id,
+        a.name as account_name,
+        a.domain,
+        COUNT(c.id) as contact_count
+      FROM verification_contacts c
+      INNER JOIN accounts a ON c.account_id = a.id
+      WHERE c.campaign_id = ${campaignId}
+        AND c.deleted = FALSE
+      GROUP BY a.id, a.name, a.domain
+      ORDER BY contact_count DESC
+    `);
+    
+    const results = (accountCapStats.rows as any[]).map((row) => {
+      const contactCount = Number(row.contact_count);
+      const remaining = Math.max(0, leadCap - contactCount);
+      const percentUsed = Math.round((contactCount / leadCap) * 100);
+      
+      return {
+        accountId: row.account_id,
+        accountName: row.account_name,
+        domain: row.domain,
+        contactCount,
+        leadCap,
+        remaining,
+        percentUsed,
+        isAtCap: contactCount >= leadCap,
+      };
+    });
+    
+    res.json(results);
+  } catch (error) {
+    console.error("Error fetching account cap stats:", error);
+    res.status(500).json({ error: "Failed to fetch account cap stats" });
+  }
+});
+
 router.get("/api/verification-campaigns/:campaignId/contacts", async (req, res) => {
   try {
     const { campaignId } = req.params;
