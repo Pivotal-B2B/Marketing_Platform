@@ -112,13 +112,11 @@ export function exportVerificationContactsToCsv(
 ): string {
   const rows = contacts.map(contact => {
     const row: Record<string, any> = {
-      // Contact fields
+      // Contact Core Fields
       'Full Name': contact.fullName || '',
       'First Name': contact.firstName || '',
       'Last Name': contact.lastName || '',
-      'Title': contact.title || '',
-      'Department': contact.department || '',
-      'Seniority Level': contact.seniorityLevel || '',
+      'Job Title': contact.title || '',
       'Email': contact.email || '',
       'Email Status': contact.emailStatus || '',
       'Phone': cleanPhoneForExport(contact.phone),
