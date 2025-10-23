@@ -339,31 +339,42 @@ export async function processUpload(jobId: string) {
             }
 
             const accountNameCsv = row.account_name || row.companyName || null;
-            const domainValue = (row.domain || row.companyDomain || null)?.toLowerCase() || null;
+            const csvDomainValue = (row.domain || row.companyDomain || null)?.toLowerCase() || null;
             const emailDomain = row.email ? normalize.extractDomain(row.email) : null;
 
             let accountId: string | null = null;
             let accountData: any = null;
 
-            const inputDomain = domainValue || emailDomain || '';
-            const normalizedInput = inputDomain ? normalizeDomain(inputDomain) : '';
-            const rootDomain = normalizedInput ? extractRootDomain(normalizedInput) : '';
+            // FIXED: Prioritize CSV company domain, only use email domain as fallback for domain lookup
+            const companyDomainForLookup = csvDomainValue ? normalizeDomain(csvDomainValue) : null;
+            const companyRootDomain = companyDomainForLookup ? extractRootDomain(companyDomainForLookup) : null;
+            
+            // Extract email domain for fallback matching ONLY
+            const emailRootDomain = emailDomain ? extractRootDomain(normalizeDomain(emailDomain)) : null;
+
+            // Personal email domains that should never be used for company matching
+            const personalDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 
+                                     'icloud.com', 'mail.com', 'naver.com', 'qq.com', 'live.com', '163.com'];
+            const isPersonalEmail = emailRootDomain ? personalDomains.includes(emailRootDomain.toLowerCase()) : false;
+            
+            // Determine which domain to use for matching (never use personal email domains)
+            const domainForMatching = companyRootDomain || (!isPersonalEmail ? emailRootDomain : null);
 
             // OPTIMIZATION: Fast O(1) lookup from pre-loaded accounts
-            const cacheKey = rootDomain || accountNameCsv || '';
+            const cacheKey = domainForMatching || accountNameCsv || '';
             if (cacheKey && accountCache.has(cacheKey)) {
               const cached = accountCache.get(cacheKey);
               accountId = cached.id;
               accountData = cached;
             } else {
-              // Try exact domain match from pre-loaded map
-              if (rootDomain && accountsByDomain.has(rootDomain.toLowerCase())) {
-                accountData = accountsByDomain.get(rootDomain.toLowerCase())!;
+              // PRIORITY 1: Try exact domain match (CSV company domain OR corporate email domain)
+              if (domainForMatching && accountsByDomain.has(domainForMatching.toLowerCase())) {
+                accountData = accountsByDomain.get(domainForMatching.toLowerCase())!;
                 accountId = accountData.id;
                 accountCache.set(cacheKey, accountData);
               }
 
-              // Try fuzzy name matching from pre-loaded map
+              // PRIORITY 2: Try fuzzy name matching from pre-loaded map
               if (!accountId && accountNameCsv) {
                 const normalizedName = normalize.companyKey(accountNameCsv);
                 const candidates = accountsByNormalizedName.get(normalizedName) || [];
@@ -372,7 +383,7 @@ export async function processUpload(jobId: string) {
 
                 for (const account of candidates) {
                   const matchResult = getMatchTypeAndConfidence(
-                    normalizedInput,
+                    domainForMatching || '',
                     accountNameCsv || undefined,
                     account.domain || '',
                     account.name
@@ -395,17 +406,21 @@ export async function processUpload(jobId: string) {
                 }
               }
 
-              // Create new account if no match found
-              if (!accountId) {
+              // Create new account ONLY if we have either a domain or company name
+              // This prevents creating duplicate "Unknown Company" accounts for personal-email-only contacts
+              if (!accountId && (domainForMatching || accountNameCsv)) {
                 const normalizedWebDomain = normalizeWebDomain(row.websiteDomain || row.domain);
                 const normalizedLinkedInUrl = normalizeLinkedInUrl(row.linkedinUrl);
                 const webTechParsed = parseWebTechnologies(row.webTechnologies);
                 const foundedDateParsed = parseFoundedDate(row.foundedDate);
                 const validatedRevenue = validateAnnualRevenue(row.annualRevenue);
                 
+                // Use domainForMatching (CSV domain or corporate email domain, never personal)
+                const domainForNewAccount = domainForMatching;
+                
                 const newAccountData = {
-                  name: accountNameCsv ?? (rootDomain ? rootDomain.split('.')[0] : 'Unknown Company'),
-                  domain: rootDomain,
+                  name: accountNameCsv ?? (domainForNewAccount ? domainForNewAccount.split('.')[0] : 'Unknown Company'),
+                  domain: domainForNewAccount,
                   mainPhone: row.hqPhone ?? null,
                   hqStreet1: row.hqAddress1 ?? null,
                   hqStreet2: row.hqAddress2 ?? null,
@@ -433,6 +448,9 @@ export async function processUpload(jobId: string) {
                 accountData = { ...newAccountData, id: `temp_${newAccountsToCreate.length}` };
                 accountId = accountData.id;
                 accountCache.set(cacheKey, accountData);
+              } else if (!accountId) {
+                // Log warning for contacts with only personal emails and no company info
+                console.warn(`[Upload] Row ${globalIndex + 1}: Skipping account creation - only personal email domain (${emailRootDomain}) with no company name/domain`);
               }
             }
 
