@@ -99,6 +99,7 @@ export default function AccountDetailPage() {
     description: "",
     list: "",
     yearFounded: "",
+    customFields: "", // JSON string for custom fields
   });
 
   const { data: account, isLoading: accountLoading } = useQuery<Account>({
@@ -177,6 +178,7 @@ export default function AccountDetailPage() {
         description: account.description || "",
         list: account.list || "",
         yearFounded: account.yearFounded?.toString() || "",
+        customFields: account.customFields ? JSON.stringify(account.customFields, null, 2) : "",
       });
       setEditDialogOpen(true);
     }
@@ -202,6 +204,21 @@ export default function AccountDetailPage() {
     // Ensure mainPhone is updated if mainPhoneE164 is changed
     if (editForm.mainPhoneE164 && !editForm.mainPhone) {
         updateData.mainPhone = editForm.mainPhoneE164; // Or handle based on your normalization logic
+    }
+    // Parse custom fields JSON
+    if (editForm.customFields && editForm.customFields.trim()) {
+      try {
+        updateData.customFields = JSON.parse(editForm.customFields);
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Invalid Custom Fields",
+          description: "Custom fields must be valid JSON format",
+        });
+        return;
+      }
+    } else {
+      updateData.customFields = null;
     }
     updateAccountMutation.mutate(updateData);
   };
@@ -1180,6 +1197,24 @@ export default function AccountDetailPage() {
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                 rows={3}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customFields">
+                Custom Fields 
+                <span className="text-xs text-muted-foreground ml-2">(JSON format)</span>
+              </Label>
+              <Textarea
+                id="customFields"
+                value={editForm.customFields}
+                onChange={(e) => setEditForm({ ...editForm, customFields: e.target.value })}
+                rows={6}
+                className="font-mono text-sm"
+                placeholder='{"field_name": "value", "another_field": "another value"}'
+                data-testid="input-custom-fields"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter custom fields as JSON key-value pairs
+              </p>
             </div>
           </div>
           <DialogFooter>
