@@ -1,8 +1,59 @@
 import { db } from "../db";
 import { verificationSuppressionList, verificationContacts } from "@shared/schema";
 import { sql, eq, inArray } from "drizzle-orm";
-import { normalize, computeNameCompanyHash } from "./verification-utils";
+import * as crypto from "crypto";
+import { normalize } from "./verification-utils";
 
+/**
+ * STRICT SUPPRESSION RULES - Only suppress when ONE of these matches:
+ * 1. Email matches (exact, case-insensitive)
+ * 2. CAV ID matches (exact)
+ * 3. CAV User ID matches (exact)
+ * 4. BOTH Full Name AND Company match (together - requires all fields non-empty)
+ * 
+ * EXPLICITLY FORBIDDEN:
+ * - First name only
+ * - Last name only
+ * - Company only
+ * - Full name only (without company)
+ */
+
+/**
+ * Compute SHA256 hash for full name + company combination
+ * Uses "|" separator to prevent collisions
+ * Returns hex string for compatibility with PostgreSQL ENCODE(DIGEST(...), 'hex')
+ * 
+ * CRITICAL: Must use SAME normalization as contact storage (normalize.toKey, normalize.companyKey)
+ */
+function computeNameCompanyHash(
+  firstName: string | null | undefined,
+  lastName: string | null | undefined,
+  company: string | null | undefined
+): string | null {
+  // CRITICAL: All three fields must be non-empty
+  if (!firstName || !lastName || !company) {
+    return null;
+  }
+  
+  // Use SAME normalization as contact storage
+  const firstNorm = normalize.toKey(firstName);
+  const lastNorm = normalize.toKey(lastName);
+  const companyNorm = normalize.companyKey(company);
+  
+  // Construct full name from normalized first/last
+  const fullName = `${firstNorm} ${lastNorm}`.trim().replace(/\s+/g, ' ').toLowerCase();
+  
+  // Use separator to prevent collision: "John Smith|Acme" vs "John|SmithAcme"
+  const hashInput = `${fullName}|${companyNorm.toLowerCase()}`;
+  
+  // SHA256 hex digest (matches PostgreSQL)
+  return crypto.createHash('sha256').update(hashInput).digest('hex');
+}
+
+/**
+ * Apply suppression logic to contacts after upload
+ * Marks contacts as suppressed based on strict matching rules
+ */
 export async function applySuppressionForContacts(
   campaignId: string,
   contactIds: string[]
@@ -10,35 +61,39 @@ export async function applySuppressionForContacts(
   if (contactIds.length === 0) return;
   
   // STRICT suppression rules - only suppress if ANY of these match:
-  // 1. Email matches
-  // 2. CAV ID matches  
-  // 3. CAV User ID matches
-  // 4. BOTH full name AND company match (requires both to be non-empty)
-  //
-  // Explicitly NOT allowed: first-only, last-only, company-only, or name-only matches
+  // 1. Email matches (exact, case-insensitive)
+  // 2. CAV ID matches (exact)
+  // 3. CAV User ID matches (exact)
+  // 4. BOTH full name AND company match (requires both non-empty)
   const result = await db
     .select({ id: verificationContacts.id })
     .from(verificationContacts)
     .leftJoin(verificationSuppressionList, 
       sql`(
-        -- Rule 1: Email exact match
+        -- Rule 1: Email exact match (case-insensitive)
         (${verificationContacts.emailLower} = ${verificationSuppressionList.emailLower} 
          AND ${verificationSuppressionList.emailLower} IS NOT NULL 
-         AND ${verificationSuppressionList.emailLower} != '')
+         AND ${verificationSuppressionList.emailLower} != ''
+         AND ${verificationContacts.emailLower} IS NOT NULL
+         AND ${verificationContacts.emailLower} != '')
         
         -- Rule 2: CAV ID exact match
         OR (${verificationContacts.cavId} = ${verificationSuppressionList.cavId} 
             AND ${verificationSuppressionList.cavId} IS NOT NULL 
-            AND ${verificationSuppressionList.cavId} != '')
+            AND ${verificationSuppressionList.cavId} != ''
+            AND ${verificationContacts.cavId} IS NOT NULL
+            AND ${verificationContacts.cavId} != '')
         
         -- Rule 3: CAV User ID exact match
         OR (${verificationContacts.cavUserId} = ${verificationSuppressionList.cavUserId} 
             AND ${verificationSuppressionList.cavUserId} IS NOT NULL 
-            AND ${verificationSuppressionList.cavUserId} != '')
+            AND ${verificationSuppressionList.cavUserId} != ''
+            AND ${verificationContacts.cavUserId} IS NOT NULL
+            AND ${verificationContacts.cavUserId} != '')
         
         -- Rule 4: Full Name AND Company match TOGETHER (both required, no partial matches)
         OR (
-          -- Contact must have BOTH full name AND company (non-empty)
+          -- Contact MUST have ALL three fields (firstName, lastName, company) non-empty
           ${verificationContacts.firstNameNorm} IS NOT NULL 
           AND ${verificationContacts.firstNameNorm} != ''
           AND ${verificationContacts.lastNameNorm} IS NOT NULL 
@@ -46,16 +101,16 @@ export async function applySuppressionForContacts(
           AND ${verificationContacts.companyKey} IS NOT NULL 
           AND ${verificationContacts.companyKey} != ''
           
-          -- Suppression entry must also have BOTH full name AND company (non-empty)
+          -- Suppression entry must also have hash (indicating it had all fields)
           AND ${verificationSuppressionList.nameCompanyHash} IS NOT NULL
           AND ${verificationSuppressionList.nameCompanyHash} != ''
           
           -- Hash match using SHA256 with separator to prevent collisions
-          -- CRITICAL: Normalize EXACTLY the same as TypeScript side
+          -- CRITICAL: Must normalize EXACTLY the same as TypeScript side
           AND ENCODE(DIGEST(
             LOWER(TRIM(REGEXP_REPLACE(
               COALESCE(${verificationContacts.firstNameNorm}, '') || ' ' || COALESCE(${verificationContacts.lastNameNorm}, ''),
-              '\s+', ' ', 'g'
+              '\\s+', ' ', 'g'
             ))) || '|' || LOWER(TRIM(${verificationContacts.companyKey})),
             'sha256'
           ), 'hex') = ${verificationSuppressionList.nameCompanyHash}
@@ -79,6 +134,10 @@ export async function applySuppressionForContacts(
   }
 }
 
+/**
+ * Add entries to suppression list
+ * Computes normalized fields and hash for name+company matching
+ */
 export async function addToSuppressionList(
   campaignId: string | null,
   entries: {
@@ -100,29 +159,22 @@ export async function addToSuppressionList(
     
     // Prepare values for batch insert
     const values = batch.map(entry => {
+      // Rule 1: Email normalization (MUST use same as contact storage)
       const emailLower = entry.email ? normalize.emailLower(entry.email) : null;
-      const cavId = entry.cavId || null;
-      const cavUserId = entry.cavUserId || null;
       
+      // Rules 2 & 3: CAV IDs (exact match, trim)
+      const cavId = entry.cavId?.trim() || null;
+      const cavUserId = entry.cavUserId?.trim() || null;
+      
+      // Rule 4: Name+Company hash
       // CRITICAL: Only compute hash when ALL three fields are present
       // This prevents company-only or name-only false positives
-      // Use SHA256 with separator for collision resistance
-      let nameCompanyHash = null;
-      if (entry.firstName && entry.lastName && entry.companyKey) {
-        // Normalize EXACTLY the same as SQL query for consistency
-        const firstNorm = normalize.toKey(entry.firstName);
-        const lastNorm = normalize.toKey(entry.lastName);
-        const fullNameRaw = (firstNorm + ' ' + lastNorm).trim().replace(/\s+/g, ' ').toLowerCase();
-        
-        // companyKey is already normalized by normalize.companyKey(), just need to ensure lowercase
-        const companyNorm = entry.companyKey.toLowerCase().trim();
-        
-        const hashInput = `${fullNameRaw}|${companyNorm}`;
-        
-        // Compute SHA256 hex (matching PostgreSQL ENCODE(DIGEST(...), 'hex'))
-        const crypto = require('crypto');
-        nameCompanyHash = crypto.createHash('sha256').update(hashInput).digest('hex');
-      }
+      // Uses SAME normalization as contact storage
+      const nameCompanyHash = computeNameCompanyHash(
+        entry.firstName,
+        entry.lastName,
+        entry.companyKey
+      );
       
       return {
         campaignId,

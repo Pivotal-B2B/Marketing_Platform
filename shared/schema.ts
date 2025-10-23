@@ -540,6 +540,13 @@ export const contacts = pgTable("contacts", {
   invalidatedAt: timestamp("invalidated_at"),
   invalidatedBy: varchar("invalidated_by").references(() => users.id, { onDelete: 'set null' }),
 
+  // Suppression Matching fields
+  fullNameNorm: text("full_name_norm"),
+  companyNorm: text("company_norm"),
+  nameCompanyHash: text("name_company_hash"),
+  cavId: text("cav_id"),
+  cavUserId: text("cav_user_id"),
+
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -551,6 +558,9 @@ export const contacts = pgTable("contacts", {
   ownerIdx: index("contacts_owner_idx").on(table.ownerId),
   tagsGinIdx: index("contacts_tags_gin_idx").using('gin', table.tags),
   timezoneIdx: index("contacts_timezone_idx").on(table.timezone),
+  cavIdIdx: index("contacts_cav_id_idx").on(table.cavId),
+  cavUserIdIdx: index("contacts_cav_user_id_idx").on(table.cavUserId),
+  nameCompanyHashIdx: index("contacts_name_company_hash_idx").on(table.nameCompanyHash),
 }));
 
 // Contact Emails - Secondary email addresses for contacts
@@ -1160,6 +1170,34 @@ export const suppressionPhones = pgTable("suppression_phones", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   phoneIdx: index("suppression_phones_idx").on(table.phoneE164),
+}));
+
+// ========== COMPREHENSIVE SUPPRESSION LIST ==========
+// Global suppression list with advanced matching rules:
+// 1. Email matches (exact, case-insensitive)
+// 2. CAV ID matches
+// 3. CAV User ID matches
+// 4. Full Name + Company BOTH match (together)
+export const suppressionList = pgTable("suppression_list", {
+  id: serial("id").primaryKey(),
+  email: text("email"),
+  emailNorm: text("email_norm"),
+  fullName: text("full_name"),
+  fullNameNorm: text("full_name_norm"),
+  companyName: text("company_name"),
+  companyNorm: text("company_norm"),
+  nameCompanyHash: text("name_company_hash"),
+  cavId: text("cav_id"),
+  cavUserId: text("cav_user_id"),
+  reason: text("reason"),
+  source: text("source"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  emailNormIdx: index("suppression_list_email_norm_idx").on(table.emailNorm),
+  cavIdIdx: index("suppression_list_cav_id_idx").on(table.cavId),
+  cavUserIdIdx: index("suppression_list_cav_user_id_idx").on(table.cavUserId),
+  nameCompanyHashIdx: index("suppression_list_name_company_hash_idx").on(table.nameCompanyHash),
 }));
 
 // ========== CAMPAIGN-LEVEL SUPPRESSION SYSTEM ==========
@@ -2001,6 +2039,12 @@ export const insertSuppressionPhoneSchema = createInsertSchema(suppressionPhones
   createdAt: true,
 });
 
+export const insertSuppressionListSchema = createInsertSchema(suppressionList).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertCampaignSuppressionAccountSchema = createInsertSchema(campaignSuppressionAccounts).omit({
   id: true,
   createdAt: true,
@@ -2257,6 +2301,9 @@ export type InsertSuppressionEmail = z.infer<typeof insertSuppressionEmailSchema
 
 export type SuppressionPhone = typeof suppressionPhones.$inferSelect;
 export type InsertSuppressionPhone = z.infer<typeof insertSuppressionPhoneSchema>;
+
+export type SuppressionListEntry = typeof suppressionList.$inferSelect;
+export type InsertSuppressionListEntry = z.infer<typeof insertSuppressionListSchema>;
 
 export type CampaignSuppressionAccount = typeof campaignSuppressionAccounts.$inferSelect;
 export type InsertCampaignSuppressionAccount = z.infer<typeof insertCampaignSuppressionAccountSchema>;
