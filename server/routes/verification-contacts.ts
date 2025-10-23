@@ -343,7 +343,8 @@ router.get("/api/verification-contacts/:id", async (req, res) => {
       SELECT 
         c.*,
         a.name as account_name,
-        a.domain
+        a.domain,
+        a.custom_fields as account_custom_fields
       FROM verification_contacts c
       LEFT JOIN accounts a ON a.id = c.account_id
       WHERE c.id = ${req.params.id}
