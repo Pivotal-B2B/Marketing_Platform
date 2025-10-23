@@ -217,7 +217,7 @@ export default function VerificationCampaignStatsPage() {
 
   const updateCustomField = (key: string, value: string) => {
     setFilters(prev => {
-      const newCustomFields = { ...prev.customFields };
+      const newCustomFields = { ...(prev.customFields || {}) };
       if (value) {
         newCustomFields[key] = value;
       } else {
