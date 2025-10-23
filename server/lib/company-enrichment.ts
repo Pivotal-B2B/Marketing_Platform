@@ -36,24 +36,25 @@ interface EnrichmentResult {
 export class CompanyEnrichmentService {
   /**
    * Determines if a contact needs address enrichment
-   * Returns true if ANY required address field is missing
+   * Returns true if ANY required AI enrichment address field is missing
    */
   static needsAddressEnrichment(contact: Partial<VerificationContact>): boolean {
-    // Require ALL essential fields to be present for a complete address
-    const hasCompleteAddress = !!(
-      contact.hqAddress1 &&
-      contact.hqCity &&
-      contact.hqState &&
-      contact.hqPostal
+    // Check AI enrichment fields - require ALL essential fields to be present for a complete address
+    const hasCompleteAIEnrichedAddress = !!(
+      contact.aiEnrichedAddress1 &&
+      contact.aiEnrichedCity &&
+      contact.aiEnrichedState &&
+      contact.aiEnrichedPostal
     );
-    return !hasCompleteAddress;
+    return !hasCompleteAIEnrichedAddress;
   }
 
   /**
    * Determines if a contact needs phone enrichment
+   * Checks if AI enriched phone is missing
    */
   static needsPhoneEnrichment(contact: Partial<VerificationContact>): boolean {
-    return !contact.hqPhone;
+    return !contact.aiEnrichedPhone;
   }
 
   /**

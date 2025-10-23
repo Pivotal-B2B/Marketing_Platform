@@ -80,11 +80,13 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
         accountName: accounts.name,
         contactCountry: verificationContacts.contactCountry,
         hqCountry: verificationContacts.hqCountry,
-        hqAddress1: verificationContacts.hqAddress1,
-        hqCity: verificationContacts.hqCity,
-        hqState: verificationContacts.hqState,
-        hqPostal: verificationContacts.hqPostal,
-        hqPhone: verificationContacts.hqPhone,
+        aiEnrichedAddress1: verificationContacts.aiEnrichedAddress1,
+        aiEnrichedAddress2: verificationContacts.aiEnrichedAddress2,
+        aiEnrichedAddress3: verificationContacts.aiEnrichedAddress3,
+        aiEnrichedCity: verificationContacts.aiEnrichedCity,
+        aiEnrichedState: verificationContacts.aiEnrichedState,
+        aiEnrichedPostal: verificationContacts.aiEnrichedPostal,
+        aiEnrichedPhone: verificationContacts.aiEnrichedPhone,
         addressEnrichmentStatus: verificationContacts.addressEnrichmentStatus,
         phoneEnrichmentStatus: verificationContacts.phoneEnrichmentStatus,
       })
@@ -211,21 +213,21 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
         const CONFIDENCE_THRESHOLD = 0.7;
 
         // Handle address enrichment result - only save if addressConfidence >= 0.7
-        // Save to CONTACT-level fields (local office address where the contact works)
+        // Save to AI Enrichment fields (separate from contact/HQ fields, based on Contact Country only)
         if (result.address && result.addressConfidence !== undefined) {
           if (result.addressConfidence >= CONFIDENCE_THRESHOLD) {
-            updateData.contactAddress1 = result.address.address1;
-            updateData.contactAddress2 = result.address.address2 || null;
-            updateData.contactAddress3 = result.address.address3 || null;
-            updateData.contactCity = result.address.city;
-            updateData.contactState = result.address.state;
-            updateData.contactPostal = result.address.postalCode;
-            updateData.contactCountry = result.address.country;
+            updateData.aiEnrichedAddress1 = result.address.address1;
+            updateData.aiEnrichedAddress2 = result.address.address2 || null;
+            updateData.aiEnrichedAddress3 = result.address.address3 || null;
+            updateData.aiEnrichedCity = result.address.city;
+            updateData.aiEnrichedState = result.address.state;
+            updateData.aiEnrichedPostal = result.address.postalCode;
+            updateData.aiEnrichedCountry = result.address.country;
             updateData.addressEnrichmentStatus = 'completed';
             updateData.addressEnrichedAt = new Date();
             updateData.addressEnrichmentError = null;
             progress.addressEnriched++;
-            console.log(`[Enrichment] Contact address enriched for ${contact.fullName} (confidence: ${result.addressConfidence})`);
+            console.log(`[Enrichment] AI enriched address for ${contact.fullName} (confidence: ${result.addressConfidence})`);
           } else {
             updateData.addressEnrichmentStatus = 'failed';
             updateData.addressEnrichmentError = `Low confidence: ${result.addressConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;
@@ -237,15 +239,15 @@ router.post("/api/verification-campaigns/:campaignId/enrich", async (req, res) =
         }
 
         // Handle phone enrichment result - only save if phoneConfidence >= 0.7
-        // Save to HQ Phone field (local office phone where the contact works)
+        // Save to AI Enrichment phone field (separate from contact/HQ phone, based on Contact Country only)
         if (result.phone && result.phoneConfidence !== undefined) {
           if (result.phoneConfidence >= CONFIDENCE_THRESHOLD) {
-            updateData.hqPhone = result.phone; // Save to hqPhone field (LOCAL office phone)
+            updateData.aiEnrichedPhone = result.phone;
             updateData.phoneEnrichmentStatus = 'completed';
             updateData.phoneEnrichedAt = new Date();
             updateData.phoneEnrichmentError = null;
             progress.phoneEnriched++;
-            console.log(`[Enrichment] Contact phone enriched for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
+            console.log(`[Enrichment] AI enriched phone for ${contact.fullName} (confidence: ${result.phoneConfidence})`);
           } else {
             updateData.phoneEnrichmentStatus = 'failed';
             updateData.phoneEnrichmentError = `Low confidence: ${result.phoneConfidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}`;

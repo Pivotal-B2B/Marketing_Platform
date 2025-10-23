@@ -3568,6 +3568,16 @@ export const verificationContacts = pgTable("verification_contacts", {
   phoneEnrichedAt: timestamp("phone_enriched_at"),
   phoneEnrichmentError: text("phone_enrichment_error"),
 
+  // AI Enrichment Results - Separate fields for enriched data based on Contact Country
+  aiEnrichedAddress1: text("ai_enriched_address1"),
+  aiEnrichedAddress2: text("ai_enriched_address2"),
+  aiEnrichedAddress3: text("ai_enriched_address3"),
+  aiEnrichedCity: text("ai_enriched_city"),
+  aiEnrichedState: text("ai_enriched_state"),
+  aiEnrichedPostal: text("ai_enriched_postal"),
+  aiEnrichedCountry: text("ai_enriched_country"),
+  aiEnrichedPhone: text("ai_enriched_phone"),
+
   customFields: jsonb("custom_fields"),
 
   createdAt: timestamp("created_at").notNull().defaultNow(),
