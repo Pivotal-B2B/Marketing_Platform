@@ -136,7 +136,9 @@ export async function checkSuppressionBulk(
     return new Map();
   }
   
-  const result = await db.execute(sql`
+  const contactIdsArray = `{${contactIds.map(id => `"${id.replace(/"/g, '\\"')}"`).join(',')}}`;
+  
+  const result = await db.execute(sql.raw(`
     WITH contact_data AS (
       SELECT 
         c.id,
@@ -147,7 +149,7 @@ export async function checkSuppressionBulk(
         c.company_norm,
         c.name_company_hash
       FROM contacts c
-      WHERE c.id = ANY(${contactIds}::varchar[])
+      WHERE c.id = ANY('${contactIdsArray}'::varchar[])
         AND c.deleted_at IS NULL
     )
     SELECT
@@ -195,7 +197,7 @@ export async function checkSuppressionBulk(
         ELSE NULL
       END AS suppression_reason
     FROM contact_data
-  `);
+  `));
   
   const suppressionMap = new Map<string, string>();
   
