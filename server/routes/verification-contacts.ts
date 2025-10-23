@@ -1034,7 +1034,7 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-field-update"
     const bulkFieldUpdateSchema = z.object({
       contactIds: z.array(z.string().uuid()).nonempty(),
       fieldName: z.string().min(1),
-      fieldValue: z.any(),
+      fieldValue: z.string(), // Only allow strings for safety
     });
     
     const { contactIds, fieldName, fieldValue } = bulkFieldUpdateSchema.parse(req.body);
@@ -1046,26 +1046,52 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-field-update"
       fieldValue
     });
     
-    // Allowed fields for bulk update
-    const allowedFields = [
-      'contactCountry', 'contactCity', 'contactState', 'contactPostal',
-      'contactAddress1', 'contactAddress2', 'contactAddress3',
-      'hqCountry', 'hqCity', 'hqState', 'hqPostal',
-      'hqAddress1', 'hqAddress2', 'hqAddress3',
-      'title', 'phone', 'mobile', 'linkedinUrl',
-      'formerPosition', 'timeInCurrentPosition', 'timeInCurrentCompany'
-    ];
+    // Strict allowlist: maps frontend field names to Drizzle camelCase property names
+    // Only these fields can be bulk updated
+    const FIELD_ALLOWLIST: Record<string, keyof typeof verificationContacts.$inferSelect> = {
+      'contactCountry': 'contactCountry',
+      'contactCity': 'contactCity',
+      'contactState': 'contactState',
+      'contactPostal': 'contactPostal',
+      'contactAddress1': 'contactAddress1',
+      'contactAddress2': 'contactAddress2',
+      'contactAddress3': 'contactAddress3',
+      'hqCountry': 'hqCountry',
+      'hqCity': 'hqCity',
+      'hqState': 'hqState',
+      'hqPostal': 'hqPostal',
+      'hqAddress1': 'hqAddress1',
+      'hqAddress2': 'hqAddress2',
+      'hqAddress3': 'hqAddress3',
+      'title': 'title',
+      'phone': 'phone',
+      'mobile': 'mobile',
+      'linkedinUrl': 'linkedinUrl',
+      'formerPosition': 'formerPosition',
+      'timeInCurrentPosition': 'timeInCurrentPosition',
+      'timeInCurrentCompany': 'timeInCurrentCompany',
+    };
     
-    if (!allowedFields.includes(fieldName)) {
+    // Validate field name against allowlist
+    const drizzlePropertyName = FIELD_ALLOWLIST[fieldName];
+    if (!drizzlePropertyName) {
       return res.status(400).json({ 
         error: "Invalid field name", 
-        allowedFields 
+        allowedFields: Object.keys(FIELD_ALLOWLIST)
       });
     }
     
-    // Build update object
+    // Sanitize and validate field value
+    const sanitizedValue = fieldValue.trim();
+    if (sanitizedValue.length > 500) {
+      return res.status(400).json({ 
+        error: "Field value too long (max 500 characters)" 
+      });
+    }
+    
+    // Build update object using Drizzle property name (type-safe)
     const updateData: any = {
-      [fieldName]: fieldValue,
+      [drizzlePropertyName]: sanitizedValue || null, // Empty string becomes null
       updatedAt: new Date()
     };
     

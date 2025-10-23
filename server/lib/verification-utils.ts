@@ -227,14 +227,8 @@ export async function checkSuppression(
     checks.push(eq(verificationSuppressionList.cavUserId, contact.cavUserId));
   }
   
-  if (contact.fullName && contact.account_name) {
-    const hash = computeNameCompanyHash(
-      contact.fullName.split(' ')[0],
-      contact.fullName.split(' ').slice(1).join(' '),
-      contact.account_name
-    );
-    checks.push(eq(verificationSuppressionList.nameCompanyHash, hash));
-  }
+  // Name+Company Hash matching removed per user request
+  // Only check: Email, CAV ID, CAV User ID
   
   if (checks.length === 0) {
     return false;

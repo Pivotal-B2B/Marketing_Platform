@@ -10,6 +10,7 @@ export async function applySuppressionForContacts(
   if (contactIds.length === 0) return;
   
   // Get suppressed contacts matching the criteria
+  // Only check: Email, CAV ID, CAV User ID (Name+Company Hash removed per user request)
   const result = await db
     .select({ id: verificationContacts.id })
     .from(verificationContacts)
@@ -18,7 +19,6 @@ export async function applySuppressionForContacts(
         (${verificationContacts.emailLower} = ${verificationSuppressionList.emailLower} AND ${verificationSuppressionList.emailLower} IS NOT NULL)
         OR (${verificationContacts.cavId} = ${verificationSuppressionList.cavId} AND ${verificationSuppressionList.cavId} IS NOT NULL)
         OR (${verificationContacts.cavUserId} = ${verificationSuppressionList.cavUserId} AND ${verificationSuppressionList.cavUserId} IS NOT NULL)
-        OR (MD5(LOWER(COALESCE(${verificationContacts.firstName}, '')) || LOWER(COALESCE(${verificationContacts.lastName}, '')) || LOWER(COALESCE(${verificationContacts.companyKey}, ''))) = ${verificationSuppressionList.nameCompanyHash} AND ${verificationSuppressionList.nameCompanyHash} IS NOT NULL)
       ) AND (${verificationSuppressionList.campaignId} = ${campaignId} OR ${verificationSuppressionList.campaignId} IS NULL)`
     )
     .where(
