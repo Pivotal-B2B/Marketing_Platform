@@ -41,13 +41,57 @@ export function Step2TelemarketingContent({ data, onNext }: Step2TelemarketingPr
     ]);
   };
 
-  const placeholders = [
-    "{{contact.first_name}}",
-    "{{contact.last_name}}",
-    "{{contact.job_title}}",
-    "{{contact.company}}",
-    "{{account.name}}",
-    "{{account.industry}}",
+  const placeholderGroups = [
+    {
+      name: "Contact",
+      items: [
+        "{{contact.fullName}}",
+        "{{contact.firstName}}",
+        "{{contact.lastName}}",
+        "{{contact.email}}",
+        "{{contact.directPhone}}",
+        "{{contact.mobilePhone}}",
+        "{{contact.jobTitle}}",
+        "{{contact.department}}",
+        "{{contact.seniorityLevel}}",
+        "{{contact.city}}",
+        "{{contact.state}}",
+        "{{contact.country}}",
+        "{{contact.linkedinUrl}}",
+      ]
+    },
+    {
+      name: "Account",
+      items: [
+        "{{account.name}}",
+        "{{account.domain}}",
+        "{{account.industry}}",
+        "{{account.staffCount}}",
+        "{{account.revenue}}",
+        "{{account.mainPhone}}",
+        "{{account.hqCity}}",
+        "{{account.hqState}}",
+        "{{account.hqCountry}}",
+        "{{account.yearFounded}}",
+        "{{account.techStack}}",
+        "{{account.linkedinUrl}}",
+      ]
+    },
+    {
+      name: "Agent",
+      items: [
+        "{{agent.fullName}}",
+        "{{agent.firstName}}",
+        "{{agent.lastName}}",
+        "{{agent.email}}",
+      ]
+    },
+    {
+      name: "Campaign",
+      items: [
+        "{{campaign.name}}",
+      ]
+    }
   ];
 
   return (
@@ -84,21 +128,30 @@ export function Step2TelemarketingContent({ data, onNext }: Step2TelemarketingPr
             />
           </div>
 
-          {/* Quick Insert Placeholders */}
-          <div className="space-y-2">
-            <Label>Quick Insert</Label>
-            <div className="flex flex-wrap gap-2">
-              {placeholders.map((placeholder) => (
-                <Button
-                  key={placeholder}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setScriptContent(scriptContent + " " + placeholder)}
-                  className="font-mono text-xs"
-                  data-testid={`button-insert-${placeholder}`}
-                >
-                  {placeholder}
-                </Button>
+          {/* Grouped Placeholders */}
+          <div className="space-y-3">
+            <Label>Available Placeholders</Label>
+            <div className="space-y-3">
+              {placeholderGroups.map((group) => (
+                <div key={group.name} className="space-y-2">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {group.name}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.items.map((placeholder) => (
+                      <Button
+                        key={placeholder}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setScriptContent(scriptContent + " " + placeholder)}
+                        className="font-mono text-xs h-7"
+                        data-testid={`button-insert-${placeholder}`}
+                      >
+                        {placeholder}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
