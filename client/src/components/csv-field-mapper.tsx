@@ -11,7 +11,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Sparkles, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Sparkles, ArrowRight, CheckCircle2, AlertTriangle, Plus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { CustomFieldDefinition } from "@shared/schema";
 
 interface FieldMapping {
@@ -103,6 +108,14 @@ export function CSVFieldMapper({
 }: CSVFieldMapperProps) {
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
   const [autoMapped, setAutoMapped] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createFieldForColumn, setCreateFieldForColumn] = useState<string | null>(null);
+  const [createFieldEntity, setCreateFieldEntity] = useState<"contact" | "account" | null>(null);
+  const [newFieldKey, setNewFieldKey] = useState("");
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState<"text" | "number" | "date" | "boolean">("text");
+  const [isCreating, setIsCreating] = useState(false);
+  const { toast } = useToast();
 
   // Fetch custom fields
   const { data: customFields, isLoading: customFieldsLoading } = useQuery<CustomFieldDefinition[]>({
@@ -278,6 +291,66 @@ export function CSVFieldMapper({
     onMappingComplete(mappings);
   };
 
+  const openCreateDialog = (csvColumn: string, entity: "contact" | "account") => {
+    setCreateFieldForColumn(csvColumn);
+    setCreateFieldEntity(entity);
+    // Auto-suggest field key from CSV column name
+    const suggestedKey = csvColumn.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    setNewFieldKey(suggestedKey);
+    setNewFieldLabel(csvColumn);
+    setShowCreateDialog(true);
+  };
+
+  const handleCreateCustomField = async () => {
+    if (!newFieldKey || !newFieldLabel || !createFieldEntity) return;
+
+    setIsCreating(true);
+    try {
+      const response = await apiRequest("POST", "/api/custom-fields", {
+        entityType: createFieldEntity,
+        fieldKey: newFieldKey,
+        displayLabel: newFieldLabel,
+        fieldType: newFieldType,
+        active: true,
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to create custom field");
+      }
+
+      // Refresh custom fields
+      await queryClient.invalidateQueries({ queryKey: ['/api/custom-fields'] });
+
+      // Auto-map the column to the newly created field
+      if (createFieldForColumn) {
+        updateMapping(createFieldForColumn, `custom_${newFieldKey}`, createFieldEntity);
+      }
+
+      toast({
+        title: "Custom Field Created",
+        description: `Created "${newFieldLabel}" and mapped it to column "${createFieldForColumn}"`,
+      });
+
+      // Reset dialog state
+      setShowCreateDialog(false);
+      setCreateFieldForColumn(null);
+      setCreateFieldEntity(null);
+      setNewFieldKey("");
+      setNewFieldLabel("");
+      setNewFieldType("text");
+    } catch (error) {
+      console.error("Failed to create custom field:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create custom field",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const mappedCount = mappings.filter(m => m.targetField !== null).length;
   const unmappedCount = mappings.length - mappedCount;
   const unmappedColumns = mappings.filter(m => m.targetField === null).map(m => m.csvColumn);
@@ -372,12 +445,25 @@ export function CSVFieldMapper({
                   {mapping.targetEntity && (mapping.targetEntity === "contact" || mapping.targetEntity === "account") && (
                     <Select
                       value={mapping.targetField || ""}
-                      onValueChange={(value) => updateMapping(mapping.csvColumn, value, mapping.targetEntity)}
+                      onValueChange={(value) => {
+                        if (value === "__CREATE_NEW__") {
+                          openCreateDialog(mapping.csvColumn, mapping.targetEntity!);
+                        } else {
+                          updateMapping(mapping.csvColumn, value, mapping.targetEntity);
+                        }
+                      }}
                     >
                       <SelectTrigger className="flex-1" data-testid={`select-field-${mapping.csvColumn}`}>
                         <SelectValue placeholder="Select field" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="__CREATE_NEW__" className="font-medium text-primary">
+                          <div className="flex items-center gap-2">
+                            <Plus className="h-3 w-3" />
+                            <span>Create New Custom Field</span>
+                          </div>
+                        </SelectItem>
+                        <div className="my-1 border-t" />
                         {(mapping.targetEntity === "contact" ? CONTACT_FIELDS : ACCOUNT_FIELDS).map((field) => (
                           <SelectItem key={field.value} value={field.value}>
                             {field.label}
@@ -409,6 +495,80 @@ export function CSVFieldMapper({
           Continue with Mapping
         </Button>
       </div>
+
+      {/* Create Custom Field Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Custom Field</DialogTitle>
+            <DialogDescription>
+              Create a new custom {createFieldEntity} field and map column "{createFieldForColumn}" to it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="field-key">Field Key*</Label>
+              <Input
+                id="field-key"
+                value={newFieldKey}
+                onChange={(e) => setNewFieldKey(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))}
+                placeholder="e.g., custom_field_name"
+                data-testid="input-field-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                Unique identifier for this field (lowercase, numbers, underscores only)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="field-label">Display Label*</Label>
+              <Input
+                id="field-label"
+                value={newFieldLabel}
+                onChange={(e) => setNewFieldLabel(e.target.value)}
+                placeholder="e.g., Custom Field Name"
+                data-testid="input-field-label"
+              />
+              <p className="text-xs text-muted-foreground">
+                Human-readable name shown in the UI
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="field-type">Field Type*</Label>
+              <Select value={newFieldType} onValueChange={(value: any) => setNewFieldType(value)}>
+                <SelectTrigger id="field-type" data-testid="select-field-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="number">Number</SelectItem>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="boolean">Boolean</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateDialog(false)}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateCustomField}
+              disabled={!newFieldKey || !newFieldLabel || isCreating}
+              data-testid="button-create-field"
+            >
+              {isCreating ? "Creating..." : "Create & Map"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
