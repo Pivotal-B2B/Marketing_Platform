@@ -62,7 +62,8 @@ interface CSVRow {
   naicsCode?: string;
 }
 
-const BATCH_SIZE = 500; // Optimized for large uploads (was 50)
+const BATCH_SIZE = 500; // Process 500 rows per batch
+const BULK_INSERT_SIZE = 100; // Insert 100 contacts at once
 
 const autoMappings: Record<string, string> = {
   'fullname': 'fullName',
@@ -259,13 +260,40 @@ export async function processUpload(jobId: string) {
     let errorCount = 0;
     const errors: Array<{ row: number; message: string }> = [];
 
-    const accountCache = new Map<string, any>();
+    // OPTIMIZATION: Pre-load all accounts once for fast in-memory matching
+    console.log('[Upload] Pre-loading all accounts for fast matching...');
+    const allAccounts = await db.select().from(accounts);
+    console.log(`[Upload] Loaded ${allAccounts.length} accounts into memory`);
+
+    // Build lookup maps for O(1) domain matching
+    const accountsByDomain = new Map<string, typeof accounts.$inferSelect>();
+    const accountsByNormalizedName = new Map<string, typeof accounts.$inferSelect[]>();
+    
+    for (const account of allAccounts) {
+      if (account.domain) {
+        const normalized = account.domain.toLowerCase().trim();
+        accountsByDomain.set(normalized, account);
+      }
+      if (account.name) {
+        const normalizedName = normalize.companyKey(account.name);
+        if (!accountsByNormalizedName.has(normalizedName)) {
+          accountsByNormalizedName.set(normalizedName, []);
+        }
+        accountsByNormalizedName.get(normalizedName)!.push(account);
+      }
+    }
 
     for (let batchStart = 0; batchStart < mappedRows.length; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, mappedRows.length);
       const batch = mappedRows.slice(batchStart, batchEnd);
 
       await db.transaction(async (tx) => {
+        // OPTIMIZATION: Collect contacts for bulk insert
+        const contactsToInsert: any[] = [];
+        const contactsToUpdate: Array<{ id: string; data: any }> = [];
+        const newAccountsToCreate: any[] = [];
+        const accountCache = new Map<string, any>();
+
         for (let i = 0; i < batch.length; i++) {
           const globalIndex = batchStart + i;
           const row = batch[i];
@@ -294,62 +322,28 @@ export async function processUpload(jobId: string) {
             const normalizedInput = inputDomain ? normalizeDomain(inputDomain) : '';
             const rootDomain = normalizedInput ? extractRootDomain(normalizedInput) : '';
 
+            // OPTIMIZATION: Fast O(1) lookup from pre-loaded accounts
             const cacheKey = rootDomain || accountNameCsv || '';
             if (cacheKey && accountCache.has(cacheKey)) {
               const cached = accountCache.get(cacheKey);
               accountId = cached.id;
               accountData = cached;
             } else {
-              if (rootDomain) {
-                const exactMatch = await tx
-                  .select()
-                  .from(accounts)
-                  .where(sql`
-                    ${accounts.domain} IS NOT NULL 
-                    AND LOWER(TRIM(${accounts.domain})) = ${rootDomain.toLowerCase()}
-                  `)
-                  .limit(1);
-
-                if (exactMatch.length > 0) {
-                  accountId = exactMatch[0].id;
-                  accountData = exactMatch[0];
-                  accountCache.set(cacheKey, accountData);
-                }
+              // Try exact domain match from pre-loaded map
+              if (rootDomain && accountsByDomain.has(rootDomain.toLowerCase())) {
+                accountData = accountsByDomain.get(rootDomain.toLowerCase())!;
+                accountId = accountData.id;
+                accountCache.set(cacheKey, accountData);
               }
 
-              if (!accountId && (inputDomain || accountNameCsv)) {
-                let candidateAccounts: typeof accounts.$inferSelect[] = [];
-
-                if (accountNameCsv) {
-                  const coreWords = normalize.companyKey(accountNameCsv).split(' ').filter(w => w.length > 2);
-                  const likePattern = coreWords.length > 0 ? `%${coreWords[0]}%` : `%${accountNameCsv}%`;
-
-                  candidateAccounts = await tx
-                    .select()
-                    .from(accounts)
-                    .where(sql`LOWER(${accounts.name}) LIKE LOWER(${likePattern})`)
-                    .limit(200);
-                }
-
-                if (candidateAccounts.length === 0 && normalizedInput) {
-                  const domainRoot = normalizedInput.split('.')[0];
-                  candidateAccounts = await tx
-                    .select()
-                    .from(accounts)
-                    .where(sql`${accounts.domain} IS NOT NULL AND ${accounts.domain} LIKE ${`%${domainRoot}%`}`)
-                    .limit(200);
-                }
-
-                if (candidateAccounts.length === 0) {
-                  candidateAccounts = await tx
-                    .select()
-                    .from(accounts)
-                    .limit(500);
-                }
-
+              // Try fuzzy name matching from pre-loaded map
+              if (!accountId && accountNameCsv) {
+                const normalizedName = normalize.companyKey(accountNameCsv);
+                const candidates = accountsByNormalizedName.get(normalizedName) || [];
+                
                 let bestMatch: { account: typeof accounts.$inferSelect; confidence: number } | null = null;
 
-                for (const account of candidateAccounts) {
+                for (const account of candidates) {
                   const matchResult = getMatchTypeAndConfidence(
                     normalizedInput,
                     accountNameCsv || undefined,
@@ -374,15 +368,15 @@ export async function processUpload(jobId: string) {
                 }
               }
 
+              // Create new account if no match found
               if (!accountId) {
-                // Parse and normalize new company custom fields
                 const normalizedWebDomain = normalizeWebDomain(row.websiteDomain || row.domain);
                 const normalizedLinkedInUrl = normalizeLinkedInUrl(row.linkedinUrl);
                 const webTechParsed = parseWebTechnologies(row.webTechnologies);
                 const foundedDateParsed = parseFoundedDate(row.foundedDate);
                 const validatedRevenue = validateAnnualRevenue(row.annualRevenue);
                 
-                const newAccount = await tx.insert(accounts).values({
+                const newAccountData = {
                   name: accountNameCsv ?? (rootDomain ? rootDomain.split('.')[0] : 'Unknown Company'),
                   domain: rootDomain,
                   mainPhone: row.hqPhone ?? null,
@@ -393,7 +387,6 @@ export async function processUpload(jobId: string) {
                   hqState: row.hqState ?? null,
                   hqPostalCode: row.hqPostal ?? null,
                   hqCountry: row.hqCountry ?? null,
-                  // NEW: Company custom fields
                   annualRevenue: validatedRevenue,
                   description: row.description ?? null,
                   websiteDomain: normalizedWebDomain,
@@ -406,9 +399,12 @@ export async function processUpload(jobId: string) {
                   webTechnologiesJson: webTechParsed.json,
                   sicCode: row.sicCode ?? null,
                   naicsCode: row.naicsCode ?? null,
-                }).returning();
-                accountId = newAccount[0].id;
-                accountData = newAccount[0];
+                };
+                
+                newAccountsToCreate.push(newAccountData);
+                // Temporarily store for this batch
+                accountData = { ...newAccountData, id: `temp_${newAccountsToCreate.length}` };
+                accountId = accountData.id;
                 accountCache.set(cacheKey, accountData);
               }
             }
@@ -581,19 +577,17 @@ export async function processUpload(jobId: string) {
               Object.assign(updateData, normalizedKeys);
 
               if (Object.keys(updateData).length > 0) {
-                await tx
-                  .update(verificationContacts)
-                  .set(updateData)
-                  .where(eq(verificationContacts.id, existingContact.id));
+                contactsToUpdate.push({ id: existingContact.id, data: updateData });
               }
+              successCount++;
             } else {
-              // Parse duration fields to months
+              // OPTIMIZATION: Collect for bulk insert
               const positionMonths = parseDurationToMonths(row.timeInCurrentPosition);
               const companyMonths = parseDurationToMonths(row.timeInCurrentCompany);
               
-              await tx.insert(verificationContacts).values({
+              contactsToInsert.push({
                 campaignId,
-                accountId,
+                accountId, // May be temp ID, will replace after account creation
                 sourceType,
                 fullName,
                 firstName: row.firstName || null,
@@ -603,7 +597,6 @@ export async function processUpload(jobId: string) {
                 phone: contactPhone,
                 mobile: row.mobile || null,
                 linkedinUrl: row.linkedinUrl || null,
-                // NEW: Career & tenure fields
                 formerPosition: row.formerPosition || null,
                 timeInCurrentPosition: row.timeInCurrentPosition || null,
                 timeInCurrentPositionMonths: positionMonths,
@@ -630,12 +623,47 @@ export async function processUpload(jobId: string) {
                 suppressed: isSuppressed,
                 ...normalizedKeys,
               });
+              successCount++;
             }
-
-            successCount++;
           } catch (error: any) {
             errorCount++;
             errors.push({ row: globalIndex + 1, message: error.message || 'Unknown error' });
+          }
+        }
+
+        // OPTIMIZATION: Bulk create new accounts
+        const tempToRealAccountId = new Map<string, string>();
+        if (newAccountsToCreate.length > 0) {
+          console.log(`[Upload] Bulk creating ${newAccountsToCreate.length} new accounts...`);
+          const createdAccounts = await tx.insert(accounts).values(newAccountsToCreate).returning();
+          createdAccounts.forEach((account, index) => {
+            const tempId = `temp_${index + 1}`;
+            tempToRealAccountId.set(tempId, account.id);
+            // Update in-memory maps for future lookups
+            if (account.domain) {
+              accountsByDomain.set(account.domain.toLowerCase().trim(), account);
+            }
+          });
+        }
+
+        // OPTIMIZATION: Replace temp account IDs with real ones
+        for (const contact of contactsToInsert) {
+          if (contact.accountId && contact.accountId.startsWith('temp_')) {
+            contact.accountId = tempToRealAccountId.get(contact.accountId) || contact.accountId;
+          }
+        }
+
+        // OPTIMIZATION: Bulk insert contacts
+        if (contactsToInsert.length > 0) {
+          console.log(`[Upload] Bulk inserting ${contactsToInsert.length} contacts...`);
+          await tx.insert(verificationContacts).values(contactsToInsert);
+        }
+
+        // OPTIMIZATION: Bulk update contacts
+        if (contactsToUpdate.length > 0) {
+          console.log(`[Upload] Updating ${contactsToUpdate.length} contacts...`);
+          for (const { id, data } of contactsToUpdate) {
+            await tx.update(verificationContacts).set(data).where(eq(verificationContacts.id, id));
           }
         }
       });
