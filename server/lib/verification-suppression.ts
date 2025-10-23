@@ -106,12 +106,10 @@ export async function applySuppressionForContacts(
           AND ${verificationSuppressionList.nameCompanyHash} != ''
           
           -- Hash match using SHA256 with separator to prevent collisions
-          -- CRITICAL: Must normalize EXACTLY the same as TypeScript side
+          -- Fields are already normalized (lowercased, trimmed, spaces collapsed)
+          -- Just concatenate: "firstname lastname|companykey"
           AND ENCODE(DIGEST(
-            LOWER(TRIM(REGEXP_REPLACE(
-              COALESCE(${verificationContacts.firstNameNorm}, '') || ' ' || COALESCE(${verificationContacts.lastNameNorm}, ''),
-              '\\s+', ' ', 'g'
-            ))) || '|' || LOWER(TRIM(${verificationContacts.companyKey})),
+            ${verificationContacts.firstNameNorm} || ' ' || ${verificationContacts.lastNameNorm} || '|' || ${verificationContacts.companyKey},
             'sha256'
           ), 'hex') = ${verificationSuppressionList.nameCompanyHash}
         )
