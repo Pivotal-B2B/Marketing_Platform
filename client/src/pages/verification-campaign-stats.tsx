@@ -12,6 +12,7 @@ import {
   Download,
   Filter,
   X,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,91 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import type { CustomFieldDefinition } from "@shared/schema";
+
+interface AccountCapStat {
+  accountId: string;
+  accountName: string;
+  domain: string | null;
+  contactCount: number;
+  leadCap: number;
+  remaining: number;
+  percentUsed: number;
+  isAtCap: boolean;
+}
+
+function AccountLeadCapsSection({ campaignId }: { campaignId: string }) {
+  const { data: accountCaps = [], isLoading } = useQuery<AccountCapStat[]>({
+    queryKey: ["/api/verification-campaigns", campaignId, "account-caps"],
+    refetchInterval: 10000,
+  });
+
+  if (isLoading) {
+    return (
+      <Card data-testid="card-account-caps">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Per-Account Lead Caps
+          </CardTitle>
+          <CardDescription>Loading account cap statistics...</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  // If no caps configured or no accounts, don't show the section
+  if (accountCaps.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card data-testid="card-account-caps">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Building2 className="h-5 w-5" />
+          Per-Account Lead Caps
+        </CardTitle>
+        <CardDescription>
+          Contact distribution across accounts (capped campaigns only)
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {accountCaps.map((account) => (
+            <div key={account.accountId} className="space-y-2" data-testid={`account-cap-${account.accountId}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">{account.accountName}</span>
+                  {account.domain && (
+                    <span className="text-xs text-muted-foreground">({account.domain})</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">
+                    {account.contactCount} / {account.leadCap}
+                  </span>
+                  {account.isAtCap && (
+                    <Badge variant="destructive" className="text-xs">
+                      At Cap
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <Progress
+                value={account.percentUsed}
+                className="h-2"
+                data-testid={`progress-account-${account.accountId}`}
+              />
+              <p className="text-xs text-muted-foreground">
+                {account.remaining} slots remaining ({account.percentUsed}% used)
+              </p>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 interface Contact {
   id: string;
@@ -798,6 +884,9 @@ export default function VerificationCampaignStatsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Per-Account Lead Caps */}
+        <AccountLeadCapsSection campaignId={campaignId!} />
 
         {/* Pipeline Status */}
         <Card data-testid="card-pipeline">
