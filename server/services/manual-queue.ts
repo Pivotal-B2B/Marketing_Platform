@@ -25,6 +25,7 @@ export class ManualQueueService {
 
   /**
    * Add contacts to agent's manual queue based on filters
+   * Uses bulk prefetching of suppression lists to avoid N+1 queries
    */
   async addContactsToAgentQueue(
     agentId: string,
@@ -42,69 +43,76 @@ export class ManualQueueService {
       // Build contact query based on filters
       const eligibleContacts = await this.getEligibleContacts(campaignId, filters, limit);
 
-      let added = 0;
-      let skipped = 0;
-
-      for (const contact of eligibleContacts) {
-        try {
-          // Check if contact already in queue for ANY agent in this campaign (global collision prevention)
-          const existingInCampaign = await db.query.agentQueue.findFirst({
-            where: and(
-              eq(agentQueue.campaignId, campaignId),
-              eq(agentQueue.contactId, contact.id),
-              or(
-                eq(agentQueue.queueState, 'queued'),
-                eq(agentQueue.queueState, 'locked'),
-                eq(agentQueue.queueState, 'in_progress')
-              )!
-            ),
-          });
-
-          if (existingInCampaign) {
-            console.log(`[ManualQueue] Contact ${contact.id} already in campaign queue (agent: ${existingInCampaign.agentId})`);
-            skipped++;
-            continue;
-          }
-
-          // Check global DNC and campaign-level suppression lists
-          const isSuppressed = await this.isContactSuppressed(
-            contact.id, 
-            contact.accountId, 
-            campaignId, 
-            contact.email
-          );
-          if (isSuppressed) {
-            skipped++;
-            continue;
-          }
-
-          // Add to queue with atomic collision prevention (ON CONFLICT DO NOTHING)
-          // Uses campaign-level uniqueness: only one active queue entry per contact per campaign
-          const result = await db.insert(agentQueue).values({
-            id: sql`gen_random_uuid()`,
-            agentId,
-            campaignId,
-            contactId: contact.id,
-            accountId: contact.accountId,
-            queueState: 'queued',
-            priority: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }).onConflictDoNothing({
-            target: [agentQueue.campaignId, agentQueue.contactId],
-            where: sql`${agentQueue.queueState} IN ('queued', 'locked', 'in_progress')`,
-          }).returning({ id: agentQueue.id });
-
-          if (result.length > 0) {
-            added++;
-          } else {
-            skipped++; // Contact already queued by another agent (race condition caught)
-          }
-        } catch (error) {
-          console.error(`[ManualQueue] Error adding contact ${contact.id}:`, error);
-          skipped++;
-        }
+      if (eligibleContacts.length === 0) {
+        return { added: 0, skipped: 0 };
       }
+
+      // PERFORMANCE OPTIMIZATION: Prefetch all suppression sets in bulk
+      const suppressionSets = await this.prefetchSuppressionSets(
+        campaignId, 
+        eligibleContacts
+      );
+
+      // Get already queued contacts in this campaign (bulk check)
+      const contactIds = eligibleContacts.map(c => c.id);
+      const alreadyQueued = await db
+        .select({ contactId: agentQueue.contactId })
+        .from(agentQueue)
+        .where(
+          and(
+            eq(agentQueue.campaignId, campaignId),
+            inArray(agentQueue.contactId, contactIds),
+            or(
+              eq(agentQueue.queueState, 'queued'),
+              eq(agentQueue.queueState, 'locked'),
+              eq(agentQueue.queueState, 'in_progress')
+            )!
+          )
+        );
+      
+      const alreadyQueuedSet = new Set(alreadyQueued.map(q => q.contactId));
+
+      // Filter contacts using in-memory suppression check
+      const contactsToAdd = eligibleContacts.filter(contact => {
+        // Skip if already queued
+        if (alreadyQueuedSet.has(contact.id)) {
+          return false;
+        }
+
+        // Check suppression using prefetched sets (in-memory)
+        return !this.isContactSuppressedBulk(contact, suppressionSets);
+      });
+
+      console.log(`[ManualQueue] Filtered ${eligibleContacts.length} contacts: ${contactsToAdd.length} to add, ${eligibleContacts.length - contactsToAdd.length} suppressed/queued`);
+
+      // Bulk insert all non-suppressed contacts
+      if (contactsToAdd.length === 0) {
+        return { added: 0, skipped: eligibleContacts.length };
+      }
+
+      const queueEntries = contactsToAdd.map(contact => ({
+        id: sql`gen_random_uuid()`,
+        agentId,
+        campaignId,
+        contactId: contact.id,
+        accountId: contact.accountId,
+        queueState: 'queued' as const,
+        priority: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+
+      // Bulk insert with conflict handling
+      const result = await db.insert(agentQueue)
+        .values(queueEntries)
+        .onConflictDoNothing({
+          target: [agentQueue.campaignId, agentQueue.contactId],
+          where: sql`${agentQueue.queueState} IN ('queued', 'locked', 'in_progress')`,
+        })
+        .returning({ id: agentQueue.id });
+
+      const added = result.length;
+      const skipped = eligibleContacts.length - added;
 
       console.log(`[ManualQueue] Added ${added} contacts to agent ${agentId} queue, skipped ${skipped}`);
       return { added, skipped };
@@ -356,7 +364,221 @@ export class ManualQueueService {
   }
 
   /**
+   * Prefetch all suppression sets for a campaign in bulk (single query per set)
+   * Returns in-memory sets for fast filtering
+   */
+  private async prefetchSuppressionSets(
+    campaignId: string,
+    contacts: Contact[]
+  ): Promise<{
+    campaignContactIds: Set<string>;
+    campaignAccountIds: Set<string>;
+    campaignEmailsNorm: Set<string>;
+    campaignDomainsNorm: Set<string>;
+    globalEmailsNorm: Set<string>;
+    globalPhonesE164: Set<string>;
+    accountDomains: Map<string, string>; // contactId -> accountDomain
+  }> {
+    const contactIds = contacts.map(c => c.id);
+    const accountIds = contacts.map(c => c.accountId).filter(Boolean) as string[];
+    const emails = contacts.map(c => c.email).filter(Boolean) as string[];
+    const emailsNorm = emails.map(e => e.toLowerCase().trim());
+    
+    // Extract all phone numbers from contacts
+    const phones: string[] = [];
+    for (const contact of contacts) {
+      if (contact.directPhoneE164) phones.push(contact.directPhoneE164);
+      if (contact.mobilePhoneE164) phones.push(contact.mobilePhoneE164);
+    }
+
+    // Parallel bulk queries for all suppression sets
+    const [
+      campaignContacts,
+      campaignAccounts,
+      campaignEmails,
+      campaignDomains,
+      globalEmails,
+      globalPhones,
+      accountData,
+    ] = await Promise.all([
+      // Campaign-level contact suppressions
+      contactIds.length > 0
+        ? db.select({ contactId: campaignSuppressionContacts.contactId })
+            .from(campaignSuppressionContacts)
+            .where(
+              and(
+                eq(campaignSuppressionContacts.campaignId, campaignId),
+                inArray(campaignSuppressionContacts.contactId, contactIds)
+              )
+            )
+        : Promise.resolve([]),
+      
+      // Campaign-level account suppressions
+      accountIds.length > 0
+        ? db.select({ accountId: campaignSuppressionAccounts.accountId })
+            .from(campaignSuppressionAccounts)
+            .where(
+              and(
+                eq(campaignSuppressionAccounts.campaignId, campaignId),
+                inArray(campaignSuppressionAccounts.accountId, accountIds)
+              )
+            )
+        : Promise.resolve([]),
+      
+      // Campaign-level email suppressions
+      emailsNorm.length > 0
+        ? db.select({ emailNorm: campaignSuppressionEmails.emailNorm })
+            .from(campaignSuppressionEmails)
+            .where(
+              and(
+                eq(campaignSuppressionEmails.campaignId, campaignId),
+                inArray(campaignSuppressionEmails.emailNorm, emailsNorm)
+              )
+            )
+        : Promise.resolve([]),
+      
+      // Campaign-level domain suppressions
+      db.select({ domainNorm: campaignSuppressionDomains.domainNorm })
+        .from(campaignSuppressionDomains)
+        .where(eq(campaignSuppressionDomains.campaignId, campaignId)),
+      
+      // Global email suppressions
+      emailsNorm.length > 0
+        ? db.select({ email: suppressionEmails.email })
+            .from(suppressionEmails)
+            .where(inArray(suppressionEmails.email, emailsNorm))
+        : Promise.resolve([]),
+      
+      // Global phone suppressions
+      phones.length > 0
+        ? db.select({ phoneE164: suppressionPhones.phoneE164 })
+            .from(suppressionPhones)
+            .where(inArray(suppressionPhones.phoneE164, phones))
+        : Promise.resolve([]),
+      
+      // Account domains (for domain-based suppression checks)
+      accountIds.length > 0
+        ? db.select({ id: accounts.id, domain: accounts.domain })
+            .from(accounts)
+            .where(inArray(accounts.id, accountIds))
+        : Promise.resolve([]),
+    ]);
+
+    // Build accountDomains map: contactId -> accountDomain
+    const accountDomainsMap = new Map<string, string>();
+    const accountDomainLookup = new Map(
+      accountData.map(a => [a.id, a.domain]).filter(([_, domain]) => domain) as [string, string][]
+    );
+    
+    for (const contact of contacts) {
+      if (contact.accountId) {
+        const domain = accountDomainLookup.get(contact.accountId);
+        if (domain) {
+          accountDomainsMap.set(contact.id, domain);
+        }
+      }
+    }
+
+    return {
+      campaignContactIds: new Set(campaignContacts.map(c => c.contactId)),
+      campaignAccountIds: new Set(campaignAccounts.map(a => a.accountId)),
+      campaignEmailsNorm: new Set(campaignEmails.map(e => e.emailNorm)),
+      campaignDomainsNorm: new Set(campaignDomains.map(d => d.domainNorm)),
+      globalEmailsNorm: new Set(globalEmails.map(e => e.email)),
+      globalPhonesE164: new Set(globalPhones.map(p => p.phoneE164)),
+      accountDomains: accountDomainsMap,
+    };
+  }
+
+  /**
+   * Check if contact is suppressed using prefetched suppression sets (in-memory)
+   * Much faster than individual DB queries for each contact
+   */
+  private isContactSuppressedBulk(
+    contact: Contact,
+    suppressionSets: {
+      campaignContactIds: Set<string>;
+      campaignAccountIds: Set<string>;
+      campaignEmailsNorm: Set<string>;
+      campaignDomainsNorm: Set<string>;
+      globalEmailsNorm: Set<string>;
+      globalPhonesE164: Set<string>;
+      accountDomains: Map<string, string>;
+    }
+  ): boolean {
+    // 1. Campaign-level contact suppression
+    if (suppressionSets.campaignContactIds.has(contact.id)) {
+      console.log(`[ManualQueue] Contact ${contact.id} is campaign-suppressed`);
+      return true;
+    }
+
+    // 2. Campaign-level account suppression
+    if (contact.accountId && suppressionSets.campaignAccountIds.has(contact.accountId)) {
+      console.log(`[ManualQueue] Account ${contact.accountId} is campaign-suppressed`);
+      return true;
+    }
+
+    // 3. Campaign-level email suppression
+    if (contact.email) {
+      const emailNorm = contact.email.toLowerCase().trim();
+      if (suppressionSets.campaignEmailsNorm.has(emailNorm)) {
+        console.log(`[ManualQueue] Email ${contact.email} is campaign-suppressed`);
+        return true;
+      }
+    }
+
+    // 4. Campaign-level domain suppression
+    // Check both email-derived domain AND account domain
+    const domainsToCheck: string[] = [];
+    
+    // Extract domain from email
+    if (contact.email) {
+      const match = contact.email.match(/@(.+)$/);
+      if (match) {
+        domainsToCheck.push(match[1]);
+      }
+    }
+    
+    // Add account domain (canonical domain)
+    const accountDomain = suppressionSets.accountDomains.get(contact.id);
+    if (accountDomain) {
+      domainsToCheck.push(accountDomain);
+    }
+    
+    for (const domain of domainsToCheck) {
+      const domainNorm = domain.toLowerCase().trim().replace(/^www\./, '');
+      if (suppressionSets.campaignDomainsNorm.has(domainNorm)) {
+        console.log(`[ManualQueue] Domain ${domain} is campaign-suppressed`);
+        return true;
+      }
+    }
+
+    // 5. Global email suppression
+    if (contact.email) {
+      const emailNorm = contact.email.toLowerCase().trim();
+      if (suppressionSets.globalEmailsNorm.has(emailNorm)) {
+        console.log(`[ManualQueue] Email ${contact.email} is globally suppressed`);
+        return true;
+      }
+    }
+
+    // 6. Global phone suppression (DNC)
+    if (contact.directPhoneE164 && suppressionSets.globalPhonesE164.has(contact.directPhoneE164)) {
+      console.log(`[ManualQueue] Direct phone is on global DNC`);
+      return true;
+    }
+    if (contact.mobilePhoneE164 && suppressionSets.globalPhonesE164.has(contact.mobilePhoneE164)) {
+      console.log(`[ManualQueue] Mobile phone is on global DNC`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Check if contact is on global or campaign-level suppression lists
+   * NOTE: This is the legacy per-contact method, kept for single-contact operations
+   * For bulk operations, use prefetchSuppressionSets + isContactSuppressedBulk
    */
   private async isContactSuppressed(
     contactId: string, 
