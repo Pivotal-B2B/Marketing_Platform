@@ -1,74 +1,66 @@
-import crypto from "crypto";
 import { db } from "../db";
-import { sql } from "drizzle-orm";
+import { contacts, suppressionList, accounts } from "@shared/schema";
+import { sql, eq, inArray, and, or } from "drizzle-orm";
+import * as crypto from "crypto";
 
 /**
- * Normalization utilities for suppression matching
- * These must match EXACTLY with the SQL normalization in the database triggers
+ * STRICT SUPPRESSION RULES - Only suppress when ONE of these matches:
+ * 1. Email matches (exact, case-insensitive)
+ * 2. CAV ID matches (exact)
+ * 3. CAV User ID matches (exact)
+ * 4. BOTH Full Name AND Company match (together - requires all fields non-empty)
+ * 
+ * EXPLICITLY FORBIDDEN:
+ * - First name only
+ * - Last name only
+ * - Company only
+ * - Full name only (without company)
  */
-export const normalize = {
-  /**
-   * Normalize email: lowercase and trim
-   */
-  email: (email?: string | null): string | null => {
-    if (!email) return null;
-    return email.trim().toLowerCase();
-  },
-
-  /**
-   * Normalize text: lowercase, trim, and collapse whitespace
-   */
-  text: (text?: string | null): string | null => {
-    if (!text) return null;
-    return text.trim().replace(/\s+/g, ' ').toLowerCase();
-  },
-
-  /**
-   * Normalize full name from first and last name
-   */
-  fullName: (firstName?: string | null, lastName?: string | null): string | null => {
-    const first = firstName?.trim() || '';
-    const last = lastName?.trim() || '';
-    const combined = `${first} ${last}`.trim();
-    if (!combined) return null;
-    return combined.replace(/\s+/g, ' ').toLowerCase();
-  },
-
-  /**
-   * Normalize company name
-   */
-  company: (companyName?: string | null): string | null => {
-    if (!companyName) return null;
-    return companyName.trim().replace(/\s+/g, ' ').toLowerCase();
-  },
-};
 
 /**
- * Compute SHA256 hash of full name + company for matching
- * Returns hex-encoded hash string
- * CRITICAL: Only compute when BOTH full name AND company are present
+ * Normalize text: lowercase, trim, collapse whitespace
  */
-export function computeNameCompanyHash(
-  fullNameNorm?: string | null,
-  companyNorm?: string | null
-): string | null {
-  if (!fullNameNorm || !companyNorm) return null;
-  const input = `${fullNameNorm}|${companyNorm}`;
-  return crypto.createHash('sha256').update(input).digest('hex');
+export function normalizeText(text?: string | null): string | null {
+  if (!text) return null;
+  return text.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 /**
- * Get suppression reason for a contact using STRICT matching rules
- * 
- * STRICT RULES - Only suppress if ANY of these match:
- * 1. Email matches (exact, case-insensitive)
- * 2. CAV ID matches
- * 3. CAV User ID matches
- * 4. BOTH full name AND company match (requires both to be non-empty)
- * 
- * Explicitly NOT allowed: first-only, last-only, company-only, or partial matches
+ * Compute SHA256 hash for full name + company combination
+ * Uses "|" separator to prevent collisions
+ * Returns hex string for compatibility with PostgreSQL ENCODE(DIGEST(...), 'hex')
  */
-export async function getSuppressionReason(contactId: string): Promise<string | null> {
+export function computeNameCompanyHash(
+  fullNameNorm: string | null,
+  companyNorm: string | null
+): string | null {
+  // CRITICAL: Both fields must be non-empty
+  if (!fullNameNorm || !companyNorm) {
+    return null;
+  }
+  
+  // Normalize inputs
+  const name = fullNameNorm.toLowerCase().trim();
+  const company = companyNorm.toLowerCase().trim();
+  
+  if (!name || !company) {
+    return null;
+  }
+  
+  // Use separator to prevent collision: "John Smith|Acme" vs "John|Smith Acme"
+  const hashInput = `${name}|${company}`;
+  
+  // SHA256 hex digest (matches PostgreSQL)
+  return crypto.createHash('sha256').update(hashInput).digest('hex');
+}
+
+/**
+ * Check suppression reason for a single contact
+ * Returns the reason if suppressed, null otherwise
+ */
+export async function getSuppressionReason(
+  contactId: string
+): Promise<string | null> {
   const result = await db.execute(sql`
     WITH contact_data AS (
       SELECT 
@@ -203,27 +195,13 @@ export async function checkSuppressionBulk(
         ELSE NULL
       END AS suppression_reason
     FROM contact_data
-    WHERE CASE
-      WHEN EXISTS (SELECT 1 FROM suppression_list s WHERE s.email_norm = contact_data.email_norm AND contact_data.email_norm IS NOT NULL AND contact_data.email_norm != '') THEN TRUE
-      WHEN EXISTS (SELECT 1 FROM suppression_list s WHERE s.cav_id = contact_data.cav_id AND contact_data.cav_id IS NOT NULL AND contact_data.cav_id != '') THEN TRUE
-      WHEN EXISTS (SELECT 1 FROM suppression_list s WHERE s.cav_user_id = contact_data.cav_user_id AND contact_data.cav_user_id IS NOT NULL AND contact_data.cav_user_id != '') THEN TRUE
-      WHEN (
-        contact_data.full_name_norm IS NOT NULL
-        AND contact_data.full_name_norm != ''
-        AND contact_data.company_norm IS NOT NULL
-        AND contact_data.company_norm != ''
-        AND contact_data.name_company_hash IS NOT NULL
-        AND EXISTS (SELECT 1 FROM suppression_list s WHERE s.name_company_hash = contact_data.name_company_hash AND s.name_company_hash IS NOT NULL AND s.name_company_hash != '')
-      ) THEN TRUE
-      ELSE FALSE
-    END
   `);
   
   const suppressionMap = new Map<string, string>();
-  for (const row of result.rows) {
-    const r = row as { id: string; suppression_reason: string | null };
-    if (r.suppression_reason) {
-      suppressionMap.set(r.id, r.suppression_reason);
+  
+  for (const row of result.rows as Array<{ id: string; suppression_reason: string | null }>) {
+    if (row.suppression_reason) {
+      suppressionMap.set(row.id, row.suppression_reason);
     }
   }
   
@@ -231,33 +209,92 @@ export async function checkSuppressionBulk(
 }
 
 /**
- * Apply suppression checking to a batch of contacts and update their status
- * This function will mark contacts as suppressed if they match any suppression rule
+ * Add entries to suppression list
+ * Computes normalized fields and hash for name+company matching
  */
-export async function applySuppressionToContacts(contactIds: string[]): Promise<{
-  totalChecked: number;
-  totalSuppressed: number;
-  suppressedBy: Record<string, number>;
-}> {
-  if (contactIds.length === 0) {
+export async function addToSuppressionList(
+  entries: Array<{
+    email?: string;
+    fullName?: string;
+    companyName?: string;
+    cavId?: string;
+    cavUserId?: string;
+    reason?: string;
+    source?: string;
+  }>
+): Promise<number> {
+  if (entries.length === 0) return 0;
+  
+  const values = entries.map(entry => {
+    // Rule 1: Email normalization (lowercase, trim)
+    const emailNorm = entry.email ? normalizeText(entry.email) : null;
+    
+    // Rules 2 & 3: CAV IDs (exact match, just trim)
+    const cavId = entry.cavId?.trim() || null;
+    const cavUserId = entry.cavUserId?.trim() || null;
+    
+    // Normalize full name and company
+    const fullNameNorm = entry.fullName ? normalizeText(entry.fullName) : null;
+    const companyNorm = entry.companyName ? normalizeText(entry.companyName) : null;
+    
+    // Rule 4: Name+Company hash
+    // CRITICAL: Only compute hash when BOTH fields are present
+    // This prevents company-only or name-only false positives
+    const nameCompanyHash = computeNameCompanyHash(fullNameNorm, companyNorm);
+    
     return {
-      totalChecked: 0,
-      totalSuppressed: 0,
-      suppressedBy: {},
+      email: entry.email || null,
+      emailNorm,
+      fullName: entry.fullName || null,
+      fullNameNorm,
+      companyName: entry.companyName || null,
+      companyNorm,
+      nameCompanyHash,
+      cavId,
+      cavUserId,
+      reason: entry.reason || null,
+      source: entry.source || null,
     };
-  }
+  });
+  
+  const result = await db.insert(suppressionList).values(values).returning();
+  return result.length;
+}
 
-  const suppressionMap = await checkSuppressionBulk(contactIds);
+/**
+ * Remove entries from suppression list by ID
+ */
+export async function removeFromSuppressionList(ids: number[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  
+  const result = await db
+    .delete(suppressionList)
+    .where(inArray(suppressionList.id, ids))
+    .returning();
+    
+  return result.length;
+}
 
-  // Count suppression reasons
-  const suppressedBy: Record<string, number> = {};
-  for (const reason of suppressionMap.values()) {
-    suppressedBy[reason] = (suppressedBy[reason] || 0) + 1;
-  }
-
-  return {
-    totalChecked: contactIds.length,
-    totalSuppressed: suppressionMap.size,
-    suppressedBy,
-  };
+/**
+ * Get all suppression list entries
+ */
+export async function getSuppressionList(options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: any[]; total: number }> {
+  const limit = options?.limit || 100;
+  const offset = options?.offset || 0;
+  
+  const data = await db
+    .select()
+    .from(suppressionList)
+    .orderBy(suppressionList.createdAt)
+    .limit(limit)
+    .offset(offset);
+  
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(suppressionList);
+  
+  return { data, total: count };
 }
