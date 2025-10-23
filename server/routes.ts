@@ -5957,4 +5957,157 @@ export function registerRoutes(app: Express) {
   app.use(verificationUploadJobsRouter);
   app.use(verificationEnrichmentRouter);
   app.use(verificationJobRecoveryRouter);
+
+  // ==================== ADMIN DATA MANAGEMENT ====================
+  
+  // Delete verification campaigns
+  app.delete("/api/admin/data/verification_campaigns", requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+      const result = await db.delete(db.schema.verificationCampaigns);
+      
+      // Log the action
+      await storage.createActivityLog({
+        entityType: 'campaign',
+        entityId: req.user!.userId,
+        action: 'admin_delete_verification_campaigns',
+        description: `Admin deleted all verification campaigns`,
+        createdBy: req.user!.userId,
+      });
+
+      res.json({ message: "All verification campaigns deleted", deletedCount: result.rowCount || 0 });
+    } catch (error) {
+      console.error('Error deleting verification campaigns:', error);
+      res.status(500).json({ message: "Failed to delete verification campaigns" });
+    }
+  });
+
+  // Delete verification contacts
+  app.delete("/api/admin/data/verification_contacts", requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+      const result = await db.delete(db.schema.verificationContacts);
+      
+      await storage.createActivityLog({
+        entityType: 'contact',
+        entityId: req.user!.userId,
+        action: 'admin_delete_verification_contacts',
+        description: `Admin deleted all verification contacts`,
+        createdBy: req.user!.userId,
+      });
+
+      res.json({ message: "All verification contacts deleted", deletedCount: result.rowCount || 0 });
+    } catch (error) {
+      console.error('Error deleting verification contacts:', error);
+      res.status(500).json({ message: "Failed to delete verification contacts" });
+    }
+  });
+
+  // Delete regular campaigns
+  app.delete("/api/admin/data/campaigns", requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+      const result = await db.delete(db.schema.campaigns);
+      
+      await storage.createActivityLog({
+        entityType: 'campaign',
+        entityId: req.user!.userId,
+        action: 'admin_delete_campaigns',
+        description: `Admin deleted all regular campaigns`,
+        createdBy: req.user!.userId,
+      });
+
+      res.json({ message: "All campaigns deleted", deletedCount: result.rowCount || 0 });
+    } catch (error) {
+      console.error('Error deleting campaigns:', error);
+      res.status(500).json({ message: "Failed to delete campaigns" });
+    }
+  });
+
+  // Delete contacts
+  app.delete("/api/admin/data/contacts", requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+      const result = await db.delete(db.schema.contacts);
+      
+      await storage.createActivityLog({
+        entityType: 'contact',
+        entityId: req.user!.userId,
+        action: 'admin_delete_contacts',
+        description: `Admin deleted all contacts`,
+        createdBy: req.user!.userId,
+      });
+
+      res.json({ message: "All contacts deleted", deletedCount: result.rowCount || 0 });
+    } catch (error) {
+      console.error('Error deleting contacts:', error);
+      res.status(500).json({ message: "Failed to delete contacts" });
+    }
+  });
+
+  // Delete accounts
+  app.delete("/api/admin/data/accounts", requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+      const result = await db.delete(db.schema.accounts);
+      
+      await storage.createActivityLog({
+        entityType: 'account',
+        entityId: req.user!.userId,
+        action: 'admin_delete_accounts',
+        description: `Admin deleted all accounts`,
+        createdBy: req.user!.userId,
+      });
+
+      res.json({ message: "All accounts deleted", deletedCount: result.rowCount || 0 });
+    } catch (error) {
+      console.error('Error deleting accounts:', error);
+      res.status(500).json({ message: "Failed to delete accounts" });
+    }
+  });
+
+  // Delete leads
+  app.delete("/api/admin/data/leads", requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+      const result = await db.delete(db.schema.leads);
+      
+      await storage.createActivityLog({
+        entityType: 'lead',
+        entityId: req.user!.userId,
+        action: 'admin_delete_leads',
+        description: `Admin deleted all leads`,
+        createdBy: req.user!.userId,
+      });
+
+      res.json({ message: "All leads deleted", deletedCount: result.rowCount || 0 });
+    } catch (error) {
+      console.error('Error deleting leads:', error);
+      res.status(500).json({ message: "Failed to delete leads" });
+    }
+  });
+
+  // Delete ALL business data
+  app.delete("/api/admin/data/all", requireRole('admin'), async (req: Request, res: Response) => {
+    try {
+      // Delete in order to respect foreign key constraints
+      await db.delete(db.schema.leads);
+      await db.delete(db.schema.campaignQueue);
+      await db.delete(db.schema.agentQueue);
+      await db.delete(db.schema.campaignAgentAssignments);
+      await db.delete(db.schema.verificationSubmissions);
+      await db.delete(db.schema.verificationContacts);
+      await db.delete(db.schema.verificationCampaigns);
+      await db.delete(db.schema.campaigns);
+      await db.delete(db.schema.contacts);
+      await db.delete(db.schema.accounts);
+      
+      await storage.createActivityLog({
+        entityType: 'user',
+        entityId: req.user!.userId,
+        action: 'admin_delete_all_data',
+        description: `Admin deleted ALL business data`,
+        createdBy: req.user!.userId,
+      });
+
+      res.json({ message: "All business data deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting all data:', error);
+      res.status(500).json({ message: "Failed to delete all data" });
+    }
+  });
 }

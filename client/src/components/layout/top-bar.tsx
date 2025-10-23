@@ -1,4 +1,4 @@
-import { Bell, HelpCircle, LogOut, Settings, Mail, Phone, Zap, UserCog, ShieldCheck } from "lucide-react";
+import { Bell, HelpCircle, LogOut, Settings, Mail, Phone, Zap, UserCog, ShieldCheck, Database } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,10 @@ export function TopBar({ userName = "Admin User", userRoles = ["admin"] }: { use
                   <DropdownMenuItem onClick={() => setLocation('/settings/users')} data-testid="menu-users">
                     <UserCog className="mr-2 h-4 w-4" />
                     User & Role Management
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLocation('/settings/data-management')} data-testid="menu-data-management">
+                    <Database className="mr-2 h-4 w-4" />
+                    Data Management
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setLocation('/suppressions')} data-testid="menu-suppressions">
                     <ShieldCheck className="mr-2 h-4 w-4" />
