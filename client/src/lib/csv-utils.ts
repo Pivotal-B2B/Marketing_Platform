@@ -206,7 +206,10 @@ export function downloadCSV(content: string, filename: string): void {
 }
 
 // Export contacts to CSV
-export function exportContactsToCSV(contacts: Contact[]): string {
+export function exportContactsToCSV(
+  contacts: Contact[], 
+  customFieldDefinitions?: Array<{ fieldKey: string; displayLabel: string; entityType: string }>
+): string {
   // Collect all unique custom field keys across all contacts
   const customFieldKeys = new Set<string>();
   contacts.forEach((contact: any) => {
@@ -216,6 +219,14 @@ export function exportContactsToCSV(contacts: Contact[]): string {
   });
   
   const customFieldKeysArray = Array.from(customFieldKeys).sort();
+  
+  // Create a map of field keys to display labels
+  const fieldLabelMap = new Map<string, string>();
+  customFieldDefinitions?.forEach(def => {
+    if (def.entityType === 'contact') {
+      fieldLabelMap.set(def.fieldKey, def.displayLabel);
+    }
+  });
   
   const baseHeaders = [
     "id",
@@ -274,8 +285,16 @@ export function exportContactsToCSV(contacts: Contact[]): string {
     "updatedAt",
   ];
 
-  // Add custom field headers (prefixed with "custom_" to distinguish them)
-  const headers = [...baseHeaders, ...customFieldKeysArray.map(key => `custom_${key}`)];
+  // Add custom field headers - use display label if available, otherwise use key with "custom_" prefix
+  const customFieldHeaders = customFieldKeysArray.map(key => {
+    const label = fieldLabelMap.get(key);
+    const headerLabel = label ? `custom_${label}` : `custom_${key}`;
+    return headerLabel; // Will be escaped when joined
+  });
+  const headers = [...baseHeaders, ...customFieldHeaders];
+  
+  // Escape all headers before creating CSV
+  const escapedHeaders = headers.map(h => escapeCSVField(h));
 
   const rows = contacts.map((contact: any) => {
     const baseRow = [
@@ -344,11 +363,14 @@ export function exportContactsToCSV(contacts: Contact[]): string {
     return [...baseRow, ...customFieldValues];
   });
 
-  return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+  return [escapedHeaders.join(","), ...rows.map((row) => row.join(","))].join("\n");
 }
 
 // Export accounts to CSV
-export function exportAccountsToCSV(accounts: Account[]): string {
+export function exportAccountsToCSV(
+  accounts: Account[],
+  customFieldDefinitions?: Array<{ fieldKey: string; displayLabel: string; entityType: string }>
+): string {
   // Collect all unique custom field keys across all accounts
   const customFieldKeys = new Set<string>();
   accounts.forEach((account: any) => {
@@ -358,6 +380,14 @@ export function exportAccountsToCSV(accounts: Account[]): string {
   });
   
   const customFieldKeysArray = Array.from(customFieldKeys).sort();
+  
+  // Create a map of field keys to display labels
+  const fieldLabelMap = new Map<string, string>();
+  customFieldDefinitions?.forEach(def => {
+    if (def.entityType === 'account') {
+      fieldLabelMap.set(def.fieldKey, def.displayLabel);
+    }
+  });
   
   const baseHeaders = [
     "id",
@@ -429,8 +459,16 @@ export function exportAccountsToCSV(accounts: Account[]): string {
     "updatedAt",
   ];
 
-  // Add custom field headers (prefixed with "custom_" to distinguish them)
-  const headers = [...baseHeaders, ...customFieldKeysArray.map(key => `custom_${key}`)];
+  // Add custom field headers - use display label if available, otherwise use key with "custom_" prefix
+  const customFieldHeaders = customFieldKeysArray.map(key => {
+    const label = fieldLabelMap.get(key);
+    const headerLabel = label ? `custom_${label}` : `custom_${key}`;
+    return headerLabel; // Will be escaped when joined
+  });
+  const headers = [...baseHeaders, ...customFieldHeaders];
+  
+  // Escape all headers before creating CSV
+  const escapedHeaders = headers.map(h => escapeCSVField(h));
 
   const rows = accounts.map((account: any) => {
     const baseRow = [
@@ -512,7 +550,7 @@ export function exportAccountsToCSV(accounts: Account[]): string {
     return [...baseRow, ...customFieldValues];
   });
 
-  return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+  return [escapedHeaders.join(","), ...rows.map((row) => row.join(","))].join("\n");
 }
 
 // Parse CSV content according to RFC4180
