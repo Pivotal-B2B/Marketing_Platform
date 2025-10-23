@@ -11,6 +11,23 @@ import { formatNumberForCsv } from './data-normalization';
  * - Proper quoting of fields with special characters
  */
 
+/**
+ * Clean phone number for CSV export
+ * Removes dots, spaces, and formats consistently
+ * Handles E.164 format (+1.234.567.8900) and other formats
+ */
+function cleanPhoneForExport(phone: string | null | undefined): string {
+  if (!phone) return '';
+  
+  // Remove dots, extra spaces, and format cleanly
+  // E.164 format: +1.234.567.8900 → +12345678900
+  // Keep only digits, plus sign, and parentheses/dashes
+  return phone
+    .replace(/\./g, '')  // Remove dots
+    .replace(/\s+/g, '')  // Remove extra spaces
+    .trim();
+}
+
 export interface ExportOptions {
   /**
    * Include UTF-8 BOM at the start of the file (recommended for Excel)
@@ -104,8 +121,8 @@ export function exportVerificationContactsToCsv(
       'Seniority Level': contact.seniorityLevel || '',
       'Email': contact.email || '',
       'Email Status': contact.emailStatus || '',
-      'Phone': contact.phone || '',
-      'Mobile': contact.mobile || '',
+      'Phone': cleanPhoneForExport(contact.phone),
+      'Mobile': cleanPhoneForExport(contact.mobile),
       'LinkedIn URL': contact.linkedinUrl || '',
       
       // Career fields (with shadow duration months)
@@ -123,36 +140,56 @@ export function exportVerificationContactsToCsv(
       'Contact State': contact.contactState || '',
       'Contact Country': contact.contactCountry || '',
       'Contact Postal Code': contact.contactPostal || '',
+      
+      // Contact's own HQ fields (from original data source)
+      'Contact HQ Address 1': contact.hqAddress1 || '',
+      'Contact HQ Address 2': contact.hqAddress2 || '',
+      'Contact HQ Address 3': contact.hqAddress3 || '',
+      'Contact HQ City': contact.hqCity || '',
+      'Contact HQ State': contact.hqState || '',
+      'Contact HQ Country': contact.hqCountry || '',
+      'Contact HQ Postal Code': contact.hqPostal || '',
+      'Contact HQ Phone': cleanPhoneForExport(contact.hqPhone),
+      
+      // AI Enrichment Results (based on Contact Country)
+      'AI Enriched Address 1': contact.aiEnrichedAddress1 || '',
+      'AI Enriched Address 2': contact.aiEnrichedAddress2 || '',
+      'AI Enriched Address 3': contact.aiEnrichedAddress3 || '',
+      'AI Enriched City': contact.aiEnrichedCity || '',
+      'AI Enriched State': contact.aiEnrichedState || '',
+      'AI Enriched Postal Code': contact.aiEnrichedPostal || '',
+      'AI Enriched Country': contact.aiEnrichedCountry || '',
+      'AI Enriched Phone': cleanPhoneForExport(contact.aiEnrichedPhone),
     };
 
     // Add company fields if requested
     if (includeCompanyFields && contact.account) {
       const account = contact.account;
       
-      row['Company Name'] = account.name || '';
-      row['Company Domain'] = account.domain || '';
-      row['Website Domain'] = account.websiteDomain || '';
-      row['Company Industry'] = account.industry || '';
-      row['Company Annual Revenue'] = account.annualRevenue ? formatNumberForCsv(account.annualRevenue) : '';
-      row['Revenue Range'] = account.revenueRange || '';
-      row['Staff Count Range'] = account.employeesSizeRange || '';
-      row['Company Description'] = account.description || ''; // Multiline text
-      row['Company Founded Date'] = account.foundedDate || '';
-      row['Company LinkedIn URL'] = account.linkedinUrl || '';
-      row['Company LinkedIn ID'] = account.linkedinId || '';
-      row['Web Technologies'] = account.webTechnologies || '';
-      row['SIC Code'] = account.sicCode || '';
-      row['NAICS Code'] = account.naicsCode || '';
+      row['Account Name'] = account.name || '';
+      row['Account Domain'] = account.domain || '';
+      row['Account Website'] = account.websiteDomain || '';
+      row['Account Industry'] = account.industry || '';
+      row['Account Revenue'] = account.annualRevenue ? formatNumberForCsv(account.annualRevenue) : '';
+      row['Account Revenue Range'] = account.revenueRange || '';
+      row['Account Size'] = account.employeesSizeRange || '';
+      row['Account Description'] = account.description || ''; // Multiline text
+      row['Account Founded'] = account.foundedDate || '';
+      row['Account LinkedIn'] = account.linkedinUrl || '';
+      row['Account LinkedIn ID'] = account.linkedinId || '';
+      row['Account Tech Stack'] = account.webTechnologies || '';
+      row['Account SIC Code'] = account.sicCode || '';
+      row['Account NAICS Code'] = account.naicsCode || '';
       
-      // HQ fields
-      row['HQ Address 1'] = account.hqStreet1 || '';
-      row['HQ Address 2'] = account.hqStreet2 || '';
-      row['HQ Address 3'] = account.hqStreet3 || '';
-      row['HQ City'] = account.hqCity || '';
-      row['HQ State'] = account.hqState || '';
-      row['HQ Country'] = account.hqCountry || '';
-      row['HQ Postal Code'] = account.hqPostalCode || '';
-      row['HQ Phone'] = account.mainPhone || '';
+      // Account HQ fields (from account master data)
+      row['Account HQ Address 1'] = account.hqStreet1 || '';
+      row['Account HQ Address 2'] = account.hqStreet2 || '';
+      row['Account HQ Address 3'] = account.hqStreet3 || '';
+      row['Account HQ City'] = account.hqCity || '';
+      row['Account HQ State'] = account.hqState || '';
+      row['Account HQ Country'] = account.hqCountry || '';
+      row['Account HQ Postal Code'] = account.hqPostalCode || '';
+      row['Account HQ Phone'] = cleanPhoneForExport(account.mainPhone);
     }
 
     // Add verification status fields
@@ -160,11 +197,18 @@ export function exportVerificationContactsToCsv(
     row['Eligibility Status'] = contact.eligibilityStatus || '';
     row['Verification Status'] = contact.verificationStatus || '';
     row['Queue Status'] = contact.queueStatus || '';
-    row['Enrichment Status'] = contact.enrichmentStatus || '';
     row['Suppressed'] = contact.suppressed ? 'Yes' : 'No';
-    row['Email Verification Status'] = contact.emailVerificationStatus || '';
     row['CAV ID'] = contact.cavId || '';
     row['CAV User ID'] = contact.cavUserId || '';
+    
+    // Add custom fields dynamically (expand JSONB)
+    if (contact.customFields && typeof contact.customFields === 'object') {
+      for (const [key, value] of Object.entries(contact.customFields)) {
+        // Use a clear prefix to distinguish custom fields
+        const fieldName = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+        row[fieldName] = value !== null && value !== undefined ? String(value) : '';
+      }
+    }
 
     return row;
   });
