@@ -153,6 +153,17 @@ export default function VerificationUploadPage() {
     onSuccess: (data) => {
       setUploadJobId(data.jobId);
       setUploadStatus("processing");
+      
+      // Show success toast and navigate away immediately
+      toast({
+        title: "Upload Started",
+        description: "Processing in background. You'll be notified when complete.",
+      });
+      
+      // Navigate to console immediately - don't wait for completion
+      setTimeout(() => {
+        navigate(`/verification/${campaignId}/console`);
+      }, 1500);
     },
     onError: (error: any) => {
       toast({
@@ -163,6 +174,7 @@ export default function VerificationUploadPage() {
     },
   });
 
+  // Background polling for completion notifications (works even after navigation)
   useEffect(() => {
     if (!uploadJobId || (uploadStatus !== "processing" && uploadStatus !== "pending")) {
       return;
@@ -178,20 +190,15 @@ export default function VerificationUploadPage() {
 
         if (data.status === "completed") {
           clearInterval(pollInterval);
-          setUploadResult({
-            total: data.totalRows,
-            created: data.successCount,
-            updated: 0,
-            skipped: data.errorCount,
-            errors: data.errors || [],
-          });
-          setStage("complete");
+          
+          // Invalidate queries to refresh data
           queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
           queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
           
+          // Show completion notification
           toast({
-            title: "Upload Complete",
-            description: `${data.successCount} contacts processed successfully, ${data.errorCount} errors`,
+            title: "Upload Complete ✓",
+            description: `${data.successCount} contacts processed successfully${data.errorCount > 0 ? `, ${data.errorCount} errors` : ''}`,
           });
         } else if (data.status === "failed") {
           clearInterval(pollInterval);
