@@ -1309,24 +1309,40 @@ export class DatabaseStorage implements IStorage {
   async assignAgentsToCampaign(campaignId: string, agentIds: string[], assignedBy: string): Promise<void> {
     // Assign agents in a transaction to ensure atomicity
     for (const agentId of agentIds) {
-      // Check if agent already has an active assignment to this specific campaign
+      // Check if any assignment (active or inactive) exists for this campaign + agent pair
       const [existingAssignment] = await db
         .select()
         .from(campaignAgentAssignments)
         .where(
           and(
             eq(campaignAgentAssignments.agentId, agentId),
-            eq(campaignAgentAssignments.campaignId, campaignId),
-            eq(campaignAgentAssignments.isActive, true)
+            eq(campaignAgentAssignments.campaignId, campaignId)
           )
         );
 
-      // Skip if already assigned to this campaign
       if (existingAssignment) {
+        // If assignment exists but is inactive, reactivate it
+        if (!existingAssignment.isActive) {
+          await db
+            .update(campaignAgentAssignments)
+            .set({ 
+              isActive: true,
+              assignedBy,
+              assignedAt: new Date(),
+              releasedAt: null
+            })
+            .where(
+              and(
+                eq(campaignAgentAssignments.campaignId, campaignId),
+                eq(campaignAgentAssignments.agentId, agentId)
+              )
+            );
+        }
+        // If already active, skip
         continue;
       }
 
-      // Create new assignment (any previous assignments to other campaigns should already be released)
+      // Create new assignment if no record exists
       await db.insert(campaignAgentAssignments).values({
         campaignId,
         agentId,
