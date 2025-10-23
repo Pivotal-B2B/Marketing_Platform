@@ -5,6 +5,8 @@ import {
   checkSuppressionBulk,
   addToSuppressionList,
   removeFromSuppressionList,
+  normalizeText,
+  computeNameCompanyHash,
 } from "./lib/suppression.service";
 
 async function testSuppressionLogic() {
@@ -151,13 +153,18 @@ async function testSuppressionLogic() {
 
   for (const contact of testContacts) {
     const fullName = `${contact.firstName} ${contact.lastName}`;
+    const fullNameNorm = normalizeText(fullName);
+    const companyNorm = normalizeText(contact.companyNorm); // already normalized in test data
+    const nameCompanyHash = computeNameCompanyHash(fullNameNorm, companyNorm);
+    
     await db.execute(sql`
       INSERT INTO contacts (
-        id, email, full_name, first_name, last_name, full_name_norm, company_norm,
-        name_company_hash, cav_id, cav_user_id
+        id, email, full_name, first_name, last_name, 
+        full_name_norm, company_norm, name_company_hash,
+        cav_id, cav_user_id
       ) VALUES (
         ${contact.id}, ${contact.email}, ${fullName}, ${contact.firstName}, ${contact.lastName},
-        ${contact.fullNameNorm}, ${contact.companyNorm}, ${contact.nameCompanyHash},
+        ${fullNameNorm}, ${companyNorm}, ${nameCompanyHash},
         ${contact.cavId}, ${contact.cavUserId}
       )
     `);
