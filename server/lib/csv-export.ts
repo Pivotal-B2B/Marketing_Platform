@@ -12,13 +12,25 @@ import { formatNumberForCsv } from './data-normalization';
  */
 
 /**
- * Clean phone number for CSV export to strict E.164 format
- * E.164 format: only "+" followed by digits (no spaces, dots, parentheses, dashes)
+ * Clean phone number for CSV export with E.164 normalization
  * 
- * Note: If phone number is already in E.164 format in the database, it will have "+".
- * If it doesn't have "+", we preserve as digits-only (don't add country code since we don't know it).
+ * Database context: verificationContacts stores display-format phones (NOT separate E.164 fields),
+ * so numbers may be in any format: "(123) 456-7890", "123-456-7890", "+12345678900", etc.
+ * 
+ * Behavior:
+ * - Removes all formatting (dots, spaces, parentheses, dashes)
+ * - Preserves "+" if present in original number
+ * - If defaultCountryCode configured:
+ *   - Checks if digits already start with country code (avoids double-prefixing)
+ *   - Adds "+{countryCode}" if not already present
+ * - Falls back to digits-only if no configuration (preserves data integrity)
+ * 
+ * Configuration is now fully implemented via ExportOptions.defaultCountryCode
  */
-function cleanPhoneForExport(phone: string | null | undefined): string {
+function cleanPhoneForExport(
+  phone: string | null | undefined,
+  defaultCountryCode?: string
+): string {
   if (!phone) return '';
   
   const trimmed = phone.trim();
@@ -32,9 +44,25 @@ function cleanPhoneForExport(phone: string | null | undefined): string {
   
   if (!digitsOnly) return ''; // No digits found
   
-  // If original had "+", preserve it for strict E.164 format
-  // If no "+", return digits only (don't assume country code)
-  return hasPlus ? `+${digitsOnly}` : digitsOnly;
+  // If original had "+", preserve it for E.164 format
+  if (hasPlus) {
+    return `+${digitsOnly}`;
+  }
+  
+  // If no "+", optionally add default country code for strict E.164
+  if (defaultCountryCode) {
+    // Avoid double-prefixing: check if digits already start with the country code
+    if (digitsOnly.startsWith(defaultCountryCode)) {
+      // Already has country code prefix, just add "+"
+      return `+${digitsOnly}`;
+    } else {
+      // Add country code prefix
+      return `+${defaultCountryCode}${digitsOnly}`;
+    }
+  }
+  
+  // Fallback: return digits only (preserves data integrity)
+  return digitsOnly;
 }
 
 export interface ExportOptions {
@@ -52,6 +80,13 @@ export interface ExportOptions {
    * Custom delimiter (default: comma)
    */
   delimiter?: string;
+  
+  /**
+   * Default country code for phone numbers without "+" prefix (e.g., "1" for US)
+   * When provided, enables strict E.164 format: +{countryCode}{digits}
+   * When omitted, phones without "+" export as digits-only
+   */
+  defaultCountryCode?: string;
 }
 
 /**
@@ -114,10 +149,15 @@ export function exportToCsv(
 
 /**
  * Export verification contacts to CSV with all custom fields
+ * 
+ * @param contacts - Array of verification contacts to export
+ * @param includeCompanyFields - Whether to include account/company fields in export
+ * @param options - Export configuration options (BOM, country code, etc.)
  */
 export function exportVerificationContactsToCsv(
   contacts: any[],
-  includeCompanyFields: boolean = true
+  includeCompanyFields: boolean = true,
+  options: ExportOptions = {}
 ): string {
   const rows = contacts.map(contact => {
     const row: Record<string, any> = {
@@ -128,8 +168,8 @@ export function exportVerificationContactsToCsv(
       'Job Title': contact.title || '',
       'Email': contact.email || '',
       'Email Status': contact.emailStatus || '',
-      'Phone': cleanPhoneForExport(contact.phone),
-      'Mobile': cleanPhoneForExport(contact.mobile),
+      'Phone': cleanPhoneForExport(contact.phone, options.defaultCountryCode),
+      'Mobile': cleanPhoneForExport(contact.mobile, options.defaultCountryCode),
       'LinkedIn URL': contact.linkedinUrl || '',
       
       // Career fields (with shadow duration months)
@@ -156,7 +196,7 @@ export function exportVerificationContactsToCsv(
       'Contact HQ State': contact.hqState || '',
       'Contact HQ Country': contact.hqCountry || '',
       'Contact HQ Postal Code': contact.hqPostal || '',
-      'Contact HQ Phone': cleanPhoneForExport(contact.hqPhone),
+      'Contact HQ Phone': cleanPhoneForExport(contact.hqPhone, options.defaultCountryCode),
       
       // AI Enrichment Results (based on Contact Country)
       'AI Enriched Address 1': contact.aiEnrichedAddress1 || '',
@@ -166,7 +206,7 @@ export function exportVerificationContactsToCsv(
       'AI Enriched State': contact.aiEnrichedState || '',
       'AI Enriched Postal Code': contact.aiEnrichedPostal || '',
       'AI Enriched Country': contact.aiEnrichedCountry || '',
-      'AI Enriched Phone': cleanPhoneForExport(contact.aiEnrichedPhone),
+      'AI Enriched Phone': cleanPhoneForExport(contact.aiEnrichedPhone, options.defaultCountryCode),
     };
 
     // Add company fields if requested
@@ -196,7 +236,7 @@ export function exportVerificationContactsToCsv(
       row['Account HQ State'] = account.hqState || '';
       row['Account HQ Country'] = account.hqCountry || '';
       row['Account HQ Postal Code'] = account.hqPostalCode || '';
-      row['Account HQ Phone'] = cleanPhoneForExport(account.mainPhone);
+      row['Account HQ Phone'] = cleanPhoneForExport(account.mainPhone, options.defaultCountryCode);
     }
 
     // Add verification status fields
@@ -220,7 +260,9 @@ export function exportVerificationContactsToCsv(
     return row;
   });
 
-  return exportToCsv(rows, { includeBOM: true });
+  // Pass through options (includeBOM, defaultCountryCode, etc.)
+  // Default includeBOM to true if not specified
+  return exportToCsv(rows, { includeBOM: true, ...options });
 }
 
 /**
