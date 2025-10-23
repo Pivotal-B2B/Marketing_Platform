@@ -86,6 +86,10 @@ export default function AccountDetailPage() {
     industryStandardized: "",
     employeesSizeRange: "",
     annualRevenue: "",
+    minAnnualRevenue: "",
+    maxAnnualRevenue: "",
+    minEmployeesSize: "",
+    maxEmployeesSize: "",
     hqCity: "",
     hqState: "",
     hqCountry: "",
@@ -93,6 +97,7 @@ export default function AccountDetailPage() {
     mainPhoneE164: "", // Added for E.164 formatted phone number
     linkedinUrl: "",
     description: "",
+    list: "",
     yearFounded: "",
   });
 
@@ -159,6 +164,10 @@ export default function AccountDetailPage() {
         industryStandardized: account.industryStandardized || "",
         employeesSizeRange: account.employeesSizeRange || "",
         annualRevenue: account.annualRevenue || "",
+        minAnnualRevenue: account.minAnnualRevenue || "",
+        maxAnnualRevenue: account.maxAnnualRevenue || "",
+        minEmployeesSize: account.minEmployeesSize?.toString() || "",
+        maxEmployeesSize: account.maxEmployeesSize?.toString() || "",
         hqCity: account.hqCity || "",
         hqState: account.hqState || "",
         hqCountry: account.hqCountry || "",
@@ -166,6 +175,7 @@ export default function AccountDetailPage() {
         mainPhoneE164: account.mainPhoneE164 || "", // Populate E.164 format
         linkedinUrl: account.linkedinUrl || "",
         description: account.description || "",
+        list: account.list || "",
         yearFounded: account.yearFounded?.toString() || "",
       });
       setEditDialogOpen(true);
@@ -176,6 +186,12 @@ export default function AccountDetailPage() {
     const updateData: any = { ...editForm };
     if (editForm.yearFounded) {
       updateData.yearFounded = parseInt(editForm.yearFounded);
+    }
+    if (editForm.minEmployeesSize) {
+      updateData.minEmployeesSize = parseInt(editForm.minEmployeesSize);
+    }
+    if (editForm.maxEmployeesSize) {
+      updateData.maxEmployeesSize = parseInt(editForm.maxEmployeesSize);
     }
     // Ensure mainPhone is updated if mainPhoneE164 is changed
     if (editForm.mainPhoneE164 && !editForm.mainPhone) {
@@ -998,11 +1014,33 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="employees">Employee Size</Label>
+                <Label htmlFor="employees">Employee Size Range</Label>
                 <Input
                   id="employees"
                   value={editForm.employeesSizeRange}
                   onChange={(e) => setEditForm({ ...editForm, employeesSizeRange: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="minEmployeesSize">Min Employees Size</Label>
+                <Input
+                  id="minEmployeesSize"
+                  type="number"
+                  value={editForm.minEmployeesSize}
+                  onChange={(e) => setEditForm({ ...editForm, minEmployeesSize: e.target.value })}
+                  placeholder="e.g., 100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxEmployeesSize">Max Employees Size</Label>
+                <Input
+                  id="maxEmployeesSize"
+                  type="number"
+                  value={editForm.maxEmployeesSize}
+                  onChange={(e) => setEditForm({ ...editForm, maxEmployeesSize: e.target.value })}
+                  placeholder="e.g., 500"
                 />
               </div>
             </div>
@@ -1022,6 +1060,28 @@ export default function AccountDetailPage() {
                   type="number"
                   value={editForm.yearFounded}
                   onChange={(e) => setEditForm({ ...editForm, yearFounded: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="minAnnualRevenue">Min Annual Revenue</Label>
+                <Input
+                  id="minAnnualRevenue"
+                  type="number"
+                  value={editForm.minAnnualRevenue}
+                  onChange={(e) => setEditForm({ ...editForm, minAnnualRevenue: e.target.value })}
+                  placeholder="e.g., 1000000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxAnnualRevenue">Max Annual Revenue</Label>
+                <Input
+                  id="maxAnnualRevenue"
+                  type="number"
+                  value={editForm.maxAnnualRevenue}
+                  onChange={(e) => setEditForm({ ...editForm, maxAnnualRevenue: e.target.value })}
+                  placeholder="e.g., 5000000"
                 />
               </div>
             </div>
@@ -1068,6 +1128,15 @@ export default function AccountDetailPage() {
                   onChange={(e) => setEditForm({ ...editForm, linkedinUrl: e.target.value })}
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="list">List</Label>
+              <Input
+                id="list"
+                value={editForm.list}
+                onChange={(e) => setEditForm({ ...editForm, list: e.target.value })}
+                placeholder="e.g., InFynd, ZoomInfo"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
