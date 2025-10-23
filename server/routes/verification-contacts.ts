@@ -1377,17 +1377,79 @@ export async function processEmailValidationJob(jobId: string) {
         continue;
       }
       
-      console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1}: Verifying ${emailsToVerify.length} unique emails for ${contacts.length} contacts`);
+      console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1}: Processing ${emailsToVerify.length} unique emails for ${contacts.length} contacts`);
       
-      // Verify emails using Email List Verify API (with rate limiting)
-      const verificationResults = await verifyEmailsBulk(emailsToVerify, {
-        delayMs: 200, // 5 requests per second
-        onProgress: (completed, total, currentEmail) => {
-          if (completed % 10 === 0 || completed === total) {
-            console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1} Progress: ${completed}/${total} (${currentEmail})`);
-          }
-        },
-      });
+      // CACHE CHECK: Query recent validations (60-day window) to avoid redundant API calls
+      const cachedValidations = await db.execute(sql`
+        SELECT email_lower, status, provider, raw_json, checked_at
+        FROM verification_email_validations
+        WHERE email_lower = ANY(${emailsToVerify})
+          AND checked_at > NOW() - INTERVAL '60 days'
+      `);
+      
+      // Build cache map for quick lookup
+      const cacheMap = new Map<string, any>();
+      if (cachedValidations.rowCount && cachedValidations.rowCount > 0) {
+        for (const row of cachedValidations.rows) {
+          cacheMap.set(row.email_lower, row);
+        }
+      }
+      
+      // Split emails into cached vs uncached
+      const emailsNeedingApi: string[] = [];
+      const verificationResults = new Map<string, EmailVerificationResult>();
+      
+      for (const email of emailsToVerify) {
+        const cached = cacheMap.get(email);
+        if (cached) {
+          // Use cached result
+          verificationResults.set(email, {
+            email: email,
+            status: cached.status as any,
+            details: cached.raw_json?.details || {
+              syntax: true,
+              domain: true,
+              smtp: cached.status === 'ok',
+              catch_all: cached.status === 'accept_all',
+              disposable: cached.status === 'disposable',
+              free: false,
+              role: false,
+            },
+            reason: cached.raw_json?.reason || cached.status,
+            provider: cached.provider || 'emaillistverify',
+            rawResponse: cached.raw_json || {},
+            checkedAt: new Date(cached.checked_at),
+          });
+        } else {
+          emailsNeedingApi.push(email);
+        }
+      }
+      
+      const cachedCount = verificationResults.size;
+      const apiCallCount = emailsNeedingApi.length;
+      
+      console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1}: Cache hits: ${cachedCount}, API calls needed: ${apiCallCount}`);
+      
+      // Only call API for uncached emails
+      if (emailsNeedingApi.length > 0) {
+        console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1}: Calling API for ${emailsNeedingApi.length} emails`);
+        
+        const apiResults = await verifyEmailsBulk(emailsNeedingApi, {
+          delayMs: 200, // 5 requests per second
+          onProgress: (completed, total, currentEmail) => {
+            if (completed % 10 === 0 || completed === total) {
+              console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1} API Progress: ${completed}/${total} (${currentEmail})`);
+            }
+          },
+        });
+        
+        // Merge API results with cached results
+        for (const [email, result] of apiResults.entries()) {
+          verificationResults.set(email, result);
+        }
+      } else {
+        console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1}: All emails found in cache, skipping API calls (saved ${cachedCount} API credits)`);
+      }
       
       // Update contacts and cache validation results for this batch
       let batchSuccessCount = 0;
