@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { eq, and, inArray, isNotNull, sql, desc } from "drizzle-orm";
 import { storage } from "./storage";
 import { comparePassword, generateToken, requireAuth, requireRole, hashPassword } from "./auth";
+import { buildFilterQuery } from "./filter-builder";
 import webhooksRouter from "./routes/webhooks";
 import dvRouter from "./routes/dv-routes";
 import queueRouter from "./routes/queue-routes";
@@ -5973,8 +5974,8 @@ export function registerRoutes(app: Express) {
       await storage.createActivityLog({
         entityType: 'campaign',
         entityId: req.user!.userId,
-        action: 'admin_delete_verification_campaigns',
-        description: `Admin deleted all verification campaigns`,
+        eventType: 'campaign_deleted',
+        payload: { action: 'admin_delete_verification_campaigns', description: 'Admin deleted all verification campaigns' },
         createdBy: req.user!.userId,
       });
 
@@ -5993,8 +5994,8 @@ export function registerRoutes(app: Express) {
       await storage.createActivityLog({
         entityType: 'contact',
         entityId: req.user!.userId,
-        action: 'admin_delete_verification_contacts',
-        description: `Admin deleted all verification contacts`,
+        eventType: 'contact_deleted',
+        payload: { action: 'admin_delete_verification_contacts', description: 'Admin deleted all verification contacts' },
         createdBy: req.user!.userId,
       });
 
@@ -6013,8 +6014,8 @@ export function registerRoutes(app: Express) {
       await storage.createActivityLog({
         entityType: 'campaign',
         entityId: req.user!.userId,
-        action: 'admin_delete_campaigns',
-        description: `Admin deleted all regular campaigns`,
+        eventType: 'campaign_deleted',
+        payload: { action: 'admin_delete_campaigns', description: 'Admin deleted all regular campaigns' },
         createdBy: req.user!.userId,
       });
 

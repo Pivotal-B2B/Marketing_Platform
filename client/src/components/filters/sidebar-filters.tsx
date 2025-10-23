@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Filter, Plus, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -190,9 +189,7 @@ export function SidebarFilters({
         
         {/* Result Count */}
         {filterGroup.conditions.length > 0 && (
-          <motion.p
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
+          <p
             className="text-xs text-slate-500 dark:text-slate-400"
             data-testid="text-result-count"
           >
@@ -207,16 +204,12 @@ export function SidebarFilters({
                 {resultsCount === 1 ? "result" : "results"}
               </>
             )}
-          </motion.p>
+          </p>
         )}
         
         {/* AND/OR Logic Toggle */}
         {activeFilterCount > 1 && (
-          <motion.div
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 mt-2"
-          >
+          <div className="flex items-center gap-2 mt-2">
             <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Match:</span>
             <ToggleGroup
               type="single"
@@ -243,7 +236,7 @@ export function SidebarFilters({
                 ANY (OR)
               </ToggleGroupItem>
             </ToggleGroup>
-          </motion.div>
+          </div>
         )}
       </div>
 
@@ -251,35 +244,23 @@ export function SidebarFilters({
       <div className="flex-shrink-0">
         <ScrollArea className="max-h-[calc(100vh-280px)]">
           <div className="px-2 pt-2 pb-2 space-y-1.5">
-            <AnimatePresence mode="popLayout">
-              {filterGroup.conditions.map((condition) => (
-                <motion.div
-                  key={condition.id}
-                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <UnifiedFilterRow
-                    condition={condition}
-                    entityType={entityType}
-                    onChange={(updated) => updateCondition(condition.id, updated)}
-                    onRemove={() => removeCondition(condition.id)}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
+            {filterGroup.conditions.map((condition) => (
+              <div key={condition.id}>
+                <UnifiedFilterRow
+                  condition={condition}
+                  entityType={entityType}
+                  onChange={(updated) => updateCondition(condition.id, updated)}
+                  onRemove={() => removeCondition(condition.id)}
+                />
+              </div>
+            ))}
 
             {/* Empty State */}
             {filterGroup.conditions.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center py-4 text-sm text-slate-400 dark:text-slate-500"
-              >
+              <div className="text-center py-4 text-sm text-slate-400 dark:text-slate-500">
                 <Filter className="h-6 w-6 mx-auto mb-1.5 opacity-20" />
                 <p className="text-xs">No filters added</p>
-              </motion.div>
+              </div>
             )}
           </div>
         </ScrollArea>
@@ -310,11 +291,7 @@ export function SidebarFilters({
           >
             Clear
           </Button>
-          <motion.div
-            whileHover={{ scale: validFilterCount > 0 ? 1.02 : 1 }}
-            whileTap={{ scale: validFilterCount > 0 ? 0.98 : 1 }}
-            className="flex-1"
-          >
+          <div className="flex-1">
             <Button
               onClick={handleApply}
               disabled={isApplying || validFilterCount === 0}
@@ -323,11 +300,7 @@ export function SidebarFilters({
             >
               {isApplying ? (
                 <>
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="mr-2 h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full"
-                  />
+                  <div className="mr-2 h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Applying...
                 </>
               ) : validFilterCount === 0 && activeFilterCount > 0 ? (
@@ -336,7 +309,7 @@ export function SidebarFilters({
                 "Apply Filters"
               )}
             </Button>
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>
