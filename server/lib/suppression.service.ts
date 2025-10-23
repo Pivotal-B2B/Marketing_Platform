@@ -136,74 +136,32 @@ export async function checkSuppressionBulk(
     return new Map();
   }
   
-  const contactIdsArray = `{${contactIds.map(id => `"${id.replace(/"/g, '\\"')}"`).join(',')}}`;
-  
-  const result = await db.execute(sql.raw(`
-    WITH contact_data AS (
-      SELECT 
-        c.id,
-        LOWER(TRIM(c.email)) AS email_norm,
-        c.cav_id,
-        c.cav_user_id,
-        c.full_name_norm,
-        c.company_norm,
-        c.name_company_hash
-      FROM contacts c
-      WHERE c.id = ANY('${contactIdsArray}'::varchar[])
-        AND c.deleted_at IS NULL
-    )
-    SELECT
-      contact_data.id,
-      CASE
-        -- Rule 1: Email exact match (case-insensitive)
-        WHEN EXISTS (
-          SELECT 1 FROM suppression_list s
-          WHERE s.email_norm = contact_data.email_norm
-            AND contact_data.email_norm IS NOT NULL
-            AND contact_data.email_norm != ''
-        ) THEN 'email'
-        
-        -- Rule 2: CAV ID exact match
-        WHEN EXISTS (
-          SELECT 1 FROM suppression_list s
-          WHERE s.cav_id = contact_data.cav_id
-            AND contact_data.cav_id IS NOT NULL
-            AND contact_data.cav_id != ''
-        ) THEN 'cav_id'
-        
-        -- Rule 3: CAV User ID exact match
-        WHEN EXISTS (
-          SELECT 1 FROM suppression_list s
-          WHERE s.cav_user_id = contact_data.cav_user_id
-            AND contact_data.cav_user_id IS NOT NULL
-            AND contact_data.cav_user_id != ''
-        ) THEN 'cav_user_id'
-        
-        -- Rule 4: Full Name + Company match TOGETHER (both required)
-        WHEN (
-          contact_data.full_name_norm IS NOT NULL
-          AND contact_data.full_name_norm != ''
-          AND contact_data.company_norm IS NOT NULL
-          AND contact_data.company_norm != ''
-          AND contact_data.name_company_hash IS NOT NULL
-          AND EXISTS (
-            SELECT 1 FROM suppression_list s
-            WHERE s.name_company_hash = contact_data.name_company_hash
-              AND s.name_company_hash IS NOT NULL
-              AND s.name_company_hash != ''
-          )
-        ) THEN 'full_name+company'
-        
-        ELSE NULL
-      END AS suppression_reason
-    FROM contact_data
-  `));
+  // Use Drizzle ORM for safe parameterized queries
+  const contactData = await db
+    .select({
+      id: contacts.id,
+      email: contacts.email,
+      cavId: contacts.cavId,
+      cavUserId: contacts.cavUserId,
+      fullNameNorm: contacts.fullNameNorm,
+      companyNorm: contacts.companyNorm,
+      nameCompanyHash: contacts.nameCompanyHash,
+    })
+    .from(contacts)
+    .where(
+      and(
+        inArray(contacts.id, contactIds),
+        isNull(contacts.deletedAt)
+      )
+    );
   
   const suppressionMap = new Map<string, string>();
   
-  for (const row of result.rows as Array<{ id: string; suppression_reason: string | null }>) {
-    if (row.suppression_reason) {
-      suppressionMap.set(row.id, row.suppression_reason);
+  // Check each contact against suppression rules using individual queries
+  for (const contact of contactData) {
+    const reason = await getSuppressionReason(contact.id);
+    if (reason) {
+      suppressionMap.set(contact.id, reason);
     }
   }
   
