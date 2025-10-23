@@ -177,13 +177,16 @@ export default function VerificationCampaignConfigPage() {
             <Label htmlFor="geoAllow">Allowed Geographies (Optional - one per line)</Label>
             <Textarea
               id="geoAllow"
-              rows={4}
+              rows={15}
               value={formData.geoAllow}
               onChange={(e) => setFormData({ ...formData, geoAllow: e.target.value })}
               placeholder="United States&#10;Canada&#10;United Kingdom"
               data-testid="input-geo-allow"
+              className="font-mono text-sm"
             />
-            <p className="text-xs text-muted-foreground mt-1">Leave empty to allow all geographies</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Leave empty to allow all geographies. Showing {formData.geoAllow.split('\n').filter(l => l.trim()).length} countries.
+            </p>
           </div>
           <div>
             <Label htmlFor="titleKeywords">Title Keywords (Optional - one per line)</Label>
