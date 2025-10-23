@@ -3520,6 +3520,8 @@ export const verificationContacts = pgTable("verification_contacts", {
   phoneEnrichedAt: timestamp("phone_enriched_at"),
   phoneEnrichmentError: text("phone_enrichment_error"),
 
+  customFields: jsonb("custom_fields"),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
