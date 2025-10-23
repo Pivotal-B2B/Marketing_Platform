@@ -336,6 +336,19 @@ export default function AccountDetailPage() {
                   </p>
                 </div>
 
+                {(account.minEmployeesSize || account.maxEmployeesSize) && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Employee Range</p>
+                    <p className="font-medium">
+                      {account.minEmployeesSize && account.maxEmployeesSize 
+                        ? `${account.minEmployeesSize} - ${account.maxEmployeesSize}`
+                        : account.minEmployeesSize 
+                        ? `${account.minEmployeesSize}+`
+                        : `Up to ${account.maxEmployeesSize}`}
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Annual Revenue</p>
                   <p className="font-medium flex items-center gap-2">
@@ -343,6 +356,19 @@ export default function AccountDetailPage() {
                     {account.annualRevenue || "-"}
                   </p>
                 </div>
+
+                {(account.minAnnualRevenue || account.maxAnnualRevenue) && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Revenue Range</p>
+                    <p className="font-medium">
+                      {account.minAnnualRevenue && account.maxAnnualRevenue 
+                        ? `$${account.minAnnualRevenue} - $${account.maxAnnualRevenue}`
+                        : account.minAnnualRevenue 
+                        ? `$${account.minAnnualRevenue}+`
+                        : `Up to $${account.maxAnnualRevenue}`}
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">HQ City</p>
@@ -403,6 +429,13 @@ export default function AccountDetailPage() {
                   <p className="text-sm text-muted-foreground mb-1">HQ Street Address 3</p>
                   <p className="font-medium">{account.hqStreet3 || "-"}</p>
                 </div>
+
+                {account.list && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">List</p>
+                    <Badge variant="secondary">{account.list}</Badge>
+                  </div>
+                )}
 
                 {account.description && (
                   <div className="col-span-2">
