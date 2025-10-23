@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { contacts, suppressionList, accounts } from "@shared/schema";
-import { sql, eq, inArray, and, or } from "drizzle-orm";
+import { sql, eq, inArray, and, or, isNull } from "drizzle-orm";
 import * as crypto from "crypto";
 
 /**
@@ -136,32 +136,69 @@ export async function checkSuppressionBulk(
     return new Map();
   }
   
-  // Use Drizzle ORM for safe parameterized queries
-  const contactData = await db
-    .select({
-      id: contacts.id,
-      email: contacts.email,
-      cavId: contacts.cavId,
-      cavUserId: contacts.cavUserId,
-      fullNameNorm: contacts.fullNameNorm,
-      companyNorm: contacts.companyNorm,
-      nameCompanyHash: contacts.nameCompanyHash,
-    })
-    .from(contacts)
-    .where(
-      and(
-        inArray(contacts.id, contactIds),
-        isNull(contacts.deletedAt)
-      )
-    );
-  
+  // Process in batches of 500 to avoid parameter limits
+  const BATCH_SIZE = 500;
   const suppressionMap = new Map<string, string>();
   
-  // Check each contact against suppression rules using individual queries
-  for (const contact of contactData) {
-    const reason = await getSuppressionReason(contact.id);
-    if (reason) {
-      suppressionMap.set(contact.id, reason);
+  for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
+    const batch = contactIds.slice(i, i + BATCH_SIZE);
+    
+    // Single set-based query using Drizzle ORM's safe parameter binding
+    // This joins contacts with suppression_list to check all rules efficiently
+    const results = await db.execute(sql`
+      SELECT
+        c.id,
+        CASE
+          -- Rule 1: Email exact match (case-insensitive)
+          WHEN EXISTS (
+            SELECT 1 FROM ${suppressionList} s
+            WHERE s.email_norm = LOWER(TRIM(c.email))
+              AND LOWER(TRIM(c.email)) IS NOT NULL
+              AND LOWER(TRIM(c.email)) != ''
+          ) THEN 'email'
+          
+          -- Rule 2: CAV ID exact match
+          WHEN EXISTS (
+            SELECT 1 FROM ${suppressionList} s
+            WHERE s.cav_id = c.cav_id
+              AND c.cav_id IS NOT NULL
+              AND c.cav_id != ''
+          ) THEN 'cav_id'
+          
+          -- Rule 3: CAV User ID exact match
+          WHEN EXISTS (
+            SELECT 1 FROM ${suppressionList} s
+            WHERE s.cav_user_id = c.cav_user_id
+              AND c.cav_user_id IS NOT NULL
+              AND c.cav_user_id != ''
+          ) THEN 'cav_user_id'
+          
+          -- Rule 4: Full Name + Company match TOGETHER (both required)
+          WHEN (
+            c.full_name_norm IS NOT NULL
+            AND c.full_name_norm != ''
+            AND c.company_norm IS NOT NULL
+            AND c.company_norm != ''
+            AND c.name_company_hash IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM ${suppressionList} s
+              WHERE s.name_company_hash = c.name_company_hash
+                AND s.name_company_hash IS NOT NULL
+                AND s.name_company_hash != ''
+            )
+          ) THEN 'full_name+company'
+          
+          ELSE NULL
+        END AS suppression_reason
+      FROM ${contacts} c
+      WHERE c.id IN ${batch}
+        AND c.deleted_at IS NULL
+    `);
+    
+    for (const row of results.rows as Array<{ id: string; suppression_reason: string | null }>) {
+      if (row.suppression_reason) {
+        suppressionMap.set(row.id, row.suppression_reason);
+      }
     }
   }
   
