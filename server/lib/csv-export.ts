@@ -12,20 +12,29 @@ import { formatNumberForCsv } from './data-normalization';
  */
 
 /**
- * Clean phone number for CSV export
- * Removes dots, spaces, and formats consistently
- * Handles E.164 format (+1.234.567.8900) and other formats
+ * Clean phone number for CSV export to strict E.164 format
+ * E.164 format: only "+" followed by digits (no spaces, dots, parentheses, dashes)
+ * 
+ * Note: If phone number is already in E.164 format in the database, it will have "+".
+ * If it doesn't have "+", we preserve as digits-only (don't add country code since we don't know it).
  */
 function cleanPhoneForExport(phone: string | null | undefined): string {
   if (!phone) return '';
   
-  // Remove dots, extra spaces, and format cleanly
-  // E.164 format: +1.234.567.8900 → +12345678900
-  // Keep only digits, plus sign, and parentheses/dashes
-  return phone
-    .replace(/\./g, '')  // Remove dots
-    .replace(/\s+/g, '')  // Remove extra spaces
-    .trim();
+  const trimmed = phone.trim();
+  if (!trimmed) return '';
+  
+  // Check if it has international format indicator (+)
+  const hasPlus = trimmed.startsWith('+');
+  
+  // Remove all non-digit characters (dots, spaces, parentheses, dashes, etc.)
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  
+  if (!digitsOnly) return ''; // No digits found
+  
+  // If original had "+", preserve it for strict E.164 format
+  // If no "+", return digits only (don't assume country code)
+  return hasPlus ? `+${digitsOnly}` : digitsOnly;
 }
 
 export interface ExportOptions {
