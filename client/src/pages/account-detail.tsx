@@ -164,8 +164,8 @@ export default function AccountDetailPage() {
         industryStandardized: account.industryStandardized || "",
         employeesSizeRange: account.employeesSizeRange || "",
         annualRevenue: account.annualRevenue || "",
-        minAnnualRevenue: account.minAnnualRevenue || "",
-        maxAnnualRevenue: account.maxAnnualRevenue || "",
+        minAnnualRevenue: account.minAnnualRevenue?.toString() || "",
+        maxAnnualRevenue: account.maxAnnualRevenue?.toString() || "",
         minEmployeesSize: account.minEmployeesSize?.toString() || "",
         maxEmployeesSize: account.maxEmployeesSize?.toString() || "",
         hqCity: account.hqCity || "",
@@ -192,6 +192,12 @@ export default function AccountDetailPage() {
     }
     if (editForm.maxEmployeesSize) {
       updateData.maxEmployeesSize = parseInt(editForm.maxEmployeesSize);
+    }
+    if (editForm.minAnnualRevenue) {
+      updateData.minAnnualRevenue = parseFloat(editForm.minAnnualRevenue);
+    }
+    if (editForm.maxAnnualRevenue) {
+      updateData.maxAnnualRevenue = parseFloat(editForm.maxAnnualRevenue);
     }
     // Ensure mainPhone is updated if mainPhoneE164 is changed
     if (editForm.mainPhoneE164 && !editForm.mainPhone) {
