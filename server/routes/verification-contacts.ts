@@ -508,42 +508,7 @@ router.post("/api/verification-contacts/:id/qa", async (req, res) => {
   }
 });
 
-router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => {
-  try {
-    const { campaignId } = req.params;
-    
-    const stats = await db.execute(sql`
-      SELECT
-        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND deleted = FALSE) as eligible_count,
-        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND suppressed = FALSE AND deleted = FALSE) as eligible_unsuppressed_count,
-        COUNT(*) FILTER (WHERE eligibility_status = 'Eligible' AND suppressed = TRUE AND deleted = FALSE) as eligible_suppressed_count,
-        COUNT(*) FILTER (WHERE verification_status = 'Validated' AND deleted = FALSE) as validated_count,
-        COUNT(*) FILTER (WHERE verification_status = 'Pending' AND deleted = FALSE) as pending_count,
-        COUNT(*) FILTER (WHERE suppressed = TRUE AND deleted = FALSE) as suppressed_count,
-        COUNT(*) FILTER (WHERE email_status = 'ok' AND deleted = FALSE) as ok_email_count,
-        COUNT(*) FILTER (WHERE email_status = 'invalid' AND deleted = FALSE) as invalid_email_count,
-        COUNT(*) FILTER (WHERE email_status = 'risky' AND deleted = FALSE) as risky_email_count,
-        COUNT(*) FILTER (WHERE in_submission_buffer = TRUE AND deleted = FALSE) as in_buffer_count,
-        COUNT(*) FILTER (WHERE deleted = TRUE) as deleted_count
-      FROM verification_contacts
-      WHERE campaign_id = ${campaignId}
-    `);
-    
-    const submissions = await db.execute(sql`
-      SELECT COUNT(*) as submission_count
-      FROM verification_lead_submissions
-      WHERE campaign_id = ${campaignId}
-    `);
-    
-    res.json({
-      ...stats.rows[0],
-      submission_count: submissions.rows[0]?.submission_count || 0,
-    });
-  } catch (error) {
-    console.error("Error fetching stats:", error);
-    res.status(500).json({ error: "Failed to fetch stats" });
-  }
-});
+// Removed duplicate /stats endpoint - now handled by verification-campaigns.ts
 
 router.post("/api/verification-contacts/:id/validate-email", async (req, res) => {
   try {
