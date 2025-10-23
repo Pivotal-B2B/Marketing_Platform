@@ -236,16 +236,43 @@ export async function processUpload(jobId: string) {
       });
     }
 
+    // Define known standard fields (not custom fields)
+    const standardFields = new Set([
+      'fullName', 'firstName', 'lastName', 'title', 'email', 'phone', 'mobile', 
+      'linkedinUrl', 'formerPosition', 'timeInCurrentPosition', 'timeInCurrentCompany',
+      'contactAddress1', 'contactAddress2', 'contactAddress3', 'contactCity', 
+      'contactState', 'contactCountry', 'contactPostal', 'companyName', 'account_name',
+      'companyDomain', 'domain', 'hqPhone', 'hqAddress1', 'hqAddress2', 'hqAddress3',
+      'hqCity', 'hqState', 'hqPostal', 'hqCountry', 'cavId', 'cavUserId', 'sourceType',
+      'annualRevenue', 'revenueRange', 'staffCountRange', 'description', 'websiteDomain',
+      'foundedDate', 'industry', 'linkedinId', 'webTechnologies', 'sicCode', 'naicsCode'
+    ]);
+
     const csvHeaders = parseResult.meta.fields || [];
     const mappedRows = (parseResult.data as any[]).map(csvRow => {
       const mappedRow: Record<string, any> = {};
+      const customFields: Record<string, any> = {};
+      
       for (const header of csvHeaders) {
         const headerLower = header.toLowerCase().replace(/[^a-z0-9_]/g, '');
         const targetField = userMappingLookup[header] || autoMappings[headerLower];
+        
         if (targetField && csvRow[header] !== undefined && csvRow[header] !== null && csvRow[header] !== '') {
-          mappedRow[targetField] = csvRow[header];
+          // Check if this is a standard field or a custom field
+          if (standardFields.has(targetField)) {
+            mappedRow[targetField] = csvRow[header];
+          } else {
+            // This is a custom field - store in customFields object
+            customFields[targetField] = csvRow[header];
+          }
         }
       }
+      
+      // Add customFields to mappedRow if any exist
+      if (Object.keys(customFields).length > 0) {
+        mappedRow._customFields = customFields;
+      }
+      
       return mappedRow;
     }) as CSVRow[];
 
@@ -574,6 +601,14 @@ export async function processUpload(jobId: string) {
                 updateData.sourceType = 'Client_Provided';
               }
               
+              // Merge custom fields if present
+              const customFieldsInRow = (row as any)._customFields || {};
+              if (Object.keys(customFieldsInRow).length > 0) {
+                // Merge with existing custom fields
+                const existingCustomFields = existingContact.customFields || {};
+                updateData.customFields = { ...existingCustomFields, ...customFieldsInRow };
+              }
+              
               Object.assign(updateData, normalizedKeys);
 
               if (Object.keys(updateData).length > 0) {
@@ -584,6 +619,9 @@ export async function processUpload(jobId: string) {
               // OPTIMIZATION: Collect for bulk insert
               const positionMonths = parseDurationToMonths(row.timeInCurrentPosition);
               const companyMonths = parseDurationToMonths(row.timeInCurrentCompany);
+              
+              // Extract custom fields if present
+              const customFieldsToStore = (row as any)._customFields || {};
               
               contactsToInsert.push({
                 campaignId,
@@ -621,6 +659,7 @@ export async function processUpload(jobId: string) {
                 eligibilityStatus: eligibility.status,
                 eligibilityReason: eligibility.reason,
                 suppressed: isSuppressed,
+                customFields: Object.keys(customFieldsToStore).length > 0 ? customFieldsToStore : null,
                 ...normalizedKeys,
               });
               successCount++;
