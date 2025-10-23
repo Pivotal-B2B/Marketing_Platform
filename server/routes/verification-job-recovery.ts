@@ -12,6 +12,52 @@ import { requireAuth } from "../auth";
 const router = Router();
 
 /**
+ * Get email validation job status
+ * GET /api/verification-campaigns/:campaignId/email-validation-jobs/:jobId
+ */
+router.get("/api/verification-campaigns/:campaignId/email-validation-jobs/:jobId", requireAuth, async (req, res) => {
+  try {
+    const { campaignId, jobId } = req.params;
+    
+    const [job] = await db
+      .select()
+      .from(verificationEmailValidationJobs)
+      .where(and(
+        eq(verificationEmailValidationJobs.id, jobId),
+        eq(verificationEmailValidationJobs.campaignId, campaignId)
+      ));
+    
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    
+    res.json({
+      jobId: job.id,
+      campaignId: job.campaignId,
+      status: job.status,
+      totalContacts: job.totalContacts,
+      processedContacts: job.processedContacts,
+      totalBatches: job.totalBatches,
+      currentBatch: job.currentBatch,
+      successCount: job.successCount,
+      failureCount: job.failureCount,
+      statusCounts: job.statusCounts,
+      errorMessage: job.errorMessage,
+      startedAt: job.startedAt,
+      finishedAt: job.finishedAt,
+      updatedAt: job.updatedAt,
+    });
+    
+  } catch (error) {
+    console.error("[JOB STATUS] Error fetching job status:", error);
+    res.status(500).json({ 
+      error: "Failed to fetch job status", 
+      message: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
+/**
  * Restart a stuck or failed email validation job
  * POST /api/verification-campaigns/:campaignId/email-validation-jobs/:jobId/restart
  */
