@@ -142,7 +142,8 @@ router.get("/api/verification-campaigns/:campaignId/queue", async (req, res) => 
         c.*,
         a.name as account_name,
         a.hq_city,
-        a.hq_country
+        a.hq_country,
+        a.custom_fields as account_custom_fields
       FROM verification_contacts c
       JOIN next_batch nb ON nb.id = c.id
       LEFT JOIN accounts a ON a.id = c.account_id

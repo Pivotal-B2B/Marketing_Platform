@@ -1276,6 +1276,26 @@ export default function VerificationConsolePage() {
                 </div>
               </div>
 
+              {(contact as any)?.account_custom_fields && Object.keys((contact as any).account_custom_fields).length > 0 && (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold mb-3">Account Custom Fields</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {Object.entries((contact as any).account_custom_fields).map(([key, value]) => (
+                      <div key={key}>
+                        <Label className="capitalize">
+                          {key.replace(/_/g, ' ')}
+                        </Label>
+                        <Input 
+                          value={typeof value === 'object' ? JSON.stringify(value) : String(value)} 
+                          readOnly 
+                          data-testid={`input-account-custom-${key}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="border-t pt-4">
                 <h3 className="text-sm font-semibold mb-3">Contact Address & Phone (Enriched)</h3>
                 <div className="grid grid-cols-3 gap-4">
@@ -1331,6 +1351,26 @@ export default function VerificationConsolePage() {
                   </div>
                 </div>
               </div>
+
+              {(contact as any)?.customFields && Object.keys((contact as any).customFields).length > 0 && (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold mb-3">Custom Fields</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {Object.entries((contact as any).customFields).map(([key, value]) => (
+                      <div key={key}>
+                        <Label className="capitalize">
+                          {key.replace(/_/g, ' ')}
+                        </Label>
+                        <Input 
+                          value={typeof value === 'object' ? JSON.stringify(value) : String(value)} 
+                          readOnly 
+                          data-testid={`input-custom-${key}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {(contact as any)?.suppressed && (
                 <div className="p-3 bg-destructive/10 border border-destructive rounded-md">
