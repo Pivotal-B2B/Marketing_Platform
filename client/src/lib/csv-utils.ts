@@ -207,7 +207,17 @@ export function downloadCSV(content: string, filename: string): void {
 
 // Export contacts to CSV
 export function exportContactsToCSV(contacts: Contact[]): string {
-  const headers = [
+  // Collect all unique custom field keys across all contacts
+  const customFieldKeys = new Set<string>();
+  contacts.forEach((contact: any) => {
+    if (contact.customFields && typeof contact.customFields === 'object') {
+      Object.keys(contact.customFields).forEach(key => customFieldKeys.add(key));
+    }
+  });
+  
+  const customFieldKeysArray = Array.from(customFieldKeys).sort();
+  
+  const baseHeaders = [
     "id",
     "accountId",
     "firstName",
@@ -248,7 +258,6 @@ export function exportContactsToCSV(contacts: Contact[]): string {
     "consentSource",
     "consentTimestamp",
     "ownerId",
-    "customFields",
     "emailStatus",
     "phoneStatus",
     "sourceSystem",
@@ -265,70 +274,92 @@ export function exportContactsToCSV(contacts: Contact[]): string {
     "updatedAt",
   ];
 
-  const rows = contacts.map((contact: any) => [
-    escapeCSVField(contact.id),
-    escapeCSVField(contact.accountId || ""),
-    escapeCSVField(contact.firstName || ""),
-    escapeCSVField(contact.lastName || ""),
-    escapeCSVField(contact.fullName || ""),
-    escapeCSVField(contact.email),
-    escapeCSVField(contact.emailNormalized || ""),
-    escapeCSVField(contact.emailVerificationStatus || ""),
-    escapeCSVField(contact.emailAiConfidence || ""),
-    escapeCSVField(contact.directPhone || ""),
-    escapeCSVField(contact.directPhoneE164 || ""),
-    escapeCSVField(contact.phoneExtension || ""),
-    escapeCSVField(contact.phoneVerifiedAt || ""),
-    escapeCSVField(contact.phoneAiConfidence || ""),
-    escapeCSVField(contact.mobilePhone || ""),
-    escapeCSVField(contact.mobilePhoneE164 || ""),
-    escapeCSVField(contact.jobTitle || ""),
-    escapeCSVField(contact.department || ""),
-    escapeCSVField(contact.seniorityLevel || ""),
-    escapeCSVField(contact.formerPosition || ""),
-    escapeCSVField(contact.timeInCurrentPosition || ""),
-    escapeCSVField(contact.timeInCurrentPositionMonths || ""),
-    escapeCSVField(contact.timeInCurrentCompany || ""),
-    escapeCSVField(contact.timeInCurrentCompanyMonths || ""),
-    escapeCSVField(contact.linkedinUrl || ""),
-    escapeCSVField(contact.address || ""),
-    escapeCSVField(contact.city || ""),
-    escapeCSVField(contact.state || ""),
-    escapeCSVField(contact.stateAbbr || ""),
-    escapeCSVField(contact.county || ""),
-    escapeCSVField(contact.postalCode || ""),
-    escapeCSVField(contact.country || ""),
-    escapeCSVField(contact.contactLocation || ""),
-    escapeCSVField(contact.timezone || ""),
-    escapeCSVField(contact.intentTopics ? contact.intentTopics.join(",") : ""),
-    escapeCSVField(contact.tags ? contact.tags.join(",") : ""),
-    escapeCSVField(contact.consentBasis || ""),
-    escapeCSVField(contact.consentSource || ""),
-    escapeCSVField(contact.consentTimestamp || ""),
-    escapeCSVField(contact.ownerId || ""),
-    escapeCSVField(contact.customFields ? JSON.stringify(contact.customFields) : ""),
-    escapeCSVField(contact.emailStatus || ""),
-    escapeCSVField(contact.phoneStatus || ""),
-    escapeCSVField(contact.sourceSystem || ""),
-    escapeCSVField(contact.sourceRecordId || ""),
-    escapeCSVField(contact.sourceUpdatedAt || ""),
-    escapeCSVField(contact.researchDate || ""),
-    escapeCSVField(contact.list || ""),
-    escapeCSVField(contact.isInvalid !== undefined ? String(contact.isInvalid) : ""),
-    escapeCSVField(contact.invalidReason || ""),
-    escapeCSVField(contact.invalidatedAt || ""),
-    escapeCSVField(contact.invalidatedBy || ""),
-    escapeCSVField(contact.deletedAt || ""),
-    escapeCSVField(contact.createdAt || ""),
-    escapeCSVField(contact.updatedAt || ""),
-  ]);
+  // Add custom field headers (prefixed with "custom_" to distinguish them)
+  const headers = [...baseHeaders, ...customFieldKeysArray.map(key => `custom_${key}`)];
+
+  const rows = contacts.map((contact: any) => {
+    const baseRow = [
+      escapeCSVField(contact.id),
+      escapeCSVField(contact.accountId || ""),
+      escapeCSVField(contact.firstName || ""),
+      escapeCSVField(contact.lastName || ""),
+      escapeCSVField(contact.fullName || ""),
+      escapeCSVField(contact.email),
+      escapeCSVField(contact.emailNormalized || ""),
+      escapeCSVField(contact.emailVerificationStatus || ""),
+      escapeCSVField(contact.emailAiConfidence || ""),
+      escapeCSVField(contact.directPhone || ""),
+      escapeCSVField(contact.directPhoneE164 || ""),
+      escapeCSVField(contact.phoneExtension || ""),
+      escapeCSVField(contact.phoneVerifiedAt || ""),
+      escapeCSVField(contact.phoneAiConfidence || ""),
+      escapeCSVField(contact.mobilePhone || ""),
+      escapeCSVField(contact.mobilePhoneE164 || ""),
+      escapeCSVField(contact.jobTitle || ""),
+      escapeCSVField(contact.department || ""),
+      escapeCSVField(contact.seniorityLevel || ""),
+      escapeCSVField(contact.formerPosition || ""),
+      escapeCSVField(contact.timeInCurrentPosition || ""),
+      escapeCSVField(contact.timeInCurrentPositionMonths || ""),
+      escapeCSVField(contact.timeInCurrentCompany || ""),
+      escapeCSVField(contact.timeInCurrentCompanyMonths || ""),
+      escapeCSVField(contact.linkedinUrl || ""),
+      escapeCSVField(contact.address || ""),
+      escapeCSVField(contact.city || ""),
+      escapeCSVField(contact.state || ""),
+      escapeCSVField(contact.stateAbbr || ""),
+      escapeCSVField(contact.county || ""),
+      escapeCSVField(contact.postalCode || ""),
+      escapeCSVField(contact.country || ""),
+      escapeCSVField(contact.contactLocation || ""),
+      escapeCSVField(contact.timezone || ""),
+      escapeCSVField(contact.intentTopics ? contact.intentTopics.join(",") : ""),
+      escapeCSVField(contact.tags ? contact.tags.join(",") : ""),
+      escapeCSVField(contact.consentBasis || ""),
+      escapeCSVField(contact.consentSource || ""),
+      escapeCSVField(contact.consentTimestamp || ""),
+      escapeCSVField(contact.ownerId || ""),
+      escapeCSVField(contact.emailStatus || ""),
+      escapeCSVField(contact.phoneStatus || ""),
+      escapeCSVField(contact.sourceSystem || ""),
+      escapeCSVField(contact.sourceRecordId || ""),
+      escapeCSVField(contact.sourceUpdatedAt || ""),
+      escapeCSVField(contact.researchDate || ""),
+      escapeCSVField(contact.list || ""),
+      escapeCSVField(contact.isInvalid !== undefined ? String(contact.isInvalid) : ""),
+      escapeCSVField(contact.invalidReason || ""),
+      escapeCSVField(contact.invalidatedAt || ""),
+      escapeCSVField(contact.invalidatedBy || ""),
+      escapeCSVField(contact.deletedAt || ""),
+      escapeCSVField(contact.createdAt || ""),
+      escapeCSVField(contact.updatedAt || ""),
+    ];
+    
+    // Add custom field values in the same order as headers
+    const customFieldValues = customFieldKeysArray.map(key => {
+      const value = contact.customFields?.[key];
+      return escapeCSVField(value !== undefined && value !== null ? String(value) : "");
+    });
+    
+    return [...baseRow, ...customFieldValues];
+  });
 
   return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
 }
 
 // Export accounts to CSV
 export function exportAccountsToCSV(accounts: Account[]): string {
-  const headers = [
+  // Collect all unique custom field keys across all accounts
+  const customFieldKeys = new Set<string>();
+  accounts.forEach((account: any) => {
+    if (account.customFields && typeof account.customFields === 'object') {
+      Object.keys(account.customFields).forEach(key => customFieldKeys.add(key));
+    }
+  });
+  
+  const customFieldKeysArray = Array.from(customFieldKeys).sort();
+  
+  const baseHeaders = [
     "id",
     "name",
     "nameNormalized",
@@ -388,7 +419,6 @@ export function exportAccountsToCSV(accounts: Account[]): string {
     "parentAccountId",
     "tags",
     "ownerId",
-    "customFields",
     "sourceSystem",
     "sourceRecordId",
     "sourceUpdatedAt",
@@ -399,76 +429,88 @@ export function exportAccountsToCSV(accounts: Account[]): string {
     "updatedAt",
   ];
 
-  const rows = accounts.map((account: any) => [
-    escapeCSVField(account.id),
-    escapeCSVField(account.name),
-    escapeCSVField(account.nameNormalized || ""),
-    escapeCSVField(account.canonicalName || ""),
-    escapeCSVField(account.domain || ""),
-    escapeCSVField(account.domainNormalized || ""),
-    escapeCSVField(account.websiteDomain || ""),
-    escapeCSVField(account.industryStandardized || ""),
-    escapeCSVField(account.industrySecondary ? account.industrySecondary.join(",") : ""),
-    escapeCSVField(account.industryCode || ""),
-    escapeCSVField(account.industryRaw || ""),
-    escapeCSVField(account.industryAiSuggested || ""),
-    escapeCSVField(account.industryAiTopk ? account.industryAiTopk.join(",") : ""),
-    escapeCSVField(account.industryAiConfidence || ""),
-    escapeCSVField(account.industryAiSource || ""),
-    escapeCSVField(account.industryAiSuggestedAt || ""),
-    escapeCSVField(account.industryAiStatus || ""),
-    escapeCSVField(account.industryAiCandidates ? JSON.stringify(account.industryAiCandidates) : ""),
-    escapeCSVField(account.industryAiReviewedBy || ""),
-    escapeCSVField(account.industryAiReviewedAt || ""),
-    escapeCSVField(account.annualRevenue || ""),
-    escapeCSVField(account.minAnnualRevenue || ""),
-    escapeCSVField(account.maxAnnualRevenue || ""),
-    escapeCSVField(account.revenueRange || ""),
-    escapeCSVField(account.employeesSizeRange || ""),
-    escapeCSVField(account.staffCount || ""),
-    escapeCSVField(account.minEmployeesSize || ""),
-    escapeCSVField(account.maxEmployeesSize || ""),
-    escapeCSVField(account.description || ""),
-    escapeCSVField(account.list || ""),
-    escapeCSVField(account.hqStreet1 || ""),
-    escapeCSVField(account.hqStreet2 || ""),
-    escapeCSVField(account.hqStreet3 || ""),
-    escapeCSVField(account.hqAddress || ""),
-    escapeCSVField(account.hqCity || ""),
-    escapeCSVField(account.hqState || ""),
-    escapeCSVField(account.hqStateAbbr || ""),
-    escapeCSVField(account.hqPostalCode || ""),
-    escapeCSVField(account.hqCountry || ""),
-    escapeCSVField(account.companyLocation || ""),
-    escapeCSVField(account.yearFounded || ""),
-    escapeCSVField(account.foundedDate || ""),
-    escapeCSVField(account.foundedDatePrecision || ""),
-    escapeCSVField(account.sicCode || ""),
-    escapeCSVField(account.naicsCode || ""),
-    escapeCSVField(account.previousNames ? account.previousNames.join(",") : ""),
-    escapeCSVField(account.linkedinUrl || ""),
-    escapeCSVField(account.linkedinId || ""),
-    escapeCSVField(account.linkedinSpecialties ? account.linkedinSpecialties.join(",") : ""),
-    escapeCSVField(account.mainPhone || ""),
-    escapeCSVField(account.mainPhoneE164 || ""),
-    escapeCSVField(account.mainPhoneExtension || ""),
-    escapeCSVField(account.intentTopics ? account.intentTopics.join(",") : ""),
-    escapeCSVField(account.techStack ? account.techStack.join(",") : ""),
-    escapeCSVField(account.webTechnologies || ""),
-    escapeCSVField(account.webTechnologiesJson ? JSON.stringify(account.webTechnologiesJson) : ""),
-    escapeCSVField(account.parentAccountId || ""),
-    escapeCSVField(account.tags ? account.tags.join(",") : ""),
-    escapeCSVField(account.ownerId || ""),
-    escapeCSVField(account.customFields ? JSON.stringify(account.customFields) : ""),
-    escapeCSVField(account.sourceSystem || ""),
-    escapeCSVField(account.sourceRecordId || ""),
-    escapeCSVField(account.sourceUpdatedAt || ""),
-    escapeCSVField(account.aiEnrichmentDate || ""),
-    escapeCSVField(account.aiEnrichmentData ? JSON.stringify(account.aiEnrichmentData) : ""),
-    escapeCSVField(account.deletedAt || ""),
-    escapeCSVField(account.createdAt || ""),
-    escapeCSVField(account.updatedAt || ""),
-  ]);
+  // Add custom field headers (prefixed with "custom_" to distinguish them)
+  const headers = [...baseHeaders, ...customFieldKeysArray.map(key => `custom_${key}`)];
+
+  const rows = accounts.map((account: any) => {
+    const baseRow = [
+      escapeCSVField(account.id),
+      escapeCSVField(account.name),
+      escapeCSVField(account.nameNormalized || ""),
+      escapeCSVField(account.canonicalName || ""),
+      escapeCSVField(account.domain || ""),
+      escapeCSVField(account.domainNormalized || ""),
+      escapeCSVField(account.websiteDomain || ""),
+      escapeCSVField(account.industryStandardized || ""),
+      escapeCSVField(account.industrySecondary ? account.industrySecondary.join(",") : ""),
+      escapeCSVField(account.industryCode || ""),
+      escapeCSVField(account.industryRaw || ""),
+      escapeCSVField(account.industryAiSuggested || ""),
+      escapeCSVField(account.industryAiTopk ? account.industryAiTopk.join(",") : ""),
+      escapeCSVField(account.industryAiConfidence || ""),
+      escapeCSVField(account.industryAiSource || ""),
+      escapeCSVField(account.industryAiSuggestedAt || ""),
+      escapeCSVField(account.industryAiStatus || ""),
+      escapeCSVField(account.industryAiCandidates ? JSON.stringify(account.industryAiCandidates) : ""),
+      escapeCSVField(account.industryAiReviewedBy || ""),
+      escapeCSVField(account.industryAiReviewedAt || ""),
+      escapeCSVField(account.annualRevenue || ""),
+      escapeCSVField(account.minAnnualRevenue || ""),
+      escapeCSVField(account.maxAnnualRevenue || ""),
+      escapeCSVField(account.revenueRange || ""),
+      escapeCSVField(account.employeesSizeRange || ""),
+      escapeCSVField(account.staffCount || ""),
+      escapeCSVField(account.minEmployeesSize || ""),
+      escapeCSVField(account.maxEmployeesSize || ""),
+      escapeCSVField(account.description || ""),
+      escapeCSVField(account.list || ""),
+      escapeCSVField(account.hqStreet1 || ""),
+      escapeCSVField(account.hqStreet2 || ""),
+      escapeCSVField(account.hqStreet3 || ""),
+      escapeCSVField(account.hqAddress || ""),
+      escapeCSVField(account.hqCity || ""),
+      escapeCSVField(account.hqState || ""),
+      escapeCSVField(account.hqStateAbbr || ""),
+      escapeCSVField(account.hqPostalCode || ""),
+      escapeCSVField(account.hqCountry || ""),
+      escapeCSVField(account.companyLocation || ""),
+      escapeCSVField(account.yearFounded || ""),
+      escapeCSVField(account.foundedDate || ""),
+      escapeCSVField(account.foundedDatePrecision || ""),
+      escapeCSVField(account.sicCode || ""),
+      escapeCSVField(account.naicsCode || ""),
+      escapeCSVField(account.previousNames ? account.previousNames.join(",") : ""),
+      escapeCSVField(account.linkedinUrl || ""),
+      escapeCSVField(account.linkedinId || ""),
+      escapeCSVField(account.linkedinSpecialties ? account.linkedinSpecialties.join(",") : ""),
+      escapeCSVField(account.mainPhone || ""),
+      escapeCSVField(account.mainPhoneE164 || ""),
+      escapeCSVField(account.mainPhoneExtension || ""),
+      escapeCSVField(account.intentTopics ? account.intentTopics.join(",") : ""),
+      escapeCSVField(account.techStack ? account.techStack.join(",") : ""),
+      escapeCSVField(account.webTechnologies || ""),
+      escapeCSVField(account.webTechnologiesJson ? JSON.stringify(account.webTechnologiesJson) : ""),
+      escapeCSVField(account.parentAccountId || ""),
+      escapeCSVField(account.tags ? account.tags.join(",") : ""),
+      escapeCSVField(account.ownerId || ""),
+      escapeCSVField(account.sourceSystem || ""),
+      escapeCSVField(account.sourceRecordId || ""),
+      escapeCSVField(account.sourceUpdatedAt || ""),
+      escapeCSVField(account.aiEnrichmentDate || ""),
+      escapeCSVField(account.aiEnrichmentData ? JSON.stringify(account.aiEnrichmentData) : ""),
+      escapeCSVField(account.deletedAt || ""),
+      escapeCSVField(account.createdAt || ""),
+      escapeCSVField(account.updatedAt || ""),
+    ];
+    
+    // Add custom field values in the same order as headers
+    const customFieldValues = customFieldKeysArray.map(key => {
+      const value = account.customFields?.[key];
+      return escapeCSVField(value !== undefined && value !== null ? String(value) : "");
+    });
+    
+    return [...baseRow, ...customFieldValues];
+  });
 
   return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
 }
