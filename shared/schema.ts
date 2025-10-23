@@ -1234,6 +1234,39 @@ export const campaignSuppressionContacts = pgTable("campaign_suppression_contact
   uniqueCampaignContact: uniqueIndex("campaign_suppression_contacts_unique").on(table.campaignId, table.contactId),
 }));
 
+// Campaign Suppression - Emails
+// Suppress specific emails from specific campaigns (for bulk CSV upload)
+export const campaignSuppressionEmails = pgTable("campaign_suppression_emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  email: text("email").notNull(),
+  emailNorm: text("email_norm").notNull(), // Normalized lowercase for matching
+  reason: text("reason"),
+  addedBy: varchar("added_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignEmailIdx: index("campaign_suppression_emails_campaign_idx").on(table.campaignId),
+  emailNormIdx: index("campaign_suppression_emails_norm_idx").on(table.campaignId, table.emailNorm),
+  uniqueCampaignEmail: uniqueIndex("campaign_suppression_emails_unique").on(table.campaignId, table.emailNorm),
+}));
+
+// Campaign Suppression - Domains
+// Suppress specific domains/companies from specific campaigns
+export const campaignSuppressionDomains = pgTable("campaign_suppression_domains", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+  domain: text("domain").notNull(), // e.g., "acme.com"
+  domainNorm: text("domain_norm").notNull(), // Normalized for matching
+  companyName: text("company_name"), // Optional company name for reference
+  reason: text("reason"),
+  addedBy: varchar("added_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignDomainIdx: index("campaign_suppression_domains_campaign_idx").on(table.campaignId),
+  domainNormIdx: index("campaign_suppression_domains_norm_idx").on(table.campaignId, table.domainNorm),
+  uniqueCampaignDomain: uniqueIndex("campaign_suppression_domains_unique").on(table.campaignId, table.domainNorm),
+}));
+
 // ========== DISPOSITION MANAGEMENT & CALL ACTIVITY SYSTEM ==========
 
 // Dispositions - Client-defined labels mapped to system actions
@@ -2057,6 +2090,16 @@ export const insertCampaignSuppressionContactSchema = createInsertSchema(campaig
   createdAt: true,
 });
 
+export const insertCampaignSuppressionEmailSchema = createInsertSchema(campaignSuppressionEmails).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCampaignSuppressionDomainSchema = createInsertSchema(campaignSuppressionDomains).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertCampaignOrderSchema = createInsertSchema(campaignOrders).omit({
   id: true,
   createdAt: true,
@@ -2312,6 +2355,12 @@ export type InsertCampaignSuppressionAccount = z.infer<typeof insertCampaignSupp
 
 export type CampaignSuppressionContact = typeof campaignSuppressionContacts.$inferSelect;
 export type InsertCampaignSuppressionContact = z.infer<typeof insertCampaignSuppressionContactSchema>;
+
+export type CampaignSuppressionEmail = typeof campaignSuppressionEmails.$inferSelect;
+export type InsertCampaignSuppressionEmail = z.infer<typeof insertCampaignSuppressionEmailSchema>;
+
+export type CampaignSuppressionDomain = typeof campaignSuppressionDomains.$inferSelect;
+export type InsertCampaignSuppressionDomain = z.infer<typeof insertCampaignSuppressionDomainSchema>;
 
 export type CampaignOrder = typeof campaignOrders.$inferSelect;
 export type InsertCampaignOrder = z.infer<typeof insertCampaignOrderSchema>;
