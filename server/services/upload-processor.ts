@@ -309,35 +309,6 @@ export async function processUpload(jobId: string) {
         accountsByNormalizedName.get(normalizedName)!.push(account);
       }
     }
-    
-    // LEAD CAP ENFORCEMENT: Pre-load current contact counts per account for this campaign
-    const leadCapPerAccount = campaign.leadCapPerAccount || 10;
-    console.log(`[Upload] Lead cap enforcement enabled: ${leadCapPerAccount} contacts per account`);
-    
-    const currentContactCounts = await db
-      .select({
-        accountId: verificationContacts.accountId,
-        count: sql<number>`count(*)::int`
-      })
-      .from(verificationContacts)
-      .where(
-        and(
-          eq(verificationContacts.campaignId, campaignId),
-          eq(verificationContacts.deleted, false),
-          isNotNull(verificationContacts.accountId)
-        )
-      )
-      .groupBy(verificationContacts.accountId);
-    
-    const accountContactCounts = new Map<string, number>();
-    for (const row of currentContactCounts) {
-      if (row.accountId) {
-        accountContactCounts.set(row.accountId, row.count);
-      }
-    }
-    console.log(`[Upload] Loaded contact counts for ${accountContactCounts.size} accounts`);
-    
-    let capViolations = 0;
 
     for (let batchStart = 0; batchStart < mappedRows.length; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, mappedRows.length);
@@ -663,22 +634,6 @@ export async function processUpload(jobId: string) {
               }
               successCount++;
             } else {
-              // LEAD CAP ENFORCEMENT: Check if account has reached its cap (including temp accounts in this batch)
-              if (accountId) {
-                const currentCount = accountContactCounts.get(accountId) || 0;
-                if (currentCount >= leadCapPerAccount) {
-                  capViolations++;
-                  errorCount++;
-                  errors.push({
-                    row: globalIndex + 1,
-                    message: `Lead cap reached for account ${accountData?.name || accountId} (${currentCount}/${leadCapPerAccount})`
-                  });
-                  continue; // Skip this contact
-                }
-                // Increment the count for this account (track pending inserts including temp IDs)
-                accountContactCounts.set(accountId, currentCount + 1);
-              }
-              
               // OPTIMIZATION: Collect for bulk insert
               const positionMonths = parseDurationToMonths(row.timeInCurrentPosition);
               const companyMonths = parseDurationToMonths(row.timeInCurrentCompany);
@@ -754,13 +709,6 @@ export async function processUpload(jobId: string) {
               filtered.push(account);
               accountsByNormalizedName.set(normalizedName, filtered);
             }
-            
-            // LEAD CAP: Migrate contact counts from temp ID to real ID
-            const tempCount = accountContactCounts.get(tempId) || 0;
-            if (tempCount > 0) {
-              accountContactCounts.set(account.id, tempCount);
-              accountContactCounts.delete(tempId);
-            }
           });
         }
 
@@ -809,7 +757,7 @@ export async function processUpload(jobId: string) {
       })
       .where(eq(verificationUploadJobs.id, jobId));
 
-    console.log(`[Upload Processor] Job ${jobId} completed: ${successCount} success, ${errorCount} errors (${capViolations} lead cap violations)`);
+    console.log(`[Upload Processor] Job ${jobId} completed: ${successCount} success, ${errorCount} errors`);
   } catch (error: any) {
     console.error(`[Upload Processor] Job ${jobId} failed:`, error);
 
