@@ -392,10 +392,15 @@ export const accounts = pgTable("accounts", {
   industryAiStatus: industryAIStatusEnum("industry_ai_status"),
 
   annualRevenue: numeric("annual_revenue"), // Removed precision to allow deployment
+  minAnnualRevenue: numeric("min_annual_revenue"), // Range minimum for revenue
+  maxAnnualRevenue: numeric("max_annual_revenue"), // Range maximum for revenue
   revenueRange: revenueRangeEnum("revenue_range"), // Pivotal Template: "$500M - $1B", "$1B+", etc.
   employeesSizeRange: staffCountRangeEnum("employees_size_range"), // Pivotal Template: "501-1000", "10000+", etc.
   staffCount: integer("staff_count"),
+  minEmployeesSize: integer("min_employees_size"), // Range minimum for employees
+  maxEmployeesSize: integer("max_employees_size"), // Range maximum for employees
   description: text("description"), // Multiline text with UTF-8 support
+  list: text("list"), // Source list identifier (e.g., "InFynd", "ZoomInfo")
 
   // Pivotal B2B Standard Template - Company Location Fields
   hqStreet1: text("hq_street_1"),
