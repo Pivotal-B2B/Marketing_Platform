@@ -2377,17 +2377,17 @@ export function registerRoutes(app: Express) {
       const dialMode = campaign.dialMode || 'manual';
 
       // Check if campaign has audience defined
-      let contacts: any[] = [];
+      let campaignContacts: any[] = [];
       if (campaign.audienceRefs) {
         const audienceRefs = campaign.audienceRefs as any;
         const uniqueContactIds = new Set<string>();
 
         // Resolve from filterGroup (advanced filters)
         if (audienceRefs.filterGroup) {
-          const filterSQL = buildFilterQuery(audienceRefs.filterGroup as FilterGroup, contacts as any);
+          const filterSQL = buildFilterQuery(audienceRefs.filterGroup as FilterGroup, contactsTable);
           if (filterSQL) {
             const audienceContacts = await db.select()
-              .from(contacts as any)
+              .from(contactsTable)
               .where(filterSQL);
             audienceContacts.forEach(c => uniqueContactIds.add(c.id));
           }
@@ -2430,10 +2430,10 @@ export function registerRoutes(app: Express) {
               .limit(1);
 
             if (segment && segment.definitionJson) {
-              const filterSQL = buildFilterQuery(segment.definitionJson as FilterGroup, contacts as any);
+              const filterSQL = buildFilterQuery(segment.definitionJson as FilterGroup, contactsTable);
               if (filterSQL) {
                 const segmentContacts = await db.select()
-                  .from(contacts as any)
+                  .from(contactsTable)
                   .where(filterSQL);
                 segmentContacts.forEach(c => uniqueContactIds.add(c.id));
               }
@@ -2443,15 +2443,15 @@ export function registerRoutes(app: Express) {
 
         // Convert contact IDs to full contact objects
         if (uniqueContactIds.size > 0) {
-          contacts = await db.select()
-            .from(contacts as any)
-            .where(sql`${(contacts as any).id} IN (${sql.join(Array.from(uniqueContactIds).map(id => sql`${id}`), sql`, `)})`)
+          campaignContacts = await db.select()
+            .from(contactsTable)
+            .where(sql`${contactsTable.id} IN (${sql.join(Array.from(uniqueContactIds).map(id => sql`${id}`), sql`, `)})`)
             .limit(10000);
         }
 
         // Remove duplicates and filter valid contacts
         const uniqueContacts = Array.from(
-          new Map(contacts.map(c => [c.id, c])).values()
+          new Map(campaignContacts.map(c => [c.id, c])).values()
         );
         const validContacts = uniqueContacts.filter(c => c.accountId);
 
