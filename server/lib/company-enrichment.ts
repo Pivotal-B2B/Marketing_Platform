@@ -78,7 +78,17 @@ export class CompanyEnrichmentService {
         };
       }
 
-      const country = contact.contactCountry || contact.hqCountry || "Unknown";
+      // CRITICAL: Only use Contact Country for enrichment (no HQ country fallback)
+      // Enrichment is based exclusively on where the contact is located
+      if (!contact.contactCountry?.trim()) {
+        return {
+          success: false,
+          addressError: "Contact Country is required for enrichment",
+          phoneError: "Contact Country is required for enrichment",
+        };
+      }
+
+      const country = contact.contactCountry;
       
       const needsAddress = this.needsAddressEnrichment(contact);
       const needsPhone = this.needsPhoneEnrichment(contact);
