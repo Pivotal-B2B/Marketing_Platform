@@ -34,7 +34,7 @@ import {
   userIdSchema
 } from "./validation/schemas";
 import { db } from "./db";
-import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts } from "@shared/schema";
+import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts, lists, segments } from "@shared/schema";
 import {
   insertAccountSchema,
   insertContactSchema,
