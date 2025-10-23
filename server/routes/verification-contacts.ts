@@ -684,7 +684,17 @@ router.post("/api/verification-contacts/:id/submit", async (req, res) => {
       const currentCount = Number(submissionCount.rows[0]?.count || 0);
       const cap = campaign.leadCapPerAccount || 10;
       if (currentCount >= cap) {
-        throw new Error("Account cap reached");
+        // Fetch account name for better error message
+        const accountInfo = await tx.execute(sql`
+          SELECT name, domain FROM accounts WHERE id = ${contact.accountId}
+        `);
+        const accountName = accountInfo.rows[0]?.name || contact.accountId;
+        throw new Error(JSON.stringify({ 
+          type: "cap_reached", 
+          accountName, 
+          currentCount, 
+          cap 
+        }));
       }
       
       const [submission] = await tx
@@ -707,9 +717,28 @@ router.post("/api/verification-contacts/:id/submit", async (req, res) => {
     res.json(result);
   } catch (error: any) {
     console.error("Error submitting contact:", error);
-    if (error.message === "Account cap reached") {
-      return res.status(400).json({ error: "Account cap reached" });
+    
+    // Handle cap reached error with detailed information
+    try {
+      const errorData = JSON.parse(error.message);
+      if (errorData.type === "cap_reached") {
+        return res.status(400).json({ 
+          error: "Account cap reached",
+          details: {
+            accountName: errorData.accountName,
+            currentCount: errorData.currentCount,
+            cap: errorData.cap,
+            message: `Account "${errorData.accountName}" has reached its submission limit (${errorData.currentCount}/${errorData.cap})`
+          }
+        });
+      }
+    } catch (parseError) {
+      // Not a JSON error, check for old-style error
+      if (error.message === "Account cap reached") {
+        return res.status(400).json({ error: "Account cap reached" });
+      }
     }
+    
     res.status(500).json({ error: "Failed to submit contact" });
   }
 });
