@@ -2443,9 +2443,10 @@ export function registerRoutes(app: Express) {
 
         // Convert contact IDs to full contact objects
         if (uniqueContactIds.size > 0) {
+          const contactIdsArray = Array.from(uniqueContactIds);
           campaignContacts = await db.select()
             .from(contactsTable)
-            .where(sql`${contactsTable.id} IN (${sql.join(Array.from(uniqueContactIds).map(id => sql`${id}`), sql`, `)})`)
+            .where(inArray(contactsTable.id, contactIdsArray))
             .limit(10000);
         }
 
