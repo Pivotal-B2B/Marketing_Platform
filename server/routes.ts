@@ -34,7 +34,7 @@ import {
   userIdSchema
 } from "./validation/schemas";
 import { db } from "./db";
-import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts, lists, segments } from "@shared/schema";
+import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts, lists, segments, leads, verificationCampaigns, verificationContacts, verificationLeadSubmissions } from "@shared/schema";
 import {
   insertAccountSchema,
   insertContactSchema,
@@ -5961,9 +5961,9 @@ export function registerRoutes(app: Express) {
   // ==================== ADMIN DATA MANAGEMENT ====================
   
   // Delete verification campaigns
-  app.delete("/api/admin/data/verification_campaigns", requireRole('admin'), async (req: Request, res: Response) => {
+  app.delete("/api/admin/data/verification_campaigns", requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
     try {
-      const result = await db.delete(db.schema.verificationCampaigns);
+      const result = await db.delete(verificationCampaigns);
       
       // Log the action
       await storage.createActivityLog({
@@ -5982,9 +5982,9 @@ export function registerRoutes(app: Express) {
   });
 
   // Delete verification contacts
-  app.delete("/api/admin/data/verification_contacts", requireRole('admin'), async (req: Request, res: Response) => {
+  app.delete("/api/admin/data/verification_contacts", requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
     try {
-      const result = await db.delete(db.schema.verificationContacts);
+      const result = await db.delete(verificationContacts);
       
       await storage.createActivityLog({
         entityType: 'contact',
@@ -6002,9 +6002,9 @@ export function registerRoutes(app: Express) {
   });
 
   // Delete regular campaigns
-  app.delete("/api/admin/data/campaigns", requireRole('admin'), async (req: Request, res: Response) => {
+  app.delete("/api/admin/data/campaigns", requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
     try {
-      const result = await db.delete(db.schema.campaigns);
+      const result = await db.delete(campaigns);
       
       await storage.createActivityLog({
         entityType: 'campaign',
@@ -6022,9 +6022,9 @@ export function registerRoutes(app: Express) {
   });
 
   // Delete contacts
-  app.delete("/api/admin/data/contacts", requireRole('admin'), async (req: Request, res: Response) => {
+  app.delete("/api/admin/data/contacts", requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
     try {
-      const result = await db.delete(db.schema.contacts);
+      const result = await db.delete(contacts);
       
       await storage.createActivityLog({
         entityType: 'contact',
@@ -6042,9 +6042,9 @@ export function registerRoutes(app: Express) {
   });
 
   // Delete accounts
-  app.delete("/api/admin/data/accounts", requireRole('admin'), async (req: Request, res: Response) => {
+  app.delete("/api/admin/data/accounts", requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
     try {
-      const result = await db.delete(db.schema.accounts);
+      const result = await db.delete(accounts);
       
       await storage.createActivityLog({
         entityType: 'account',
@@ -6062,9 +6062,9 @@ export function registerRoutes(app: Express) {
   });
 
   // Delete leads
-  app.delete("/api/admin/data/leads", requireRole('admin'), async (req: Request, res: Response) => {
+  app.delete("/api/admin/data/leads", requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
     try {
-      const result = await db.delete(db.schema.leads);
+      const result = await db.delete(leads);
       
       await storage.createActivityLog({
         entityType: 'lead',
@@ -6082,19 +6082,19 @@ export function registerRoutes(app: Express) {
   });
 
   // Delete ALL business data
-  app.delete("/api/admin/data/all", requireRole('admin'), async (req: Request, res: Response) => {
+  app.delete("/api/admin/data/all", requireAuth, requireRole('admin'), async (req: Request, res: Response) => {
     try {
       // Delete in order to respect foreign key constraints
-      await db.delete(db.schema.leads);
-      await db.delete(db.schema.campaignQueue);
-      await db.delete(db.schema.agentQueue);
-      await db.delete(db.schema.campaignAgentAssignments);
-      await db.delete(db.schema.verificationSubmissions);
-      await db.delete(db.schema.verificationContacts);
-      await db.delete(db.schema.verificationCampaigns);
-      await db.delete(db.schema.campaigns);
-      await db.delete(db.schema.contacts);
-      await db.delete(db.schema.accounts);
+      await db.delete(leads);
+      await db.delete(campaignQueue);
+      await db.delete(agentQueue);
+      await db.delete(campaignAgentAssignments);
+      await db.delete(verificationLeadSubmissions);
+      await db.delete(verificationContacts);
+      await db.delete(verificationCampaigns);
+      await db.delete(campaigns);
+      await db.delete(contacts);
+      await db.delete(accounts);
       
       await storage.createActivityLog({
         entityType: 'user',
