@@ -640,10 +640,16 @@ export function csvRowToContact(
     data[header] = row[index] || "";
   });
 
+  // Track which headers were used for known fields
+  const usedHeaders = new Set<string>();
+
   // Helper to get value from multiple possible column names
   const getValue = (...keys: string[]) => {
     for (const key of keys) {
-      if (data[key]) return data[key];
+      if (data[key]) {
+        usedHeaders.add(key);
+        return data[key];
+      }
     }
     return undefined;
   };
@@ -667,21 +673,41 @@ export function csvRowToContact(
     linkedinUrl: getValue('linkedinUrl', 'LinkedIn URL', 'linkedin_url', 'LinkedIn'),
     consentBasis: getValue('consentBasis', 'Consent Basis', 'consent_basis'),
     consentSource: getValue('consentSource', 'Consent Source', 'consent_source'),
+    formerPosition: getValue('formerPosition', 'Former Position', 'former_position'),
+    timeInCurrentPosition: getValue('timeInCurrentPosition', 'Time In Current Position', 'time_in_current_position'),
+    timeInCurrentCompany: getValue('timeInCurrentCompany', 'Time In Current Company', 'time_in_current_company'),
   };
 
   // Parse tags
   if (data.tags) {
+    usedHeaders.add('tags');
     const tagsStr = data.tags.replace(/^"|"$/g, "");
     contact.tags = tagsStr.split(",").map((t) => t.trim()).filter(Boolean);
   }
 
-  // Parse custom fields
+  // Initialize custom fields object
+  contact.customFields = {};
+
+  // Parse custom fields JSON if provided
   if (data.customFields) {
+    usedHeaders.add('customFields');
     try {
       contact.customFields = JSON.parse(data.customFields);
     } catch {
       contact.customFields = {};
     }
+  }
+
+  // Capture any unmapped columns as custom fields
+  headers.forEach((header) => {
+    if (!usedHeaders.has(header) && data[header] && data[header].trim() !== "") {
+      contact.customFields[header] = data[header];
+    }
+  });
+
+  // Only include customFields if there are any
+  if (Object.keys(contact.customFields).length === 0) {
+    delete contact.customFields;
   }
 
   return contact;
@@ -697,10 +723,16 @@ export function csvRowToAccount(
     data[header] = row[index] || "";
   });
 
+  // Track which headers were used for known fields
+  const usedHeaders = new Set<string>();
+
   // Helper to get value from multiple possible column names
   const getValue = (...keys: string[]) => {
     for (const key of keys) {
-      if (data[key]) return data[key];
+      if (data[key]) {
+        usedHeaders.add(key);
+        return data[key];
+      }
     }
     return undefined;
   };
@@ -711,6 +743,11 @@ export function csvRowToAccount(
     industryStandardized: getValue('industryStandardized', 'Industry', 'industry'),
     employeesSizeRange: getValue('employeesSizeRange', 'Employee Size', 'employee_size', 'employees'),
     annualRevenue: getValue('annualRevenue', 'Annual Revenue', 'revenue'),
+    minAnnualRevenue: getValue('minAnnualRevenue', 'Min Annual Revenue', 'min_annual_revenue'),
+    maxAnnualRevenue: getValue('maxAnnualRevenue', 'Max Annual Revenue', 'max_annual_revenue'),
+    minEmployeesSize: getValue('minEmployeesSize', 'Min Employees Size', 'min_employees_size') ? parseInt(getValue('minEmployeesSize', 'Min Employees Size', 'min_employees_size')!) : undefined,
+    maxEmployeesSize: getValue('maxEmployeesSize', 'Max Employees Size', 'max_employees_size') ? parseInt(getValue('maxEmployeesSize', 'Max Employees Size', 'max_employees_size')!) : undefined,
+    list: getValue('list', 'List', 'Source List'),
     hqStreet1: getValue('hqStreet1', 'HQ Street Address 1', 'street1', 'address1'),
     hqStreet2: getValue('hqStreet2', 'HQ Street Address 2', 'street2', 'address2'),
     hqStreet3: getValue('hqStreet3', 'HQ Street Address 3', 'street3', 'address3'),
@@ -729,23 +766,41 @@ export function csvRowToAccount(
 
   // Parse tech stack
   if (data.techStack) {
+    usedHeaders.add('techStack');
     const techStr = data.techStack.replace(/^"|"$/g, "");
     account.techStack = techStr.split(",").map((t) => t.trim()).filter(Boolean);
   }
 
   // Parse tags
   if (data.tags) {
+    usedHeaders.add('tags');
     const tagsStr = data.tags.replace(/^"|"$/g, "");
     account.tags = tagsStr.split(",").map((t) => t.trim()).filter(Boolean);
   }
 
-  // Parse custom fields
+  // Initialize custom fields object
+  account.customFields = {};
+
+  // Parse custom fields JSON if provided
   if (data.customFields) {
+    usedHeaders.add('customFields');
     try {
       account.customFields = JSON.parse(data.customFields);
     } catch {
       account.customFields = {};
     }
+  }
+
+  // Capture any unmapped columns as custom fields
+  headers.forEach((header) => {
+    if (!usedHeaders.has(header) && data[header] && data[header].trim() !== "") {
+      account.customFields[header] = data[header];
+    }
+  });
+
+  // Only include customFields if there are any
+  if (Object.keys(account.customFields).length === 0) {
+    delete account.customFields;
   }
 
   return account;
@@ -828,10 +883,16 @@ export function csvRowToContactFromUnified(
     data[header] = row[index] || "";
   });
 
+  // Track which headers were used for known fields
+  const usedHeaders = new Set<string>();
+
   // Helper to get value from multiple possible column names
   const getValue = (...keys: string[]) => {
     for (const key of keys) {
-      if (data[key]) return data[key];
+      if (data[key]) {
+        usedHeaders.add(key);
+        return data[key];
+      }
     }
     return undefined;
   };
@@ -861,21 +922,41 @@ export function csvRowToContactFromUnified(
     linkedinUrl: getValue('linkedinUrl', 'LinkedIn URL', 'linkedin_url', 'LinkedIn'),
     consentBasis: getValue('consentBasis', 'Consent Basis', 'consent_basis'),
     consentSource: getValue('consentSource', 'Consent Source', 'consent_source'),
+    formerPosition: getValue('formerPosition', 'Former Position', 'former_position'),
+    timeInCurrentPosition: getValue('timeInCurrentPosition', 'Time In Current Position', 'time_in_current_position'),
+    timeInCurrentCompany: getValue('timeInCurrentCompany', 'Time In Current Company', 'time_in_current_company'),
   };
 
   // Parse tags
   if (data.tags) {
+    usedHeaders.add('tags');
     const tagsStr = data.tags.replace(/^"|"$/g, "");
     contact.tags = tagsStr.split(",").map((t) => t.trim()).filter(Boolean);
   }
 
-  // Parse custom fields
+  // Initialize custom fields object
+  contact.customFields = {};
+
+  // Parse custom fields JSON if provided
   if (data.customFields) {
+    usedHeaders.add('customFields');
     try {
       contact.customFields = JSON.parse(data.customFields);
     } catch {
       contact.customFields = {};
     }
+  }
+
+  // Capture any unmapped contact columns as custom fields (excluding account_ prefixed columns)
+  headers.forEach((header) => {
+    if (!header.startsWith('account_') && !usedHeaders.has(header) && data[header] && data[header].trim() !== "") {
+      contact.customFields[header] = data[header];
+    }
+  });
+
+  // Only include customFields if there are any
+  if (Object.keys(contact.customFields).length === 0) {
+    delete contact.customFields;
   }
 
   return contact;
@@ -891,12 +972,20 @@ export function csvRowToAccountFromUnified(
     data[header] = row[index] || "";
   });
 
+  // Track which account_ prefixed headers were used
+  const usedAccountHeaders = new Set<string>();
+
   const account: any = {
     name: data.account_name,
     domain: data.account_domain || undefined,
     industryStandardized: data.account_industry || data.account_industryStandardized || undefined,
     employeesSizeRange: data.account_employeesSize || data.account_employeesSizeRange || undefined,
     annualRevenue: data.account_revenue || data.account_annualRevenue || undefined,
+    minAnnualRevenue: data.account_minAnnualRevenue || undefined,
+    maxAnnualRevenue: data.account_maxAnnualRevenue || undefined,
+    minEmployeesSize: data.account_minEmployeesSize ? parseInt(data.account_minEmployeesSize) : undefined,
+    maxEmployeesSize: data.account_maxEmployeesSize ? parseInt(data.account_maxEmployeesSize) : undefined,
+    list: data.account_list || undefined,
     hqStreet1: data.account_hqStreet1 || undefined,
     hqStreet2: data.account_hqStreet2 || undefined,
     hqStreet3: data.account_hqStreet3 || undefined,
@@ -908,27 +997,58 @@ export function csvRowToAccountFromUnified(
     mainPhone: formatPhoneNumber(data.account_phone || data.account_mainPhone, data.account_country || data.account_hqCountry), // Format with account country
     linkedinUrl: data.account_linkedinUrl || undefined,
     description: data.account_description || undefined,
+    yearFounded: data.account_yearFounded ? parseInt(data.account_yearFounded) : undefined,
   };
+
+  // Mark known fields as used
+  const knownFields = ['account_name', 'account_domain', 'account_industry', 'account_industryStandardized',
+    'account_employeesSize', 'account_employeesSizeRange', 'account_revenue', 'account_annualRevenue',
+    'account_minAnnualRevenue', 'account_maxAnnualRevenue', 'account_minEmployeesSize', 'account_maxEmployeesSize',
+    'account_list', 'account_hqStreet1', 'account_hqStreet2', 'account_hqStreet3', 'account_city', 'account_hqCity',
+    'account_state', 'account_hqState', 'account_hqPostalCode', 'account_country', 'account_hqCountry',
+    'account_companyLocation', 'account_phone', 'account_mainPhone', 'account_linkedinUrl', 'account_description',
+    'account_yearFounded'];
+  knownFields.forEach(field => usedAccountHeaders.add(field));
 
   // Parse tech stack
   if (data.account_techStack) {
+    usedAccountHeaders.add('account_techStack');
     const techStr = data.account_techStack.replace(/^"|"$/g, "");
     account.techStack = techStr.split(",").map((t) => t.trim()).filter(Boolean);
   }
 
   // Parse tags
   if (data.account_tags) {
+    usedAccountHeaders.add('account_tags');
     const tagsStr = data.account_tags.replace(/^"|"$/g, "");
     account.tags = tagsStr.split(",").map((t) => t.trim()).filter(Boolean);
   }
 
-  // Parse custom fields
+  // Initialize custom fields object
+  account.customFields = {};
+
+  // Parse custom fields JSON if provided
   if (data.account_customFields) {
+    usedAccountHeaders.add('account_customFields');
     try {
       account.customFields = JSON.parse(data.account_customFields);
     } catch {
       account.customFields = {};
     }
+  }
+
+  // Capture any unmapped account_ prefixed columns as custom fields (strip account_ prefix)
+  headers.forEach((header) => {
+    if (header.startsWith('account_') && !usedAccountHeaders.has(header) && data[header] && data[header].trim() !== "") {
+      // Store with account_ prefix stripped for cleaner field names
+      const fieldName = header.replace(/^account_/, '');
+      account.customFields[fieldName] = data[header];
+    }
+  });
+
+  // Only include customFields if there are any
+  if (Object.keys(account.customFields).length === 0) {
+    delete account.customFields;
   }
 
   return account;
