@@ -3320,7 +3320,91 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      // 3. QUEUE MANAGEMENT - Intelligent next actions based on disposition
+      // 3. QUALIFIED DISPOSITION - Add to campaign-level suppression
+      if (disposition === 'qualified' && contact && contactId && campaignId) {
+        try {
+          console.log(`[DISPOSITION] Qualified call - adding to campaign suppression for contact ${contactId}`);
+          
+          // Add contact to campaign suppression list (prevents re-calling in this campaign)
+          const { campaignSuppressionContacts } = await import('@shared/schema');
+          
+          await db.insert(campaignSuppressionContacts)
+            .values({
+              campaignId,
+              contactId,
+              reason: 'Qualified - successful call',
+              addedBy: agentId,
+            })
+            .onConflictDoNothing(); // Ignore if already suppressed
+          
+          console.log(`[DISPOSITION] Contact added to campaign suppression list`);
+          
+          // Check per-account cap and auto-suppress if reached
+          if (contact.accountId) {
+            const [campaign] = await db
+              .select({
+                accountCapEnabled: campaignsTable.accountCapEnabled,
+                accountCapValue: campaignsTable.accountCapValue,
+                accountCapMode: campaignsTable.accountCapMode,
+              })
+              .from(campaignsTable)
+              .where(eq(campaignsTable.id, campaignId))
+              .limit(1);
+            
+            if (campaign?.accountCapEnabled && campaign.accountCapValue) {
+              console.log(`[DISPOSITION] Checking per-account cap for account ${contact.accountId} (mode: ${campaign.accountCapMode}, cap: ${campaign.accountCapValue})`);
+              
+              // Count successful calls for this account in this campaign
+              // For now, count qualified dispositions (can be extended to other positive dispositions)
+              const [capResult] = await db
+                .select({ count: sql<number>`count(*)` })
+                .from(calls)
+                .where(
+                  and(
+                    eq(calls.campaignId, campaignId),
+                    eq(calls.accountId, contact.accountId),
+                    eq(calls.disposition, 'qualified')
+                  )
+                );
+              
+              const qualifiedCount = Number(capResult?.count || 0);
+              console.log(`[DISPOSITION] Account has ${qualifiedCount} qualified calls, cap is ${campaign.accountCapValue}`);
+              
+              // If cap is reached, auto-suppress the entire account from this campaign
+              if (qualifiedCount >= campaign.accountCapValue) {
+                console.log(`[DISPOSITION] ⚠️ Account cap reached! Auto-suppressing account ${contact.accountId} from campaign ${campaignId}`);
+                
+                const { campaignSuppressionAccounts } = await import('@shared/schema');
+                
+                await db.insert(campaignSuppressionAccounts)
+                  .values({
+                    campaignId,
+                    accountId: contact.accountId,
+                    reason: `Account cap reached (${qualifiedCount}/${campaign.accountCapValue} qualified calls)`,
+                    addedBy: agentId,
+                  })
+                  .onConflictDoNothing(); // Ignore if already suppressed
+                
+                // Remove all contacts from this account from ALL agents' queues in this campaign
+                const removedFromQueues = await db.delete(agentQueue)
+                  .where(
+                    and(
+                      eq(agentQueue.campaignId, campaignId),
+                      eq(agentQueue.accountId, contact.accountId)
+                    )
+                  )
+                  .returning({ contactId: agentQueue.contactId });
+                
+                console.log(`[DISPOSITION] ✅ Account suppressed. Removed ${removedFromQueues.length} contacts from queues`);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[DISPOSITION] Error handling qualified disposition suppression:', error);
+        }
+      }
+
+      // 4. QUEUE MANAGEMENT - Intelligent next actions based on disposition
       if (contactId && campaignId) {
         try {
           // Define final dispositions (contact should be removed from campaign immediately)

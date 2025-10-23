@@ -3,16 +3,24 @@ import { db } from '../db';
 import { 
   campaignSuppressionAccounts, 
   campaignSuppressionContacts,
+  campaignSuppressionEmails,
+  campaignSuppressionDomains,
   accounts,
   contacts,
   campaigns,
   insertCampaignSuppressionAccountSchema,
   insertCampaignSuppressionContactSchema,
+  insertCampaignSuppressionEmailSchema,
+  insertCampaignSuppressionDomainSchema,
   type CampaignSuppressionAccount,
-  type CampaignSuppressionContact
+  type CampaignSuppressionContact,
+  type CampaignSuppressionEmail,
+  type CampaignSuppressionDomain
 } from '../../shared/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import * as csv from 'fast-csv';
+import { Readable } from 'stream';
 
 const router = Router();
 
@@ -436,6 +444,378 @@ router.get('/:campaignId/suppressions/check', async (req: Request, res: Response
   } catch (error) {
     console.error('Error checking campaign suppressions:', error);
     res.status(500).json({ error: 'Failed to check campaign suppressions' });
+  }
+});
+
+// ============================================================================
+// CAMPAIGN SUPPRESSION - EMAILS
+// ============================================================================
+
+/**
+ * GET /api/campaigns/:campaignId/suppressions/emails
+ * List all suppressed emails for a campaign
+ */
+router.get('/:campaignId/suppressions/emails', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const { limit = '100', offset = '0' } = req.query;
+
+    const suppressions = await db
+      .select()
+      .from(campaignSuppressionEmails)
+      .where(eq(campaignSuppressionEmails.campaignId, campaignId))
+      .orderBy(campaignSuppressionEmails.createdAt)
+      .limit(parseInt(limit as string))
+      .offset(parseInt(offset as string));
+
+    // Get total count
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(campaignSuppressionEmails)
+      .where(eq(campaignSuppressionEmails.campaignId, campaignId));
+
+    res.json({
+      data: suppressions,
+      total: count,
+      limit: parseInt(limit as string),
+      offset: parseInt(offset as string),
+    });
+  } catch (error) {
+    console.error('Error fetching campaign email suppressions:', error);
+    res.status(500).json({ error: 'Failed to fetch campaign email suppressions' });
+  }
+});
+
+/**
+ * POST /api/campaigns/:campaignId/suppressions/emails
+ * Add email(s) to campaign suppression list
+ * Body: { emails: string[], reason?: string }
+ */
+router.post('/:campaignId/suppressions/emails', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = (req as any).user?.id;
+    
+    const bodySchema = z.object({
+      emails: z.array(z.string().email()).min(1),
+      reason: z.string().optional(),
+    });
+
+    const { emails, reason } = bodySchema.parse(req.body);
+
+    // Validate campaign exists
+    const [campaign] = await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Prepare suppression entries
+    const suppressionEntries = emails.map(email => ({
+      campaignId,
+      email,
+      emailNorm: email.toLowerCase().trim(),
+      reason: reason || 'Manually added',
+      addedBy: userId,
+    }));
+
+    // Insert suppressions (ignore duplicates)
+    const inserted = await db
+      .insert(campaignSuppressionEmails)
+      .values(suppressionEntries)
+      .onConflictDoNothing()
+      .returning();
+
+    res.status(201).json({
+      message: `Added ${inserted.length} email(s) to campaign suppression list`,
+      added: inserted.length,
+      duplicates: emails.length - inserted.length,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error adding campaign email suppressions:', error);
+    res.status(500).json({ error: 'Failed to add campaign email suppressions' });
+  }
+});
+
+/**
+ * POST /api/campaigns/:campaignId/suppressions/emails/upload
+ * Upload CSV file with emails to suppress
+ * Expects multipart/form-data with 'file' field containing CSV
+ */
+router.post('/:campaignId/suppressions/emails/upload', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = (req as any).user?.id;
+
+    // Validate campaign exists
+    const [campaign] = await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Parse CSV from request body (assuming it's sent as text/csv or multipart)
+    const csvContent = req.body.csvContent || req.body;
+    
+    if (typeof csvContent !== 'string') {
+      return res.status(400).json({ error: 'CSV content must be provided as string' });
+    }
+
+    // Parse CSV and extract emails
+    const emails: string[] = [];
+    const stream = Readable.from([csvContent]);
+    
+    await new Promise<void>((resolve, reject) => {
+      stream
+        .pipe(csv.parse({ headers: true, trim: true }))
+        .on('data', (row: any) => {
+          // Try to find email column (common headers: email, Email, EMAIL, e-mail, etc.)
+          const email = row.email || row.Email || row.EMAIL || 
+                       row['e-mail'] || row['E-mail'] || row['E-Mail'] ||
+                       row['Email Address'] || row['email_address'];
+          
+          if (email && typeof email === 'string') {
+            const trimmedEmail = email.trim().toLowerCase();
+            // Basic email validation
+            if (trimmedEmail.includes('@') && trimmedEmail.includes('.')) {
+              emails.push(trimmedEmail);
+            }
+          }
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    if (emails.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid emails found in CSV. Ensure CSV has an "email" column.' 
+      });
+    }
+
+    // Remove duplicates
+    const uniqueEmails = [...new Set(emails)];
+
+    // Prepare suppression entries
+    const suppressionEntries = uniqueEmails.map(email => ({
+      campaignId,
+      email,
+      emailNorm: email.toLowerCase().trim(),
+      reason: 'CSV bulk upload',
+      addedBy: userId,
+    }));
+
+    // Insert suppressions (ignore duplicates)
+    const inserted = await db
+      .insert(campaignSuppressionEmails)
+      .values(suppressionEntries)
+      .onConflictDoNothing()
+      .returning();
+
+    res.status(201).json({
+      message: `Successfully processed CSV upload`,
+      totalInFile: emails.length,
+      uniqueEmails: uniqueEmails.length,
+      added: inserted.length,
+      duplicates: uniqueEmails.length - inserted.length,
+    });
+  } catch (error) {
+    console.error('Error uploading campaign email suppressions:', error);
+    res.status(500).json({ error: 'Failed to upload campaign email suppressions' });
+  }
+});
+
+/**
+ * DELETE /api/campaigns/:campaignId/suppressions/emails/:id
+ * Remove email from campaign suppression list
+ */
+router.delete('/:campaignId/suppressions/emails/:id', async (req: Request, res: Response) => {
+  try {
+    const { campaignId, id } = req.params;
+
+    const deleted = await db
+      .delete(campaignSuppressionEmails)
+      .where(
+        and(
+          eq(campaignSuppressionEmails.campaignId, campaignId),
+          eq(campaignSuppressionEmails.id, id)
+        )
+      )
+      .returning();
+
+    if (deleted.length === 0) {
+      return res.status(404).json({ error: 'Suppression entry not found' });
+    }
+
+    res.status(200).json({ 
+      message: 'Email removed from campaign suppression list',
+      deleted: deleted[0]
+    });
+  } catch (error) {
+    console.error('Error deleting campaign email suppression:', error);
+    res.status(500).json({ error: 'Failed to delete campaign email suppression' });
+  }
+});
+
+// ============================================================================
+// CAMPAIGN SUPPRESSION - DOMAINS
+// ============================================================================
+
+/**
+ * GET /api/campaigns/:campaignId/suppressions/domains
+ * List all suppressed domains for a campaign
+ */
+router.get('/:campaignId/suppressions/domains', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const { limit = '100', offset = '0' } = req.query;
+
+    const suppressions = await db
+      .select()
+      .from(campaignSuppressionDomains)
+      .where(eq(campaignSuppressionDomains.campaignId, campaignId))
+      .orderBy(campaignSuppressionDomains.createdAt)
+      .limit(parseInt(limit as string))
+      .offset(parseInt(offset as string));
+
+    // Get total count
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(campaignSuppressionDomains)
+      .where(eq(campaignSuppressionDomains.campaignId, campaignId));
+
+    res.json({
+      data: suppressions,
+      total: count,
+      limit: parseInt(limit as string),
+      offset: parseInt(offset as string),
+    });
+  } catch (error) {
+    console.error('Error fetching campaign domain suppressions:', error);
+    res.status(500).json({ error: 'Failed to fetch campaign domain suppressions' });
+  }
+});
+
+/**
+ * POST /api/campaigns/:campaignId/suppressions/domains
+ * Add domain(s)/company(s) to campaign suppression list
+ * Body: { domains: string[], companyNames?: string[], reason?: string }
+ */
+router.post('/:campaignId/suppressions/domains', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = (req as any).user?.id;
+    
+    const bodySchema = z.object({
+      domains: z.array(z.string()).min(1).optional(),
+      companyNames: z.array(z.string()).min(1).optional(),
+      reason: z.string().optional(),
+    }).refine(data => data.domains || data.companyNames, {
+      message: 'Either domains or companyNames must be provided',
+    });
+
+    const { domains = [], companyNames = [], reason } = bodySchema.parse(req.body);
+
+    // Validate campaign exists
+    const [campaign] = await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    const suppressionEntries = [];
+
+    // Add domains
+    for (const domain of domains) {
+      const domainNorm = domain.toLowerCase().trim().replace(/^www\./, '');
+      suppressionEntries.push({
+        campaignId,
+        domain,
+        domainNorm,
+        companyName: null,
+        reason: reason || 'Manually added',
+        addedBy: userId,
+      });
+    }
+
+    // Add company names (as domains)
+    for (const companyName of companyNames) {
+      // Normalize company name to use as domain-like identifier
+      const companyNorm = companyName.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+      suppressionEntries.push({
+        campaignId,
+        domain: companyName,
+        domainNorm: companyNorm,
+        companyName,
+        reason: reason || 'Manually added',
+        addedBy: userId,
+      });
+    }
+
+    // Insert suppressions (ignore duplicates)
+    const inserted = await db
+      .insert(campaignSuppressionDomains)
+      .values(suppressionEntries)
+      .onConflictDoNothing()
+      .returning();
+
+    res.status(201).json({
+      message: `Added ${inserted.length} domain(s)/company(s) to campaign suppression list`,
+      added: inserted.length,
+      duplicates: suppressionEntries.length - inserted.length,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error adding campaign domain suppressions:', error);
+    res.status(500).json({ error: 'Failed to add campaign domain suppressions' });
+  }
+});
+
+/**
+ * DELETE /api/campaigns/:campaignId/suppressions/domains/:id
+ * Remove domain from campaign suppression list
+ */
+router.delete('/:campaignId/suppressions/domains/:id', async (req: Request, res: Response) => {
+  try {
+    const { campaignId, id } = req.params;
+
+    const deleted = await db
+      .delete(campaignSuppressionDomains)
+      .where(
+        and(
+          eq(campaignSuppressionDomains.campaignId, campaignId),
+          eq(campaignSuppressionDomains.id, id)
+        )
+      )
+      .returning();
+
+    if (deleted.length === 0) {
+      return res.status(404).json({ error: 'Suppression entry not found' });
+    }
+
+    res.status(200).json({ 
+      message: 'Domain removed from campaign suppression list',
+      deleted: deleted[0]
+    });
+  } catch (error) {
+    console.error('Error deleting campaign domain suppression:', error);
+    res.status(500).json({ error: 'Failed to delete campaign domain suppression' });
   }
 });
 

@@ -2,7 +2,7 @@ import { storage } from "../storage";
 import type { AgentQueue, Contact, Campaign, ManualQueueFilters } from "@shared/schema";
 import { eq, and, or, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
-import { agentQueue, contacts, accounts, campaigns, suppressionEmails, suppressionPhones, campaignSuppressionAccounts, campaignSuppressionContacts } from "@shared/schema";
+import { agentQueue, contacts, accounts, campaigns, suppressionEmails, suppressionPhones, campaignSuppressionAccounts, campaignSuppressionContacts, campaignSuppressionEmails, campaignSuppressionDomains } from "@shared/schema";
 
 interface QueueConfig {
   lockTimeoutSec: number; // How long a contact stays locked before auto-release
@@ -167,7 +167,7 @@ export class ManualQueueService {
       // Fetch full contact details if lock was successful
       if (result) {
         const fullItem = await db.query.agentQueue.findFirst({
-          where: eq(agentQueue.id, result.id),
+          where: eq(agentQueue.id, result.id as string),
         });
         return fullItem || null;
       }
@@ -390,7 +390,59 @@ export class ManualQueueService {
       }
     }
 
-    // 3. Check global email suppression (DNC)
+    // Get contact details for email/domain checking
+    const contact = await storage.getContact(contactId);
+    
+    // 3. Check campaign-level email suppression
+    if (email) {
+      const emailNorm = email.toLowerCase().trim();
+      const campaignEmailSuppression = await db.query.campaignSuppressionEmails.findFirst({
+        where: and(
+          eq(campaignSuppressionEmails.campaignId, campaignId),
+          eq(campaignSuppressionEmails.emailNorm, emailNorm)
+        ),
+      });
+      if (campaignEmailSuppression) {
+        console.log(`[ManualQueue] Email ${email} is suppressed for campaign ${campaignId}`);
+        return true;
+      }
+    }
+
+    // 4. Check campaign-level domain suppression
+    if (contact && (email || contact.accountId)) {
+      // Extract domain from email or fetch account domain
+      let domain: string | null = null;
+      
+      // Try to get domain from account
+      if (contact.accountId) {
+        const account = await db.query.accounts.findFirst({
+          where: eq(accounts.id, contact.accountId),
+        });
+        domain = account?.domain || null;
+      }
+      
+      // If no domain from account, extract from email
+      if (!domain && email) {
+        const match = email.match(/@(.+)$/);
+        domain = match ? match[1] : null;
+      }
+
+      if (domain) {
+        const domainNorm = domain.toLowerCase().trim().replace(/^www\./, '');
+        const campaignDomainSuppression = await db.query.campaignSuppressionDomains.findFirst({
+          where: and(
+            eq(campaignSuppressionDomains.campaignId, campaignId),
+            eq(campaignSuppressionDomains.domainNorm, domainNorm)
+          ),
+        });
+        if (campaignDomainSuppression) {
+          console.log(`[ManualQueue] Domain ${domain} is suppressed for campaign ${campaignId}`);
+          return true;
+        }
+      }
+    }
+
+    // 5. Check global email suppression (DNC)
     if (email) {
       const emailSuppression = await db.query.suppressionEmails.findFirst({
         where: eq(suppressionEmails.email, email),
@@ -401,8 +453,7 @@ export class ManualQueueService {
       }
     }
 
-    // 4. Check global phone suppression (DNC)
-    const contact = await storage.getContact(contactId);
+    // 6. Check global phone suppression (DNC)
     if (contact) {
       const phonesToCheck: string[] = [];
       if (contact.directPhoneE164) phonesToCheck.push(contact.directPhoneE164);
