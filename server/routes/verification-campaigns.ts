@@ -384,17 +384,32 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
         c.last_name,
         c.title,
         c.email,
+        c.email_lower,
         c.phone,
         c.mobile,
         c.linkedin_url,
+        c.cav_id,
+        c.cav_user_id,
+        c.former_position,
+        c.time_in_current_position,
+        c.time_in_current_position_months,
+        c.time_in_current_company,
+        c.time_in_current_company_months,
         c.contact_address1,
+        c.contact_address2,
+        c.contact_address3,
         c.contact_city,
         c.contact_state,
         c.contact_country,
         c.contact_postal,
-        c.former_position,
-        c.time_in_current_position,
-        c.time_in_current_company,
+        c.hq_address_1,
+        c.hq_address_2,
+        c.hq_address_3,
+        c.hq_city,
+        c.hq_state,
+        c.hq_country,
+        c.hq_postal,
+        c.hq_phone,
         c.eligibility_status,
         c.eligibility_reason,
         c.verification_status,
@@ -402,6 +417,11 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
         c.email_status,
         c.suppressed,
         c.source_type,
+        c.priority_score,
+        c.in_submission_buffer,
+        c.assignee_id,
+        c.address_enrichment_status,
+        c.phone_enrichment_status,
         c.custom_fields,
         c.created_at,
         c.updated_at,
@@ -410,9 +430,13 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
         a.industry_standardized as account_industry,
         a.employees_size_range as account_size,
         a.revenue_range as account_revenue,
+        a.main_phone as account_phone,
+        a.hq_street1 as account_hq_street1,
+        a.hq_street2 as account_hq_street2,
         a.hq_city as account_city,
         a.hq_state as account_state,
         a.hq_country as account_country,
+        a.hq_postal_code as account_postal,
         a.custom_fields as account_custom_fields
       FROM verification_contacts c
       LEFT JOIN accounts a ON a.id = c.account_id
@@ -421,6 +445,19 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
     `);
 
     const contacts = result.rows as any[];
+
+    // Collect all unique custom field keys from contacts and accounts
+    const contactCustomFieldKeys = new Set<string>();
+    const accountCustomFieldKeys = new Set<string>();
+    
+    contacts.forEach(contact => {
+      if (contact.custom_fields && typeof contact.custom_fields === 'object') {
+        Object.keys(contact.custom_fields).forEach(key => contactCustomFieldKeys.add(key));
+      }
+      if (contact.account_custom_fields && typeof contact.account_custom_fields === 'object') {
+        Object.keys(contact.account_custom_fields).forEach(key => accountCustomFieldKeys.add(key));
+      }
+    });
 
     // Generate CSV
     const csvRows: string[] = [];
@@ -433,17 +470,32 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
       'Last Name',
       'Title',
       'Email',
+      'Email Lower',
       'Phone',
       'Mobile',
       'LinkedIn URL',
-      'Address',
-      'City',
-      'State',
-      'Country',
-      'Postal Code',
+      'CAV ID',
+      'CAV User ID',
       'Former Position',
       'Time in Current Position',
+      'Time in Current Position (Months)',
       'Time in Current Company',
+      'Time in Current Company (Months)',
+      'Contact Address 1',
+      'Contact Address 2',
+      'Contact Address 3',
+      'Contact City',
+      'Contact State',
+      'Contact Country',
+      'Contact Postal Code',
+      'HQ Address 1',
+      'HQ Address 2',
+      'HQ Address 3',
+      'HQ City',
+      'HQ State',
+      'HQ Country',
+      'HQ Postal Code',
+      'HQ Phone',
       'Eligibility Status',
       'Eligibility Reason',
       'Verification Status',
@@ -451,6 +503,11 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
       'Email Status',
       'Suppressed',
       'Source Type',
+      'Priority Score',
+      'In Submission Buffer',
+      'Assignee ID',
+      'Address Enrichment Status',
+      'Phone Enrichment Status',
       'Created At',
       'Updated At',
       'Account Name',
@@ -458,10 +515,26 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
       'Account Industry',
       'Account Size',
       'Account Revenue',
+      'Account Phone',
+      'Account HQ Street 1',
+      'Account HQ Street 2',
       'Account City',
       'Account State',
       'Account Country',
+      'Account Postal Code',
     ];
+    
+    // Add contact custom field headers
+    const sortedContactCustomFieldKeys = Array.from(contactCustomFieldKeys).sort();
+    sortedContactCustomFieldKeys.forEach(key => {
+      headers.push(`Contact Custom: ${key}`);
+    });
+    
+    // Add account custom field headers
+    const sortedAccountCustomFieldKeys = Array.from(accountCustomFieldKeys).sort();
+    sortedAccountCustomFieldKeys.forEach(key => {
+      headers.push(`Account Custom: ${key}`);
+    });
     
     csvRows.push(headers.join(','));
 
@@ -480,17 +553,32 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
         escapeCSV(contact.last_name),
         escapeCSV(contact.title),
         contact.email || '',
+        contact.email_lower || '',
         contact.phone || '',
         contact.mobile || '',
         contact.linkedin_url || '',
+        contact.cav_id || '',
+        contact.cav_user_id || '',
+        escapeCSV(contact.former_position),
+        contact.time_in_current_position || '',
+        contact.time_in_current_position_months || '',
+        contact.time_in_current_company || '',
+        contact.time_in_current_company_months || '',
         escapeCSV(contact.contact_address1),
+        escapeCSV(contact.contact_address2),
+        escapeCSV(contact.contact_address3),
         escapeCSV(contact.contact_city),
         escapeCSV(contact.contact_state),
         escapeCSV(contact.contact_country),
         contact.contact_postal || '',
-        escapeCSV(contact.former_position),
-        contact.time_in_current_position || '',
-        contact.time_in_current_company || '',
+        escapeCSV(contact.hq_address_1),
+        escapeCSV(contact.hq_address_2),
+        escapeCSV(contact.hq_address_3),
+        escapeCSV(contact.hq_city),
+        escapeCSV(contact.hq_state),
+        escapeCSV(contact.hq_country),
+        contact.hq_postal || '',
+        contact.hq_phone || '',
         contact.eligibility_status || '',
         escapeCSV(contact.eligibility_reason),
         contact.verification_status || '',
@@ -498,6 +586,11 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
         contact.email_status || '',
         contact.suppressed ? 'Yes' : 'No',
         contact.source_type || '',
+        contact.priority_score || '',
+        contact.in_submission_buffer ? 'Yes' : 'No',
+        contact.assignee_id || '',
+        contact.address_enrichment_status || '',
+        contact.phone_enrichment_status || '',
         contact.created_at || '',
         contact.updated_at || '',
         escapeCSV(contact.account_name),
@@ -505,10 +598,26 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
         escapeCSV(contact.account_industry),
         contact.account_size || '',
         contact.account_revenue || '',
+        contact.account_phone || '',
+        escapeCSV(contact.account_hq_street1),
+        escapeCSV(contact.account_hq_street2),
         escapeCSV(contact.account_city),
         escapeCSV(contact.account_state),
         escapeCSV(contact.account_country),
+        contact.account_postal || '',
       ];
+      
+      // Add contact custom fields
+      sortedContactCustomFieldKeys.forEach(key => {
+        const customFieldValue = contact.custom_fields?.[key] || '';
+        row.push(escapeCSV(customFieldValue));
+      });
+      
+      // Add account custom fields
+      sortedAccountCustomFieldKeys.forEach(key => {
+        const customFieldValue = contact.account_custom_fields?.[key] || '';
+        row.push(escapeCSV(customFieldValue));
+      });
       
       csvRows.push(row.join(','));
     }
