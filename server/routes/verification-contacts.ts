@@ -1027,6 +1027,98 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-mark-validate
   }
 });
 
+// Bulk Field Update endpoint
+router.post("/api/verification-campaigns/:campaignId/contacts/bulk-field-update", requireAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const bulkFieldUpdateSchema = z.object({
+      contactIds: z.array(z.string().uuid()).nonempty(),
+      fieldName: z.string().min(1),
+      fieldValue: z.any(),
+    });
+    
+    const { contactIds, fieldName, fieldValue } = bulkFieldUpdateSchema.parse(req.body);
+    
+    console.log('[BULK FIELD UPDATE] Request received:', { 
+      campaignId, 
+      contactCount: contactIds.length,
+      fieldName,
+      fieldValue
+    });
+    
+    // Allowed fields for bulk update
+    const allowedFields = [
+      'contactCountry', 'contactCity', 'contactState', 'contactPostal',
+      'contactAddress1', 'contactAddress2', 'contactAddress3',
+      'hqCountry', 'hqCity', 'hqState', 'hqPostal',
+      'hqAddress1', 'hqAddress2', 'hqAddress3',
+      'title', 'phone', 'mobile', 'linkedinUrl',
+      'formerPosition', 'timeInCurrentPosition', 'timeInCurrentCompany'
+    ];
+    
+    if (!allowedFields.includes(fieldName)) {
+      return res.status(400).json({ 
+        error: "Invalid field name", 
+        allowedFields 
+      });
+    }
+    
+    // Build update object
+    const updateData: any = {
+      [fieldName]: fieldValue,
+      updatedAt: new Date()
+    };
+    
+    const result = await db
+      .update(verificationContacts)
+      .set(updateData)
+      .where(
+        and(
+          inArray(verificationContacts.id, contactIds),
+          eq(verificationContacts.campaignId, campaignId),
+          eq(verificationContacts.deleted, false)
+        )
+      )
+      .returning({ id: verificationContacts.id });
+    
+    const updatedIds = result.map(r => r.id);
+    
+    console.log('[BULK FIELD UPDATE] Updated:', { 
+      updated: updatedIds.length, 
+      skipped: contactIds.length - updatedIds.length 
+    });
+    
+    if (updatedIds.length > 0 && req.user?.userId) {
+      await db.insert(verificationAuditLog).values({
+        actorId: req.user.userId,
+        entityType: 'contact',
+        action: 'bulk_field_update',
+        entityId: campaignId,
+        before: null,
+        after: { 
+          fieldName,
+          fieldValue,
+          contactIds: updatedIds, 
+          requestedIds: contactIds 
+        },
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      updatedCount: updatedIds.length,
+      updatedIds,
+      skippedCount: contactIds.length - updatedIds.length,
+    });
+  } catch (error) {
+    console.error("Error bulk field update:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    res.status(500).json({ error: "Failed to bulk update field" });
+  }
+});
+
 // Bulk Enrichment endpoint
 router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requireAuth, async (req, res) => {
   try {

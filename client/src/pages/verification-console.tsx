@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles, Download } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles, Download, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,6 +35,9 @@ export default function VerificationConsolePage() {
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [bulkDeleteReason, setBulkDeleteReason] = useState("");
+  const [bulkFieldUpdateDialogOpen, setBulkFieldUpdateDialogOpen] = useState(false);
+  const [bulkUpdateFieldName, setBulkUpdateFieldName] = useState("");
+  const [bulkUpdateFieldValue, setBulkUpdateFieldValue] = useState("");
   const [enrichmentDialogOpen, setEnrichmentDialogOpen] = useState(false);
   const [enrichmentProgress, setEnrichmentProgress] = useState<any>(null);
   const [enrichmentBatchSize, setEnrichmentBatchSize] = useState(50);
@@ -351,6 +354,36 @@ export default function VerificationConsolePage() {
     },
   });
 
+  const bulkFieldUpdateMutation = useMutation({
+    mutationFn: async ({ contactIds, fieldName, fieldValue }: { contactIds: string[]; fieldName: string; fieldValue: any }) => {
+      const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/contacts/bulk-field-update`, { 
+        contactIds,
+        fieldName,
+        fieldValue
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Bulk field update complete",
+        description: `${data.updatedCount} contact(s) updated`,
+      });
+      setSelectedContactIds(new Set());
+      setBulkFieldUpdateDialogOpen(false);
+      setBulkUpdateFieldName("");
+      setBulkUpdateFieldValue("");
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Bulk field update failed",
+        description: error.message || "Failed to update field",
+        variant: "destructive",
+      });
+    },
+  });
+
   const bulkEnrichmentMutation = useMutation({
     mutationFn: async (contactIds: string[]) => {
       const res = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/contacts/bulk-enrich`, { 
@@ -500,6 +533,20 @@ export default function VerificationConsolePage() {
   const handleBulkMarkValidated = () => {
     if (selectedContactIds.size === 0) return;
     bulkMarkValidatedMutation.mutate(Array.from(selectedContactIds));
+  };
+
+  const handleBulkFieldUpdate = () => {
+    if (selectedContactIds.size === 0) return;
+    setBulkFieldUpdateDialogOpen(true);
+  };
+
+  const confirmBulkFieldUpdate = () => {
+    if (selectedContactIds.size === 0 || !bulkUpdateFieldName || bulkUpdateFieldValue === "") return;
+    bulkFieldUpdateMutation.mutate({
+      contactIds: Array.from(selectedContactIds),
+      fieldName: bulkUpdateFieldName,
+      fieldValue: bulkUpdateFieldValue
+    });
   };
 
   const handleSaveAndNext = async () => {
@@ -918,7 +965,7 @@ export default function VerificationConsolePage() {
                         size="sm"
                         variant="default"
                         onClick={handleBulkMarkValidated}
-                        disabled={bulkMarkValidatedMutation.isPending || bulkEmailValidationMutation.isPending || bulkEnrichmentMutation.isPending || bulkDeleteMutation.isPending}
+                        disabled={bulkMarkValidatedMutation.isPending || bulkEmailValidationMutation.isPending || bulkEnrichmentMutation.isPending || bulkDeleteMutation.isPending || bulkFieldUpdateMutation.isPending}
                         data-testid="button-bulk-mark-validated"
                       >
                         <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -926,9 +973,19 @@ export default function VerificationConsolePage() {
                       </Button>
                       <Button
                         size="sm"
+                        variant="outline"
+                        onClick={handleBulkFieldUpdate}
+                        disabled={bulkFieldUpdateMutation.isPending || bulkEmailValidationMutation.isPending || bulkEnrichmentMutation.isPending || bulkMarkValidatedMutation.isPending || bulkDeleteMutation.isPending}
+                        data-testid="button-bulk-field-update"
+                      >
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        {bulkFieldUpdateMutation.isPending ? "Updating..." : "Update Field"}
+                      </Button>
+                      <Button
+                        size="sm"
                         variant="destructive"
                         onClick={handleBulkDelete}
-                        disabled={bulkDeleteMutation.isPending || bulkEmailValidationMutation.isPending || bulkEnrichmentMutation.isPending || bulkMarkValidatedMutation.isPending}
+                        disabled={bulkDeleteMutation.isPending || bulkEmailValidationMutation.isPending || bulkEnrichmentMutation.isPending || bulkMarkValidatedMutation.isPending || bulkFieldUpdateMutation.isPending}
                         data-testid="button-bulk-delete"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -1493,6 +1550,77 @@ export default function VerificationConsolePage() {
               data-testid="button-confirm-bulk-delete"
             >
               {bulkDeleteMutation.isPending ? "Deleting..." : `Delete ${selectedContactIds.size} Contact(s)`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkFieldUpdateDialogOpen} onOpenChange={setBulkFieldUpdateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bulk Update Field</AlertDialogTitle>
+            <AlertDialogDescription>
+              Update a field value for {selectedContactIds.size} selected contact(s).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="field-name">Field to Update</Label>
+              <Select 
+                value={bulkUpdateFieldName} 
+                onValueChange={setBulkUpdateFieldName}
+              >
+                <SelectTrigger id="field-name" data-testid="select-field-name" className="mt-2">
+                  <SelectValue placeholder="Select field" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contactCountry">Contact Country</SelectItem>
+                  <SelectItem value="contactCity">Contact City</SelectItem>
+                  <SelectItem value="contactState">Contact State/Province</SelectItem>
+                  <SelectItem value="contactPostal">Contact Postal Code</SelectItem>
+                  <SelectItem value="contactAddress1">Contact Address Line 1</SelectItem>
+                  <SelectItem value="contactAddress2">Contact Address Line 2</SelectItem>
+                  <SelectItem value="contactAddress3">Contact Address Line 3</SelectItem>
+                  <SelectItem value="hqCountry">HQ Country</SelectItem>
+                  <SelectItem value="hqCity">HQ City</SelectItem>
+                  <SelectItem value="hqState">HQ State/Province</SelectItem>
+                  <SelectItem value="hqPostal">HQ Postal Code</SelectItem>
+                  <SelectItem value="hqAddress1">HQ Address Line 1</SelectItem>
+                  <SelectItem value="hqAddress2">HQ Address Line 2</SelectItem>
+                  <SelectItem value="hqAddress3">HQ Address Line 3</SelectItem>
+                  <SelectItem value="title">Job Title</SelectItem>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="mobile">Mobile</SelectItem>
+                  <SelectItem value="linkedinUrl">LinkedIn URL</SelectItem>
+                  <SelectItem value="formerPosition">Former Position</SelectItem>
+                  <SelectItem value="timeInCurrentPosition">Time in Current Position</SelectItem>
+                  <SelectItem value="timeInCurrentCompany">Time in Current Company</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="field-value">New Value</Label>
+              <Input
+                id="field-value"
+                placeholder="Enter new value..."
+                value={bulkUpdateFieldValue}
+                onChange={(e) => setBulkUpdateFieldValue(e.target.value)}
+                data-testid="input-field-value"
+                className="mt-2"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                This value will be applied to all selected contacts
+              </p>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-field-update">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkFieldUpdate}
+              disabled={bulkFieldUpdateMutation.isPending || !bulkUpdateFieldName || bulkUpdateFieldValue === ""}
+              data-testid="button-confirm-bulk-field-update"
+            >
+              {bulkFieldUpdateMutation.isPending ? "Updating..." : `Update ${selectedContactIds.size} Contact(s)`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
