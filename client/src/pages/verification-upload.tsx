@@ -9,8 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { parseCSV } from "@/lib/csv-utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { CSVFieldMapper } from "@/components/csv-field-mapper";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
@@ -394,123 +393,22 @@ export default function VerificationUploadPage() {
           <CardHeader>
             <CardTitle>Map CSV Columns to Fields</CardTitle>
             <CardDescription>
-              Match your CSV columns to verification contact fields. Auto-mapping has been applied based on column names.
+              Match your CSV columns to verification contact fields. You can also create custom fields on the fly.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert>
-              <AlertDescription className="text-xs">
-                <strong>Tip:</strong> Fields marked in <strong className="text-primary">blue</strong> were auto-mapped. 
-                You can change any mapping or skip unmapped columns.
-              </AlertDescription>
-            </Alert>
-
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-3">
-                {csvHeaders.map((header, index) => {
-                  const autoMapped = autoMapVerificationColumn(header);
-                  return (
-                    <div key={index} className="flex items-center gap-4 p-3 border rounded-md">
-                      <div className="flex-1">
-                        <div className={`font-medium text-sm ${autoMapped ? 'text-primary' : ''}`}>
-                          {header}
-                        </div>
-                        {csvData.length > 0 && csvData[0][index] && (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Sample: {csvData[0][index]?.slice(0, 40)}...
-                          </div>
-                        )}
-                      </div>
-                      <div className="w-64">
-                        <Select
-                          value={fieldMappings.find(m => m.csvColumn === header)?.targetField || autoMapped || "skip"}
-                          onValueChange={(value) => {
-                            const newMappings = fieldMappings.filter(m => m.csvColumn !== header);
-                            if (value !== "skip") {
-                              newMappings.push({
-                                csvColumn: header,
-                                targetField: value,
-                                targetEntity: getTargetEntity(value),
-                              });
-                            }
-                            setFieldMappings(newMappings);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Skip this column" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="skip">Skip Column</SelectItem>
-                            
-                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                              Contact Info
-                            </div>
-                            <SelectItem value="fullName">Full Name</SelectItem>
-                            <SelectItem value="firstName">First Name</SelectItem>
-                            <SelectItem value="lastName">Last Name</SelectItem>
-                            <SelectItem value="title">Job Title</SelectItem>
-                            <SelectItem value="email">Email</SelectItem>
-                            <SelectItem value="phone">Phone</SelectItem>
-                            <SelectItem value="mobile">Mobile</SelectItem>
-                            <SelectItem value="linkedinUrl">LinkedIn URL</SelectItem>
-                            
-                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
-                              Contact Address
-                            </div>
-                            <SelectItem value="contactAddress1">Address Line 1</SelectItem>
-                            <SelectItem value="contactAddress2">Address Line 2</SelectItem>
-                            <SelectItem value="contactAddress3">Address Line 3</SelectItem>
-                            <SelectItem value="contactCity">City</SelectItem>
-                            <SelectItem value="contactState">State</SelectItem>
-                            <SelectItem value="contactCountry">Country</SelectItem>
-                            <SelectItem value="contactPostal">Postal Code</SelectItem>
-                            
-                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
-                              Company Info
-                            </div>
-                            <SelectItem value="account_name">Company Name</SelectItem>
-                            <SelectItem value="domain">Domain</SelectItem>
-                            <SelectItem value="hqPhone">HQ Phone</SelectItem>
-                            <SelectItem value="hqAddress1">HQ Address 1</SelectItem>
-                            <SelectItem value="hqAddress2">HQ Address 2</SelectItem>
-                            <SelectItem value="hqAddress3">HQ Address 3</SelectItem>
-                            <SelectItem value="hqCity">HQ City</SelectItem>
-                            <SelectItem value="hqState">HQ State</SelectItem>
-                            <SelectItem value="hqPostal">HQ Postal Code</SelectItem>
-                            <SelectItem value="hqCountry">HQ Country</SelectItem>
-                            
-                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
-                              Other
-                            </div>
-                            <SelectItem value="cavId">CAV ID</SelectItem>
-                            <SelectItem value="cavUserId">CAV User ID</SelectItem>
-                            <SelectItem value="sourceType">Source Type</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-
-            <div className="flex gap-2 pt-4 border-t">
-              <Button onClick={() => handleMappingComplete(fieldMappings)}>
-                Continue to Upload
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setStage("select");
-                  setFile(null);
-                  setCsvHeaders([]);
-                  setCsvData([]);
-                  setFieldMappings([]);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
+          <CardContent>
+            <CSVFieldMapper
+              csvHeaders={csvHeaders}
+              sampleData={csvData.slice(0, 3)}
+              onMappingComplete={handleMappingComplete}
+              onCancel={() => {
+                setStage("select");
+                setFile(null);
+                setCsvHeaders([]);
+                setCsvData([]);
+                setFieldMappings([]);
+              }}
+            />
           </CardContent>
         </Card>
       )}
