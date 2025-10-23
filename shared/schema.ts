@@ -77,7 +77,9 @@ export const callDispositionEnum = pgEnum('call_disposition', [
   'not_interested',
   'callback-requested',
   'qualified',
-  'dnc-request'
+  'dnc-request',
+  'wrong_number',
+  'invalid_data'
 ]);
 
 // Dual-Dialer Mode Enums

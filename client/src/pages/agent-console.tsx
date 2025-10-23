@@ -1289,12 +1289,14 @@ export default function AgentConsolePage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="qualified">✅ Qualified</SelectItem>
-                          <SelectItem value="callback_requested">📞 Callback</SelectItem>
+                          <SelectItem value="callback-requested">📞 Callback</SelectItem>
                           <SelectItem value="not_interested">❌ Not Interested</SelectItem>
                           <SelectItem value="voicemail">📧 Voicemail</SelectItem>
-                          <SelectItem value="no_answer">📵 No Answer</SelectItem>
+                          <SelectItem value="no-answer">📵 No Answer</SelectItem>
                           <SelectItem value="busy">⏰ Busy</SelectItem>
-                          <SelectItem value="dnc_request">🚫 Do Not Call</SelectItem>
+                          <SelectItem value="dnc-request">🚫 Do Not Call</SelectItem>
+                          <SelectItem value="wrong_number">☎️ Wrong Number</SelectItem>
+                          <SelectItem value="invalid_data">⚠️ Invalid Data</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

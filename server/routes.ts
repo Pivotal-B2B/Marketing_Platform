@@ -3167,63 +3167,185 @@ export function registerRoutes(app: Express) {
 
       const call = await storage.createCallDisposition(callData);
 
-      // Handle DNC requests - add to global suppression list
-      if (req.body.disposition === 'dnc_request' && req.body.contactId) {
+      // ==================== INTELLIGENT DISPOSITION HANDLING ====================
+      
+      const disposition = req.body.disposition;
+      const contactId = req.body.contactId;
+      const campaignId = req.body.campaignId;
+
+      // Get contact details for suppression actions
+      let contact = null;
+      if (contactId) {
         try {
-          console.log(`[DISPOSITION] DNC request for contact ${req.body.contactId}`);
+          contact = await storage.getContact(contactId);
+        } catch (error) {
+          console.error('[DISPOSITION] Error fetching contact:', error);
+        }
+      }
 
-          // Get contact details to add phone to suppression list
-          const contact = await storage.getContact(req.body.contactId);
+      // 1. DNC REQUEST - Add to global Do Not Call list
+      if (disposition === 'dnc-request' && contact) {
+        try {
+          console.log(`[DISPOSITION] DNC request for contact ${contactId}`);
 
-          if (contact) {
-            // Add phone numbers to global DNC list
-            const phonesToSuppress: string[] = [];
-            if (contact.directPhoneE164) phonesToSuppress.push(contact.directPhoneE164);
-            if (contact.mobilePhoneE164) phonesToSuppress.push(contact.mobilePhoneE164);
+          // Add phone numbers to global DNC list
+          const phonesToSuppress: string[] = [];
+          if (contact.directPhoneE164) phonesToSuppress.push(contact.directPhoneE164);
+          if (contact.mobilePhoneE164) phonesToSuppress.push(contact.mobilePhoneE164);
 
-            for (const phone of phonesToSuppress) {
-              try {
-                await storage.addPhoneSuppression({
-                  phoneE164: phone,
-                  reason: 'DNC request from agent',
-                  source: `Agent Console - ${agentId}`,
-                });
-                console.log(`[DISPOSITION] Added ${phone} to global DNC list`);
-              } catch (error) {
-                // Ignore duplicate key errors (phone already in DNC)
-                if (!error.message?.includes('duplicate key') && !error.message?.includes('unique constraint')) {
-                  console.error(`[DISPOSITION] Error adding ${phone} to DNC:`, error);
-                }
+          for (const phone of phonesToSuppress) {
+            try {
+              await storage.addPhoneSuppression({
+                phoneE164: phone,
+                reason: 'DNC request from agent',
+                source: `Agent Console - ${agentId}`,
+              });
+              console.log(`[DISPOSITION] Added ${phone} to global DNC list`);
+            } catch (error) {
+              if (!error.message?.includes('duplicate key') && !error.message?.includes('unique constraint')) {
+                console.error(`[DISPOSITION] Error adding ${phone} to DNC:`, error);
               }
             }
           }
         } catch (error) {
           console.error('[DISPOSITION] Error handling DNC request:', error);
-          // Don't fail the disposition if this fails
         }
       }
 
-      // SHARED QUEUE: Remove contact from ALL agents' queues after disposition
-      if (req.body.contactId && req.body.campaignId) {
+      // 2. NOT INTERESTED - Add to global suppression list
+      if (disposition === 'not_interested' && contact) {
         try {
-          console.log(`[DISPOSITION] Removing contact ${req.body.contactId} from ALL agents' queues in campaign ${req.body.campaignId}`);
+          console.log(`[DISPOSITION] Not Interested - adding to global suppression for contact ${contactId}`);
 
-          // Remove from ALL agents' queues (contact is now "claimed" by the agent who disposed it)
-          const removed = await db.delete(agentQueue)
-            .where(
-              and(
-                eq(agentQueue.contactId, req.body.contactId),
-                eq(agentQueue.campaignId, req.body.campaignId)
-              )
-            )
-            .returning({ agentId: agentQueue.agentId, queueState: agentQueue.queueState });
+          // Add to global suppression list (email + name/company hash)
+          const { addToSuppressionList } = await import('./lib/suppression.service');
+          
+          const suppressionEntries = [];
+          
+          // Add by email if available
+          if (contact.email) {
+            suppressionEntries.push({
+              email: contact.email,
+              fullName: contact.fullName,
+              companyName: contact.account?.name,
+              reason: 'Not Interested',
+              source: `Agent Console - ${agentId}`,
+            });
+          }
+          
+          // Add by name+company hash if available
+          if (contact.fullName && contact.account?.name) {
+            suppressionEntries.push({
+              fullName: contact.fullName,
+              companyName: contact.account.name,
+              reason: 'Not Interested',
+              source: `Agent Console - ${agentId}`,
+            });
+          }
 
-          if (removed.length > 0) {
-            console.log(`[DISPOSITION] Removed contact from ${removed.length} agents' queues:`, removed.map(r => `${r.agentId} (${r.queueState})`));
+          if (suppressionEntries.length > 0) {
+            await addToSuppressionList(suppressionEntries);
+            console.log(`[DISPOSITION] Added ${suppressionEntries.length} suppression entries for Not Interested contact`);
           }
         } catch (error) {
-          console.error('[DISPOSITION] Error removing contact from queues:', error);
-          // Don't fail the disposition if this fails
+          console.error('[DISPOSITION] Error adding Not Interested to suppression:', error);
+        }
+      }
+
+      // 3. QUEUE MANAGEMENT - Intelligent next actions based on disposition
+      if (contactId && campaignId) {
+        try {
+          // Define final dispositions (contact should be removed from campaign immediately)
+          const finalDispositions = ['qualified', 'not_interested', 'dnc-request', 'callback-requested'];
+          
+          // Define retry dispositions (contact should be requeued after delay)
+          const retryDispositions = ['no-answer', 'busy', 'voicemail'];
+          
+          // Define invalid dispositions (contact should be marked invalid and removed)
+          const invalidDispositions = ['wrong_number', 'invalid_data'];
+
+          if (finalDispositions.includes(disposition)) {
+            // Remove from ALL agents' queues (final disposition - contact is done)
+            console.log(`[DISPOSITION] Final disposition "${disposition}" - removing contact ${contactId} from ALL queues in campaign ${campaignId}`);
+            
+            const removed = await db.delete(agentQueue)
+              .where(
+                and(
+                  eq(agentQueue.contactId, contactId),
+                  eq(agentQueue.campaignId, campaignId)
+                )
+              )
+              .returning({ agentId: agentQueue.agentId, queueState: agentQueue.queueState });
+
+            if (removed.length > 0) {
+              console.log(`[DISPOSITION] Removed from ${removed.length} agents' queues`);
+            }
+          } else if (retryDispositions.includes(disposition)) {
+            // Requeue with 3-day delay
+            console.log(`[DISPOSITION] Retry disposition "${disposition}" - requeuing contact ${contactId} with 3-day delay`);
+            
+            const retryDate = new Date();
+            retryDate.setDate(retryDate.getDate() + 3);
+            
+            // Update queue item to schedule for retry
+            await db.update(agentQueue)
+              .set({
+                queueState: 'queued',
+                scheduledFor: retryDate,
+                lockedBy: null,
+                lockedAt: null,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(agentQueue.contactId, contactId),
+                  eq(agentQueue.campaignId, campaignId),
+                  eq(agentQueue.agentId, agentId)
+                )
+              );
+            
+            console.log(`[DISPOSITION] Contact requeued for retry at ${retryDate.toISOString()}`);
+          } else if (invalidDispositions.includes(disposition)) {
+            // Mark contact as invalid and remove from campaign
+            console.log(`[DISPOSITION] Invalid disposition "${disposition}" - marking contact ${contactId} as invalid`);
+            
+            // Mark contact as invalid
+            if (contact) {
+              await db.update(contactsTable)
+                .set({
+                  isInvalid: true,
+                  invalidReason: `Agent marked as ${disposition}`,
+                  invalidatedAt: new Date(),
+                  invalidatedBy: agentId,
+                })
+                .where(eq(contactsTable.id, contactId));
+            }
+            
+            // Remove from ALL queues
+            await db.delete(agentQueue)
+              .where(
+                and(
+                  eq(agentQueue.contactId, contactId),
+                  eq(agentQueue.campaignId, campaignId)
+                )
+              );
+            
+            console.log(`[DISPOSITION] Contact marked invalid and removed from campaign`);
+          } else {
+            // Default behavior for other dispositions - remove from current agent's queue only
+            console.log(`[DISPOSITION] Standard disposition "${disposition}" - removing from current agent's queue`);
+            
+            await db.delete(agentQueue)
+              .where(
+                and(
+                  eq(agentQueue.contactId, contactId),
+                  eq(agentQueue.campaignId, campaignId),
+                  eq(agentQueue.agentId, agentId)
+                )
+              );
+          }
+        } catch (error) {
+          console.error('[DISPOSITION] Error managing queue:', error);
         }
       }
 
