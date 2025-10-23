@@ -391,8 +391,27 @@ export function CSVImportDialog({
         const allContactFields = new Set<string>();
         const allAccountFields = new Set<string>();
         
+        // Create a map from CSV column name to its index
+        const csvColumnIndexMap = new Map<string, number>();
+        headers.forEach((header, idx) => {
+          csvColumnIndexMap.set(header, idx);
+        });
+        
+        const mappedHeaders = fieldMappings.map(m => {
+          if (!m.targetField || !m.targetEntity) return "";
+          return m.targetEntity === "account" ? `account_${m.targetField}` : m.targetField;
+        });
+        
+        // Process all rows to collect custom field keys
         for (const row of csvData) {
-          const { contactData, accountData } = processRowWithMappings(row);
+          const mappedRow = fieldMappings.map(mapping => {
+            if (!mapping.csvColumn) return "";
+            const csvColumnIndex = csvColumnIndexMap.get(mapping.csvColumn);
+            return csvColumnIndex !== undefined ? (row[csvColumnIndex] || "") : "";
+          });
+          
+          const contactData = csvRowToContactFromUnified(mappedRow, mappedHeaders);
+          const accountData = csvRowToAccountFromUnified(mappedRow, mappedHeaders);
           
           if (contactData.customFields && typeof contactData.customFields === 'object') {
             Object.keys(contactData.customFields).forEach(key => allContactFields.add(key));
