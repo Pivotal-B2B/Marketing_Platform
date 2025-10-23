@@ -137,6 +137,29 @@ export function CSVImportAccountsDialog({
       }
 
       setImportResults({ success: successCount, created: createdCount, updated: updatedCount, failed: failedCount });
+      
+      // Auto-register any discovered custom fields
+      try {
+        const accounts = csvData.map((row) => csvRowToAccount(row, headers));
+        const allCustomFieldKeys = new Set<string>();
+        
+        accounts.forEach((account: any) => {
+          if (account.customFields && typeof account.customFields === 'object') {
+            Object.keys(account.customFields).forEach(key => allCustomFieldKeys.add(key));
+          }
+        });
+
+        if (allCustomFieldKeys.size > 0) {
+          await apiRequest('POST', '/api/custom-fields/auto-register', {
+            entityType: 'account',
+            fieldKeys: Array.from(allCustomFieldKeys)
+          });
+        }
+      } catch (error) {
+        console.error('Failed to auto-register custom fields:', error);
+        // Don't fail the whole import if custom field registration fails
+      }
+
       setStage("complete");
 
       const messageParts = [];

@@ -385,6 +385,44 @@ export function CSVImportDialog({
       console.log('[CSV-IMPORT] Import complete - Created:', createdCount, 'Updated:', updatedCount, 'Failed:', failedCount);
 
       setImportResults({ success: successCount, created: createdCount, updated: updatedCount, failed: failedCount });
+      
+      // Auto-register any discovered custom fields for contacts and accounts
+      try {
+        const allContactFields = new Set<string>();
+        const allAccountFields = new Set<string>();
+        
+        for (const row of csvData) {
+          const { contactData, accountData } = processRowWithMappings(row);
+          
+          if (contactData.customFields && typeof contactData.customFields === 'object') {
+            Object.keys(contactData.customFields).forEach(key => allContactFields.add(key));
+          }
+          
+          if (accountData && accountData.customFields && typeof accountData.customFields === 'object') {
+            Object.keys(accountData.customFields).forEach(key => allAccountFields.add(key));
+          }
+        }
+
+        // Register contact custom fields
+        if (allContactFields.size > 0) {
+          await apiRequest('POST', '/api/custom-fields/auto-register', {
+            entityType: 'contact',
+            fieldKeys: Array.from(allContactFields)
+          });
+        }
+
+        // Register account custom fields
+        if (allAccountFields.size > 0) {
+          await apiRequest('POST', '/api/custom-fields/auto-register', {
+            entityType: 'account',
+            fieldKeys: Array.from(allAccountFields)
+          });
+        }
+      } catch (error) {
+        console.error('Failed to auto-register custom fields:', error);
+        // Don't fail the whole import if custom field registration fails
+      }
+
       setStage("complete");
 
       const messageParts = [];

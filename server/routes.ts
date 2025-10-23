@@ -1108,6 +1108,58 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Auto-register custom fields from CSV upload
+  app.post('/api/custom-fields/auto-register', async (req, res) => {
+    try {
+      const { entityType, fieldKeys } = req.body;
+      
+      if (!entityType || !fieldKeys || !Array.isArray(fieldKeys)) {
+        return res.status(400).json({ error: 'entityType and fieldKeys array are required' });
+      }
+
+      if (!['account', 'contact'].includes(entityType)) {
+        return res.status(400).json({ error: 'entityType must be "account" or "contact"' });
+      }
+
+      // Get existing field definitions for this entity type
+      const existing = await db.select()
+        .from(customFieldDefinitions)
+        .where(eq(customFieldDefinitions.entityType, entityType as 'account' | 'contact'));
+
+      const existingKeys = new Set(existing.map(f => f.fieldKey));
+      const newFields = fieldKeys.filter((key: string) => !existingKeys.has(key));
+
+      // Create definitions for new fields
+      const created = [];
+      for (const fieldKey of newFields) {
+        const [field] = await db.insert(customFieldDefinitions)
+          .values({
+            entityType: entityType as 'account' | 'contact',
+            fieldKey,
+            displayLabel: fieldKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), // Convert snake_case to Title Case
+            fieldType: 'text', // Default to text, can be changed later
+            description: `Auto-discovered custom field from CSV upload`,
+            placeholder: null,
+            displayOrder: 999 + created.length, // Put new fields at the end
+            active: true,
+            createdBy: req.user?.userId || null,
+          })
+          .returning();
+        
+        created.push(field);
+      }
+
+      res.json({
+        registered: created.length,
+        skipped: fieldKeys.length - created.length,
+        fields: created
+      });
+    } catch (error: any) {
+      console.error('Error auto-registering custom fields:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Auto-linking endpoints
   app.get("/api/accounts/:id/contacts", requireAuth, async (req, res) => {
     try {
