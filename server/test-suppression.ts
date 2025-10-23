@@ -150,12 +150,13 @@ async function testSuppressionLogic() {
   ];
 
   for (const contact of testContacts) {
+    const fullName = `${contact.firstName} ${contact.lastName}`;
     await db.execute(sql`
       INSERT INTO contacts (
-        id, email, first_name, last_name, full_name_norm, company_norm,
+        id, email, full_name, first_name, last_name, full_name_norm, company_norm,
         name_company_hash, cav_id, cav_user_id
       ) VALUES (
-        ${contact.id}, ${contact.email}, ${contact.firstName}, ${contact.lastName},
+        ${contact.id}, ${contact.email}, ${fullName}, ${contact.firstName}, ${contact.lastName},
         ${contact.fullNameNorm}, ${contact.companyNorm}, ${contact.nameCompanyHash},
         ${contact.cavId}, ${contact.cavUserId}
       )
