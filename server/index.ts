@@ -89,6 +89,10 @@ app.use((req, res, next) => {
   const { startJobScheduler } = await import("./lib/dv-queue");
   startJobScheduler();
   
+  // Initialize CSV import queue and worker (BullMQ)
+  const { initializeCSVImportQueue } = await import("./lib/csv-import-queue");
+  initializeCSVImportQueue();
+  
   // Auto-resume stuck email validation jobs
   const { resumeStuckEmailValidationJobs } = await import("./lib/resume-validation-jobs");
   setTimeout(() => resumeStuckEmailValidationJobs(), 5000); // Wait 5 seconds after startup
