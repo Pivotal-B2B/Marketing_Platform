@@ -671,6 +671,151 @@ export default function VerificationConsolePage() {
         </Card>
       </div>
 
+      {/* Submission Manager - External Validation Workflow */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Submission Manager</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                External email validation and client delivery workflow
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="flex flex-col gap-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Step 1: Export for Validation</h4>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  window.location.href = `/api/verification-campaigns/${campaignId}/contacts/export/validated-verified`;
+                }}
+                data-testid="button-export-for-validation"
+                className="w-full justify-start"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Eligible Contacts
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Download contacts ready for email validation
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Step 2: Prepare Buffer</h4>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(
+                      `/api/verification-campaigns/${campaignId}/submission/prepare`,
+                      {
+                        method: "POST",
+                        body: JSON.stringify({ batchSize: 500 }),
+                        headers: { 
+                          "Content-Type": "application/json",
+                          "Authorization": `Bearer ${localStorage.getItem('authToken')}`,
+                        },
+                        credentials: "include",
+                      }
+                    );
+                    const data = await res.json();
+                    toast({
+                      title: "Buffer Prepared",
+                      description: `${data.buffered} contacts locked for delivery`,
+                    });
+                    queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to prepare submission buffer",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                data-testid="button-prepare-buffer"
+                className="w-full justify-start"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Lock Validated Contacts
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Lock contacts with validated emails for delivery
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Step 3: Export for Client</h4>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  window.location.href = `/api/verification-campaigns/${campaignId}/submission/export?template=enriched`;
+                }}
+                data-testid="button-export-for-client"
+                className="w-full justify-start"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Buffered Leads
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Download final leads for client delivery
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Step 4: Clear Buffer</h4>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (!confirm("Clear submission buffer? This will unlock all contacts for the next batch.")) return;
+                  try {
+                    await fetch(`/api/verification-campaigns/${campaignId}/flush`, {
+                      method: "POST",
+                      headers: {
+                        "Authorization": `Bearer ${localStorage.getItem('authToken')}`,
+                      },
+                      credentials: "include",
+                    });
+                    toast({
+                      title: "Buffer Cleared",
+                      description: "Submission buffer has been reset",
+                    });
+                    queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to clear buffer",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                data-testid="button-clear-buffer"
+                className="w-full justify-start"
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Clear Buffer
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Reset buffer after client delivery
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 p-3 bg-muted/50 rounded-md border">
+            <p className="text-sm">
+              <strong>Workflow:</strong> 1) Export eligible contacts → 2) Validate emails externally (EmailListVerify, ZeroBounce, etc.) → 
+              3) Upload results via CSV Import → 4) Lock validated contacts → 5) Export for client → 6) Clear buffer
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {!currentContactId ? (
         <Card>
           <CardHeader>
