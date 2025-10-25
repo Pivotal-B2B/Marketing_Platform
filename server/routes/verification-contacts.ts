@@ -1383,7 +1383,7 @@ export async function processEmailValidationJob(jobId: string) {
       const cachedValidations = await db.execute(sql`
         SELECT email_lower, status, provider, raw_json, checked_at
         FROM verification_email_validations
-        WHERE email_lower = ANY(${emailsToVerify})
+        WHERE email_lower = ANY(${sql.raw(`ARRAY[${emailsToVerify.map(e => `'${e.replace(/'/g, "''")}'`).join(',')}]`)})
           AND checked_at > NOW() - INTERVAL '60 days'
       `);
       
