@@ -256,19 +256,35 @@ router.get("/api/verification-campaigns/:campaignId/queue/all-ids", async (req, 
         AND c.verification_status = 'Pending'`;
     }
     
+    // Enforce per-account cap: Only select up to 'cap' contacts per account
+    // This ensures validation respects the lead cap setting
     const result = await db.execute(sql`
-      SELECT c.id
-      FROM verification_contacts c
-      WHERE ${baseConditions}
-        AND (
-          SELECT COUNT(*) FROM verification_lead_submissions s
-          WHERE s.account_id = c.account_id AND s.campaign_id = ${campaignId}
-        ) < ${cap}
-        ${filterSQL}
-        ${companySearch ? sql`AND c.account_id IN (
-          SELECT id FROM accounts WHERE LOWER(name) LIKE ${`%${companySearch.toLowerCase()}%`}
-        )` : sql``}
-      ORDER BY c.priority_score DESC NULLS LAST, c.updated_at ASC
+      WITH ranked_contacts AS (
+        SELECT 
+          c.id,
+          c.account_id,
+          c.priority_score,
+          c.updated_at,
+          ROW_NUMBER() OVER (
+            PARTITION BY c.account_id 
+            ORDER BY c.priority_score DESC NULLS LAST, c.updated_at ASC
+          ) as account_rank,
+          (
+            SELECT COUNT(*) FROM verification_lead_submissions s
+            WHERE s.account_id = c.account_id AND s.campaign_id = ${campaignId}
+          ) as submitted_count
+        FROM verification_contacts c
+        WHERE ${baseConditions}
+          ${filterSQL}
+          ${companySearch ? sql`AND c.account_id IN (
+            SELECT id FROM accounts WHERE LOWER(name) LIKE ${`%${companySearch.toLowerCase()}%`}
+          )` : sql``}
+      )
+      SELECT id
+      FROM ranked_contacts
+      WHERE account_rank <= ${cap} - submitted_count
+        AND submitted_count < ${cap}
+      ORDER BY priority_score DESC NULLS LAST, updated_at ASC
     `);
     
     const ids = result.rows.map((r: any) => r.id);
