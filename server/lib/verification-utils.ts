@@ -125,6 +125,14 @@ export const normalize = {
   }
 };
 
+/**
+ * Two-Stage Eligibility Evaluation
+ * Stage 1: Geo/Title criteria (synchronous, fast)
+ * Stage 2: Email validation (async, runs only on potential eligibles for api_free provider)
+ * 
+ * IMPORTANT: Only campaigns with emailValidationProvider='api_free' use two-stage validation.
+ * All other providers (EmailListVerify, external, etc.) return 'Eligible' immediately.
+ */
 export function evaluateEligibility(
   title: string | null | undefined,
   contactCountry: string | null | undefined,
@@ -142,14 +150,16 @@ export function evaluateEligibility(
   const eligibilityConfig = campaign.eligibilityConfig || {};
   const { geoAllow = [], titleKeywords = [], seniorDmFallback = [] } = eligibilityConfig;
   
-  if (geoAllow.length === 0 && titleKeywords.length === 0 && seniorDmFallback.length === 0) {
-    return { status: 'Eligible' as const, reason: 'no_restrictions' };
-  }
-  
+  // Check geographic restrictions
   const countryOk = geoAllow.length === 0 || geoAllow.some(allowed => 
     c.includes(allowed.toLowerCase()) || allowed.toLowerCase().includes(c)
   );
   
+  if (!countryOk) {
+    return { status: 'Out_of_Scope' as const, reason: 'country_not_in_geo_allow_list' };
+  }
+  
+  // Check title restrictions
   const titleMatch = titleKeywords.length === 0 || titleKeywords.some(keyword => 
     t.includes(keyword.toLowerCase())
   );
@@ -158,15 +168,55 @@ export function evaluateEligibility(
     t.includes(senior.toLowerCase())
   );
   
-  if (!countryOk) {
-    return { status: 'Out_of_Scope' as const, reason: 'country_not_in_geo_allow_list' };
-  }
-  
   if (titleKeywords.length > 0 && !(titleMatch || seniorMatch)) {
     return { status: 'Out_of_Scope' as const, reason: 'title_not_matching_keywords' };
   }
   
+  // At this point, contact passed geo/title checks → "potential eligible"
+  // Only use two-stage validation for api_free provider
+  const provider = campaign.emailValidationProvider || 'emaillistverify';
+  if (provider === 'api_free') {
+    return { status: 'Pending_Email_Validation' as const, reason: 'awaiting_email_validation' };
+  }
+  
+  // All other providers: return Eligible immediately (backward compatible)
   return { status: 'Eligible' as const, reason: 'eligible' };
+}
+
+/**
+ * Finalize eligibility status after email validation completes
+ * Updates contact from 'Pending_Email_Validation' to 'Eligible' or 'Ineligible_Email_Invalid'
+ */
+export function finalizeEligibilityAfterEmailValidation(
+  emailStatus: 'ok' | 'invalid' | 'risky' | 'accept_all' | 'disposable' | 'unknown',
+  currentEligibilityStatus: string
+): { eligibilityStatus: 'Eligible' | 'Ineligible_Email_Invalid'; reason: string } {
+  // Only finalize if currently pending
+  if (currentEligibilityStatus !== 'Pending_Email_Validation') {
+    return { 
+      eligibilityStatus: currentEligibilityStatus as any, 
+      reason: 'not_pending_validation' 
+    };
+  }
+  
+  // Determine final eligibility based on email validation result
+  switch (emailStatus) {
+    case 'ok':
+    case 'accept_all': // Accept-all is acceptable (low risk of bounce)
+      return { eligibilityStatus: 'Eligible', reason: 'email_validated_ok' };
+    
+    case 'risky': // Risky emails (role accounts, free providers) are still eligible but flagged
+      return { eligibilityStatus: 'Eligible', reason: 'email_risky_but_accepted' };
+    
+    case 'invalid':
+    case 'disposable':
+      return { eligibilityStatus: 'Ineligible_Email_Invalid', reason: `email_${emailStatus}` };
+    
+    case 'unknown':
+    default:
+      // If we can't determine validity, accept with caution
+      return { eligibilityStatus: 'Eligible', reason: 'email_status_unknown' };
+  }
 }
 
 /**
@@ -608,6 +658,8 @@ export async function recalculateAccountCapStatus(
  * 2. Checks if account has reached cap
  * 3. Calculates priority scores (seniority + title alignment)
  * 4. Returns comprehensive result for contact update
+ * 
+ * Now supports two-stage validation with 'Pending_Email_Validation' status
  */
 export async function evaluateEligibilityWithCap(
   contact: {
@@ -618,7 +670,7 @@ export async function evaluateEligibilityWithCap(
   },
   campaign: VerificationCampaign
 ): Promise<{
-  eligibilityStatus: 'Eligible' | 'Out_of_Scope' | 'Ineligible_Cap_Reached';
+  eligibilityStatus: 'Eligible' | 'Out_of_Scope' | 'Ineligible_Cap_Reached' | 'Pending_Email_Validation';
   eligibilityReason: string;
   seniorityLevel: 'executive' | 'vp' | 'director' | 'manager' | 'ic' | 'unknown';
   titleAlignmentScore: number;
@@ -632,30 +684,7 @@ export async function evaluateEligibilityWithCap(
     contact.email
   );
   
-  // If not basically eligible, return early
-  if (basicEligibility.status !== 'Eligible') {
-    const seniorityLevel = extractSeniorityLevel(contact.title);
-    const titleAlignmentScore = calculateTitleAlignment(
-      contact.title,
-      campaign.priorityConfig?.targetJobTitles
-    );
-    const priorityScore = calculatePriorityScore(
-      seniorityLevel,
-      titleAlignmentScore,
-      campaign.priorityConfig?.seniorityWeight,
-      campaign.priorityConfig?.titleAlignmentWeight
-    );
-    
-    return {
-      eligibilityStatus: basicEligibility.status,
-      eligibilityReason: basicEligibility.reason,
-      seniorityLevel,
-      titleAlignmentScore,
-      priorityScore,
-    };
-  }
-  
-  // Calculate priority scores
+  // Calculate priority scores regardless of eligibility status (needed for sorting)
   const seniorityLevel = extractSeniorityLevel(contact.title);
   const titleAlignmentScore = calculateTitleAlignment(
     contact.title,
@@ -667,6 +696,31 @@ export async function evaluateEligibilityWithCap(
     campaign.priorityConfig?.seniorityWeight,
     campaign.priorityConfig?.titleAlignmentWeight
   );
+  
+  // If not basically eligible (including Pending_Email_Validation), return early
+  if (basicEligibility.status !== 'Eligible' && basicEligibility.status !== 'Pending_Email_Validation') {
+    return {
+      eligibilityStatus: basicEligibility.status,
+      eligibilityReason: basicEligibility.reason,
+      seniorityLevel,
+      titleAlignmentScore,
+      priorityScore,
+    };
+  }
+  
+  // If pending email validation, return that status (cap check happens after validation)
+  if (basicEligibility.status === 'Pending_Email_Validation') {
+    return {
+      eligibilityStatus: 'Pending_Email_Validation',
+      eligibilityReason: basicEligibility.reason,
+      seniorityLevel,
+      titleAlignmentScore,
+      priorityScore,
+    };
+  }
+  
+  // At this point, basicEligibility.status === 'Eligible'
+  // Now check account cap enforcement
   
   // If no account ID, can't check cap - mark eligible
   if (!contact.accountId) {

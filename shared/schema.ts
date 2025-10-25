@@ -3511,7 +3511,13 @@ export type InsertDvRun = z.infer<typeof insertDvRunSchema>;
 export type DvDelivery = typeof dvDeliveries.$inferSelect;
 export type DvSelectionSet = typeof dvSelectionSets.$inferSelect;
 
-export const verificationEligibilityStatusEnum = pgEnum('verification_eligibility_status', ['Eligible', 'Out_of_Scope', 'Ineligible_Cap_Reached']);
+export const verificationEligibilityStatusEnum = pgEnum('verification_eligibility_status', [
+  'Eligible', 
+  'Out_of_Scope', 
+  'Ineligible_Cap_Reached', 
+  'Pending_Email_Validation', 
+  'Ineligible_Email_Invalid'
+]);
 export const verificationStatusEnum = pgEnum('verification_status', ['Pending', 'Validated', 'Replaced', 'Invalid']);
 export const verificationQaStatusEnum = pgEnum('verification_qa_status', ['Unreviewed', 'Flagged', 'Passed', 'Rejected']);
 export const verificationEmailStatusEnum = pgEnum('verification_email_status', ['unknown', 'ok', 'invalid', 'risky', 'accept_all', 'disposable']);
@@ -3661,6 +3667,23 @@ export const verificationEmailValidations = pgTable("verification_email_validati
   provider: text("provider").default("ELV").notNull(),
   status: verificationEmailStatusEnum("status").notNull(),
   rawJson: jsonb("raw_json"),
+  
+  // API-free validation details
+  syntaxValid: boolean("syntax_valid"),
+  hasMx: boolean("has_mx"),
+  hasSmtp: boolean("has_smtp"),
+  smtpAccepted: boolean("smtp_accepted"),
+  isRole: boolean("is_role"),
+  isFree: boolean("is_free"),
+  isDisposable: boolean("is_disposable"),
+  confidence: integer("confidence"),
+  validationTrace: jsonb("validation_trace").$type<{
+    syntax?: { ok: boolean; reason?: string };
+    dns?: { hasMX: boolean; hasA: boolean; mxHosts?: string[] };
+    smtp?: { code?: number; rcptOk?: boolean; banner?: string; raw?: string[] };
+    risk?: { isRole: boolean; isFree: boolean; isDisposable: boolean };
+  }>(),
+  
   checkedAt: timestamp("checked_at").notNull().defaultNow(),
 }, (table) => ({
   pk: {
@@ -3668,6 +3691,21 @@ export const verificationEmailValidations = pgTable("verification_email_validati
     columns: [table.contactId, table.emailLower],
   },
   emailCacheIdx: index("verification_email_validations_cache_idx").on(table.emailLower, table.checkedAt),
+}));
+
+// Domain cache for DNS/MX lookups (reduces API-free validation overhead)
+export const emailValidationDomainCache = pgTable("email_validation_domain_cache", {
+  domain: text("domain").primaryKey(),
+  hasMx: boolean("has_mx").default(false).notNull(),
+  hasA: boolean("has_a").default(false).notNull(),
+  mxHosts: jsonb("mx_hosts").$type<string[]>(),
+  spfRecord: text("spf_record"),
+  dmarcRecord: text("dmarc_record"),
+  acceptAllProbability: integer("accept_all_probability").default(0).notNull(),
+  lastChecked: timestamp("last_checked").notNull().defaultNow(),
+  checkCount: integer("check_count").default(1).notNull(),
+}, (table) => ({
+  lastCheckedIdx: index("email_validation_domain_cache_last_checked_idx").on(table.lastChecked),
 }));
 
 export const verificationSuppressionList = pgTable("verification_suppression_list", {
@@ -3810,6 +3848,7 @@ export const insertVerificationCampaignSchema = createInsertSchema(verificationC
   });
 export const insertVerificationContactSchema = createInsertSchema(verificationContacts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertVerificationEmailValidationSchema = createInsertSchema(verificationEmailValidations).omit({ checkedAt: true });
+export const insertEmailValidationDomainCacheSchema = createInsertSchema(emailValidationDomainCache).omit({ lastChecked: true, checkCount: true });
 export const insertVerificationSuppressionListSchema = createInsertSchema(verificationSuppressionList).omit({ id: true, addedAt: true });
 export const insertVerificationLeadSubmissionSchema = createInsertSchema(verificationLeadSubmissions).omit({ id: true, createdAt: true });
 export const insertVerificationAuditLogSchema = createInsertSchema(verificationAuditLog).omit({ id: true, at: true });
@@ -3822,6 +3861,8 @@ export type VerificationContact = typeof verificationContacts.$inferSelect;
 export type InsertVerificationContact = z.infer<typeof insertVerificationContactSchema>;
 export type VerificationEmailValidation = typeof verificationEmailValidations.$inferSelect;
 export type InsertVerificationEmailValidation = z.infer<typeof insertVerificationEmailValidationSchema>;
+export type EmailValidationDomainCache = typeof emailValidationDomainCache.$inferSelect;
+export type InsertEmailValidationDomainCache = z.infer<typeof insertEmailValidationDomainCacheSchema>;
 export type VerificationSuppressionList = typeof verificationSuppressionList.$inferSelect;
 export type InsertVerificationSuppressionList = z.infer<typeof insertVerificationSuppressionListSchema>;
 export type VerificationLeadSubmission = typeof verificationLeadSubmissions.$inferSelect;

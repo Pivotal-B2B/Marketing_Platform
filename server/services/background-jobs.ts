@@ -5,6 +5,7 @@
 
 import { processPendingTranscriptions } from './assemblyai-transcription';
 import { processUnanalyzedLeads } from './ai-qa-analyzer';
+import { startEmailValidationJob } from '../jobs/email-validation-job';
 import { db } from '../db';
 import { agentQueue, campaignQueue } from '@shared/schema';
 import { eq, lt, and, inArray, sql } from 'drizzle-orm';
@@ -102,10 +103,14 @@ export function startBackgroundJobs() {
     }
   }, LOCK_SWEEPER_INTERVAL);
 
+  // Email validation job (cron-based)
+  startEmailValidationJob();
+
   console.log('[Background Jobs] All jobs started successfully');
   console.log(`[Background Jobs] - Transcription job: every ${TRANSCRIPTION_JOB_INTERVAL/1000}s`);
   console.log(`[Background Jobs] - AI analysis job: every ${AI_ANALYSIS_JOB_INTERVAL/1000}s`);
   console.log(`[Background Jobs] - Lock sweeper: every ${LOCK_SWEEPER_INTERVAL/1000}s`);
+  console.log(`[Background Jobs] - Email validation job: cron-based (every 2 minutes)`);
 }
 
 /**
