@@ -57,6 +57,13 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
   - **Export Generation:** Query streaming to CSV → S3 upload → short-lived presigned download URLs
   - **Storage:** Supports AWS S3, Cloudflare R2, Wasabi, MinIO, and other S3-compatible services
   - **Security:** Private buckets with presigned URLs (10-15 min expiry), never store raw files in database
+- **BullMQ Job Queue System:** Production-ready asynchronous job processing with Redis-backed queues:
+  - **CSV Import Queue:** Scalable background processing for large CSV uploads with real-time job status tracking and progress monitoring
+  - **Graceful Degradation:** Automatic fallback to in-memory processing when Redis is not available (development mode)
+  - **Job Monitoring API:** RESTful endpoints for job status (`/api/csv-import-jobs/:jobId`), progress tracking, and error reporting
+  - **Worker Architecture:** Dedicated worker process for streaming S3 files → CSV parsing → batched database inserts (1000 rows/batch)
+  - **Retry Logic:** Automatic job retry with exponential backoff for transient failures
+  - **Production Requirements:** Redis connection required for production (REDIS_URL environment variable). Upstash Redis recommended for serverless compatibility.
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)
