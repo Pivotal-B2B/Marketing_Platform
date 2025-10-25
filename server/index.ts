@@ -93,6 +93,10 @@ app.use((req, res, next) => {
   const { resumeStuckEmailValidationJobs } = await import("./lib/resume-validation-jobs");
   setTimeout(() => resumeStuckEmailValidationJobs(), 5000); // Wait 5 seconds after startup
   
+  // Auto-resume stuck CSV upload jobs
+  const { resumeStuckUploadJobs } = await import("./lib/upload-job-processor");
+  setTimeout(() => resumeStuckUploadJobs(), 5000); // Wait 5 seconds after startup
+  
   registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

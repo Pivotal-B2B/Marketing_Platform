@@ -3700,11 +3700,14 @@ export const verificationAuditLog = pgTable("verification_audit_log", {
 
 export const uploadJobStatusEnum = pgEnum('upload_job_status', ['pending', 'processing', 'completed', 'failed']);
 
+export const uploadJobTypeEnum = pgEnum('upload_job_type', ['validation_results', 'submissions', 'contacts']);
+
 export const emailValidationJobStatusEnum = pgEnum('email_validation_job_status', ['pending', 'processing', 'completed', 'failed', 'cancelled']);
 
 export const verificationUploadJobs = pgTable("verification_upload_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   campaignId: varchar("campaign_id").references(() => verificationCampaigns.id, { onDelete: 'cascade' }).notNull(),
+  jobType: uploadJobTypeEnum("job_type").notNull(),
   status: uploadJobStatusEnum("status").default('pending').notNull(),
   totalRows: integer("total_rows").default(0).notNull(),
   processedRows: integer("processed_rows").default(0).notNull(),
@@ -3722,6 +3725,7 @@ export const verificationUploadJobs = pgTable("verification_upload_jobs", {
 }, (table) => ({
   campaignIdx: index("verification_upload_jobs_campaign_idx").on(table.campaignId),
   statusIdx: index("verification_upload_jobs_status_idx").on(table.status),
+  jobTypeIdx: index("verification_upload_jobs_type_idx").on(table.jobType),
   createdAtIdx: index("verification_upload_jobs_created_at_idx").on(table.createdAt),
 }));
 
