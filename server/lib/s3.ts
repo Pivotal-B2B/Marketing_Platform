@@ -194,6 +194,30 @@ export async function getPublicUrl(key: string): Promise<string> {
 }
 
 /**
+ * Stream a file from S3
+ * Returns a readable stream for processing large files without loading into memory
+ * 
+ * @param key - S3 object key
+ * @returns Readable stream
+ */
+export async function streamFromS3(key: string): Promise<Readable> {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+  });
+
+  const response = await s3Client.send(command);
+
+  if (!response.Body) {
+    throw new Error(`No body in S3 response for key: ${key}`);
+  }
+
+  // AWS SDK returns the Body as a ReadableStream or Blob in browsers,
+  // but in Node.js it's already a Readable stream
+  return response.Body as Readable;
+}
+
+/**
  * Check if S3 is properly configured
  * Accepts either explicit credentials OR IAM role-based auth (bucket must be set)
  * @returns True if S3 is configured (either with keys or IAM roles)
