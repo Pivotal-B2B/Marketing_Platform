@@ -249,7 +249,8 @@ export function CSVImportDialog({
       console.log('[CSV-IMPORT] Is unified format:', isUnifiedFormat);
 
       // Process in batches for better performance with large files
-      const BATCH_SIZE = 50;
+      // Increased from 50 to 2500 to avoid production timeouts on large imports
+      const BATCH_SIZE = 2500;
       const totalBatches = Math.ceil(csvData.length / BATCH_SIZE);
       
       for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
