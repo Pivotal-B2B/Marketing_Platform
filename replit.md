@@ -51,9 +51,17 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Call Reporting System:** Comprehensive analytics and reporting for telemarketing campaigns, including global dashboards, campaign analytics, agent performance, and detailed call lists, all with RBAC enforcement.
 - **Content Studio & Integrations:** Unified asset library, AI content generator, multi-platform social media publishing, and secure inter-Repl communication with an external Resources Centre.
 - **Email Infrastructure Settings:** Enterprise-grade email deliverability management including domain authentication, tracking domains, IP pools, warmup plans, and sender profiles.
+- **S3-First File Architecture:** Production-grade file handling with direct-to-S3 uploads, streaming CSV processing, and presigned URLs:
+  - **Direct Browser Uploads:** Presigned URLs allow browsers to upload directly to S3, bypassing server memory/bandwidth limits
+  - **Streaming CSV Processing:** BullMQ workers stream from S3 → CSV parser → batched Postgres inserts (1000 rows/batch)
+  - **Export Generation:** Query streaming to CSV → S3 upload → short-lived presigned download URLs
+  - **Storage:** Supports AWS S3, Cloudflare R2, Wasabi, MinIO, and other S3-compatible services
+  - **Security:** Private buckets with presigned URLs (10-15 min expiry), never store raw files in database
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)
+- **Object Storage:** AWS S3 / Cloudflare R2 / Wasabi / MinIO (S3-compatible)
+- **Cache & Queue:** Redis (Upstash recommended for production)
 - **Frontend Framework:** React 18
 - **UI Component Library:** shadcn/ui
 - **Routing:** Wouter
@@ -69,3 +77,52 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Job Queue:** BullMQ (powered by Redis)
 - **Domain Parsing:** tldts (Mozilla Public Suffix List)
 - **Web Search API (Fallback):** Brave Search API (for AI enrichment)
+
+## Production Configuration
+
+### Required Environment Variables
+```bash
+# Application
+NODE_ENV=production
+PORT=3000
+APP_ORIGIN=https://your-domain.tld
+
+# Database (Neon PostgreSQL)
+DATABASE_URL=postgres://...
+PG_POOL_MIN=2
+PG_POOL_MAX=15
+
+# Redis (Upstash or compatible)
+REDIS_URL=rediss://:password@host:port
+
+# S3 Storage (AWS/R2/Wasabi/MinIO)
+S3_ACCESS_KEY_ID=your_access_key
+S3_SECRET_ACCESS_KEY=your_secret_key
+S3_REGION=us-east-1              # or 'auto' for R2
+S3_ENDPOINT=https://endpoint     # Required for R2/MinIO; omit for AWS
+S3_BUCKET=pivotal-crm-prod
+S3_PUBLIC_BASE=https://cdn.domain.tld  # Optional CDN base URL
+
+# Security
+JWT_SECRET=your_jwt_secret
+
+# Email Validation (Optional - API-free validation uses DNS only)
+EMAIL_LIST_VERIFY_KEY=your_key   # If using EmailListVerify
+SKIP_SMTP_VALIDATION=true        # Set to true to skip SMTP probing
+EMAIL_VALIDATION_BATCH_SIZE=50   # Contacts per validation batch
+```
+
+### Performance Optimizations
+- **Production Build:** `vite build` generates optimized static assets in `/dist`
+- **Compression:** Express compression middleware (gzip/brotli) enabled
+- **Connection Pooling:** Postgres pool size 10-20 (tuned for Replit VM)
+- **HTTP Keep-Alive:** Enabled for persistent connections
+- **CDN:** Cloudflare in front for static asset caching (`/assets/*`)
+- **Cache Headers:** Immutable assets served with long cache times
+- **Cursor Pagination:** All list endpoints use cursor-based pagination (no OFFSET)
+- **Query Optimization:** Composite indexes on hot query paths
+- **Background Jobs:** All heavy processing (CSV ingest, enrichment, exports) runs async via BullMQ
+- **File Operations:** Direct-to-S3 for uploads, streaming from S3 for processing, never load full files in memory
+
+### Database Performance Indexes
+Key indexes for production workload (see database migration files for full DDL)

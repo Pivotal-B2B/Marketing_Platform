@@ -21,6 +21,7 @@ import verificationJobRecoveryRouter from './routes/verification-job-recovery';
 import verificationAccountCapsRouter from './routes/verification-account-caps';
 import verificationPriorityConfigRouter from './routes/verification-priority-config';
 import suppressionRouter from './routes/suppression-routes';
+import s3FilesRouter from './routes/s3-files';
 import { z } from "zod";
 import {
   apiLimiter,
@@ -6240,6 +6241,9 @@ export function registerRoutes(app: Express) {
   
   // ==================== GENERAL SUPPRESSION (CONTACTS) ====================
   app.use('/api/suppression', requireAuth, suppressionRouter);
+
+  // ==================== S3 FILE OPERATIONS ====================
+  app.use(requireAuth, s3FilesRouter);
 
   // ==================== ADMIN DATA MANAGEMENT ====================
   
