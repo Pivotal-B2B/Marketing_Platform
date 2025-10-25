@@ -317,3 +317,150 @@ export async function wasSubmittedRecently(
   
   return { submitted: false };
 }
+
+/**
+ * Extract seniority level from job title
+ * Maps C-suite → executive, VP → vp, Director → director, Manager → manager, IC → ic
+ */
+export function extractSeniorityLevel(title?: string | null): 'executive' | 'vp' | 'director' | 'manager' | 'ic' | 'unknown' {
+  if (!title) return 'unknown';
+  
+  const normalized = title.toLowerCase().trim();
+  
+  // C-suite and executive patterns
+  const executivePatterns = [
+    /\b(ceo|chief executive|president|chairman|chairwoman|chairperson)\b/i,
+    /\bc[a-z]o\b/i, // CTO, CFO, COO, CMO, CIO, etc.
+    /\bfounder\b/i,
+    /\bowner\b/i,
+    /\bmanaging director\b/i,
+    /\bgeneral manager\b/i, // Often C-level in many orgs
+  ];
+  
+  // VP patterns
+  const vpPatterns = [
+    /\b(vp|vice president|v\.p\.)\b/i,
+    /\bevp\b/i, // Executive VP
+    /\bavp\b/i, // Assistant VP
+    /\bsvp\b/i, // Senior VP
+  ];
+  
+  // Director patterns
+  const directorPatterns = [
+    /\bdirector\b/i,
+    /\bhead of\b/i,
+  ];
+  
+  // Manager patterns
+  const managerPatterns = [
+    /\bmanager\b/i,
+    /\bsupervisor\b/i,
+    /\blead\b/i,
+    /\bteam lead\b/i,
+  ];
+  
+  // Check in order of seniority (highest to lowest)
+  for (const pattern of executivePatterns) {
+    if (pattern.test(normalized)) return 'executive';
+  }
+  
+  for (const pattern of vpPatterns) {
+    if (pattern.test(normalized)) return 'vp';
+  }
+  
+  for (const pattern of directorPatterns) {
+    if (pattern.test(normalized)) return 'director';
+  }
+  
+  for (const pattern of managerPatterns) {
+    if (pattern.test(normalized)) return 'manager';
+  }
+  
+  // Default to IC (Individual Contributor)
+  return 'ic';
+}
+
+/**
+ * Convert seniority level to numeric score
+ * executive: 5, vp: 4, director: 3, manager: 2, ic: 1, unknown: 0
+ */
+export function getSeniorityScore(level: string): number {
+  const scoreMap: Record<string, number> = {
+    executive: 5,
+    vp: 4,
+    director: 3,
+    manager: 2,
+    ic: 1,
+    unknown: 0,
+  };
+  return scoreMap[level] || 0;
+}
+
+/**
+ * Calculate title alignment score based on campaign target job titles
+ * Returns a score between 0 and 1
+ * - 1.0: Exact match
+ * - 0.75: Contains keyword
+ * - 0.5: Fuzzy match
+ * - 0.0: No match
+ */
+export function calculateTitleAlignment(
+  title?: string | null,
+  targetTitles?: string[]
+): number {
+  if (!title || !targetTitles || targetTitles.length === 0) {
+    return 0.5; // Neutral score if no targets specified
+  }
+  
+  const normalized = title.toLowerCase().trim();
+  let bestScore = 0;
+  
+  for (const target of targetTitles) {
+    const targetNorm = target.toLowerCase().trim();
+    
+    // Exact match
+    if (normalized === targetNorm) {
+      bestScore = Math.max(bestScore, 1.0);
+      continue;
+    }
+    
+    // Contains keyword
+    if (normalized.includes(targetNorm) || targetNorm.includes(normalized)) {
+      bestScore = Math.max(bestScore, 0.75);
+      continue;
+    }
+    
+    // Fuzzy match: check if individual words match
+    const titleWords = normalized.split(/\s+/);
+    const targetWords = targetNorm.split(/\s+/);
+    const matchedWords = titleWords.filter(word => 
+      targetWords.some(tw => word.includes(tw) || tw.includes(word))
+    );
+    
+    if (matchedWords.length > 0) {
+      const fuzzyScore = 0.5 * (matchedWords.length / Math.max(titleWords.length, targetWords.length));
+      bestScore = Math.max(bestScore, fuzzyScore);
+    }
+  }
+  
+  return bestScore;
+}
+
+/**
+ * Calculate overall priority score combining seniority and title alignment
+ * Formula: seniorityWeight * seniorityScore + titleWeight * titleAlignment
+ * Default weights: 0.7 seniority, 0.3 title alignment
+ */
+export function calculatePriorityScore(
+  seniorityLevel: string,
+  titleAlignmentScore: number,
+  seniorityWeight: number = 0.7,
+  titleAlignmentWeight: number = 0.3
+): number {
+  const seniorityScore = getSeniorityScore(seniorityLevel);
+  
+  // Normalize seniority score to 0-1 range (divide by max score of 5)
+  const normalizedSeniority = seniorityScore / 5;
+  
+  return (seniorityWeight * normalizedSeniority) + (titleAlignmentWeight * titleAlignmentScore);
+}
