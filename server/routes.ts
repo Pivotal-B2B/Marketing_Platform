@@ -18,6 +18,8 @@ import verificationUploadRouter from './routes/verification-upload';
 import verificationUploadJobsRouter from './routes/verification-upload-jobs';
 import verificationEnrichmentRouter from './routes/verification-enrichment';
 import verificationJobRecoveryRouter from './routes/verification-job-recovery';
+import verificationAccountCapsRouter from './routes/verification-account-caps';
+import verificationPriorityConfigRouter from './routes/verification-priority-config';
 import suppressionRouter from './routes/suppression-routes';
 import { z } from "zod";
 import {
@@ -6233,6 +6235,8 @@ export function registerRoutes(app: Express) {
   app.use(verificationUploadJobsRouter);
   app.use(verificationEnrichmentRouter);
   app.use(verificationJobRecoveryRouter);
+  app.use(verificationAccountCapsRouter);
+  app.use(verificationPriorityConfigRouter);
   
   // ==================== GENERAL SUPPRESSION (CONTACTS) ====================
   app.use('/api/suppression', requireAuth, suppressionRouter);

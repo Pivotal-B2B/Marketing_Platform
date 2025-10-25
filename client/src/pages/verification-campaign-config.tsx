@@ -7,8 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { AccountCapManager } from "@/components/verification/AccountCapManager";
+import { PriorityConfigEditor } from "@/components/verification/PriorityConfigEditor";
 
 export default function VerificationCampaignConfigPage() {
   const { id } = useParams();
@@ -121,7 +124,7 @@ export default function VerificationCampaignConfigPage() {
             {isNew ? "New Verification Campaign" : `Configure: ${(campaign as any)?.name}`}
           </h1>
           <p className="text-muted-foreground mt-1" data-testid="text-page-description">
-            Set up eligibility rules and quality targets
+            Set up eligibility rules, priority scoring, and account caps
           </p>
         </div>
       </div>
@@ -254,35 +257,7 @@ export default function VerificationCampaignConfigPage() {
         </CardContent>
       </Card>
 
-      {!isNew && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldX className="h-5 w-5" />
-              Suppression Management
-            </CardTitle>
-            <CardDescription>Upload and manage suppression lists for this campaign</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              <Link href={`/verification/${id}/suppression-upload`}>
-                <Button variant="outline" data-testid="button-upload-suppression">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Suppression File
-                </Button>
-              </Link>
-              <Link href={`/verification/${id}/console`}>
-                <Button variant="outline" data-testid="button-view-console">
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Console
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 mt-6">
         <Button
           variant="outline"
           onClick={() => navigate("/verification/campaigns")}
@@ -299,6 +274,21 @@ export default function VerificationCampaignConfigPage() {
           {updateMutation.isPending ? "Saving..." : "Save Campaign"}
         </Button>
       </div>
+
+      {!isNew && (
+        <Tabs defaultValue="priority" className="mt-8">
+          <TabsList>
+            <TabsTrigger value="priority" data-testid="tab-priority-config">Priority Configuration</TabsTrigger>
+            <TabsTrigger value="caps" data-testid="tab-account-caps">Account Caps</TabsTrigger>
+          </TabsList>
+          <TabsContent value="priority">
+            <PriorityConfigEditor campaignId={id!} />
+          </TabsContent>
+          <TabsContent value="caps">
+            <AccountCapManager campaignId={id!} />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }
