@@ -3,7 +3,7 @@ import { db } from "../db";
 import { verificationContacts, verificationCampaigns, accounts } from "@shared/schema";
 import { eq, and, or, sql } from "drizzle-orm";
 import Papa from "papaparse";
-import { evaluateEligibility, checkSuppression, computeNormalizedKeys, normalize } from "../lib/verification-utils";
+import { evaluateEligibility, evaluateEligibilityWithCap, checkSuppression, computeNormalizedKeys, normalize } from "../lib/verification-utils";
 import { getMatchTypeAndConfidence, normalizeDomain, extractRootDomain } from "@shared/domain-utils";
 
 const router = Router();
@@ -345,11 +345,15 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
           });
 
           // Pre-compute eligibility and suppression BEFORE insert
-          const eligibility = evaluateEligibility(
-            row.title || null,
-            row.contactCountry || null,
-            campaign,
-            row.email || null
+          // Use new cap-aware eligibility evaluation with priority scoring
+          const eligibility = await evaluateEligibilityWithCap(
+            {
+              title: row.title || null,
+              contactCountry: row.contactCountry || null,
+              email: row.email || null,
+              accountId: accountId || null,
+            },
+            campaign
           );
 
           const isSuppressed = await checkSuppression(campaignId, {
@@ -506,8 +510,11 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
             }
             
             // Always re-evaluate eligibility and suppression on update
-            updateData.eligibilityStatus = eligibility.status;
-            updateData.eligibilityReason = eligibility.reason;
+            updateData.eligibilityStatus = eligibility.eligibilityStatus;
+            updateData.eligibilityReason = eligibility.eligibilityReason;
+            updateData.seniorityLevel = eligibility.seniorityLevel;
+            updateData.titleAlignmentScore = String(eligibility.titleAlignmentScore);
+            updateData.priorityScore = String(eligibility.priorityScore);
             updateData.suppressed = isSuppressed;
             Object.assign(updateData, normalizedKeys);
             
@@ -561,8 +568,11 @@ router.post("/api/verification-campaigns/:campaignId/upload", async (req: Reques
               hqPostal: row.hqPostal || null,
               cavId: row.cavId || null,
               cavUserId: row.cavUserId || null,
-              eligibilityStatus: eligibility.status,
-              eligibilityReason: eligibility.reason,
+              eligibilityStatus: eligibility.eligibilityStatus,
+              eligibilityReason: eligibility.eligibilityReason,
+              seniorityLevel: eligibility.seniorityLevel,
+              titleAlignmentScore: String(eligibility.titleAlignmentScore),
+              priorityScore: String(eligibility.priorityScore),
               suppressed: isSuppressed,
               ...normalizedKeys,
             });

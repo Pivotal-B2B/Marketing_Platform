@@ -464,3 +464,247 @@ export function calculatePriorityScore(
   
   return (seniorityWeight * normalizedSeniority) + (titleAlignmentWeight * titleAlignmentScore);
 }
+
+/**
+ * Get or create account cap status for a campaign-account pair
+ */
+export async function getOrCreateAccountCapStatus(
+  campaignId: string,
+  accountId: string,
+  cap: number
+) {
+  const { db } = await import('../db');
+  const { verificationAccountCapStatus } = await import('@shared/schema');
+  const { eq, and } = await import('drizzle-orm');
+  
+  const [existing] = await db
+    .select()
+    .from(verificationAccountCapStatus)
+    .where(
+      and(
+        eq(verificationAccountCapStatus.campaignId, campaignId),
+        eq(verificationAccountCapStatus.accountId, accountId)
+      )
+    )
+    .limit(1);
+  
+  if (existing) {
+    return existing;
+  }
+  
+  // Create new status record
+  const [newStatus] = await db
+    .insert(verificationAccountCapStatus)
+    .values({
+      campaignId,
+      accountId,
+      cap,
+      submittedCount: 0,
+      reservedCount: 0,
+      eligibleCount: 0,
+    })
+    .returning();
+  
+  return newStatus;
+}
+
+/**
+ * Update account cap status counts
+ */
+export async function updateAccountCapStatus(
+  campaignId: string,
+  accountId: string,
+  updates: {
+    submittedCount?: number;
+    reservedCount?: number;
+    eligibleCount?: number;
+  }
+) {
+  const { db } = await import('../db');
+  const { verificationAccountCapStatus } = await import('@shared/schema');
+  const { eq, and, sql } = await import('drizzle-orm');
+  
+  await db
+    .update(verificationAccountCapStatus)
+    .set({
+      ...updates,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(verificationAccountCapStatus.campaignId, campaignId),
+        eq(verificationAccountCapStatus.accountId, accountId)
+      )
+    );
+}
+
+/**
+ * Recalculate account cap status counts from actual contact data
+ */
+export async function recalculateAccountCapStatus(
+  campaignId: string,
+  accountId: string
+) {
+  const { db } = await import('../db');
+  const { verificationContacts, verificationLeadSubmissions, verificationAccountCapStatus } = await import('@shared/schema');
+  const { eq, and, count, sql } = await import('drizzle-orm');
+  
+  // Count submitted contacts
+  const [submittedResult] = await db
+    .select({ count: count() })
+    .from(verificationLeadSubmissions)
+    .where(
+      and(
+        eq(verificationLeadSubmissions.campaignId, campaignId),
+        eq(verificationLeadSubmissions.accountId, accountId)
+      )
+    );
+  
+  // Count reserved contacts
+  const [reservedResult] = await db
+    .select({ count: count() })
+    .from(verificationContacts)
+    .where(
+      and(
+        eq(verificationContacts.campaignId, campaignId),
+        eq(verificationContacts.accountId, accountId),
+        eq(verificationContacts.reservedSlot, true)
+      )
+    );
+  
+  // Count eligible contacts
+  const [eligibleResult] = await db
+    .select({ count: count() })
+    .from(verificationContacts)
+    .where(
+      and(
+        eq(verificationContacts.campaignId, campaignId),
+        eq(verificationContacts.accountId, accountId),
+        eq(verificationContacts.eligibilityStatus, 'Eligible')
+      )
+    );
+  
+  // Update the cap status
+  await db
+    .update(verificationAccountCapStatus)
+    .set({
+      submittedCount: submittedResult.count,
+      reservedCount: reservedResult.count,
+      eligibleCount: eligibleResult.count,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(verificationAccountCapStatus.campaignId, campaignId),
+        eq(verificationAccountCapStatus.accountId, accountId)
+      )
+    );
+}
+
+/**
+ * Comprehensive eligibility evaluation with cap enforcement and priority scoring
+ * This function:
+ * 1. Evaluates basic eligibility (geo, title, email)
+ * 2. Checks if account has reached cap
+ * 3. Calculates priority scores (seniority + title alignment)
+ * 4. Returns comprehensive result for contact update
+ */
+export async function evaluateEligibilityWithCap(
+  contact: {
+    title?: string | null;
+    contactCountry?: string | null;
+    email?: string | null;
+    accountId?: string | null;
+  },
+  campaign: VerificationCampaign
+): Promise<{
+  eligibilityStatus: 'Eligible' | 'Out_of_Scope' | 'Ineligible_Cap_Reached';
+  eligibilityReason: string;
+  seniorityLevel: 'executive' | 'vp' | 'director' | 'manager' | 'ic' | 'unknown';
+  titleAlignmentScore: number;
+  priorityScore: number;
+}> {
+  // First, evaluate basic eligibility (geo, title, email)
+  const basicEligibility = evaluateEligibility(
+    contact.title,
+    contact.contactCountry,
+    campaign,
+    contact.email
+  );
+  
+  // If not basically eligible, return early
+  if (basicEligibility.status !== 'Eligible') {
+    const seniorityLevel = extractSeniorityLevel(contact.title);
+    const titleAlignmentScore = calculateTitleAlignment(
+      contact.title,
+      campaign.priorityConfig?.targetJobTitles
+    );
+    const priorityScore = calculatePriorityScore(
+      seniorityLevel,
+      titleAlignmentScore,
+      campaign.priorityConfig?.seniorityWeight,
+      campaign.priorityConfig?.titleAlignmentWeight
+    );
+    
+    return {
+      eligibilityStatus: basicEligibility.status,
+      eligibilityReason: basicEligibility.reason,
+      seniorityLevel,
+      titleAlignmentScore,
+      priorityScore,
+    };
+  }
+  
+  // Calculate priority scores
+  const seniorityLevel = extractSeniorityLevel(contact.title);
+  const titleAlignmentScore = calculateTitleAlignment(
+    contact.title,
+    campaign.priorityConfig?.targetJobTitles
+  );
+  const priorityScore = calculatePriorityScore(
+    seniorityLevel,
+    titleAlignmentScore,
+    campaign.priorityConfig?.seniorityWeight,
+    campaign.priorityConfig?.titleAlignmentWeight
+  );
+  
+  // If no account ID, can't check cap - mark eligible
+  if (!contact.accountId) {
+    return {
+      eligibilityStatus: 'Eligible',
+      eligibilityReason: 'eligible_no_account_id',
+      seniorityLevel,
+      titleAlignmentScore,
+      priorityScore,
+    };
+  }
+  
+  // Check account cap status
+  const cap = campaign.leadCapPerAccount || 10;
+  const capStatus = await getOrCreateAccountCapStatus(
+    campaign.id,
+    contact.accountId,
+    cap
+  );
+  
+  // Check if cap reached
+  const totalCommitted = capStatus.submittedCount + capStatus.reservedCount;
+  if (totalCommitted >= cap) {
+    return {
+      eligibilityStatus: 'Ineligible_Cap_Reached',
+      eligibilityReason: `account_cap_reached_${cap}`,
+      seniorityLevel,
+      titleAlignmentScore,
+      priorityScore,
+    };
+  }
+  
+  // Contact is eligible
+  return {
+    eligibilityStatus: 'Eligible',
+    eligibilityReason: 'eligible',
+    seniorityLevel,
+    titleAlignmentScore,
+    priorityScore,
+  };
+}
