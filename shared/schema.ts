@@ -3511,13 +3511,14 @@ export type InsertDvRun = z.infer<typeof insertDvRunSchema>;
 export type DvDelivery = typeof dvDeliveries.$inferSelect;
 export type DvSelectionSet = typeof dvSelectionSets.$inferSelect;
 
-export const verificationEligibilityStatusEnum = pgEnum('verification_eligibility_status', ['Eligible', 'Out_of_Scope']);
+export const verificationEligibilityStatusEnum = pgEnum('verification_eligibility_status', ['Eligible', 'Out_of_Scope', 'Ineligible_Cap_Reached']);
 export const verificationStatusEnum = pgEnum('verification_status', ['Pending', 'Validated', 'Replaced', 'Invalid']);
 export const verificationQaStatusEnum = pgEnum('verification_qa_status', ['Unreviewed', 'Flagged', 'Passed', 'Rejected']);
 export const verificationEmailStatusEnum = pgEnum('verification_email_status', ['unknown', 'ok', 'invalid', 'risky', 'accept_all', 'disposable']);
 export const verificationSourceTypeEnum = pgEnum('verification_source_type', ['Client_Provided', 'New_Sourced']);
 export const addressEnrichmentStatusEnum = pgEnum('address_enrichment_status', ['not_needed', 'pending', 'in_progress', 'completed', 'failed']);
 export const phoneEnrichmentStatusEnum = pgEnum('phone_enrichment_status', ['not_needed', 'pending', 'in_progress', 'completed', 'failed']);
+export const seniorityLevelEnum = pgEnum('seniority_level', ['executive', 'vp', 'director', 'manager', 'ic', 'unknown']);
 
 export const verificationCampaigns = pgTable("verification_campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -3530,6 +3531,13 @@ export const verificationCampaigns = pgTable("verification_campaigns", {
     titleKeywords?: string[];
     seniorDmFallback?: string[];
   }>(),
+  
+  priorityConfig: jsonb("priority_config").$type<{
+    targetJobTitles?: string[];
+    targetSeniorityLevels?: string[];
+    seniorityWeight?: number;
+    titleAlignmentWeight?: number;
+  }>().default(sql`'{"seniorityWeight": 0.7, "titleAlignmentWeight": 0.3}'::jsonb`),
   
   emailValidationProvider: text("email_validation_provider").default("emaillistverify"),
   okEmailStates: text("ok_email_states").array().default(sql`ARRAY['valid', 'accept_all']::text[]`),
@@ -3603,7 +3611,10 @@ export const verificationContacts = pgTable("verification_contacts", {
   deleted: boolean("deleted").default(false),
 
   assigneeId: varchar("assignee_id").references(() => users.id, { onDelete: 'set null' }),
+  seniorityLevel: seniorityLevelEnum("seniority_level").default('unknown'),
+  titleAlignmentScore: numeric("title_alignment_score", { precision: 3, scale: 2 }),
   priorityScore: numeric("priority_score", { precision: 10, scale: 2 }),
+  reservedSlot: boolean("reserved_slot").default(false),
   inSubmissionBuffer: boolean("in_submission_buffer").default(false),
 
   firstNameNorm: text("first_name_norm"),
@@ -3682,6 +3693,20 @@ export const verificationLeadSubmissions = pgTable("verification_lead_submission
   excludedReason: text("excluded_reason"),
 }, (table) => ({
   campaignAccountIdx: index("verification_submissions_campaign_account_idx").on(table.campaignId, table.accountId),
+}));
+
+export const verificationAccountCapStatus = pgTable("verification_account_cap_status", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => verificationCampaigns.id, { onDelete: 'cascade' }).notNull(),
+  accountId: varchar("account_id").references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  cap: integer("cap").notNull(),
+  submittedCount: integer("submitted_count").default(0).notNull(),
+  reservedCount: integer("reserved_count").default(0).notNull(),
+  eligibleCount: integer("eligible_count").default(0).notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  campaignAccountIdx: index("verification_cap_status_campaign_account_idx").on(table.campaignId, table.accountId),
+  uniqueCampaignAccount: uniqueIndex("verification_cap_status_unique").on(table.campaignId, table.accountId),
 }));
 
 export const verificationAuditLog = pgTable("verification_audit_log", {
