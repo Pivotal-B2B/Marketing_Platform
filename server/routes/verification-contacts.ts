@@ -1380,29 +1380,36 @@ export async function processEmailValidationJob(jobId: string) {
       console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1}: Processing ${emailsToVerify.length} unique emails for ${contacts.length} contacts`);
       
       // CACHE CHECK: Query recent validations (60-day window) to avoid redundant API calls
+      // Chunk emails into smaller batches to avoid SQL ANY/ALL array issues
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
       
-      const cachedValidations = await db
-        .select({
-          email_lower: verificationEmailValidations.emailLower,
-          status: verificationEmailValidations.status,
-          provider: verificationEmailValidations.provider,
-          raw_json: verificationEmailValidations.rawJson,
-          checked_at: verificationEmailValidations.checkedAt,
-        })
-        .from(verificationEmailValidations)
-        .where(
-          and(
-            inArray(verificationEmailValidations.emailLower, emailsToVerify),
-            sql`${verificationEmailValidations.checkedAt} > ${sixtyDaysAgo}`
-          )
-        );
-      
-      // Build cache map for quick lookup
       const cacheMap = new Map<string, any>();
-      for (const row of cachedValidations) {
-        cacheMap.set(row.email_lower, row);
+      const CACHE_QUERY_CHUNK_SIZE = 100; // Query cache in chunks of 100 emails at a time
+      
+      for (let i = 0; i < emailsToVerify.length; i += CACHE_QUERY_CHUNK_SIZE) {
+        const emailChunk = emailsToVerify.slice(i, i + CACHE_QUERY_CHUNK_SIZE);
+        
+        const cachedValidationsChunk = await db
+          .select({
+            email_lower: verificationEmailValidations.emailLower,
+            status: verificationEmailValidations.status,
+            provider: verificationEmailValidations.provider,
+            raw_json: verificationEmailValidations.rawJson,
+            checked_at: verificationEmailValidations.checkedAt,
+          })
+          .from(verificationEmailValidations)
+          .where(
+            and(
+              inArray(verificationEmailValidations.emailLower, emailChunk),
+              sql`${verificationEmailValidations.checkedAt} > ${sixtyDaysAgo}`
+            )
+          );
+        
+        // Add to cache map
+        for (const row of cachedValidationsChunk) {
+          cacheMap.set(row.email_lower, row);
+        }
       }
       
       // Split emails into cached vs uncached
