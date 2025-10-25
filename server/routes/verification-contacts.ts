@@ -1380,19 +1380,29 @@ export async function processEmailValidationJob(jobId: string) {
       console.log(`[EMAIL VALIDATION JOB] Job ${jobId}: Batch ${batchIndex + 1}: Processing ${emailsToVerify.length} unique emails for ${contacts.length} contacts`);
       
       // CACHE CHECK: Query recent validations (60-day window) to avoid redundant API calls
-      const cachedValidations = await db.execute(sql`
-        SELECT email_lower, status, provider, raw_json, checked_at
-        FROM verification_email_validations
-        WHERE email_lower = ANY(${sql.raw(`ARRAY[${emailsToVerify.map(e => `'${e.replace(/'/g, "''")}'`).join(',')}]`)})
-          AND checked_at > NOW() - INTERVAL '60 days'
-      `);
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      
+      const cachedValidations = await db
+        .select({
+          email_lower: verificationEmailValidations.emailLower,
+          status: verificationEmailValidations.status,
+          provider: verificationEmailValidations.provider,
+          raw_json: verificationEmailValidations.rawJson,
+          checked_at: verificationEmailValidations.checkedAt,
+        })
+        .from(verificationEmailValidations)
+        .where(
+          and(
+            inArray(verificationEmailValidations.emailLower, emailsToVerify),
+            sql`${verificationEmailValidations.checkedAt} > ${sixtyDaysAgo}`
+          )
+        );
       
       // Build cache map for quick lookup
       const cacheMap = new Map<string, any>();
-      if (cachedValidations.rowCount && cachedValidations.rowCount > 0) {
-        for (const row of cachedValidations.rows) {
-          cacheMap.set(row.email_lower, row);
-        }
+      for (const row of cachedValidations) {
+        cacheMap.set(row.email_lower, row);
       }
       
       // Split emails into cached vs uncached
