@@ -7,6 +7,8 @@ import {
   accounts,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
+import Papa from "papaparse";
+import { normalize } from "../lib/verification-utils";
 
 const router = Router();
 
@@ -40,6 +42,10 @@ router.post("/api/verification-campaigns/:campaignId/submission/prepare", async 
           AND c.suppressed = FALSE
           AND c.email_status = 'ok'
           AND c.in_submission_buffer = FALSE
+          AND c.id NOT IN (
+            SELECT contact_id FROM verification_lead_submissions
+            WHERE created_at >= NOW() - INTERVAL '730 days'
+          )
           AND (
             SELECT COUNT(*) FROM verification_lead_submissions s
             WHERE s.account_id = c.account_id AND s.campaign_id = ${campaignId}
@@ -235,6 +241,258 @@ router.get("/api/verification-campaigns/:campaignId/submission/export", async (r
   } catch (error) {
     console.error("Error exporting data:", error);
     res.status(500).json({ error: "Failed to export data" });
+  }
+});
+
+/**
+ * Upload validated email results from external validation service
+ * Expects CSV with columns: email, emailStatus (or Email Status)
+ * Updates email_status for matching contacts
+ */
+router.post("/api/verification-campaigns/:campaignId/upload/validation-results", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const { csvData } = req.body;
+    
+    if (!csvData) {
+      return res.status(400).json({ error: "csvData is required" });
+    }
+    
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    // Parse CSV
+    const parseResult = Papa.parse(csvData, {
+      header: true,
+      skipEmptyLines: true,
+      delimitersToGuess: [',', '\t', '|', ';'],
+    });
+    
+    if (parseResult.errors.length > 0) {
+      return res.status(400).json({
+        error: "CSV parsing failed",
+        details: parseResult.errors,
+      });
+    }
+    
+    const results = {
+      total: 0,
+      updated: 0,
+      notFound: 0,
+      errors: [] as string[],
+    };
+    
+    // Process each row
+    for (let i = 0; i < parseResult.data.length; i++) {
+      const row: any = parseResult.data[i];
+      results.total++;
+      
+      // Flexible column name matching
+      const email = row.email || row.Email || row.EMAIL || row['Email Address'];
+      const emailStatus = row.emailStatus || row.email_status || row['Email Status'] || row['emailStatus'] || row['email_validation_status'];
+      
+      if (!email) {
+        results.errors.push(`Row ${i + 2}: Missing email address`);
+        continue;
+      }
+      
+      if (!emailStatus) {
+        results.errors.push(`Row ${i + 2}: Missing emailStatus`);
+        continue;
+      }
+      
+      // Normalize email status to match our enum: unknown, ok, risky, invalid
+      let normalizedStatus = emailStatus.toLowerCase().trim();
+      if (normalizedStatus === 'valid' || normalizedStatus === 'deliverable') {
+        normalizedStatus = 'ok';
+      } else if (normalizedStatus === 'unknown' || normalizedStatus === 'catch-all' || normalizedStatus === 'accept_all') {
+        normalizedStatus = 'risky';
+      } else if (normalizedStatus === 'invalid' || normalizedStatus === 'undeliverable') {
+        normalizedStatus = 'invalid';
+      } else if (normalizedStatus !== 'ok' && normalizedStatus !== 'risky' && normalizedStatus !== 'invalid') {
+        normalizedStatus = 'unknown';
+      }
+      
+      try {
+        // Find contact by email in this campaign
+        const emailLower = normalize.emailLower(email);
+        
+        const updated = await db
+          .update(verificationContacts)
+          .set({ 
+            emailStatus: normalizedStatus,
+            updatedAt: new Date()
+          })
+          .where(
+            sql`${verificationContacts.campaignId} = ${campaignId}
+                AND ${verificationContacts.emailLower} = ${emailLower}
+                AND ${verificationContacts.deleted} = FALSE`
+          )
+          .returning({ id: verificationContacts.id });
+        
+        if (updated.length > 0) {
+          results.updated++;
+        } else {
+          results.notFound++;
+        }
+      } catch (error) {
+        results.errors.push(`Row ${i + 2}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+    
+    console.log(`[VALIDATION UPLOAD] Campaign ${campaignId}: Processed ${results.total} rows, updated ${results.updated} contacts`);
+    
+    res.json(results);
+  } catch (error) {
+    console.error("Error uploading validation results:", error);
+    res.status(500).json({ error: "Failed to upload validation results" });
+  }
+});
+
+/**
+ * Upload submission records to track which contacts have been delivered to client
+ * Expects CSV with columns: email (or contact_id), submitted_at (optional)
+ * Creates submission records with 2-year exclusion tracking
+ */
+router.post("/api/verification-campaigns/:campaignId/upload/submissions", async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const { csvData } = req.body;
+    
+    if (!csvData) {
+      return res.status(400).json({ error: "csvData is required" });
+    }
+    
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    // Parse CSV
+    const parseResult = Papa.parse(csvData, {
+      header: true,
+      skipEmptyLines: true,
+      delimitersToGuess: [',', '\t', '|', ';'],
+    });
+    
+    if (parseResult.errors.length > 0) {
+      return res.status(400).json({
+        error: "CSV parsing failed",
+        details: parseResult.errors,
+      });
+    }
+    
+    const results = {
+      total: 0,
+      created: 0,
+      alreadySubmitted: 0,
+      notFound: 0,
+      errors: [] as string[],
+    };
+    
+    // Process each row
+    for (let i = 0; i < parseResult.data.length; i++) {
+      const row: any = parseResult.data[i];
+      results.total++;
+      
+      // Flexible column name matching
+      const email = row.email || row.Email || row.EMAIL || row['Email Address'];
+      const contactId = row.contact_id || row.contactId || row['Contact ID'];
+      const submittedAtStr = row.submitted_at || row.submittedAt || row['Submitted At'] || row['Submission Date'];
+      
+      if (!email && !contactId) {
+        results.errors.push(`Row ${i + 2}: Missing both email and contact_id`);
+        continue;
+      }
+      
+      try {
+        // Find contact by ID or email
+        let contact;
+        if (contactId) {
+          [contact] = await db
+            .select()
+            .from(verificationContacts)
+            .where(
+              sql`${verificationContacts.id} = ${contactId}
+                  AND ${verificationContacts.campaignId} = ${campaignId}
+                  AND ${verificationContacts.deleted} = FALSE`
+            );
+        } else {
+          const emailLower = normalize.emailLower(email);
+          [contact] = await db
+            .select()
+            .from(verificationContacts)
+            .where(
+              sql`${verificationContacts.emailLower} = ${emailLower}
+                  AND ${verificationContacts.campaignId} = ${campaignId}
+                  AND ${verificationContacts.deleted} = FALSE`
+            );
+        }
+        
+        if (!contact) {
+          results.notFound++;
+          continue;
+        }
+        
+        // Check if already submitted
+        const [existing] = await db
+          .select()
+          .from(verificationLeadSubmissions)
+          .where(eq(verificationLeadSubmissions.contactId, contact.id));
+        
+        if (existing) {
+          results.alreadySubmitted++;
+          continue;
+        }
+        
+        // Parse submission date (if provided)
+        let submittedAt = new Date();
+        if (submittedAtStr) {
+          const parsed = new Date(submittedAtStr);
+          if (!isNaN(parsed.getTime())) {
+            submittedAt = parsed;
+          }
+        }
+        
+        // Create submission record
+        await db.insert(verificationLeadSubmissions).values({
+          contactId: contact.id,
+          accountId: contact.accountId,
+          campaignId: campaignId,
+          createdAt: submittedAt,
+        });
+        
+        // Mark contact as submitted
+        await db
+          .update(verificationContacts)
+          .set({ 
+            inSubmissionBuffer: true,
+            updatedAt: new Date()
+          })
+          .where(eq(verificationContacts.id, contact.id));
+        
+        results.created++;
+      } catch (error) {
+        results.errors.push(`Row ${i + 2}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+    
+    console.log(`[SUBMISSION UPLOAD] Campaign ${campaignId}: Processed ${results.total} rows, created ${results.created} submissions`);
+    
+    res.json(results);
+  } catch (error) {
+    console.error("Error uploading submission records:", error);
+    res.status(500).json({ error: "Failed to upload submission records" });
   }
 });
 

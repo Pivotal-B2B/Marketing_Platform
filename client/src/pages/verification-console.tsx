@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles, Download, Edit3 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles, Download, Edit3, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +21,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -44,6 +52,12 @@ export default function VerificationConsolePage() {
   const [enrichmentDelay, setEnrichmentDelay] = useState(1500);
   const [validationJobId, setValidationJobId] = useState<string | null>(null);
   const [validationProgress, setValidationProgress] = useState<any>(null);
+  const [validationUploadOpen, setValidationUploadOpen] = useState(false);
+  const [validationUploadFile, setValidationUploadFile] = useState<File | null>(null);
+  const [validationUploadResults, setValidationUploadResults] = useState<any>(null);
+  const [submissionUploadOpen, setSubmissionUploadOpen] = useState(false);
+  const [submissionUploadFile, setSubmissionUploadFile] = useState<File | null>(null);
+  const [submissionUploadResults, setSubmissionUploadResults] = useState<any>(null);
   const [filters, setFilters] = useState({
     contactSearch: "",
     phoneSearch: "",
@@ -808,10 +822,36 @@ export default function VerificationConsolePage() {
           </div>
 
           <div className="mt-4 p-3 bg-muted/50 rounded-md border">
-            <p className="text-sm">
+            <p className="text-sm mb-3">
               <strong>Workflow:</strong> 1) Export eligible contacts → 2) Validate emails externally (EmailListVerify, ZeroBounce, etc.) → 
               3) Upload results via CSV Import → 4) Lock validated contacts → 5) Export for client → 6) Clear buffer
             </p>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setValidationUploadOpen(true);
+                  setValidationUploadResults(null);
+                }}
+                data-testid="button-upload-validation-results"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Validation Results
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setSubmissionUploadOpen(true);
+                  setSubmissionUploadResults(null);
+                }}
+                data-testid="button-upload-submission-records"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Submission Records
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1893,6 +1933,223 @@ export default function VerificationConsolePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Validation Results Upload Dialog */}
+      <Dialog open={validationUploadOpen} onOpenChange={setValidationUploadOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Upload Validation Results</DialogTitle>
+            <DialogDescription>
+              Upload CSV file with validated email results from external service (ZeroBounce, NeverBounce, etc.)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="validation-csv-file">CSV File</Label>
+              <Input
+                id="validation-csv-file"
+                type="file"
+                accept=".csv"
+                onChange={(e) => setValidationUploadFile(e.target.files?.[0] || null)}
+                data-testid="input-validation-csv-file"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Required columns: <strong>email</strong>, <strong>emailStatus</strong> (or "Email Status")
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Status values: valid/ok, invalid, risky/unknown
+              </p>
+            </div>
+
+            {validationUploadResults && (
+              <div className="space-y-2 p-3 bg-muted/50 rounded-md border">
+                <h4 className="font-medium text-sm">Upload Results:</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>Total Rows: <strong>{validationUploadResults.total}</strong></div>
+                  <div>Updated: <strong className="text-green-600">{validationUploadResults.updated}</strong></div>
+                  <div>Not Found: <strong className="text-amber-600">{validationUploadResults.notFound}</strong></div>
+                  <div>Errors: <strong className="text-red-600">{validationUploadResults.errors?.length || 0}</strong></div>
+                </div>
+                {validationUploadResults.errors && validationUploadResults.errors.length > 0 && (
+                  <div className="mt-2 max-h-40 overflow-y-auto">
+                    <p className="text-xs font-medium mb-1">Errors:</p>
+                    {validationUploadResults.errors.map((err: string, idx: number) => (
+                      <p key={idx} className="text-xs text-red-600">{err}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setValidationUploadOpen(false);
+              setValidationUploadFile(null);
+              setValidationUploadResults(null);
+            }}>
+              Close
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!validationUploadFile) {
+                  toast({ title: "Error", description: "Please select a file", variant: "destructive" });
+                  return;
+                }
+
+                try {
+                  const reader = new FileReader();
+                  reader.onload = async (e) => {
+                    const csvData = e.target?.result as string;
+                    
+                    const response = await fetch(`/api/verification-campaigns/${campaignId}/upload/validation-results`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${localStorage.getItem('authToken')}`,
+                      },
+                      credentials: "include",
+                      body: JSON.stringify({ csvData }),
+                    });
+
+                    const result = await response.json();
+                    setValidationUploadResults(result);
+                    
+                    toast({
+                      title: "Upload Complete",
+                      description: `Updated ${result.updated} contacts out of ${result.total} rows`,
+                    });
+                    
+                    queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+                  };
+                  reader.readAsText(validationUploadFile);
+                } catch (error) {
+                  toast({
+                    title: "Error",
+                    description: "Failed to upload validation results",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={!validationUploadFile}
+              data-testid="button-confirm-validation-upload"
+            >
+              Upload & Process
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Submission Records Upload Dialog */}
+      <Dialog open={submissionUploadOpen} onOpenChange={setSubmissionUploadOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Upload Submission Records</DialogTitle>
+            <DialogDescription>
+              Upload CSV file with contacts that have been delivered to client. These will be excluded from eligibility for 2 years.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="submission-csv-file">CSV File</Label>
+              <Input
+                id="submission-csv-file"
+                type="file"
+                accept=".csv"
+                onChange={(e) => setSubmissionUploadFile(e.target.files?.[0] || null)}
+                data-testid="input-submission-csv-file"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Required: <strong>email</strong> (or contact_id)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Optional: <strong>submitted_at</strong> (date when delivered to client)
+              </p>
+            </div>
+
+            {submissionUploadResults && (
+              <div className="space-y-2 p-3 bg-muted/50 rounded-md border">
+                <h4 className="font-medium text-sm">Upload Results:</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>Total Rows: <strong>{submissionUploadResults.total}</strong></div>
+                  <div>Created: <strong className="text-green-600">{submissionUploadResults.created}</strong></div>
+                  <div>Already Submitted: <strong className="text-amber-600">{submissionUploadResults.alreadySubmitted}</strong></div>
+                  <div>Not Found: <strong className="text-amber-600">{submissionUploadResults.notFound}</strong></div>
+                  <div>Errors: <strong className="text-red-600">{submissionUploadResults.errors?.length || 0}</strong></div>
+                </div>
+                {submissionUploadResults.errors && submissionUploadResults.errors.length > 0 && (
+                  <div className="mt-2 max-h-40 overflow-y-auto">
+                    <p className="text-xs font-medium mb-1">Errors:</p>
+                    {submissionUploadResults.errors.map((err: string, idx: number) => (
+                      <p key={idx} className="text-xs text-red-600">{err}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-800">
+              <p className="text-xs text-amber-800 dark:text-amber-200">
+                <strong>Note:</strong> Contacts marked as submitted will be excluded from future eligibility checks for 2 years to prevent duplicate submissions.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setSubmissionUploadOpen(false);
+              setSubmissionUploadFile(null);
+              setSubmissionUploadResults(null);
+            }}>
+              Close
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!submissionUploadFile) {
+                  toast({ title: "Error", description: "Please select a file", variant: "destructive" });
+                  return;
+                }
+
+                try {
+                  const reader = new FileReader();
+                  reader.onload = async (e) => {
+                    const csvData = e.target?.result as string;
+                    
+                    const response = await fetch(`/api/verification-campaigns/${campaignId}/upload/submissions`, {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${localStorage.getItem('authToken')}`,
+                      },
+                      credentials: "include",
+                      body: JSON.stringify({ csvData }),
+                    });
+
+                    const result = await response.json();
+                    setSubmissionUploadResults(result);
+                    
+                    toast({
+                      title: "Upload Complete",
+                      description: `Created ${result.created} submission records out of ${result.total} rows`,
+                    });
+                    
+                    queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+                  };
+                  reader.readAsText(submissionUploadFile);
+                } catch (error) {
+                  toast({
+                    title: "Error",
+                    description: "Failed to upload submission records",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={!submissionUploadFile}
+              data-testid="button-confirm-submission-upload"
+            >
+              Upload & Process
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

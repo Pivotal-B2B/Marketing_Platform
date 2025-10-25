@@ -281,3 +281,39 @@ export async function checkSuppression(
   
   return suppressed.length > 0;
 }
+
+/**
+ * Check if a contact was submitted in the last 2 years (730 days)
+ * Submitted contacts should be excluded from eligibility for 2 years
+ * 
+ * @param contactId - The contact ID to check
+ * @returns true if submitted within last 2 years, false otherwise
+ */
+export async function wasSubmittedRecently(
+  contactId: string
+): Promise<{ submitted: boolean; submittedAt?: Date }> {
+  const { db } = await import('../db');
+  const { verificationLeadSubmissions } = await import('@shared/schema');
+  const { eq, gte, and } = await import('drizzle-orm');
+  
+  // Calculate date 2 years ago (730 days)
+  const twoYearsAgo = new Date();
+  twoYearsAgo.setDate(twoYearsAgo.getDate() - 730);
+  
+  const [submission] = await db
+    .select()
+    .from(verificationLeadSubmissions)
+    .where(
+      and(
+        eq(verificationLeadSubmissions.contactId, contactId),
+        gte(verificationLeadSubmissions.createdAt, twoYearsAgo)
+      )
+    )
+    .limit(1);
+  
+  if (submission) {
+    return { submitted: true, submittedAt: submission.createdAt };
+  }
+  
+  return { submitted: false };
+}
