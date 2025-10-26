@@ -1083,7 +1083,7 @@ router.post("/api/verification-campaigns/:id/merge-cav-data", async (req, res) =
   }
 });
 
-// Smart Lead Cap Enforcement endpoint (asynchronous)
+// Smart Lead Cap Enforcement endpoint (BullMQ-based)
 router.post("/api/verification-campaigns/:id/enforce-caps", async (req, res) => {
   try {
     const campaignId = req.params.id;
@@ -1101,28 +1101,52 @@ router.post("/api/verification-campaigns/:id/enforce-caps", async (req, res) => 
     // Get cap limit
     const cap = campaign.leadCapPerAccount || 10;
     
-    console.log(`[API] Triggering asynchronous smart cap enforcement for campaign ${campaignId} with cap ${cap}`);
+    // Import queue functions
+    const { capEnforcementQueue, addCapEnforcementJob } = await import("../lib/cap-enforcement-queue");
     
-    // Return immediately with 202 Accepted - job will run in background
+    // Check if queue is available
+    if (!capEnforcementQueue) {
+      console.warn(`[API] Cap enforcement queue not available - falling back to direct execution`);
+      
+      // Fallback to direct execution (for development without Redis)
+      res.status(202).json({
+        success: true,
+        message: "Smart cap enforcement started (direct execution - no Redis)",
+        campaignId: campaignId,
+        cap: cap,
+        status: "processing",
+      });
+      
+      const { enforceAccountCapWithPriority } = await import("../lib/verification-utils");
+      setImmediate(async () => {
+        try {
+          const stats = await enforceAccountCapWithPriority(campaignId, cap);
+          console.log(`[Cap Enforcement] Direct execution complete for campaign ${campaignId}:`, stats);
+        } catch (error) {
+          console.error(`[Cap Enforcement] Direct execution error for campaign ${campaignId}:`, error);
+        }
+      });
+      return;
+    }
+    
+    // Add job to BullMQ queue
+    const jobId = await addCapEnforcementJob({ campaignId, cap });
+    
+    if (!jobId) {
+      return res.status(500).json({
+        error: "Failed to create cap enforcement job",
+      });
+    }
+    
+    console.log(`[API] Cap enforcement job ${jobId} queued for campaign ${campaignId} with cap ${cap}`);
+    
     res.status(202).json({
       success: true,
-      message: "Smart cap enforcement job started in background",
+      message: "Smart cap enforcement job queued",
+      jobId: jobId,
       campaignId: campaignId,
       cap: cap,
-      status: "processing",
-    });
-    
-    // Run smart cap enforcement in background (non-blocking)
-    // Dynamic import to avoid circular dependencies
-    const { enforceAccountCapWithPriority } = await import("../lib/verification-utils");
-    
-    setImmediate(async () => {
-      try {
-        const stats = await enforceAccountCapWithPriority(campaignId, cap);
-        console.log(`[Cap Enforcement] Background job complete for campaign ${campaignId}:`, stats);
-      } catch (error) {
-        console.error(`[Cap Enforcement] Background job error for campaign ${campaignId}:`, error);
-      }
+      status: "queued",
     });
     
   } catch (error) {
@@ -1130,6 +1154,39 @@ router.post("/api/verification-campaigns/:id/enforce-caps", async (req, res) => 
     res.status(500).json({ 
       error: "Failed to start cap enforcement job",
       details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get Cap Enforcement Job Status endpoint
+router.get("/api/cap-enforcement-jobs/:jobId", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    
+    const { capEnforcementQueue, getCapEnforcementJobStatus } = await import("../lib/cap-enforcement-queue");
+    
+    // Check if queue is available
+    if (!capEnforcementQueue) {
+      return res.status(503).json({
+        error: "Cap enforcement queue not available",
+      });
+    }
+    
+    // Get job status
+    const status = await getCapEnforcementJobStatus(jobId);
+    
+    if (!status) {
+      return res.status(404).json({
+        error: "Job not found",
+      });
+    }
+    
+    res.json(status);
+  } catch (error) {
+    console.error("Error getting job status:", error);
+    res.status(500).json({
+      error: "Failed to get job status",
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 });

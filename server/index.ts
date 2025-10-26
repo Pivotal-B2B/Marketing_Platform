@@ -93,6 +93,10 @@ app.use((req, res, next) => {
   const { initializeCSVImportQueue } = await import("./lib/csv-import-queue");
   initializeCSVImportQueue();
   
+  // Initialize cap enforcement queue and worker (BullMQ)
+  const { initializeCapEnforcementQueue } = await import("./lib/cap-enforcement-queue");
+  initializeCapEnforcementQueue();
+  
   // Auto-resume stuck email validation jobs
   const { resumeStuckEmailValidationJobs } = await import("./lib/resume-validation-jobs");
   setTimeout(() => resumeStuckEmailValidationJobs(), 5000); // Wait 5 seconds after startup
