@@ -16,42 +16,57 @@ interface WebSearchResponse {
 }
 
 /**
- * Search the web using Brave Search API
- * Falls back gracefully if API key is not configured
+ * Search the web using Google Programmable Search Engine (Custom Search JSON API)
+ * Falls back gracefully if API key or Search Engine ID is not configured
+ * 
+ * Setup instructions:
+ * 1. Create a Programmable Search Engine at https://programmablesearchengine.google.com/
+ * 2. Get your Search Engine ID (CX) from the control panel
+ * 3. Get an API key from Google Cloud Console (https://console.cloud.google.com/apis/credentials)
+ * 4. Add GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_ENGINE_ID to your environment
  */
 export async function searchWeb(query: string): Promise<WebSearchResponse> {
-  const apiKey = process.env.BRAVE_SEARCH_API_KEY;
+  const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
+  const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
   
-  if (!apiKey) {
-    console.log("[WebSearch] No BRAVE_SEARCH_API_KEY configured - web search disabled");
+  if (!apiKey || !searchEngineId) {
+    const missing = !apiKey ? "GOOGLE_SEARCH_API_KEY" : "GOOGLE_SEARCH_ENGINE_ID";
+    console.log(`[WebSearch] ${missing} not configured - web search disabled`);
     return {
       success: false,
       results: [],
-      error: "Web search not configured (missing BRAVE_SEARCH_API_KEY)",
+      error: `Web search not configured (missing ${missing})`,
     };
   }
 
   try {
     console.log(`[WebSearch] Searching: "${query}"`);
     
-    const response = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`, {
+    const url = new URL('https://www.googleapis.com/customsearch/v1');
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('cx', searchEngineId);
+    url.searchParams.set('q', query);
+    url.searchParams.set('num', '5'); // Return 5 results
+    
+    const response = await fetch(url.toString(), {
       headers: {
         'Accept': 'application/json',
-        'Accept-Encoding': 'gzip',
-        'X-Subscription-Token': apiKey,
       },
     });
 
     if (!response.ok) {
-      throw new Error(`Brave Search API error: ${response.status} ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error?.message || `${response.status} ${response.statusText}`;
+      throw new Error(`Google Custom Search API error: ${errorMessage}`);
     }
 
     const data = await response.json();
     
-    const results: SearchResult[] = (data.web?.results || []).map((result: any) => ({
-      title: result.title || "",
-      url: result.url || "",
-      description: result.description || "",
+    // Google Custom Search returns results in the 'items' array
+    const results: SearchResult[] = (data.items || []).map((item: any) => ({
+      title: item.title || "",
+      url: item.link || "",
+      description: item.snippet || "",
     }));
 
     console.log(`[WebSearch] Found ${results.length} results`);

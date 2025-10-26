@@ -152,10 +152,10 @@ export class CompanyEnrichmentService {
       }
 
       // STAGE 2: Fall back to web search if available
-      const hasApiKey = !!process.env.BRAVE_SEARCH_API_KEY;
+      const hasApiKey = !!(process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_ENGINE_ID);
       
       if (!hasApiKey) {
-        console.log(`[CompanyEnrichment] Stage 2 SKIPPED - No web search API key configured`);
+        console.log(`[CompanyEnrichment] Stage 2 SKIPPED - No web search API credentials configured`);
         return aiResult; // Return AI result even if low confidence
       }
 
@@ -313,7 +313,7 @@ Output valid JSON only.`
   }
 
   /**
-   * Stage 2: Try web search enrichment using Brave Search API
+   * Stage 2: Try web search enrichment using Google Custom Search API
    */
   private static async tryWebSearchEnrichment(
     companyName: string,

@@ -60,4 +60,4 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Email Service Providers:** SendGrid, AWS SES, Mailgun
 - **Job Queue:** BullMQ (powered by Redis)
 - **Domain Parsing:** tldts (Mozilla Public Suffix List)
-- **Web Search API (Fallback):** Brave Search API (for AI enrichment)
+- **Web Search API (Fallback):** Google Programmable Search Engine (Custom Search JSON API) - for AI enrichment fallback
