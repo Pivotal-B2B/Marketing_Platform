@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
 import { ArrowLeft, Save, ShieldX, Upload, Eye } from "lucide-react";
@@ -34,6 +34,22 @@ export default function VerificationCampaignConfigPage() {
     okRateTarget: 0.95,
     deliverabilityTarget: 0.97,
   });
+
+  useEffect(() => {
+    if (campaign && !isLoading) {
+      const config = (campaign as any).eligibilityConfig || {};
+      setFormData({
+        name: (campaign as any).name,
+        monthlyTarget: (campaign as any).monthlyTarget,
+        leadCapPerAccount: (campaign as any).leadCapPerAccount,
+        geoAllow: config.geoAllow?.join("\n") || "",
+        titleKeywords: config.titleKeywords?.join("\n") || "",
+        seniorDmFallback: config.seniorDmFallback?.join("\n") || "",
+        okRateTarget: Number((campaign as any).okRateTarget),
+        deliverabilityTarget: Number((campaign as any).deliverabilityTarget),
+      });
+    }
+  }, [campaign, isLoading]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -89,22 +105,6 @@ export default function VerificationCampaignConfigPage() {
 
   if (isLoading && !isNew) {
     return <div className="p-6" data-testid="text-loading">Loading...</div>;
-  }
-
-  if (campaign && !isLoading) {
-    const config = (campaign as any).eligibilityConfig || {};
-    if (formData.name === "") {
-      setFormData({
-        name: (campaign as any).name,
-        monthlyTarget: (campaign as any).monthlyTarget,
-        leadCapPerAccount: (campaign as any).leadCapPerAccount,
-        geoAllow: config.geoAllow?.join("\n") || "",
-        titleKeywords: config.titleKeywords?.join("\n") || "",
-        seniorDmFallback: config.seniorDmFallback?.join("\n") || "",
-        okRateTarget: Number((campaign as any).okRateTarget),
-        deliverabilityTarget: Number((campaign as any).deliverabilityTarget),
-      });
-    }
   }
 
   return (
