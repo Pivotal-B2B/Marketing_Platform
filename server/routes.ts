@@ -24,6 +24,7 @@ import suppressionRouter from './routes/suppression-routes';
 import s3FilesRouter from './routes/s3-files';
 import csvImportJobsRouter from './routes/csv-import-jobs';
 import emailValidationTestRouter from './routes/email-validation-test';
+import verificationExportRouter from './routes/verification-export';
 import { z } from "zod";
 import {
   apiLimiter,
@@ -6252,6 +6253,9 @@ export function registerRoutes(app: Express) {
 
   // ==================== EMAIL VALIDATION TESTING ====================
   app.use(requireAuth, emailValidationTestRouter);
+
+  // ==================== VERIFICATION CAMPAIGN EXPORT ====================
+  app.use(requireAuth, verificationExportRouter);
 
   // ==================== ADMIN DATA MANAGEMENT ====================
   
