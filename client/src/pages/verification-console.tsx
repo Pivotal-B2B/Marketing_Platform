@@ -49,13 +49,6 @@ const EMAIL_STATUS_CONFIG = {
     color: "text-green-600",
     description: "High quality, verified deliverable"
   },
-  ok: { 
-    label: "OK", 
-    variant: "default" as const, 
-    icon: CheckCircle2, 
-    color: "text-green-600",
-    description: "Legacy status - deliverable"
-  },
   
   // Medium risk - proceed with caution
   risky: { 
@@ -1134,7 +1127,6 @@ export default function VerificationConsolePage() {
                         <SelectItem value="all">All statuses</SelectItem>
                         <SelectItem value="safe_to_send">Safe to Send</SelectItem>
                         <SelectItem value="valid">Valid</SelectItem>
-                        <SelectItem value="ok">OK (Legacy)</SelectItem>
                         <SelectItem value="risky">Risky</SelectItem>
                         <SelectItem value="send_with_caution">Send with Caution</SelectItem>
                         <SelectItem value="accept_all">Accept-All</SelectItem>

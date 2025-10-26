@@ -78,7 +78,6 @@ export type EmailValidationStatus =
   | 'unknown'
   | 'valid'
   | 'safe_to_send'
-  | 'ok'
   | 'risky'
   | 'send_with_caution'
   | 'accept_all'

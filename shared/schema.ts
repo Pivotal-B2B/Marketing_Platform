@@ -54,10 +54,16 @@ export const qaStatusEnum = pgEnum('qa_status', [
 ]);
 
 export const emailVerificationStatusEnum = pgEnum('email_verification_status', [
-  'unknown',
-  'valid',
-  'invalid',
-  'risky'
+  'unknown',          // Cannot verify (SMTP blocked, timeout, etc)
+  'valid',            // High quality, verified deliverable
+  'safe_to_send',     // Verified deliverable, recommended
+  'risky',            // May deliver but has risk factors (role, free provider)
+  'send_with_caution', // Lower confidence, proceed carefully
+  'accept_all',       // Domain accepts all emails (catch-all)
+  'invalid',          // Syntax error or no MX records
+  'disabled',         // Mailbox exists but disabled/full/quota exceeded
+  'disposable',       // Temporary/disposable email service
+  'spam_trap'         // Known spam trap address
 ]);
 
 export const orderStatusEnum = pgEnum('order_status', [
@@ -3524,7 +3530,6 @@ export const verificationEmailStatusEnum = pgEnum('verification_email_status', [
   'unknown',          // Cannot verify (SMTP blocked, timeout, etc)
   'valid',            // High quality, verified deliverable
   'safe_to_send',     // Verified deliverable, recommended
-  'ok',               // Legacy alias for 'valid'
   'risky',            // May deliver but has risk factors (role, free provider)
   'send_with_caution', // Lower confidence, proceed carefully
   'accept_all',       // Domain accepts all emails (catch-all)
