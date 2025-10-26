@@ -396,8 +396,8 @@ router.post("/api/verification-contacts/:contactId/enrich", async (req, res) => 
       return res.status(400).json({ error: "Contact must be eligible for enrichment" });
     }
 
-    if (contact.emailStatus !== 'ok' && !force) {
-      return res.status(400).json({ error: "Contact must have a valid email (OK status) for enrichment" });
+    if (contact.emailStatus !== 'valid' && contact.emailStatus !== 'safe_to_send' && !force) {
+      return res.status(400).json({ error: "Contact must have a valid email (valid or safe_to_send status) for enrichment" });
     }
 
     // Check if contact needs enrichment
