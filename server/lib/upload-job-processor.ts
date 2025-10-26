@@ -258,8 +258,17 @@ async function processSubmissions(
       processedCount++;
 
       try {
-        const email = (row.email || row.Email)?.trim().toLowerCase();
-        const contactId = row.contact_id || row.contactId || row['Contact ID'];
+        // Support multiple email column name formats
+        const email = (
+          row.email || 
+          row.Email || 
+          row['CAV-Email'] || 
+          row['CAV Email'] ||
+          row['email_address'] ||
+          row['Email Address']
+        )?.trim().toLowerCase();
+        
+        const contactId = row.contact_id || row.contactId || row['Contact ID'] || row['CAV-ID'];
         const submittedAt = row.submitted_at || row.submittedAt || row['Submitted At'];
 
         let targetContactId: string | null = null;
