@@ -476,11 +476,15 @@ export async function validateEmail(
       result.hasSmtp = !!smtp.rcptOk;
       result.smtpAccepted = smtp.rcptOk;
       
-      // Detect disabled/full mailboxes via SMTP codes
+      // SMTP rejection codes (550/551/552/553) can indicate disabled mailboxes
+      // BUT many corporate mail servers (Emirates, British Airways, etc.) reject 
+      // anonymous SMTP probes as anti-spam protection - even for valid emails!
+      // Treat as "unknown" unless corroborated by other signals
       if (smtp.code && (smtp.code === 550 || smtp.code === 551 || smtp.code === 552 || smtp.code === 553)) {
-        result.status = 'disabled';
-        result.isDisabled = true;
-        result.confidence = 90;
+        // Downgrade to "unknown" to avoid false positives from corporate anti-spam
+        result.status = 'unknown';
+        result.isDisabled = true; // Flag for telemetry/analysis
+        result.confidence = 60; // Lower confidence since this may be anti-spam protection
         return result;
       }
       

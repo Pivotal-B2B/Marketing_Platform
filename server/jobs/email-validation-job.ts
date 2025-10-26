@@ -14,7 +14,9 @@ import { finalizeEligibilityAfterEmailValidation } from '../lib/verification-uti
 // OPTIMIZED SETTINGS FOR HIGH PERFORMANCE
 const BATCH_SIZE = Number(process.env.EMAIL_VALIDATION_BATCH_SIZE || 500); // 10x increase
 const PROCESS_INTERVAL = '*/1 * * * *'; // Every 1 minute (was 2)
-const SKIP_SMTP_DEFAULT = process.env.SKIP_SMTP_VALIDATION === 'true';
+// Skip SMTP by default to avoid false positives from corporate anti-spam measures
+// Set SKIP_SMTP_VALIDATION=false to enable SMTP probing (not recommended for B2B)
+const SKIP_SMTP_DEFAULT = process.env.SKIP_SMTP_VALIDATION !== 'false';
 const PARALLEL_LIMIT = Number(process.env.EMAIL_VALIDATION_PARALLEL || 20); // Process 20 emails at once
 
 let isProcessing = false;
@@ -165,6 +167,7 @@ export function startEmailValidationJob() {
   console.log(`  - Batch size: ${BATCH_SIZE}`);
   console.log(`  - Interval: ${PROCESS_INTERVAL}`);
   console.log(`  - Parallel limit: ${PARALLEL_LIMIT}`);
+  console.log(`  - SMTP probing: ${SKIP_SMTP_DEFAULT ? 'DISABLED (DNS-only)' : 'ENABLED'}`);
   console.log(`  - Theoretical max: ${BATCH_SIZE * 60} emails/hour`);
   
   // Run on startup (after 5 seconds)
