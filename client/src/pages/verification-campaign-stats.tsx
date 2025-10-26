@@ -302,6 +302,66 @@ export default function VerificationCampaignStatsPage() {
     },
   });
 
+  const smartExportMutation = useMutation({
+    mutationFn: async (exportFilters: FilterState) => {
+      const params = new URLSearchParams();
+      
+      if (exportFilters.preset) params.append('filter', exportFilters.preset);
+      if (exportFilters.fullName) params.append('fullName', exportFilters.fullName);
+      if (exportFilters.email) params.append('email', exportFilters.email);
+      if (exportFilters.title) params.append('title', exportFilters.title);
+      if (exportFilters.phone) params.append('phone', exportFilters.phone);
+      if (exportFilters.accountName) params.append('accountName', exportFilters.accountName);
+      if (exportFilters.city) params.append('city', exportFilters.city);
+      if (exportFilters.state) params.append('state', exportFilters.state);
+      if (exportFilters.country) params.append('country', exportFilters.country);
+      if (exportFilters.eligibilityStatus) params.append('eligibilityStatus', exportFilters.eligibilityStatus);
+      if (exportFilters.verificationStatus) params.append('verificationStatus', exportFilters.verificationStatus);
+      if (exportFilters.emailStatus) params.append('emailStatus', exportFilters.emailStatus);
+      if (exportFilters.qaStatus) params.append('qaStatus', exportFilters.qaStatus);
+      if (exportFilters.suppressed) params.append('suppressed', exportFilters.suppressed);
+      
+      if (exportFilters.customFields) {
+        params.append('customFields', JSON.stringify(exportFilters.customFields));
+      }
+
+      const res = await fetch(
+        `/api/verification-campaigns/${campaignId}/export-smart?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          },
+          credentials: "include",
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to export smart template");
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `verification-smart-template-${campaignId}-${new Date().toISOString()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Smart export successful",
+        description: "Your contacts have been exported with best phone and address selection",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Smart export failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const openDetail = (title: string, filter: string) => {
     setDetailDialog({ open: true, title, filter });
   };
@@ -315,6 +375,14 @@ export default function VerificationCampaignStatsPage() {
       exportMutation.mutate({ preset });
     } else {
       exportMutation.mutate(filters);
+    }
+  };
+
+  const handleSmartExport = (preset?: string) => {
+    if (preset) {
+      smartExportMutation.mutate({ preset });
+    } else {
+      smartExportMutation.mutate(filters);
     }
   };
 
@@ -456,9 +524,18 @@ export default function VerificationCampaignStatsPage() {
                     onClick={() => handleExport()}
                     disabled={exportMutation.isPending}
                     data-testid="button-export-filtered"
+                    variant="outline"
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    {exportMutation.isPending ? "Exporting..." : "Export Filtered"}
+                    {exportMutation.isPending ? "Exporting..." : "Export All Fields"}
+                  </Button>
+                  <Button
+                    onClick={() => handleSmartExport()}
+                    disabled={smartExportMutation.isPending}
+                    data-testid="button-export-smart"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {smartExportMutation.isPending ? "Exporting..." : "Export Smart Template"}
                   </Button>
                 </div>
               </div>

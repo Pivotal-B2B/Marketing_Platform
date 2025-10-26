@@ -700,4 +700,329 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
   }
 });
 
+// Smart Template Export - Intelligently selects best phone and address from multiple sources
+router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    
+    // Import the smart data selection utility
+    const { selectBestVerificationContactData } = await import("../lib/verification-best-data");
+    
+    // Verify campaign exists
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    // Build filters from query params (mirror regular export logic)
+    const {
+      filter,
+      fullName,
+      email,
+      title,
+      phone,
+      accountName,
+      city,
+      state,
+      country,
+      eligibilityStatus,
+      verificationStatus,
+      emailStatus,
+      qaStatus,
+      suppressed,
+      customFields 
+    } = req.query;
+
+    // Build filter conditions
+    const conditions: any[] = [sql`c.campaign_id = ${campaignId}`];
+    
+    // Preset filter (all, eligible, suppressed, submitted, etc.)
+    if (filter) {
+      switch (filter) {
+        case 'all':
+          conditions.push(sql`c.deleted = FALSE`);
+          break;
+        case 'eligible':
+          conditions.push(sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.eligibility_status = 'Eligible'`);
+          break;
+        case 'suppressed':
+          conditions.push(sql`c.deleted = FALSE AND c.suppressed = TRUE`);
+          break;
+        case 'validated':
+          conditions.push(sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.verification_status = 'Validated'`);
+          break;
+        case 'ok_email':
+          conditions.push(sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.email_status IN ('valid', 'safe_to_send')`);
+          break;
+        case 'invalid_email':
+          conditions.push(sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.verification_status = 'Invalid'`);
+          break;
+        case 'submitted':
+          const submittedLeads = await db
+            .select({ contactId: verificationLeadSubmissions.contactId })
+            .from(verificationLeadSubmissions)
+            .where(eq(verificationLeadSubmissions.campaignId, campaignId));
+          
+          const submittedIds = submittedLeads.map(l => l.contactId).filter(Boolean);
+          
+          if (submittedIds.length === 0) {
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', `attachment; filename="verification-smart-template-${campaignId}-${new Date().toISOString()}.csv"`);
+            return res.send('No contacts found');
+          }
+          
+          conditions.push(sql`c.id IN (${sql.join(submittedIds.map(id => sql`${id}`), sql`, `)})`);
+          break;
+      }
+    } else {
+      conditions.push(sql`c.deleted = FALSE`);
+    }
+
+    // Advanced filters
+    if (fullName) {
+      conditions.push(sql`c.full_name ILIKE ${`%${fullName}%`}`);
+    }
+    if (email) {
+      conditions.push(sql`c.email ILIKE ${`%${email}%`}`);
+    }
+    if (title) {
+      conditions.push(sql`c.title ILIKE ${`%${title}%`}`);
+    }
+    if (phone) {
+      conditions.push(sql`(c.phone ILIKE ${`%${phone}%`} OR c.mobile ILIKE ${`%${phone}%`})`);
+    }
+    if (accountName) {
+      conditions.push(sql`a.name ILIKE ${`%${accountName}%`}`);
+    }
+    if (city) {
+      conditions.push(sql`c.contact_city ILIKE ${`%${city}%`}`);
+    }
+    if (state) {
+      conditions.push(sql`c.contact_state ILIKE ${`%${state}%`}`);
+    }
+    if (country) {
+      conditions.push(sql`c.contact_country ILIKE ${`%${country}%`}`);
+    }
+    if (eligibilityStatus) {
+      conditions.push(sql`c.eligibility_status = ${eligibilityStatus}`);
+    }
+    if (verificationStatus) {
+      conditions.push(sql`c.verification_status = ${verificationStatus}`);
+    }
+    if (emailStatus) {
+      conditions.push(sql`c.email_status = ${emailStatus}`);
+    }
+    if (qaStatus) {
+      conditions.push(sql`c.qa_status = ${qaStatus}`);
+    }
+    if (suppressed !== undefined && suppressed !== 'all') {
+      conditions.push(sql`c.suppressed = ${suppressed === 'true'}`);
+    }
+
+    // Custom fields filtering
+    if (customFields && typeof customFields === 'string') {
+      try {
+        const customFieldsObj = JSON.parse(customFields);
+        for (const [key, value] of Object.entries(customFieldsObj)) {
+          if (value && typeof value === 'string') {
+            const [entityType, fieldKey] = key.split('.');
+            if (entityType === 'contact') {
+              conditions.push(sql`c.custom_fields->>${fieldKey} ILIKE ${`%${value}%`}`);
+            } else if (entityType === 'account') {
+              conditions.push(sql`a.custom_fields->>${fieldKey} ILIKE ${`%${value}%`}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing custom fields:', e);
+      }
+    }
+    
+    const whereClause = conditions.length > 0 
+      ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+      : sql``;
+    
+    // Fetch all contacts with account data
+    const result = await db.execute(sql`
+      SELECT 
+        c.id,
+        c.full_name,
+        c.first_name,
+        c.last_name,
+        c.title,
+        c.email,
+        c.phone,
+        c.mobile,
+        c.linkedin_url,
+        c.cav_id,
+        c.cav_user_id,
+        c.contact_address1,
+        c.contact_address2,
+        c.contact_address3,
+        c.contact_city,
+        c.contact_state,
+        c.contact_country,
+        c.contact_postal,
+        c.hq_address_1,
+        c.hq_address_2,
+        c.hq_address_3,
+        c.hq_city,
+        c.hq_state,
+        c.hq_country,
+        c.hq_postal,
+        c.hq_phone,
+        c.ai_enriched_address1,
+        c.ai_enriched_address2,
+        c.ai_enriched_address3,
+        c.ai_enriched_city,
+        c.ai_enriched_state,
+        c.ai_enriched_country,
+        c.ai_enriched_postal,
+        c.ai_enriched_phone,
+        c.eligibility_status,
+        c.verification_status,
+        c.email_status,
+        c.suppressed,
+        c.custom_fields,
+        c.created_at,
+        a.name as account_name,
+        a.domain as account_domain,
+        a.industry_standardized as account_industry,
+        a.custom_fields as account_custom_fields
+      FROM verification_contacts c
+      LEFT JOIN accounts a ON a.id = c.account_id
+      ${whereClause}
+      ORDER BY c.updated_at DESC
+    `);
+    
+    const contacts = result.rows as any[];
+    
+    // Generate Smart Template CSV
+    const csvRows: string[] = [];
+    
+    const escapeCSV = (val: any) => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+    
+    // Header row with smart template fields
+    const headers = [
+      'ID',
+      'Full Name',
+      'First Name',
+      'Last Name',
+      'Title',
+      'Email',
+      'LinkedIn URL',
+      'CAV ID',
+      'CAV User ID',
+      // Smart Selected Fields
+      'Best Phone',
+      'Best Phone Source',
+      'Best Address Line 1',
+      'Best Address Line 2',
+      'Best Address Line 3',
+      'Best City',
+      'Best State',
+      'Best Country',
+      'Best Postal Code',
+      'Best Address Source',
+      // Account Info
+      'Company Name',
+      'Company Domain',
+      'Company Industry',
+      // Status Fields
+      'Eligibility Status',
+      'Verification Status',
+      'Email Status',
+      'Suppressed',
+      'Created At',
+    ];
+    
+    csvRows.push(headers.join(','));
+    
+    // Data rows with smart data selection
+    for (const contact of contacts) {
+      // Use smart selection utility
+      const smartData = selectBestVerificationContactData({
+        phone: contact.phone,
+        mobile: contact.mobile,
+        contactAddress1: contact.contact_address1,
+        contactAddress2: contact.contact_address2,
+        contactAddress3: contact.contact_address3,
+        contactCity: contact.contact_city,
+        contactState: contact.contact_state,
+        contactCountry: contact.contact_country,
+        contactPostal: contact.contact_postal,
+        hqPhone: contact.hq_phone,
+        hqAddress1: contact.hq_address_1,
+        hqAddress2: contact.hq_address_2,
+        hqAddress3: contact.hq_address_3,
+        hqCity: contact.hq_city,
+        hqState: contact.hq_state,
+        hqCountry: contact.hq_country,
+        hqPostal: contact.hq_postal,
+        aiEnrichedPhone: contact.ai_enriched_phone,
+        aiEnrichedAddress1: contact.ai_enriched_address1,
+        aiEnrichedAddress2: contact.ai_enriched_address2,
+        aiEnrichedAddress3: contact.ai_enriched_address3,
+        aiEnrichedCity: contact.ai_enriched_city,
+        aiEnrichedState: contact.ai_enriched_state,
+        aiEnrichedCountry: contact.ai_enriched_country,
+        aiEnrichedPostal: contact.ai_enriched_postal,
+        customFields: contact.custom_fields,
+      });
+      
+      const row = [
+        contact.id,
+        escapeCSV(contact.full_name),
+        escapeCSV(contact.first_name),
+        escapeCSV(contact.last_name),
+        escapeCSV(contact.title),
+        contact.email || '',
+        contact.linkedin_url || '',
+        contact.cav_id || '',
+        contact.cav_user_id || '',
+        // Smart selected fields
+        smartData.phone.phoneFormatted || '',
+        smartData.phone.source,
+        escapeCSV(smartData.address.address.line1),
+        escapeCSV(smartData.address.address.line2),
+        escapeCSV(smartData.address.address.line3),
+        escapeCSV(smartData.address.address.city),
+        escapeCSV(smartData.address.address.state),
+        escapeCSV(smartData.address.address.country),
+        smartData.address.address.postal || '',
+        smartData.address.source,
+        // Account info
+        escapeCSV(contact.account_name),
+        contact.account_domain || '',
+        escapeCSV(contact.account_industry),
+        // Status
+        contact.eligibility_status || '',
+        contact.verification_status || '',
+        contact.email_status || '',
+        contact.suppressed ? 'Yes' : 'No',
+        contact.created_at || '',
+      ];
+      
+      csvRows.push(row.join(','));
+    }
+    
+    const csv = csvRows.join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="verification-smart-template-${campaignId}-${new Date().toISOString()}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    console.error("Error exporting smart template:", error);
+    res.status(500).json({ error: "Failed to export smart template" });
+  }
+});
+
 export default router;
