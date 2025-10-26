@@ -685,14 +685,14 @@ export default function VerificationConsolePage() {
         </Card>
       </div>
 
-      {/* Submission Manager - External Validation Workflow */}
+      {/* Submission Manager - Built-in Validation Workflow */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Submission Manager</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                External email validation and client delivery workflow
+                Built-in email validation and client delivery workflow
               </p>
             </div>
           </div>
@@ -700,7 +700,7 @@ export default function VerificationConsolePage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="flex flex-col gap-2">
-              <h4 className="text-sm font-medium text-muted-foreground">Step 1: Export for Validation</h4>
+              <h4 className="text-sm font-medium text-muted-foreground">Step 1: Review Eligible</h4>
               <Button
                 variant="outline"
                 size="sm"
@@ -714,12 +714,12 @@ export default function VerificationConsolePage() {
                 Export Eligible Contacts
               </Button>
               <p className="text-xs text-muted-foreground">
-                Download contacts ready for email validation
+                Download contacts with validated emails (auto-validated)
               </p>
             </div>
 
             <div className="flex flex-col gap-2">
-              <h4 className="text-sm font-medium text-muted-foreground">Step 2: Prepare Buffer</h4>
+              <h4 className="text-sm font-medium text-muted-foreground">Step 2: Lock for Delivery</h4>
               <Button
                 variant="outline"
                 size="sm"
@@ -822,35 +822,43 @@ export default function VerificationConsolePage() {
           </div>
 
           <div className="mt-4 p-3 bg-muted/50 rounded-md border">
-            <p className="text-sm mb-3">
-              <strong>Workflow:</strong> 1) Export eligible contacts → 2) Validate emails externally (EmailListVerify, ZeroBounce, etc.) → 
-              3) Upload results via CSV Import → 4) Lock validated contacts → 5) Export for client → 6) Clear buffer
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setValidationUploadOpen(true);
-                  setValidationUploadResults(null);
-                }}
-                data-testid="button-upload-validation-results"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Validation Results
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setSubmissionUploadOpen(true);
-                  setSubmissionUploadResults(null);
-                }}
-                data-testid="button-upload-submission-records"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Submission Records
-              </Button>
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium mb-1">Built-in Email Validation</p>
+                <p className="text-xs text-muted-foreground">
+                  <strong>Automatic Workflow:</strong> Contacts are validated in the background using built-in DNS/MX verification → 
+                  Export eligible contacts → Lock for delivery → Export for client → Clear buffer
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setValidationUploadOpen(true);
+                    setValidationUploadResults(null);
+                  }}
+                  data-testid="button-upload-validation-results"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload External Validation (Optional)
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setSubmissionUploadOpen(true);
+                    setSubmissionUploadResults(null);
+                  }}
+                  data-testid="button-upload-submission-records"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Submission Records
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                💡 <strong>Tip:</strong> Email validation now runs automatically in the background. You can still upload external validation results if needed.
+              </p>
             </div>
           </div>
         </CardContent>
