@@ -247,8 +247,28 @@ const COUNTRY_DIAL_CODES: Record<string, string> = {
 function cleanPhoneNumber(phone: string): string {
   if (!phone) return '';
   
+  let cleaned = String(phone).trim();
+  
+  // Handle scientific notation (e.g., "9.19769E+11" or "9.19769e+11")
+  if (/[eE][+-]?\d+/.test(cleaned)) {
+    try {
+      // Convert scientific notation to full number string
+      const num = parseFloat(cleaned);
+      if (!isNaN(num) && isFinite(num)) {
+        // Convert to string without scientific notation
+        cleaned = num.toLocaleString('en-US', {
+          useGrouping: false,
+          maximumFractionDigits: 0,
+          minimumFractionDigits: 0
+        });
+      }
+    } catch (e) {
+      // If conversion fails, continue with original string
+    }
+  }
+  
   // Remove common separators and whitespace
-  return phone
+  return cleaned
     .replace(/[\s\-\(\)\[\]\.]/g, '')
     .replace(/^[\+]/g, ''); // Remove leading + if present
 }
