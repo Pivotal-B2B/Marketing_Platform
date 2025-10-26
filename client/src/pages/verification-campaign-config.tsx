@@ -7,13 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AccountCapManager } from "@/components/verification/AccountCapManager";
-import { PriorityConfigEditor } from "@/components/verification/PriorityConfigEditor";
 
 export default function VerificationCampaignConfigPage() {
   const { id } = useParams();
@@ -178,7 +176,7 @@ export default function VerificationCampaignConfigPage() {
             {isNew ? "New Verification Campaign" : `Configure: ${(campaign as any)?.name}`}
           </h1>
           <p className="text-muted-foreground mt-1" data-testid="text-page-description">
-            Set up eligibility rules, priority scoring, and account caps
+            Set up eligibility rules and account caps
           </p>
         </div>
       </div>
@@ -452,18 +450,9 @@ export default function VerificationCampaignConfigPage() {
       </div>
 
       {!isNew && (
-        <Tabs defaultValue="priority" className="mt-8">
-          <TabsList>
-            <TabsTrigger value="priority" data-testid="tab-priority-config">Priority Configuration</TabsTrigger>
-            <TabsTrigger value="caps" data-testid="tab-account-caps">Account Caps</TabsTrigger>
-          </TabsList>
-          <TabsContent value="priority">
-            <PriorityConfigEditor campaignId={id!} />
-          </TabsContent>
-          <TabsContent value="caps">
-            <AccountCapManager campaignId={id!} />
-          </TabsContent>
-        </Tabs>
+        <div className="mt-8">
+          <AccountCapManager campaignId={id!} />
+        </div>
       )}
     </div>
   );
