@@ -671,8 +671,9 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
       // Add contact custom fields
       sortedContactCustomFieldKeys.forEach(key => {
         const customFieldValue = contact.custom_fields?.[key] || '';
-        // Format phone numbers for CAT Tel field
-        if (key === 'CAT Tel' && customFieldValue) {
+        // Format phone numbers for any phone-related custom field
+        const isPhoneField = /phone|tel|mobile|fax/i.test(key);
+        if (isPhoneField && customFieldValue) {
           row.push(formatPhoneWithCountryCode(customFieldValue, contact.contact_country));
         } else {
           row.push(escapeCSV(customFieldValue));

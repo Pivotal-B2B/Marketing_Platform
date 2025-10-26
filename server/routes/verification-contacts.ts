@@ -1778,7 +1778,11 @@ router.get("/api/verification-campaigns/:campaignId/contacts/export/csv", async 
     }));
     
     // Generate CSV with UTF-8 BOM and proper formatting
-    const csvContent = exportVerificationContactsToCsv(contacts, includeCompanyFields);
+    // Default to US country code (+1) for phone number formatting
+    const csvContent = exportVerificationContactsToCsv(contacts, includeCompanyFields, {
+      includeBOM: true,
+      defaultCountryCode: '1',
+    });
     
     // Create download response with proper headers
     const { content, headers } = createCsvDownloadResponse(
@@ -1835,7 +1839,10 @@ router.get("/api/verification-campaigns/:campaignId/contacts/export/validated-ve
     
     if (contacts.length === 0) {
       // Return empty CSV with headers
-      const emptyContent = exportVerificationContactsToCsv([], includeCompanyFields);
+      const emptyContent = exportVerificationContactsToCsv([], includeCompanyFields, {
+        includeBOM: true,
+        defaultCountryCode: '1',
+      });
       const { content, headers } = createCsvDownloadResponse(
         emptyContent,
         `validated-verified-contacts-${campaignId}-${new Date().toISOString().split('T')[0]}.csv`
@@ -1849,7 +1856,11 @@ router.get("/api/verification-campaigns/:campaignId/contacts/export/validated-ve
     }
     
     // Generate CSV with UTF-8 BOM and proper formatting
-    const csvContent = exportVerificationContactsToCsv(contacts, includeCompanyFields);
+    // Default to US country code (+1) for phone number formatting
+    const csvContent = exportVerificationContactsToCsv(contacts, includeCompanyFields, {
+      includeBOM: true,
+      defaultCountryCode: '1',
+    });
     
     // Create download response with proper headers
     const { content, headers } = createCsvDownloadResponse(

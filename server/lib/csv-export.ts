@@ -253,7 +253,15 @@ export function exportVerificationContactsToCsv(
       for (const [key, value] of Object.entries(contact.customFields)) {
         // Use a clear prefix to distinguish custom fields
         const fieldName = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
-        row[fieldName] = value !== null && value !== undefined ? String(value) : '';
+        
+        // Check if this is a phone-related field and format accordingly
+        const isPhoneField = /phone|tel|mobile|fax/i.test(key);
+        
+        if (isPhoneField && (typeof value === 'string' || typeof value === 'number')) {
+          row[fieldName] = cleanPhoneForExport(String(value), options.defaultCountryCode);
+        } else {
+          row[fieldName] = value !== null && value !== undefined ? String(value) : '';
+        }
       }
     }
 
