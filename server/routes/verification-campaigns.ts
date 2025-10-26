@@ -3,6 +3,7 @@ import { db } from "../db";
 import { verificationCampaigns, insertVerificationCampaignSchema, verificationLeadSubmissions, verificationContacts, accounts } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
+import { formatPhoneWithCountryCode } from "../lib/phone-formatter";
 
 const router = Router();
 
@@ -614,8 +615,8 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
         escapeCSV(contact.title),
         contact.email || '',
         contact.email_lower || '',
-        contact.phone || '',
-        contact.mobile || '',
+        formatPhoneWithCountryCode(contact.phone, contact.contact_country),
+        formatPhoneWithCountryCode(contact.mobile, contact.contact_country),
         contact.linkedin_url || '',
         contact.cav_id || '',
         contact.cav_user_id || '',
@@ -638,7 +639,7 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
         escapeCSV(contact.hq_state),
         escapeCSV(contact.hq_country),
         contact.hq_postal || '',
-        contact.hq_phone || '',
+        formatPhoneWithCountryCode(contact.hq_phone, contact.hq_country),
         contact.eligibility_status || '',
         escapeCSV(contact.eligibility_reason),
         contact.verification_status || '',
@@ -658,7 +659,7 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
         escapeCSV(contact.account_industry),
         contact.account_size || '',
         contact.account_revenue || '',
-        contact.account_phone || '',
+        formatPhoneWithCountryCode(contact.account_phone, contact.account_country),
         escapeCSV(contact.account_hq_street1),
         escapeCSV(contact.account_hq_street2),
         escapeCSV(contact.account_city),
@@ -670,7 +671,12 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
       // Add contact custom fields
       sortedContactCustomFieldKeys.forEach(key => {
         const customFieldValue = contact.custom_fields?.[key] || '';
-        row.push(escapeCSV(customFieldValue));
+        // Format phone numbers for CAT Tel field
+        if (key === 'CAT Tel' && customFieldValue) {
+          row.push(formatPhoneWithCountryCode(customFieldValue, contact.contact_country));
+        } else {
+          row.push(escapeCSV(customFieldValue));
+        }
       });
       
       // Add account custom fields
