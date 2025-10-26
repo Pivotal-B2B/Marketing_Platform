@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db";
-import { verificationCampaigns, insertVerificationCampaignSchema, verificationLeadSubmissions, verificationContacts, accounts } from "@shared/schema";
+import { verificationCampaigns, insertVerificationCampaignSchema, verificationLeadSubmissions, verificationContacts, accounts, exportTemplates } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { z } from "zod";
 import { formatPhoneWithCountryCode } from "../lib/phone-formatter";
@@ -704,9 +704,15 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
 router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
   try {
     const campaignId = req.params.id;
+    const { templateId } = req.query;
     
     // Import the smart data selection utility
     const { selectBestVerificationContactData } = await import("../lib/verification-best-data");
+    const { 
+      applyExportTemplate, 
+      getDefaultSmartExportMapping, 
+      contactToFieldMap 
+    } = await import("../lib/apply-export-template");
     
     // Verify campaign exists
     const [campaign] = await db
@@ -716,6 +722,22 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
     
     if (!campaign) {
       return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    // Fetch template if provided
+    let template = null;
+    if (templateId && typeof templateId === 'string') {
+      const [fetchedTemplate] = await db
+        .select()
+        .from(exportTemplates)
+        .where(eq(exportTemplates.id, templateId))
+        .limit(1);
+      
+      if (!fetchedTemplate) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      template = fetchedTemplate;
     }
     
     // Build filters from query params (mirror regular export logic)
@@ -910,39 +932,24 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
       return `"${str.replace(/"/g, '""')}"`;
     };
     
-    // Header row with smart template fields
-    const headers = [
-      'ID',
-      'Full Name',
-      'First Name',
-      'Last Name',
-      'Title',
-      'Email',
-      'LinkedIn URL',
-      'CAV ID',
-      'CAV User ID',
-      // Smart Selected Fields
-      'Best Phone',
-      'Best Phone Source',
-      'Best Address Line 1',
-      'Best Address Line 2',
-      'Best Address Line 3',
-      'Best City',
-      'Best State',
-      'Best Country',
-      'Best Postal Code',
-      'Best Address Source',
-      // Account Info
-      'Company Name',
-      'Company Domain',
-      'Company Industry',
-      // Status Fields
-      'Eligibility Status',
-      'Verification Status',
-      'Email Status',
-      'Suppressed',
-      'Created At',
-    ];
+    // Get headers - use template if provided, otherwise use default
+    let headers: string[];
+    if (template) {
+      // Template will be applied per-row, but we need headers first
+      // Extract headers from template mappings
+      const { columnOrder, fieldMappings } = template;
+      const orderedKeys = columnOrder && columnOrder.length > 0 
+        ? columnOrder 
+        : Object.keys(fieldMappings);
+      
+      headers = orderedKeys
+        .filter(key => key in fieldMappings)
+        .map(key => fieldMappings[key]);
+    } else {
+      // Use default headers
+      const defaultMapping = getDefaultSmartExportMapping();
+      headers = defaultMapping.headers;
+    }
     
     csvRows.push(headers.join(','));
     
@@ -978,38 +985,48 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
         customFields: contact.custom_fields,
       });
       
-      const row = [
-        contact.id,
-        escapeCSV(contact.full_name),
-        escapeCSV(contact.first_name),
-        escapeCSV(contact.last_name),
-        escapeCSV(contact.title),
-        contact.email || '',
-        contact.linkedin_url || '',
-        contact.cav_id || '',
-        contact.cav_user_id || '',
-        // Smart selected fields
-        smartData.phone.phoneFormatted || '',
-        smartData.phone.source,
-        escapeCSV(smartData.address.address.line1),
-        escapeCSV(smartData.address.address.line2),
-        escapeCSV(smartData.address.address.line3),
-        escapeCSV(smartData.address.address.city),
-        escapeCSV(smartData.address.address.state),
-        escapeCSV(smartData.address.address.country),
-        smartData.address.address.postal || '',
-        smartData.address.source,
-        // Account info
-        escapeCSV(contact.account_name),
-        contact.account_domain || '',
-        escapeCSV(contact.account_industry),
-        // Status
-        contact.eligibility_status || '',
-        contact.verification_status || '',
-        contact.email_status || '',
-        contact.suppressed ? 'Yes' : 'No',
-        contact.created_at || '',
-      ];
+      let row: any[];
+      
+      if (template) {
+        // Use template mapping
+        const fieldMap = contactToFieldMap(contact, smartData, escapeCSV);
+        const templateResult = applyExportTemplate(fieldMap, template);
+        row = templateResult.row;
+      } else {
+        // Use default row format
+        row = [
+          contact.id,
+          escapeCSV(contact.full_name),
+          escapeCSV(contact.first_name),
+          escapeCSV(contact.last_name),
+          escapeCSV(contact.title),
+          contact.email || '',
+          contact.linkedin_url || '',
+          contact.cav_id || '',
+          contact.cav_user_id || '',
+          // Smart selected fields
+          smartData.phone.phoneFormatted || '',
+          smartData.phone.source,
+          escapeCSV(smartData.address.address.line1),
+          escapeCSV(smartData.address.address.line2),
+          escapeCSV(smartData.address.address.line3),
+          escapeCSV(smartData.address.address.city),
+          escapeCSV(smartData.address.address.state),
+          escapeCSV(smartData.address.address.country),
+          smartData.address.address.postal || '',
+          smartData.address.source,
+          // Account info
+          escapeCSV(contact.account_name),
+          contact.account_domain || '',
+          escapeCSV(contact.account_industry),
+          // Status
+          contact.eligibility_status || '',
+          contact.verification_status || '',
+          contact.email_status || '',
+          contact.suppressed ? 'Yes' : 'No',
+          contact.created_at || '',
+        ];
+      }
       
       csvRows.push(row.join(','));
     }

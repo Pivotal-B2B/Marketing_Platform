@@ -378,12 +378,12 @@ export default function VerificationCampaignStatsPage() {
     }
   };
 
-  const handleSmartExport = (preset?: string) => {
-    if (preset) {
-      smartExportMutation.mutate({ preset });
-    } else {
-      smartExportMutation.mutate(filters);
+  const handleSmartExport = (preset?: string, templateId?: string) => {
+    const params = preset ? { preset } : filters;
+    if (templateId) {
+      (params as any).templateId = templateId;
     }
+    smartExportMutation.mutate(params);
   };
 
   const updateFilter = (key: keyof FilterState, value: string) => {

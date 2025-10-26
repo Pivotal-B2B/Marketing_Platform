@@ -17,52 +17,29 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Color Scheme:** Primary Royal Blue with Teal accent, adaptive light/dark surfaces, and semantic status colors.
 - **Typography:** Inter font for text, JetBrains Mono for data.
 - **Components:** shadcn/ui for consistent enterprise components, including role-based sidebar navigation, global search, data tables, and step wizards.
-- **Design System:** Comprehensive design system with accessible, high-performance pattern components incorporating design tokens.
 - **Advanced Filtering:** `AdvancedFilterBar` component with multi-operator support and filter chips.
 - **View Toggle System:** Dual-view architecture for Accounts (Cards/Table) with seamless state preservation.
-- **Navigation Pattern:** Enterprise-standard layout with core business features (CRM, Campaigns, Analytics, Content, DV Projects) in left sidebar, and administrative settings (Infrastructure, Organization) in top-right Settings dropdown menu (admin-only).
-- **Responsive Design:** Mobile-first responsive design across the entire application using consistent Tailwind breakpoints, ensuring optimal display and touch-friendly interaction on all devices.
+- **Navigation Pattern:** Enterprise-standard layout with core business features in left sidebar, and administrative settings in top-right Settings dropdown menu (admin-only).
+- **Responsive Design:** Mobile-first responsive design across the entire application using consistent Tailwind breakpoints.
 
 **Technical Implementations & Features:**
-- **Data Model:** Core entities include Users (RBAC), Accounts (AI enrichment), Contacts (validation/deduplication), Dynamic Segments, Static Lists, Domain Sets, Campaigns (Email & Telemarketing), Leads (multi-stage QA workflow), Suppressions, and Campaign Orders.
 - **AI-Powered Quality Assurance:** Integrates AssemblyAI for call transcription and Replit AI (OpenAI-compatible) for lead qualification scoring, account enrichment, and multi-factor scoring. Includes AI-powered local office enrichment.
 - **Data Management:** Unified CSV Import/Export System with intelligent deduplication/upsert logic, dynamic custom fields, smart company name normalization, and RBAC-enforced filter visibility.
-- **Compliance & Suppression:** Multi-tier suppression system (campaign-level and global) for emails (unsubscribe) and phones (Do Not Call) with RESTful API support for bulk operations. Includes a strict 4-rule suppression system to prevent over-suppression. Campaign-specific suppression lists support CSV upload via settings page with flexible matching (email, CAV ID, CAV User ID, or name+company).
-- **Campaign Management:** Supports Email campaigns (HTML editor, personalization, tracking) and Telemarketing campaigns with a dual dialer strategy (Manual/Power Dial), active call script assignment with comprehensive dynamic personalization, and Telnyx call recording integration.
-- **Lead QA Workflow:** Multi-stage workflow (New → Under Review → Approved/Rejected → Published) with checklist validation and agent insights, accessible via a comprehensive lead detail page.
+- **Compliance & Suppression:** Multi-tier suppression system (campaign-level and global) for emails (unsubscribe) and phones (Do Not Call) with RESTful API support and a strict 4-rule suppression system.
+- **Campaign Management:** Supports Email campaigns (HTML editor, personalization, tracking) and Telemarketing campaigns with a dual dialer strategy (Manual/Power Dial), active call script assignment, and Telnyx call recording integration.
+- **Lead QA Workflow:** Multi-stage workflow (New → Under Review → Approved/Rejected → Published) with checklist validation and agent insights.
 - **Client Portal (Bridge Model):** Allows clients to specify campaign order requirements via configurable webhooks.
-- **Data Verification (DV) Module:** Project-based workflow for data cleaning and verification with CSV upload, smart field mapping, multi-stage background processing, durable idempotency, smart deduplication, and suppression management. Features configurable campaigns with campaign-specific eligibility rules, enhanced company matching with Public Suffix List, and manual EmailListVerify validation.
-- **API-Free Email Validation (10-Status System):** Zero-cost email validation system with comprehensive quality assessment. **EmailListVerify integration fully removed** (October 26, 2025):
-  - **10 Validation Statuses:** Granular email quality classification: `safe_to_send` (SMTP-verified, best), `valid` (DNS-verified, high quality), `send_with_caution` (free providers), `risky` (role accounts), `accept_all` (catch-all), `unknown` (cannot verify), `invalid` (syntax/DNS errors), `disabled` (mailbox disabled/full), `disposable` (temp email), `spam_trap` (known trap).
-  - **Two-Stage Eligibility Flow:** Contacts passing geo/title criteria receive `Pending_Email_Validation` status, queuing them for asynchronous validation. Background job processes validations every 2 minutes with configurable batch size (default: 50 contacts).
-  - **Comprehensive Validation Engine:** Four-stage validation process: (1) Syntax validation (RFC 5322 compliance, format checks), (2) DNS/MX resolution with TTL-based domain caching to minimize lookups, (3) Risk assessment (role accounts, disposable/free providers, spam traps), (4) Optional SMTP probing (can be disabled to avoid spam flags).
-  - **Domain-Level Caching:** `emailValidationDomainCache` table stores DNS/MX records with TTL-based expiration, reducing redundant lookups for same-domain emails.
-  - **Intelligent Status Mapping:** `safe_to_send`/`valid` → `Eligible` (high quality), `send_with_caution`/`risky`/`accept_all` → `Eligible` (with warnings), `invalid`/`disabled`/`disposable`/`spam_trap` → `Ineligible_Email_Invalid`, `unknown` → `Eligible` (cautious acceptance to prevent workflow blocking).
-  - **Rate Limiting & Concurrency:** Domain-aware batching prevents abuse and respects server limits. Sequential domain processing with 500ms inter-domain delays ensures graceful validation.
-- **External Email Validation Workflow:** Complete workflow for validating emails externally: 1) Export eligible contacts (respects per-account caps), 2) Validate with any service (ZeroBounce, NeverBounce, etc.), 3) Upload results via CSV, 4) Lock validated contacts in submission buffer, 5) Export for client delivery, 6) Clear buffer. Includes submission tracking in `verification_lead_submissions` table.
-- **Lead Cap Enforcement with Priority Scoring:** Intelligent per-account lead cap system with multi-factor priority scoring to optimize lead selection and allocation:
-  - **Priority Scoring System:** Calculates priority scores for contacts based on seniority level (C-suite:5, VP:4, Director:3, Manager:2, IC:1) and job title alignment with target keywords using fuzzy matching (exact:1.0, contains:0.75, fuzzy:0.5, none:0.0). Configurable weights (default: 70% seniority, 30% title alignment) allow campaign-specific optimization.
-  - **Cap Enforcement Architecture:** Multi-stage enforcement at export, validation queue, and submission/delivery using window functions, reserved_slot flags, and persistent tracking in `verificationAccountCapStatus` table. Prevents concurrent overshooting through atomic slot reservation.
-  - **Account Cap Manager UI:** Real-time dashboard showing per-company cap status (available/near_cap/at_cap), submitted count, reserved count, slots remaining, and top priority score. Supports dynamic cap adjustments and bulk recalculation.
-  - **Campaign-Level Overrides:** Priority configuration per verification campaign with customizable target job titles, target seniority levels, and scoring weights. Includes bulk recalculation endpoint to re-score all contacts when configuration changes.
-  - **Smart Queue Ordering:** Lead selection uses `ORDER BY priority_score DESC NULLS LAST, updated_at ASC` to ensure highest-value contacts are processed first while respecting per-account caps.
+- **Data Verification (DV) Module:** Project-based workflow for data cleaning and verification with CSV upload, smart field mapping, multi-stage background processing, durable idempotency, smart deduplication, and suppression management.
+- **API-Free Email Validation (10-Status System):** Zero-cost email validation system with comprehensive quality assessment, two-stage eligibility flow, comprehensive validation engine (syntax, DNS/MX, risk assessment, optional SMTP probing), and domain-level caching.
+- **External Email Validation Workflow:** Complete workflow for validating emails externally via export, validation, upload results, and submission.
+- **Smart Export with Template Mapper:** Client-customizable CSV export system allowing mapping internal field names to client-specific column headers, including template management, smart phone & address selection, field mapping, custom column headers, and column ordering.
+- **Lead Cap Enforcement with Priority Scoring:** Intelligent per-account lead cap system with multi-factor priority scoring based on seniority and job title alignment. Includes cap enforcement architecture, account cap manager UI, campaign-level overrides, and smart queue ordering.
 - **Security & User Management:** JWT token generation, bcrypt password hashing, and multi-role user management system with RBAC.
-- **Call Reporting System:** Comprehensive analytics and reporting for telemarketing campaigns, including global dashboards, campaign analytics, agent performance, and detailed call lists, all with RBAC enforcement.
+- **Call Reporting System:** Comprehensive analytics and reporting for telemarketing campaigns.
 - **Content Studio & Integrations:** Unified asset library, AI content generator, multi-platform social media publishing, and secure inter-Repl communication with an external Resources Centre.
 - **Email Infrastructure Settings:** Enterprise-grade email deliverability management including domain authentication, tracking domains, IP pools, warmup plans, and sender profiles.
-- **S3-First File Architecture:** Production-grade file handling with direct-to-S3 uploads, streaming CSV processing, and presigned URLs:
-  - **Direct Browser Uploads:** Presigned URLs allow browsers to upload directly to S3, bypassing server memory/bandwidth limits
-  - **Streaming CSV Processing:** BullMQ workers stream from S3 → CSV parser → batched Postgres inserts (1000 rows/batch)
-  - **Export Generation:** Query streaming to CSV → S3 upload → short-lived presigned download URLs
-  - **Storage:** Supports AWS S3, Cloudflare R2, Wasabi, MinIO, and other S3-compatible services
-  - **Security:** Private buckets with presigned URLs (10-15 min expiry), never store raw files in database
-- **BullMQ Job Queue System:** Production-ready asynchronous job processing with Redis-backed queues:
-  - **CSV Import Queue:** Scalable background processing for large CSV uploads with real-time job status tracking and progress monitoring
-  - **Graceful Degradation:** Automatic fallback to in-memory processing when Redis is not available (development mode)
-  - **Job Monitoring API:** RESTful endpoints for job status (`/api/csv-import-jobs/:jobId`), progress tracking, and error reporting
-  - **Worker Architecture:** Dedicated worker process for streaming S3 files → CSV parsing → batched database inserts (1000 rows/batch)
-  - **Retry Logic:** Automatic job retry with exponential backoff for transient failures
-  - **Production Requirements:** Redis connection required for production (REDIS_URL environment variable). Upstash Redis recommended for serverless compatibility.
+- **S3-First File Architecture:** Production-grade file handling with direct-to-S3 uploads, streaming CSV processing, and presigned URLs.
+- **BullMQ Job Queue System:** Production-ready asynchronous job processing with Redis-backed queues for CSV import, with worker architecture, retry logic, and job monitoring.
 
 ## External Dependencies
 - **Database:** Neon (PostgreSQL)
@@ -83,54 +60,3 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Job Queue:** BullMQ (powered by Redis)
 - **Domain Parsing:** tldts (Mozilla Public Suffix List)
 - **Web Search API (Fallback):** Brave Search API (for AI enrichment)
-
-## Production Configuration
-
-### Required Environment Variables
-```bash
-# Application
-NODE_ENV=production
-PORT=3000
-APP_ORIGIN=https://your-domain.tld
-
-# Database (Neon PostgreSQL)
-DATABASE_URL=postgres://...
-PG_POOL_MIN=2
-PG_POOL_MAX=15
-
-# Redis (Upstash or compatible)
-REDIS_URL=rediss://:password@host:port
-
-# S3 Storage (AWS/R2/Wasabi/MinIO)
-S3_ACCESS_KEY_ID=your_access_key
-S3_SECRET_ACCESS_KEY=your_secret_key
-S3_REGION=us-east-1              # or 'auto' for R2
-S3_ENDPOINT=https://endpoint     # Required for R2/MinIO; omit for AWS
-S3_BUCKET=pivotal-crm-prod
-S3_PUBLIC_BASE=https://cdn.domain.tld  # Optional CDN base URL
-
-# Security
-JWT_SECRET=your_jwt_secret
-
-# Email Validation (Built-in API-free validation)
-SKIP_SMTP_VALIDATION=true        # Set to true to skip SMTP probing (recommended)
-EMAIL_VALIDATION_BATCH_SIZE=50   # Contacts per validation batch
-DNS_TIMEOUT_MS=3000              # DNS query timeout (default: 3000ms)
-SMTP_CONNECT_TIMEOUT_MS=10000    # SMTP connection timeout (default: 10s)
-DOMAIN_CACHE_TTL_HOURS=24        # Domain cache TTL (default: 24 hours)
-```
-
-### Performance Optimizations
-- **Production Build:** `vite build` generates optimized static assets in `/dist`
-- **Compression:** Express compression middleware (gzip/brotli) enabled
-- **Connection Pooling:** Postgres pool size 10-20 (tuned for Replit VM)
-- **HTTP Keep-Alive:** Enabled for persistent connections
-- **CDN:** Cloudflare in front for static asset caching (`/assets/*`)
-- **Cache Headers:** Immutable assets served with long cache times
-- **Cursor Pagination:** All list endpoints use cursor-based pagination (no OFFSET)
-- **Query Optimization:** Composite indexes on hot query paths
-- **Background Jobs:** All heavy processing (CSV ingest, enrichment, exports) runs async via BullMQ
-- **File Operations:** Direct-to-S3 for uploads, streaming from S3 for processing, never load full files in memory
-
-### Database Performance Indexes
-Key indexes for production workload (see database migration files for full DDL)

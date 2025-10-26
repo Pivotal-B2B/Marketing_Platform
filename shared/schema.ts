@@ -3844,6 +3844,27 @@ export const verificationEmailValidationJobs = pgTable("verification_email_valid
   createdAtIdx: index("verification_email_validation_jobs_created_at_idx").on(table.createdAt),
 }));
 
+// Export Templates for Smart Export Mapper
+export const exportTemplates = pgTable("export_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  templateType: varchar("template_type").notNull().default('verification_smart'), // verification_smart, standard, etc.
+  fieldMappings: jsonb("field_mappings").notNull().$type<Record<string, string>>(), // { "our_field": "Client Column Name" }
+  columnOrder: jsonb("column_order").$type<string[]>(), // Optional ordering
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  nameIdx: index("export_templates_name_idx").on(table.name),
+  typeIdx: index("export_templates_type_idx").on(table.templateType),
+  createdByIdx: index("export_templates_created_by_idx").on(table.createdBy),
+}));
+
+export const exportTemplatesRelations = relations(exportTemplates, ({ one }) => ({
+  createdBy: one(users, { fields: [exportTemplates.createdBy], references: [users.id] }),
+}));
+
 export const verificationCampaignsRelations = relations(verificationCampaigns, ({ one, many }) => ({
   createdBy: one(users, { fields: [verificationCampaigns.createdBy], references: [users.id] }),
   contacts: many(verificationContacts),
@@ -3875,6 +3896,7 @@ export const insertVerificationLeadSubmissionSchema = createInsertSchema(verific
 export const insertVerificationAuditLogSchema = createInsertSchema(verificationAuditLog).omit({ id: true, at: true });
 export const insertVerificationUploadJobSchema = createInsertSchema(verificationUploadJobs).omit({ id: true, createdAt: true, updatedAt: true, startedAt: true, finishedAt: true });
 export const insertVerificationEmailValidationJobSchema = createInsertSchema(verificationEmailValidationJobs).omit({ id: true, createdAt: true, updatedAt: true, startedAt: true, finishedAt: true });
+export const insertExportTemplateSchema = createInsertSchema(exportTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type VerificationCampaign = typeof verificationCampaigns.$inferSelect;
 export type InsertVerificationCampaign = z.infer<typeof insertVerificationCampaignSchema>;
@@ -3894,3 +3916,5 @@ export type VerificationUploadJob = typeof verificationUploadJobs.$inferSelect;
 export type InsertVerificationUploadJob = z.infer<typeof insertVerificationUploadJobSchema>;
 export type VerificationEmailValidationJob = typeof verificationEmailValidationJobs.$inferSelect;
 export type InsertVerificationEmailValidationJob = z.infer<typeof insertVerificationEmailValidationJobSchema>;
+export type ExportTemplate = typeof exportTemplates.$inferSelect;
+export type InsertExportTemplate = z.infer<typeof insertExportTemplateSchema>;
