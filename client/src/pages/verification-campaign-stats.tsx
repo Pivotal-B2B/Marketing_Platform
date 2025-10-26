@@ -302,6 +302,28 @@ export default function VerificationCampaignStatsPage() {
     },
   });
 
+  const enforceCapsMutation = useMutation({
+    mutationFn: async () => {
+      const result = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/enforce-caps`);
+      return result;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "account-caps"] });
+      toast({
+        title: "Lead cap enforcement started",
+        description: `Smart cap enforcement is running. It will keep the top ${data.cap || 10} highest-quality contacts per company.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Cap enforcement failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const smartExportMutation = useMutation({
     mutationFn: async (exportFilters: FilterState) => {
       const params = new URLSearchParams();
@@ -483,6 +505,15 @@ export default function VerificationCampaignStatsPage() {
               >
                 <RefreshCcw className={`h-4 w-4 mr-2 ${revalidateMutation.isPending ? 'animate-spin' : ''}`} />
                 {revalidateMutation.isPending ? "Re-validating..." : "Re-validate Emails"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => enforceCapsMutation.mutate()}
+                disabled={enforceCapsMutation.isPending}
+                data-testid="button-enforce-caps"
+              >
+                <Building2 className={`h-4 w-4 mr-2 ${enforceCapsMutation.isPending ? 'animate-spin' : ''}`} />
+                {enforceCapsMutation.isPending ? "Enforcing..." : "Enforce Lead Caps"}
               </Button>
               <Button
                 onClick={() => navigate(`/verification/${campaignId}/console`)}
