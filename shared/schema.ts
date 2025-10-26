@@ -3521,6 +3521,7 @@ export const verificationEligibilityStatusEnum = pgEnum('verification_eligibilit
   'Eligible', 
   'Out_of_Scope', 
   'Ineligible_Cap_Reached', 
+  'Ineligible_Recently_Submitted', // Submitted in last 2 years - auto-excluded
   'Pending_Email_Validation', 
   'Ineligible_Email_Invalid'
 ]);

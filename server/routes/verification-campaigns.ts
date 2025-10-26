@@ -701,10 +701,11 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
 });
 
 // Smart Template Export - Intelligently selects best phone and address from multiple sources
+// Only exports contacts with COMPLETE phone AND address
 router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
   try {
     const campaignId = req.params.id;
-    const { templateId } = req.query;
+    const { templateId, markAsSubmitted } = req.query;
     
     // Import the smart data selection utility
     const { selectBestVerificationContactData } = await import("../lib/verification-best-data");
@@ -713,6 +714,8 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
       getDefaultSmartExportMapping, 
       contactToFieldMap 
     } = await import("../lib/apply-export-template");
+    const { analyzeContactCompleteness } = await import("../lib/contact-completeness");
+    const { verificationLeadSubmissions } = await import("@shared/schema");
     
     // Verify campaign exists
     const [campaign] = await db
@@ -887,6 +890,7 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
     const result = await db.execute(sql`
       SELECT 
         c.id,
+        c.account_id,
         c.full_name,
         c.first_name,
         c.last_name,
@@ -936,7 +940,81 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
       ORDER BY c.updated_at DESC
     `);
     
-    const contacts = result.rows as any[];
+    const contactsRaw = result.rows as any[];
+    
+    // CRITICAL FILTER: Only include contacts with COMPLETE phone AND address
+    const contactsToExport: any[] = [];
+    const incompleteContacts: any[] = [];
+    
+    for (const contact of contactsRaw) {
+      // Pre-process smart data to check completeness
+      const smartData = selectBestVerificationContactData({
+        phone: contact.phone,
+        mobile: contact.mobile,
+        contactAddress1: contact.contact_address1,
+        contactAddress2: contact.contact_address2,
+        contactAddress3: contact.contact_address3,
+        contactCity: contact.contact_city,
+        contactState: contact.contact_state,
+        contactCountry: contact.contact_country,
+        contactPostal: contact.contact_postal,
+        hqPhone: contact.hq_phone,
+        hqAddress1: contact.hq_address_1,
+        hqAddress2: contact.hq_address_2,
+        hqAddress3: contact.hq_address_3,
+        hqCity: contact.hq_city,
+        hqState: contact.hq_state,
+        hqCountry: contact.hq_country,
+        hqPostal: contact.hq_postal,
+        aiEnrichedPhone: contact.ai_enriched_phone,
+        aiEnrichedAddress1: contact.ai_enriched_address1,
+        aiEnrichedAddress2: contact.ai_enriched_address2,
+        aiEnrichedAddress3: contact.ai_enriched_address3,
+        aiEnrichedCity: contact.ai_enriched_city,
+        aiEnrichedState: contact.ai_enriched_state,
+        aiEnrichedCountry: contact.ai_enriched_country,
+        aiEnrichedPostal: contact.ai_enriched_postal,
+        customFields: contact.custom_fields,
+      });
+      
+      const completeness = analyzeContactCompleteness(smartData);
+      
+      if (completeness.isClientReady) {
+        contactsToExport.push({ ...contact, _smartData: smartData });
+      } else {
+        incompleteContacts.push({ 
+          id: contact.id, 
+          email: contact.email,
+          missingFields: completeness.missingFields 
+        });
+      }
+    }
+    
+    console.log(`[SMART EXPORT] Filtered ${contactsToExport.length} complete contacts from ${contactsRaw.length} total`);
+    console.log(`[SMART EXPORT] ${incompleteContacts.length} contacts excluded (incomplete data)`);
+    
+    // Mark contacts as submitted if requested
+    if (markAsSubmitted === 'true' && contactsToExport.length > 0) {
+      const contactIds = contactsToExport.map(c => c.id);
+      
+      // Insert submission records
+      const submissionValues = contactsToExport.map(c => ({
+        contactId: c.id,
+        accountId: c.account_id,
+        campaignId,
+      }));
+      
+      try {
+        await db.insert(verificationLeadSubmissions)
+          .values(submissionValues)
+          .onConflictDoNothing(); // Skip if already submitted
+        
+        console.log(`[SMART EXPORT] Marked ${contactsToExport.length} contacts as submitted`);
+      } catch (error) {
+        console.error('[SMART EXPORT] Error marking as submitted:', error);
+        // Continue with export even if submission tracking fails
+      }
+    }
     
     // Generate Smart Template CSV
     const csvRows: string[] = [];
@@ -968,37 +1046,10 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
     
     csvRows.push(headers.join(','));
     
-    // Data rows with smart data selection
-    for (const contact of contacts) {
-      // Use smart selection utility
-      const smartData = selectBestVerificationContactData({
-        phone: contact.phone,
-        mobile: contact.mobile,
-        contactAddress1: contact.contact_address1,
-        contactAddress2: contact.contact_address2,
-        contactAddress3: contact.contact_address3,
-        contactCity: contact.contact_city,
-        contactState: contact.contact_state,
-        contactCountry: contact.contact_country,
-        contactPostal: contact.contact_postal,
-        hqPhone: contact.hq_phone,
-        hqAddress1: contact.hq_address_1,
-        hqAddress2: contact.hq_address_2,
-        hqAddress3: contact.hq_address_3,
-        hqCity: contact.hq_city,
-        hqState: contact.hq_state,
-        hqCountry: contact.hq_country,
-        hqPostal: contact.hq_postal,
-        aiEnrichedPhone: contact.ai_enriched_phone,
-        aiEnrichedAddress1: contact.ai_enriched_address1,
-        aiEnrichedAddress2: contact.ai_enriched_address2,
-        aiEnrichedAddress3: contact.ai_enriched_address3,
-        aiEnrichedCity: contact.ai_enriched_city,
-        aiEnrichedState: contact.ai_enriched_state,
-        aiEnrichedCountry: contact.ai_enriched_country,
-        aiEnrichedPostal: contact.ai_enriched_postal,
-        customFields: contact.custom_fields,
-      });
+    // Data rows with smart data selection (ONLY complete contacts)
+    for (const contact of contactsToExport) {
+      // Use cached smart data from completeness check
+      const smartData = contact._smartData;
       
       let row: any[];
       
@@ -1054,6 +1105,76 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
   } catch (error) {
     console.error("Error exporting smart template:", error);
     res.status(500).json({ error: "Failed to export smart template" });
+  }
+});
+
+// Submission Exclusion - Enforce 2-year exclusion for submitted contacts
+router.post("/api/verification-campaigns/:id/enforce-submission-exclusion", async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    
+    // Verify campaign exists
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    const { enforceSubmissionExclusion } = await import("../lib/submission-exclusion");
+    const stats = await enforceSubmissionExclusion(campaignId);
+    
+    res.json({
+      success: true,
+      message: `Submission exclusion enforced`,
+      stats,
+    });
+  } catch (error) {
+    console.error("Error enforcing submission exclusion:", error);
+    res.status(500).json({ error: "Failed to enforce submission exclusion" });
+  }
+});
+
+// Continuous Enrichment - Identify and queue incomplete contacts for AI enrichment
+router.post("/api/verification-campaigns/:id/identify-for-enrichment", async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    const { autoQueue = true } = req.body; // Auto-queue by default
+    
+    // Verify campaign exists
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    const { identifyContactsForEnrichment, queueForEnrichment } = await import("../lib/continuous-enrichment");
+    const result = await identifyContactsForEnrichment(campaignId);
+    
+    // Auto-queue for enrichment if requested
+    let queuedCounts = { phone: 0, address: 0, both: 0 };
+    if (autoQueue) {
+      queuedCounts.phone = await queueForEnrichment(result.needsPhoneEnrichment, 'phone');
+      queuedCounts.address = await queueForEnrichment(result.needsAddressEnrichment, 'address');
+      queuedCounts.both = await queueForEnrichment(result.needsBothEnrichment, 'both');
+    }
+    
+    res.json({
+      success: true,
+      message: autoQueue 
+        ? `Queued ${queuedCounts.phone + queuedCounts.address + queuedCounts.both} contacts for enrichment`
+        : `Identified ${result.stats.queued} contacts needing enrichment`,
+      ...result,
+      queued: autoQueue ? queuedCounts : undefined,
+    });
+  } catch (error) {
+    console.error("Error identifying contacts for enrichment:", error);
+    res.status(500).json({ error: "Failed to identify contacts for enrichment" });
   }
 });
 
