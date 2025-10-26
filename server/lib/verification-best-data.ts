@@ -285,7 +285,7 @@ export function selectBestAddress(contact: VerificationContactData): BestAddress
       },
       source: 'Company HQ Address',
       country: contact.hqCountry,
-      allowMissingCountry: false, // CRITICAL FIX: HQ address MUST have matching country
+      allowMissingCountry: false, // CRITICAL: HQ address MUST have matching country to prevent wrong-country exports
     },
   ];
   

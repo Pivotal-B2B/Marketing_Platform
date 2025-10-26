@@ -579,13 +579,15 @@ export async function processUpload(jobId: string) {
                 if (contactState) updateData.contactState = contactState;
                 if (row.contactCountry) updateData.contactCountry = row.contactCountry;
                 if (contactPostal) updateData.contactPostal = contactPostal;
-                if (row.hqAddress1) updateData.hqAddress1 = row.hqAddress1;
-                if (row.hqAddress2) updateData.hqAddress2 = row.hqAddress2;
-                if (row.hqAddress3) updateData.hqAddress3 = row.hqAddress3;
-                if (row.hqCity) updateData.hqCity = row.hqCity;
-                if (row.hqState) updateData.hqState = row.hqState;
-                if (row.hqCountry) updateData.hqCountry = row.hqCountry;
-                if (row.hqPostal) updateData.hqPostal = row.hqPostal;
+                // Update HQ fields from CSV or account data
+                if (row.hqAddress1 || accountData?.hqStreet1) updateData.hqAddress1 = row.hqAddress1 || accountData?.hqStreet1;
+                if (row.hqAddress2 || accountData?.hqStreet2) updateData.hqAddress2 = row.hqAddress2 || accountData?.hqStreet2;
+                if (row.hqAddress3 || accountData?.hqStreet3) updateData.hqAddress3 = row.hqAddress3 || accountData?.hqStreet3;
+                if (row.hqCity || accountData?.hqCity) updateData.hqCity = row.hqCity || accountData?.hqCity;
+                if (row.hqState || accountData?.hqState) updateData.hqState = row.hqState || accountData?.hqState;
+                if (row.hqCountry || accountData?.hqCountry) updateData.hqCountry = row.hqCountry || accountData?.hqCountry;
+                if (row.hqPostal || accountData?.hqPostalCode) updateData.hqPostal = row.hqPostal || accountData?.hqPostalCode;
+                if (accountData?.mainPhone) updateData.hqPhone = accountData.mainPhone;
               } else {
                 if (row.firstName) updateData.firstName = row.firstName;
                 if (row.lastName) updateData.lastName = row.lastName;
@@ -601,13 +603,15 @@ export async function processUpload(jobId: string) {
                 if (contactState) updateData.contactState = contactState;
                 if (row.contactCountry) updateData.contactCountry = row.contactCountry;
                 if (contactPostal) updateData.contactPostal = contactPostal;
-                if (row.hqAddress1) updateData.hqAddress1 = row.hqAddress1;
-                if (row.hqAddress2) updateData.hqAddress2 = row.hqAddress2;
-                if (row.hqAddress3) updateData.hqAddress3 = row.hqAddress3;
-                if (row.hqCity) updateData.hqCity = row.hqCity;
-                if (row.hqState) updateData.hqState = row.hqState;
-                if (row.hqCountry) updateData.hqCountry = row.hqCountry;
-                if (row.hqPostal) updateData.hqPostal = row.hqPostal;
+                // Update HQ fields from CSV or account data
+                if (row.hqAddress1 || accountData?.hqStreet1) updateData.hqAddress1 = row.hqAddress1 || accountData?.hqStreet1;
+                if (row.hqAddress2 || accountData?.hqStreet2) updateData.hqAddress2 = row.hqAddress2 || accountData?.hqStreet2;
+                if (row.hqAddress3 || accountData?.hqStreet3) updateData.hqAddress3 = row.hqAddress3 || accountData?.hqStreet3;
+                if (row.hqCity || accountData?.hqCity) updateData.hqCity = row.hqCity || accountData?.hqCity;
+                if (row.hqState || accountData?.hqState) updateData.hqState = row.hqState || accountData?.hqState;
+                if (row.hqCountry || accountData?.hqCountry) updateData.hqCountry = row.hqCountry || accountData?.hqCountry;
+                if (row.hqPostal || accountData?.hqPostalCode) updateData.hqPostal = row.hqPostal || accountData?.hqPostalCode;
+                if (accountData?.mainPhone) updateData.hqPhone = accountData.mainPhone;
               }
 
               updateData.eligibilityStatus = eligibility.status;
@@ -665,13 +669,16 @@ export async function processUpload(jobId: string) {
                 contactState,
                 contactCountry: row.contactCountry || null,
                 contactPostal,
-                hqAddress1: row.hqAddress1 || null,
-                hqAddress2: row.hqAddress2 || null,
-                hqAddress3: row.hqAddress3 || null,
-                hqCity: row.hqCity || null,
-                hqState: row.hqState || null,
-                hqCountry: row.hqCountry || null,
-                hqPostal: row.hqPostal || null,
+                // CRITICAL FIX: Populate HQ fields from account data if available (for smart address selection)
+                // Fallback to CSV row if provided explicitly
+                hqAddress1: row.hqAddress1 || accountData?.hqStreet1 || null,
+                hqAddress2: row.hqAddress2 || accountData?.hqStreet2 || null,
+                hqAddress3: row.hqAddress3 || accountData?.hqStreet3 || null,
+                hqCity: row.hqCity || accountData?.hqCity || null,
+                hqState: row.hqState || accountData?.hqState || null,
+                hqCountry: row.hqCountry || accountData?.hqCountry || null,
+                hqPostal: row.hqPostal || accountData?.hqPostalCode || null,
+                hqPhone: accountData?.mainPhone || null,
                 cavId: row.cavId || null,
                 cavUserId: row.cavUserId || null,
                 eligibilityStatus: eligibility.status,
