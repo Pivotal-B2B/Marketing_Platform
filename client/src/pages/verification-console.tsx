@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles, Download, Edit3, Upload } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Mail, BarChart3, Filter, X, Trash2, Sparkles, Download, Edit3, Upload, ShieldAlert, Ban, Trash, HelpCircle, CheckCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +31,115 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+
+// Email status display configuration with comprehensive statuses
+const EMAIL_STATUS_CONFIG = {
+  // High quality - ready to send
+  safe_to_send: { 
+    label: "Safe to Send", 
+    variant: "default" as const, 
+    icon: CheckCheck, 
+    color: "text-green-600",
+    description: "Verified deliverable, recommended for sending"
+  },
+  valid: { 
+    label: "Valid", 
+    variant: "default" as const, 
+    icon: CheckCircle2, 
+    color: "text-green-600",
+    description: "High quality, verified deliverable"
+  },
+  ok: { 
+    label: "OK", 
+    variant: "default" as const, 
+    icon: CheckCircle2, 
+    color: "text-green-600",
+    description: "Legacy status - deliverable"
+  },
+  
+  // Medium risk - proceed with caution
+  risky: { 
+    label: "Risky", 
+    variant: "secondary" as const, 
+    icon: AlertTriangle, 
+    color: "text-yellow-600",
+    description: "May deliver but has risk factors (role account, free provider)"
+  },
+  send_with_caution: { 
+    label: "Send with Caution", 
+    variant: "secondary" as const, 
+    icon: AlertCircle, 
+    color: "text-orange-600",
+    description: "Lower confidence, proceed carefully"
+  },
+  accept_all: { 
+    label: "Accept-All", 
+    variant: "secondary" as const, 
+    icon: Mail, 
+    color: "text-blue-600",
+    description: "Domain accepts all emails (catch-all server)"
+  },
+  unknown: { 
+    label: "Unknown", 
+    variant: "outline" as const, 
+    icon: HelpCircle, 
+    color: "text-muted-foreground",
+    description: "Cannot verify (SMTP blocked, timeout)"
+  },
+  
+  // Invalid/blocked - do not send
+  invalid: { 
+    label: "Invalid", 
+    variant: "destructive" as const, 
+    icon: XCircle, 
+    color: "text-red-600",
+    description: "Syntax error or no MX records"
+  },
+  disabled: { 
+    label: "Disabled", 
+    variant: "destructive" as const, 
+    icon: Ban, 
+    color: "text-red-600",
+    description: "Mailbox exists but disabled/full/quota exceeded"
+  },
+  disposable: { 
+    label: "Disposable", 
+    variant: "destructive" as const, 
+    icon: Trash, 
+    color: "text-red-600",
+    description: "Temporary/disposable email service"
+  },
+  spam_trap: { 
+    label: "Spam Trap", 
+    variant: "destructive" as const, 
+    icon: ShieldAlert, 
+    color: "text-red-600",
+    description: "Known spam trap address - DO NOT SEND"
+  },
+};
+
+// Helper to render email status badge with icon
+function renderEmailStatusBadge(status: string | null | undefined, size: 'sm' | 'md' = 'md') {
+  if (!status) {
+    const Icon = EMAIL_STATUS_CONFIG.unknown.icon;
+    return (
+      <Badge variant="outline" className={size === 'sm' ? 'text-xs' : ''}>
+        <Icon className={`${size === 'sm' ? 'h-3 w-3' : 'h-4 w-4'} mr-1`} />
+        Unknown
+      </Badge>
+    );
+  }
+  
+  const config = EMAIL_STATUS_CONFIG[status as keyof typeof EMAIL_STATUS_CONFIG] || EMAIL_STATUS_CONFIG.unknown;
+  const Icon = config.icon;
+  
+  return (
+    <Badge variant={config.variant} className={size === 'sm' ? 'text-xs' : ''} title={config.description}>
+      <Icon className={`${size === 'sm' ? 'h-3 w-3' : 'h-4 w-4'} mr-1`} />
+      {config.label}
+    </Badge>
+  );
+}
 
 export default function VerificationConsolePage() {
   const { campaignId } = useParams();
@@ -1023,11 +1132,17 @@ export default function VerificationConsolePage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All statuses</SelectItem>
-                        <SelectItem value="ok">OK</SelectItem>
+                        <SelectItem value="safe_to_send">Safe to Send</SelectItem>
+                        <SelectItem value="valid">Valid</SelectItem>
+                        <SelectItem value="ok">OK (Legacy)</SelectItem>
+                        <SelectItem value="risky">Risky</SelectItem>
+                        <SelectItem value="send_with_caution">Send with Caution</SelectItem>
+                        <SelectItem value="accept_all">Accept-All</SelectItem>
                         <SelectItem value="unknown">Unknown</SelectItem>
                         <SelectItem value="invalid">Invalid</SelectItem>
-                        <SelectItem value="accept_all">Accept All</SelectItem>
+                        <SelectItem value="disabled">Disabled</SelectItem>
                         <SelectItem value="disposable">Disposable</SelectItem>
+                        <SelectItem value="spam_trap">Spam Trap</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1285,18 +1400,7 @@ export default function VerificationConsolePage() {
                           {contact.email || "-"}
                         </td>
                         <td className="p-3" data-testid={`badge-email-status-${index}`}>
-                          <Badge
-                            variant={
-                              contact.email_status === "ok" || contact.emailStatus === "ok"
-                                ? "default"
-                                : contact.email_status === "invalid" || contact.emailStatus === "invalid"
-                                ? "destructive"
-                                : "secondary"
-                            }
-                            className="text-xs"
-                          >
-                            {contact.email_status || contact.emailStatus || "unknown"}
-                          </Badge>
+                          {renderEmailStatusBadge(contact.email_status || contact.emailStatus, 'sm')}
                         </td>
                         <td className="p-3 text-sm text-muted-foreground" data-testid={`text-phone-${index}`}>
                           {contact.phone || "-"}
@@ -1423,23 +1527,7 @@ export default function VerificationConsolePage() {
                     <Label>Email</Label>
                     <div className="flex gap-2">
                       <Input value={(contact as any)?.email || ""} readOnly data-testid="input-email" className="flex-1" />
-                      {((contact as any)?.email_status || (contact as any)?.emailStatus) && (
-                        <Badge
-                          variant={
-                            ((contact as any).email_status || (contact as any).emailStatus) === 'ok'
-                              ? 'default'
-                              : ((contact as any).email_status || (contact as any).emailStatus) === 'invalid'
-                              ? 'destructive'
-                              : 'secondary'
-                          }
-                          data-testid="badge-email-status"
-                        >
-                          {((contact as any).email_status || (contact as any).emailStatus) === 'ok' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                          {((contact as any).email_status || (contact as any).emailStatus) === 'invalid' && <XCircle className="h-3 w-3 mr-1" />}
-                          {((contact as any).email_status || (contact as any).emailStatus) === 'risky' && <AlertCircle className="h-3 w-3 mr-1" />}
-                          {(contact as any).email_status || (contact as any).emailStatus}
-                        </Badge>
-                      )}
+                      {renderEmailStatusBadge((contact as any)?.email_status || (contact as any)?.emailStatus, 'md')}
                     </div>
                   </div>
                   <div>
