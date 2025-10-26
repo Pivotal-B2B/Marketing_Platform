@@ -1022,6 +1022,49 @@ export default function VerificationConsolePage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={async () => {
+                    if (!confirm("This will re-validate all emails using the current validation engine. Continue?")) return;
+                    try {
+                      const res = await fetch(
+                        `/api/verification-campaigns/${campaignId}/contacts/revalidate-emails`,
+                        {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${localStorage.getItem('authToken')}`,
+                          },
+                          credentials: "include",
+                        }
+                      );
+                      
+                      const data = await res.json();
+                      
+                      if (!res.ok) {
+                        throw new Error(data.error || "Failed to trigger re-validation");
+                      }
+                      
+                      toast({
+                        title: "Re-validation Started",
+                        description: data.message || `${data.count || 0} contacts queued for re-validation`,
+                      });
+                      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+                    } catch (error: any) {
+                      toast({
+                        title: "Error",
+                        description: error.message || "Failed to trigger re-validation",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  data-testid="button-revalidate-emails"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Re-validate Emails
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     window.location.href = `/api/verification-campaigns/${campaignId}/contacts/export/validated-verified`;
                   }}

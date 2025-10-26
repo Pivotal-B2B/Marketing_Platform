@@ -1312,9 +1312,9 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-enrich", requ
           continue;
         }
         
-        // CRITICAL: Filter for OK emails only
-        if (contact.emailStatus !== 'ok') {
-          console.log(`[BULK ENRICHMENT] Skipping contact ${contactId} - email status is ${contact.emailStatus}, not 'ok'`);
+        // CRITICAL: Filter for valid emails only
+        if (contact.emailStatus !== 'valid' && contact.emailStatus !== 'safe_to_send') {
+          console.log(`[BULK ENRICHMENT] Skipping contact ${contactId} - email status is ${contact.emailStatus}, not valid or safe_to_send`);
           skipped++;
           skippedReasons.noOkEmail++;
           continue;
@@ -1886,7 +1886,7 @@ router.get("/api/verification-campaigns/:campaignId/contacts/export/validated-ve
     
     // Fetch only contacts that are:
     // 1. verificationStatus = 'Validated'
-    // 2. emailStatus = 'ok' (verified and deliverable)
+    // 2. emailStatus = 'valid' or 'safe_to_send' (verified and deliverable)
     const contactsData = await db
       .select({
         contact: verificationContacts,
@@ -1897,7 +1897,7 @@ router.get("/api/verification-campaigns/:campaignId/contacts/export/validated-ve
       .where(and(
         eq(verificationContacts.campaignId, campaignId),
         eq(verificationContacts.verificationStatus, 'Validated'),
-        eq(verificationContacts.emailStatus, 'ok'),
+        sql`${verificationContacts.emailStatus} IN ('valid', 'safe_to_send')`,
         eq(verificationContacts.deleted, false),
       ))
       .orderBy(desc(verificationContacts.createdAt));
@@ -1946,6 +1946,94 @@ router.get("/api/verification-campaigns/:campaignId/contacts/export/validated-ve
   } catch (error) {
     console.error("[EXPORT VALIDATED+VERIFIED] Error:", error);
     res.status(500).json({ error: "Failed to export validated and verified contacts" });
+  }
+});
+
+// Re-validate all eligible contacts endpoint
+router.post("/api/verification-campaigns/:campaignId/contacts/revalidate-emails", requireAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    
+    console.log(`[RE-VALIDATE] Starting email re-validation for campaign ${campaignId}`);
+    
+    // Get campaign to ensure it exists
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    // Find all contacts that have been through email validation
+    // (any status except Pending_Email_Validation and initial statuses)
+    const contactsToRevalidate = await db
+      .select({
+        id: verificationContacts.id,
+        email: verificationContacts.email,
+        eligibilityStatus: verificationContacts.eligibilityStatus,
+      })
+      .from(verificationContacts)
+      .where(
+        and(
+          eq(verificationContacts.campaignId, campaignId),
+          eq(verificationContacts.deleted, false),
+          sql`${verificationContacts.email} IS NOT NULL AND ${verificationContacts.email} != ''`,
+          // Include contacts that passed initial geo/title checks
+          sql`${verificationContacts.eligibilityStatus} IN ('Eligible', 'Ineligible_Email_Invalid', 'Pending_Email_Validation')`
+        )
+      );
+    
+    console.log(`[RE-VALIDATE] Found ${contactsToRevalidate.length} contacts to re-validate`);
+    
+    if (contactsToRevalidate.length === 0) {
+      return res.json({ 
+        message: "No contacts found to re-validate",
+        count: 0
+      });
+    }
+    
+    // Delete existing validation records for these contacts
+    const contactIds = contactsToRevalidate.map(c => c.id);
+    
+    await db
+      .delete(verificationEmailValidations)
+      .where(inArray(verificationEmailValidations.contactId, contactIds));
+    
+    console.log(`[RE-VALIDATE] Deleted existing validation records for ${contactIds.length} contacts`);
+    
+    // Reset contacts to Pending_Email_Validation status
+    const updateResult = await db
+      .update(verificationContacts)
+      .set({
+        eligibilityStatus: 'Pending_Email_Validation',
+        emailStatus: null,
+        updatedAt: new Date(),
+      })
+      .where(inArray(verificationContacts.id, contactIds));
+    
+    console.log(`[RE-VALIDATE] Reset ${contactIds.length} contacts to Pending_Email_Validation status`);
+    
+    // Log the re-validation action
+    await db.insert(verificationAuditLog).values({
+      campaignId,
+      userId: (req as any).user?.id || null,
+      action: 'contacts_email_revalidation',
+      details: {
+        contactCount: contactIds.length,
+        timestamp: new Date().toISOString(),
+      },
+    });
+    
+    res.json({ 
+      message: `Successfully queued ${contactIds.length} contacts for email re-validation`,
+      count: contactIds.length
+    });
+    
+  } catch (error) {
+    console.error("[RE-VALIDATE] Error:", error);
+    res.status(500).json({ error: "Failed to re-validate contacts" });
   }
 });
 

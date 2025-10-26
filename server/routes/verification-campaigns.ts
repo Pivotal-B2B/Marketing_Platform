@@ -103,7 +103,7 @@ router.get("/api/verification-campaigns/:campaignId/stats", async (req, res) => 
         COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE) as active_count,
         COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Eligible') as eligible_count,
         COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Eligible' AND verification_status = 'Validated') as validated_count,
-        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Eligible' AND verification_status = 'Validated' AND email_status = 'ok') as ok_email_count,
+        COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Eligible' AND verification_status = 'Validated' AND email_status IN ('valid', 'safe_to_send')) as ok_email_count,
         COUNT(*) FILTER (WHERE deleted = FALSE AND suppressed = FALSE AND eligibility_status = 'Eligible' AND verification_status = 'Invalid') as invalid_email_count,
         COUNT(*) FILTER (WHERE in_submission_buffer = TRUE) as in_buffer_count
       FROM verification_contacts
@@ -220,7 +220,7 @@ router.get("/api/verification-campaigns/:campaignId/contacts", async (req, res) 
         filterCondition = sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.verification_status = 'Validated'`;
         break;
       case 'ok_email':
-        filterCondition = sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.email_status = 'ok'`;
+        filterCondition = sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.email_status IN ('valid', 'safe_to_send')`;
         break;
       case 'invalid_email':
         filterCondition = sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.verification_status = 'Invalid'`;
@@ -344,7 +344,7 @@ router.get("/api/verification-campaigns/:campaignId/export", async (req, res) =>
           conditions.push(sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.verification_status = 'Validated'`);
           break;
         case 'ok_email':
-          conditions.push(sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.email_status = 'ok'`);
+          conditions.push(sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.email_status IN ('valid', 'safe_to_send')`);
           break;
         case 'invalid_email':
           conditions.push(sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.verification_status = 'Invalid'`);
