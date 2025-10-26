@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { accounts, verificationContacts } from '@shared/schema';
 import { eq, isNull, or, sql } from 'drizzle-orm';
-import { normalizeDomain } from '../storage';
+import { normalizeDomain, isValidDomain } from '@shared/domain-utils';
 
 /**
  * Backfill Account Domains from Contact Emails
@@ -28,22 +28,18 @@ function extractDomainFromEmail(email: string | null | undefined): string | null
 }
 
 /**
- * Validate domain format and quality
+ * Validate domain format and quality using shared utilities
+ * Combined with additional corporate domain checks
  */
 function isValidCorporateDomain(domain: string): boolean {
   const normalized = domain.toLowerCase().trim();
   
-  // Check if personal domain
+  // Check if personal domain first (quick reject)
   if (PERSONAL_DOMAINS.includes(normalized)) {
     return false;
   }
   
-  // Must have at least one dot
-  if (!normalized.includes('.')) {
-    return false;
-  }
-  
-  // Must not have double dots (typos like "acit..com")
+  // Must not have double dots (typos like "acit..com") - check before isValidDomain
   if (normalized.includes('..')) {
     return false;
   }
@@ -58,15 +54,9 @@ function isValidCorporateDomain(domain: string): boolean {
     return false;
   }
   
-  // Must have valid TLD (at least 2 chars after last dot)
-  const parts = normalized.split('.');
-  const tld = parts[parts.length - 1];
-  if (!tld || tld.length < 2 || tld.length > 10) {
-    return false;
-  }
-  
-  // Must only contain valid characters (alphanumeric, dots, hyphens)
-  if (!/^[a-z0-9.-]+$/.test(normalized)) {
+  // Use the shared validation utility that handles TLD validation properly
+  // This accepts all legitimate TLDs including long modern gTLDs (.international, .construction, etc.)
+  if (!isValidDomain(normalized)) {
     return false;
   }
   
@@ -175,7 +165,7 @@ export async function backfillAccountDomainsForCampaign(campaignId: string): Pro
       // Select the most frequent corporate domain
       let selectedDomain = '';
       let maxCount = 0;
-      for (const [domain, count] of domains.entries()) {
+      for (const [domain, count] of Array.from(domains.entries())) {
         if (count > maxCount) {
           maxCount = count;
           selectedDomain = domain;
