@@ -23,6 +23,7 @@ import verificationPriorityConfigRouter from './routes/verification-priority-con
 import suppressionRouter from './routes/suppression-routes';
 import s3FilesRouter from './routes/s3-files';
 import csvImportJobsRouter from './routes/csv-import-jobs';
+import emailValidationTestRouter from './routes/email-validation-test';
 import { z } from "zod";
 import {
   apiLimiter,
@@ -6248,6 +6249,9 @@ export function registerRoutes(app: Express) {
 
   // ==================== CSV IMPORT JOBS (BullMQ) ====================
   app.use(requireAuth, csvImportJobsRouter);
+
+  // ==================== EMAIL VALIDATION TESTING ====================
+  app.use(requireAuth, emailValidationTestRouter);
 
   // ==================== ADMIN DATA MANAGEMENT ====================
   
