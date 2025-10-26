@@ -108,22 +108,26 @@ function isAddressComplete(address: Partial<AddressComponents>): boolean {
 
 /**
  * Check if address country matches the contact's country
+ * STRICT MATCHING: Prevents HQ addresses from wrong countries being selected
  */
 function doesCountryMatch(
   contactCountry: string | null | undefined,
-  addressCountry: string | null | undefined
+  addressCountry: string | null | undefined,
+  allowMissingAddressCountry: boolean = false
 ): boolean {
   const normalizedContact = normalizeCountry(contactCountry);
   const normalizedAddress = normalizeCountry(addressCountry);
   
-  // If contact has no country, accept any address
+  // If contact has no country, accept any address (fallback for incomplete data)
   if (!normalizedContact) return true;
   
-  // If address has no country but contact does, we can infer it matches
-  // (e.g., CAV custom fields may not have country but are assumed to match)
-  if (!normalizedAddress) return true;
+  // CRITICAL FIX: If address has no country but contact does, only accept if explicitly allowed
+  // This prevents HQ addresses from wrong countries being selected
+  // allowMissingAddressCountry=true for CAV custom fields (verified, inferred to match contact)
+  // allowMissingAddressCountry=false for HQ/AI addresses (must have matching country)
+  if (!normalizedAddress) return allowMissingAddressCountry;
   
-  // Both have countries - they must match
+  // Both have countries - they MUST match exactly
   return normalizedContact === normalizedAddress;
 }
 
@@ -218,24 +222,28 @@ export function selectBestPhone(contact: VerificationContactData): BestPhone {
 }
 
 /**
- * Select the best address from available sources with country matching
+ * Select the best address from available sources with STRICT country matching
  * Priority: CAV Custom Fields > Contact > AI Enriched > Company HQ
  * CAV fields are prioritized because they're client-verified data
+ * 
+ * CRITICAL: Enforces strict country matching to prevent HQ addresses from wrong countries
  */
 export function selectBestAddress(contact: VerificationContactData): BestAddress {
   const contactCountry = contact.contactCountry;
   
   // Define address candidates with their sources
-  // CAV Custom Fields come FIRST (highest priority)
+  // CAV Custom Fields come FIRST (highest priority) and can have missing country (inferred from contact)
   const candidates: Array<{
     address: Partial<AddressComponents>;
     source: AddressSource;
     country: string | null | undefined;
+    allowMissingCountry: boolean; // NEW: Controls strict country matching
   }> = [
     {
       address: getCavAddress(contact.customFields),
       source: 'CAV Custom Fields',
       country: contactCountry, // Infer from contact country
+      allowMissingCountry: true, // CAV fields are verified, allow missing country
     },
     {
       address: {
@@ -249,6 +257,7 @@ export function selectBestAddress(contact: VerificationContactData): BestAddress
       },
       source: 'Contact Address',
       country: contact.contactCountry,
+      allowMissingCountry: true, // Contact address is assumed to be in contact's country
     },
     {
       address: {
@@ -262,6 +271,7 @@ export function selectBestAddress(contact: VerificationContactData): BestAddress
       },
       source: 'AI Enriched Address',
       country: contact.aiEnrichedCountry,
+      allowMissingCountry: false, // AI enrichment MUST have matching country
     },
     {
       address: {
@@ -275,13 +285,18 @@ export function selectBestAddress(contact: VerificationContactData): BestAddress
       },
       source: 'Company HQ Address',
       country: contact.hqCountry,
+      allowMissingCountry: false, // CRITICAL FIX: HQ address MUST have matching country
     },
   ];
   
   // Find first complete address that matches contact country
   for (const candidate of candidates) {
     const isComplete = isAddressComplete(candidate.address);
-    const countryMatches = doesCountryMatch(contactCountry, candidate.country);
+    const countryMatches = doesCountryMatch(
+      contactCountry, 
+      candidate.country, 
+      candidate.allowMissingCountry
+    );
     
     if (isComplete && countryMatches) {
       // Fill in country if missing (e.g., from CAV fields)

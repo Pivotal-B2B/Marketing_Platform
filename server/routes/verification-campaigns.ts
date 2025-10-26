@@ -762,7 +762,7 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
     // Build filter conditions
     const conditions: any[] = [sql`c.campaign_id = ${campaignId}`];
     
-    // Preset filter (all, eligible, suppressed, submitted, etc.)
+    // Preset filter (all, eligible, suppressed, submitted, client_ready)
     if (filter) {
       switch (filter) {
         case 'all':
@@ -783,6 +783,15 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
         case 'invalid_email':
           conditions.push(sql`c.deleted = FALSE AND c.suppressed = FALSE AND c.verification_status = 'Invalid'`);
           break;
+        case 'client_ready':
+          // CLIENT-READY FILTER: Only export fully validated, eligible contacts with valid emails
+          // This enforces: Validated + Eligible + Valid email + Not suppressed + Cap enforced (excludes Ineligible_Cap_Reached)
+          conditions.push(sql`c.deleted = FALSE 
+            AND c.suppressed = FALSE 
+            AND c.eligibility_status = 'Eligible' 
+            AND c.verification_status = 'Validated' 
+            AND c.email_status IN ('valid', 'safe_to_send')`);
+          break;
         case 'submitted':
           const submittedLeads = await db
             .select({ contactId: verificationLeadSubmissions.contactId })
@@ -801,7 +810,13 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
           break;
       }
     } else {
-      conditions.push(sql`c.deleted = FALSE`);
+      // DEFAULT: Export only client-ready contacts (changed from 'all')
+      // This ensures Smart Template exports are production-ready by default
+      conditions.push(sql`c.deleted = FALSE 
+        AND c.suppressed = FALSE 
+        AND c.eligibility_status = 'Eligible' 
+        AND c.verification_status = 'Validated' 
+        AND c.email_status IN ('valid', 'safe_to_send')`);
     }
 
     // Advanced filters

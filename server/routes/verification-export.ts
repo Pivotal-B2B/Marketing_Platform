@@ -484,7 +484,7 @@ async function handlePresetExport(
   }
 }
 
-// Export all eligible + validated contacts
+// Export all eligible + validated + valid email contacts (client-ready)
 router.post(
   "/api/verification-campaigns/:campaignId/export/ready-for-delivery",
   requireAuth,
@@ -492,7 +492,7 @@ router.post(
     await handlePresetExport(req, res, {
       eligibilityStatuses: ['Eligible'],
       verificationStatuses: ['Validated'],
-      emailStatuses: ['ok'],
+      emailStatuses: ['valid', 'safe_to_send'], // FIXED: Use actual email statuses from 10-status system
       suppressed: false,
       inSubmissionBuffer: false,
     });
