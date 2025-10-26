@@ -322,8 +322,9 @@ Output valid JSON only.`
     needsPhone: boolean
   ): Promise<EnrichmentResult> {
     try {
-      // Search the web
-      const searchQuery = `${companyName} ${country} office address phone number`;
+      // Enhanced search query: Company + Location + office + contact details
+      // This targets local office information specifically within the contact's location
+      const searchQuery = `"${companyName}" ${country} office address phone contact location`;
       const searchResults = await searchWeb(searchQuery);
 
       if (!searchResults.success || searchResults.results.length === 0) {
@@ -356,6 +357,15 @@ CRITICAL REQUIREMENTS:
 - Analyze the web search results provided
 - Extract the company's LOCAL office information in the SPECIFIED COUNTRY
 - Do NOT return global HQ data unless it's in the specified country
+- Extract COMPLETE address components:
+  * Street Address Line 1 (required)
+  * Street Address Line 2 (suite/floor/building - if available)
+  * Street Address Line 3 (additional info - if available)
+  * City (required)
+  * State/Province (required)
+  * Postal Code (required)
+  * Country (required)
+- Extract phone number with country code for the local office
 - Only extract information explicitly stated in the search results
 - Return SEPARATE confidence scores for address and phone (0.0-1.0)
 - Confidence 0.9-1.0: Found on official company website or verified Google Business
@@ -444,7 +454,13 @@ Output valid JSON only.`
     parts.push(`Find LOCAL office information for "${companyName}" in ${country} from your training data.\n`);
 
     if (needsAddress) {
-      parts.push(`Address: Complete local office address in ${country} (Street, City, State, Postal Code)`);
+      parts.push(`Address: Extract COMPLETE local office address in ${country}:
+- Street Address Line 1 (required)
+- Street Address Line 2 (suite/floor/building if available)
+- Street Address Line 3 (additional info if available)
+- City (required)
+- State/Province (required)
+- Postal Code (required)`);
     }
     if (needsPhone) {
       parts.push(`Phone: Local office phone number in ${country} with country code`);
@@ -469,10 +485,17 @@ Output valid JSON only.`
     parts.push(`Extract LOCAL office information for "${companyName}" in ${country} from these web search results:\n\n${searchContext}\n`);
 
     if (needsAddress) {
-      parts.push(`Address: Extract the complete local office address in ${country}`);
+      parts.push(`Address: Extract COMPLETE local office address in ${country}:
+- Street Address Line 1 (building number and street name - REQUIRED)
+- Street Address Line 2 (suite/floor/building/unit - if mentioned)
+- Street Address Line 3 (additional location info - if mentioned)
+- City (REQUIRED)
+- State/Province (REQUIRED)
+- Postal Code (REQUIRED)
+Target the office location within ${country} specifically.`);
     }
     if (needsPhone) {
-      parts.push(`Phone: Extract the local office phone number in ${country}`);
+      parts.push(`Phone: Extract the local office phone number in ${country} with country code`);
     }
 
     parts.push(this.getJSONFormat(needsAddress, needsPhone));
@@ -489,8 +512,9 @@ Output valid JSON only.`
   "addressConfidence": 0.0-1.0,
   "addressReason": "explanation if not found",
   "address": {
-    "address1": "street address",
-    "address2": "suite/floor (optional)",
+    "address1": "street address line 1 (building number and street name)",
+    "address2": "street address line 2 (suite/floor/building/unit - optional)",
+    "address3": "street address line 3 (additional info - optional)",
     "city": "city name",
     "state": "state/province",
     "postalCode": "postal code",
