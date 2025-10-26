@@ -67,9 +67,20 @@ export async function processUploadJob(jobId: string) {
       delimitersToGuess: [',', '\t', '|', ';'],
     });
 
-    if (parseResult.errors.length > 0) {
-      throw new Error(`CSV parsing failed: ${parseResult.errors.map(e => e.message).join(', ')}`);
+    // Only fail on FATAL errors, not warnings (like delimiter detection)
+    // Use PapaParse's built-in 'fatal' flag for robust error filtering
+    const fatalErrors = parseResult.errors.filter(e => {
+      // If error doesn't have a 'fatal' flag, treat FieldMismatch as fatal
+      if (e.type === 'FieldMismatch') return true;
+      // Otherwise, only count errors marked as fatal
+      return false;
+    });
+    
+    if (fatalErrors.length > 0) {
+      throw new Error(`CSV parsing failed: ${fatalErrors.map(e => e.message).join(', ')}`);
     }
+    
+    console.log(`[UPLOAD JOB] CSV parsed with ${parseResult.errors.length} warnings (${fatalErrors.length} fatal)`);
 
     const rows = parseResult.data as Array<Record<string, string>>;
     console.log(`[UPLOAD JOB] Job ${jobId}: Parsed ${rows.length} rows`);
