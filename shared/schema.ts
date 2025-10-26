@@ -3717,10 +3717,7 @@ export const verificationEmailValidations = pgTable("verification_email_validati
   
   checkedAt: timestamp("checked_at").notNull().defaultNow(),
 }, (table) => ({
-  pk: {
-    name: 'verification_email_validations_pkey',
-    columns: [table.contactId, table.emailLower],
-  },
+  pk: primaryKey({ name: 'verification_email_validations_pkey', columns: [table.contactId, table.emailLower] }),
   emailCacheIdx: index("verification_email_validations_cache_idx").on(table.emailLower, table.checkedAt),
 }));
 
