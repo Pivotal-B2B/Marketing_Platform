@@ -324,6 +324,28 @@ export default function VerificationCampaignStatsPage() {
     },
   });
 
+  const reEvaluateMutation = useMutation({
+    mutationFn: async () => {
+      const result = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/re-evaluate-eligibility`);
+      return result;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "account-caps"] });
+      toast({
+        title: "Eligibility re-evaluation complete",
+        description: `Fixed ${data.markedOutOfScope} contacts that were incorrectly marked as Eligible. ${data.remainEligible} contacts remain eligible.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Re-evaluation failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const smartExportMutation = useMutation({
     mutationFn: async (exportFilters: FilterState) => {
       const params = new URLSearchParams();
@@ -505,6 +527,15 @@ export default function VerificationCampaignStatsPage() {
               >
                 <RefreshCcw className={`h-4 w-4 mr-2 ${revalidateMutation.isPending ? 'animate-spin' : ''}`} />
                 {revalidateMutation.isPending ? "Re-validating..." : "Re-validate Emails"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => reEvaluateMutation.mutate()}
+                disabled={reEvaluateMutation.isPending}
+                data-testid="button-reevaluate-eligibility"
+              >
+                <CheckCircle2 className={`h-4 w-4 mr-2 ${reEvaluateMutation.isPending ? 'animate-spin' : ''}`} />
+                {reEvaluateMutation.isPending ? "Re-evaluating..." : "Fix Eligibility"}
               </Button>
               <Button
                 variant="outline"

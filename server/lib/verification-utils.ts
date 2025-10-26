@@ -981,7 +981,7 @@ export async function enforceAccountCapWithPriority(
       if (!accountId) continue;
       
       try {
-        // Get all potentially eligible contacts for this account (Eligible or those with valid emails)
+        // Get ONLY contacts that are already Eligible (respect Out_of_Scope and other ineligible statuses)
         const contacts = await db
           .select({
             contact: verificationContacts,
@@ -995,8 +995,9 @@ export async function enforceAccountCapWithPriority(
               eq(verificationContacts.accountId, accountId),
               eq(verificationContacts.deleted, false),
               eq(verificationContacts.suppressed, false),
-              // Only consider contacts with valid/safe emails (data quality baseline)
-              inArray(verificationContacts.emailStatus, ['safe_to_send', 'valid', 'send_with_caution', 'risky', 'accept_all', 'unknown', 'ok'])
+              // CRITICAL: Only process contacts that are ALREADY Eligible
+              // Do NOT re-process Out_of_Scope or other ineligible contacts
+              eq(verificationContacts.eligibilityStatus, 'Eligible')
             )
           );
         

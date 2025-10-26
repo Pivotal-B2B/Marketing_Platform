@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db";
 import { verificationCampaigns, insertVerificationCampaignSchema, verificationLeadSubmissions, verificationContacts, accounts, exportTemplates } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { formatPhoneWithCountryCode } from "../lib/phone-formatter";
 
@@ -1187,6 +1187,92 @@ router.get("/api/cap-enforcement-jobs/:jobId", async (req, res) => {
     res.status(500).json({
       error: "Failed to get job status",
       message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * POST /api/verification-campaigns/:id/re-evaluate-eligibility
+ * Re-evaluate eligibility for ALL contacts to fix data corruption
+ * This checks geo/title requirements and marks non-matching contacts as Out_of_Scope
+ */
+router.post("/api/verification-campaigns/:id/re-evaluate-eligibility", async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    
+    console.log(`[RE-EVALUATE] Starting eligibility re-evaluation for campaign ${campaignId}`);
+    
+    // Get campaign
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    // Get all contacts that are currently Eligible or Ineligible_Cap_Reached
+    // (these are the ones that might have been incorrectly marked)
+    const contacts = await db
+      .select()
+      .from(verificationContacts)
+      .where(
+        and(
+          eq(verificationContacts.campaignId, campaignId),
+          eq(verificationContacts.deleted, false),
+          inArray(verificationContacts.eligibilityStatus, ['Eligible', 'Ineligible_Cap_Reached'])
+        )
+      );
+    
+    console.log(`[RE-EVALUATE] Found ${contacts.length} contacts to re-evaluate`);
+    
+    const { evaluateEligibility } = await import("../lib/verification-utils");
+    
+    let markedOutOfScope = 0;
+    let remainEligible = 0;
+    
+    // Re-evaluate each contact
+    for (const contact of contacts) {
+      const result = evaluateEligibility(
+        contact.title,
+        contact.contactCountry,
+        campaign,
+        contact.email
+      );
+      
+      // If contact should be Out_of_Scope, update it
+      if (result.status === 'Out_of_Scope') {
+        await db
+          .update(verificationContacts)
+          .set({
+            eligibilityStatus: 'Out_of_Scope',
+            eligibilityReason: result.reason,
+            updatedAt: new Date(),
+          })
+          .where(eq(verificationContacts.id, contact.id));
+        
+        markedOutOfScope++;
+      } else {
+        remainEligible++;
+      }
+    }
+    
+    console.log(`[RE-EVALUATE] Complete: ${markedOutOfScope} marked Out_of_Scope, ${remainEligible} remain eligible`);
+    
+    res.json({
+      success: true,
+      message: `Re-evaluated ${contacts.length} contacts`,
+      markedOutOfScope,
+      remainEligible,
+      totalProcessed: contacts.length,
+    });
+    
+  } catch (error) {
+    console.error("Error re-evaluating eligibility:", error);
+    res.status(500).json({ 
+      error: "Failed to re-evaluate eligibility",
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
