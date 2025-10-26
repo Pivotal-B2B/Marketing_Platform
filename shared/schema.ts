@@ -3688,6 +3688,9 @@ export const verificationEmailValidations = pgTable("verification_email_validati
   isRole: boolean("is_role"),
   isFree: boolean("is_free"),
   isDisposable: boolean("is_disposable"),
+  isSpamTrap: boolean("is_spam_trap"),
+  isAcceptAll: boolean("is_accept_all"),
+  isDisabled: boolean("is_disabled"),
   confidence: integer("confidence"),
   validationTrace: jsonb("validation_trace").$type<{
     syntax?: { ok: boolean; reason?: string };
