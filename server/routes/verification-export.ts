@@ -69,7 +69,7 @@ router.post(
 
       const filters = validation.data;
 
-      // Get campaign
+      // Get campaign and verify access (RBAC)
       const [campaign] = await db
         .select()
         .from(verificationCampaigns)
@@ -77,6 +77,19 @@ router.post(
 
       if (!campaign) {
         return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      // Security: Verify user has access to this campaign
+      // Admin users can access all campaigns
+      // Regular users can only access campaigns they own or are assigned to
+      if (req.auth.role !== 'admin') {
+        // For non-admin users, verify ownership or assignment
+        // (This assumes campaigns have an ownerId or similar field)
+        // For now, we'll enforce admin-only access for exports as a security measure
+        return res.status(403).json({
+          error: "Forbidden",
+          message: "Only administrators can export verification campaigns",
+        });
       }
 
       console.log(`[EXPORT] Starting export for campaign ${campaignId}`, filters);
@@ -97,7 +110,7 @@ router.post(
       }
 
       if (filters.emailStatuses && filters.emailStatuses.length > 0) {
-        conditions.push(sql`${verificationContacts.emailStatus} = ANY(${filters.emailStatuses})`);
+        conditions.push(inArray(verificationContacts.emailStatus, filters.emailStatuses as any));
       }
 
       if (filters.suppressed !== undefined) {
@@ -209,39 +222,39 @@ router.post(
 
       for (const contact of contacts) {
         const row = [
-          contact.id || '',
+          escapeCSV(contact.id || ''),
           escapeCSV(contact.fullName || ''),
           escapeCSV(contact.firstName || ''),
           escapeCSV(contact.lastName || ''),
           escapeCSV(contact.title || ''),
-          contact.email || '',
-          contact.phone || '',
-          contact.mobile || '',
-          contact.linkedinUrl || '',
+          escapeCSV(contact.email || ''),
+          escapeCSV(contact.phone || ''),
+          escapeCSV(contact.mobile || ''),
+          escapeCSV(contact.linkedinUrl || ''),
           escapeCSV(contact.companyName || ''),
-          contact.companyWebsite || '',
-          contact.companyIndustry || '',
-          contact.companySize || '',
-          contact.companyRevenue || '',
-          contact.contactCity || '',
-          contact.contactState || '',
-          contact.contactCountry || '',
-          contact.contactPostal || '',
-          contact.hqCity || '',
-          contact.hqState || '',
-          contact.hqCountry || '',
-          contact.hqPostal || '',
-          contact.hqPhone || '',
-          contact.eligibilityStatus || '',
-          contact.verificationStatus || '',
-          contact.emailStatus || '',
-          contact.priorityScore?.toString() || '',
-          contact.suppressed ? 'Yes' : 'No',
-          contact.inSubmissionBuffer ? 'Yes' : 'No',
-          contact.sourceType || '',
-          contact.cavId || '',
-          contact.createdAt?.toISOString() || '',
-          contact.updatedAt?.toISOString() || '',
+          escapeCSV(contact.companyWebsite || ''),
+          escapeCSV(contact.companyIndustry || ''),
+          escapeCSV(contact.companySize || ''),
+          escapeCSV(contact.companyRevenue || ''),
+          escapeCSV(contact.contactCity || ''),
+          escapeCSV(contact.contactState || ''),
+          escapeCSV(contact.contactCountry || ''),
+          escapeCSV(contact.contactPostal || ''),
+          escapeCSV(contact.hqCity || ''),
+          escapeCSV(contact.hqState || ''),
+          escapeCSV(contact.hqCountry || ''),
+          escapeCSV(contact.hqPostal || ''),
+          escapeCSV(contact.hqPhone || ''),
+          escapeCSV(contact.eligibilityStatus || ''),
+          escapeCSV(contact.verificationStatus || ''),
+          escapeCSV(contact.emailStatus || ''),
+          escapeCSV(contact.priorityScore?.toString() || ''),
+          escapeCSV(contact.suppressed ? 'Yes' : 'No'),
+          escapeCSV(contact.inSubmissionBuffer ? 'Yes' : 'No'),
+          escapeCSV(contact.sourceType || ''),
+          escapeCSV(contact.cavId || ''),
+          escapeCSV(contact.createdAt?.toISOString() || ''),
+          escapeCSV(contact.updatedAt?.toISOString() || ''),
         ];
         csvLines.push(row.join(','));
       }
@@ -311,6 +324,14 @@ async function handlePresetExport(
       return res.status(404).json({ error: "Campaign not found" });
     }
 
+    // Security: Verify user has access to this campaign
+    if (req.auth.role !== 'admin') {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "Only administrators can export verification campaigns",
+      });
+    }
+
     // Re-execute the main export logic with preset filters
     req.body = filters;
     
@@ -333,7 +354,7 @@ async function handlePresetExport(
       conditions.push(inArray(verificationContacts.verificationStatus, filters.verificationStatuses as any));
     }
     if (filters.emailStatuses) {
-      conditions.push(sql`${verificationContacts.emailStatus} = ANY(${filters.emailStatuses})`);
+      conditions.push(inArray(verificationContacts.emailStatus, filters.emailStatuses as any));
     }
     if (filters.suppressed !== undefined) {
       conditions.push(eq(verificationContacts.suppressed, filters.suppressed));
@@ -401,17 +422,39 @@ async function handlePresetExport(
     const csvLines = [headers.join(',')];
     for (const contact of contacts) {
       const row = [
-        contact.id || '', escapeCSV(contact.fullName || ''), escapeCSV(contact.firstName || ''),
-        escapeCSV(contact.lastName || ''), escapeCSV(contact.title || ''), contact.email || '',
-        contact.phone || '', contact.mobile || '', contact.linkedinUrl || '',
-        escapeCSV(contact.companyName || ''), contact.companyWebsite || '', contact.companyIndustry || '',
-        contact.companySize || '', contact.companyRevenue || '',
-        contact.contactCity || '', contact.contactState || '', contact.contactCountry || '', contact.contactPostal || '',
-        contact.hqCity || '', contact.hqState || '', contact.hqCountry || '', contact.hqPostal || '', contact.hqPhone || '',
-        contact.eligibilityStatus || '', contact.verificationStatus || '', contact.emailStatus || '',
-        contact.priorityScore?.toString() || '', contact.suppressed ? 'Yes' : 'No',
-        contact.inSubmissionBuffer ? 'Yes' : 'No', contact.sourceType || '', contact.cavId || '',
-        contact.createdAt?.toISOString() || '', contact.updatedAt?.toISOString() || '',
+        escapeCSV(contact.id || ''), 
+        escapeCSV(contact.fullName || ''), 
+        escapeCSV(contact.firstName || ''),
+        escapeCSV(contact.lastName || ''), 
+        escapeCSV(contact.title || ''), 
+        escapeCSV(contact.email || ''),
+        escapeCSV(contact.phone || ''), 
+        escapeCSV(contact.mobile || ''), 
+        escapeCSV(contact.linkedinUrl || ''),
+        escapeCSV(contact.companyName || ''), 
+        escapeCSV(contact.companyWebsite || ''), 
+        escapeCSV(contact.companyIndustry || ''),
+        escapeCSV(contact.companySize || ''), 
+        escapeCSV(contact.companyRevenue || ''),
+        escapeCSV(contact.contactCity || ''), 
+        escapeCSV(contact.contactState || ''), 
+        escapeCSV(contact.contactCountry || ''), 
+        escapeCSV(contact.contactPostal || ''),
+        escapeCSV(contact.hqCity || ''), 
+        escapeCSV(contact.hqState || ''), 
+        escapeCSV(contact.hqCountry || ''), 
+        escapeCSV(contact.hqPostal || ''), 
+        escapeCSV(contact.hqPhone || ''),
+        escapeCSV(contact.eligibilityStatus || ''), 
+        escapeCSV(contact.verificationStatus || ''), 
+        escapeCSV(contact.emailStatus || ''),
+        escapeCSV(contact.priorityScore?.toString() || ''), 
+        escapeCSV(contact.suppressed ? 'Yes' : 'No'),
+        escapeCSV(contact.inSubmissionBuffer ? 'Yes' : 'No'), 
+        escapeCSV(contact.sourceType || ''), 
+        escapeCSV(contact.cavId || ''),
+        escapeCSV(contact.createdAt?.toISOString() || ''), 
+        escapeCSV(contact.updatedAt?.toISOString() || ''),
       ];
       csvLines.push(row.join(','));
     }

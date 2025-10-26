@@ -191,9 +191,15 @@ curl -X POST \
 ## 🔒 Security & Access
 
 - **Authentication Required:** All export endpoints require a valid JWT token
+- **Admin-Only Access:** Exports are restricted to administrators only for security and data protection
+- **RBAC Enforcement:** Non-admin users receive 403 Forbidden when attempting exports
 - **S3 Security:** Files are uploaded to private S3 buckets
 - **Presigned URLs:** Download links expire after 15 minutes (900 seconds)
 - **File Location:** `s3://bucket/verification-exports/{campaignId}/{filename}.csv`
+
+### Access Control
+
+Export functionality is **admin-only** to prevent unauthorized data access across campaigns and tenants. Regular users must request exports from administrators.
 
 ## ⚡ Performance Notes
 
