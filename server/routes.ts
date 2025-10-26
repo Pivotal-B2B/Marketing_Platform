@@ -6246,16 +6246,16 @@ export function registerRoutes(app: Express) {
   app.use('/api/suppression', requireAuth, suppressionRouter);
 
   // ==================== S3 FILE OPERATIONS ====================
-  app.use(requireAuth, s3FilesRouter);
+  app.use(s3FilesRouter);
 
   // ==================== CSV IMPORT JOBS (BullMQ) ====================
-  app.use(requireAuth, csvImportJobsRouter);
+  app.use(csvImportJobsRouter);
 
   // ==================== EMAIL VALIDATION TESTING ====================
-  app.use(requireAuth, emailValidationTestRouter);
+  app.use(emailValidationTestRouter);
 
   // ==================== VERIFICATION CAMPAIGN EXPORT ====================
-  app.use(requireAuth, verificationExportRouter);
+  app.use(verificationExportRouter);
 
   // ==================== ADMIN DATA MANAGEMENT ====================
   
