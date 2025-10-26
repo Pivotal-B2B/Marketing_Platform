@@ -13,6 +13,7 @@ import {
   Filter,
   X,
   Building2,
+  RefreshCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { CustomFieldDefinition } from "@shared/schema";
 
 interface AccountCapStat {
@@ -278,6 +280,28 @@ export default function VerificationCampaignStatsPage() {
     },
   });
 
+  const revalidateMutation = useMutation({
+    mutationFn: async () => {
+      const result = await apiRequest("POST", `/api/verification-campaigns/${campaignId}/contacts/revalidate-emails`);
+      return result;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "queue"] });
+      toast({
+        title: "Re-validation started",
+        description: `${data.count} contacts queued for email validation. Background job will process them within 2 minutes.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Re-validation failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const openDetail = (title: string, filter: string) => {
     setDetailDialog({ open: true, title, filter });
   };
@@ -382,6 +406,15 @@ export default function VerificationCampaignStatsPage() {
               >
                 <Filter className="h-4 w-4 mr-2" />
                 {showAdvancedFilters ? "Hide Filters" : "Advanced Filters"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => revalidateMutation.mutate()}
+                disabled={revalidateMutation.isPending}
+                data-testid="button-revalidate-emails"
+              >
+                <RefreshCcw className={`h-4 w-4 mr-2 ${revalidateMutation.isPending ? 'animate-spin' : ''}`} />
+                {revalidateMutation.isPending ? "Re-validating..." : "Re-validate Emails"}
               </Button>
               <Button
                 onClick={() => navigate(`/verification/${campaignId}/console`)}
