@@ -15,9 +15,9 @@ import punycode from "punycode";
 
 const EMAIL_MAX_LENGTH = 254;
 const LOCAL_MAX_LENGTH = 64;
-const DNS_TIMEOUT_MS = Number(process.env.DNS_TIMEOUT_MS || 3000);
-const SMTP_CONNECT_TIMEOUT_MS = Number(process.env.SMTP_CONNECT_TIMEOUT_MS || 10000);
-const DOMAIN_CACHE_TTL_HOURS = Number(process.env.DOMAIN_CACHE_TTL_HOURS || 24);
+const DNS_TIMEOUT_MS = Number(process.env.DNS_TIMEOUT_MS || 2000); // Reduced from 3000ms
+const SMTP_CONNECT_TIMEOUT_MS = Number(process.env.SMTP_CONNECT_TIMEOUT_MS || 5000); // Reduced from 10000ms
+const DOMAIN_CACHE_TTL_HOURS = Number(process.env.DOMAIN_CACHE_TTL_HOURS || 168); // Increased to 7 days
 const VALIDATOR_HELO = process.env.VALIDATOR_HELO || 'validator.pivotal-b2b.ai';
 const VALIDATOR_MAIL_FROM = process.env.VALIDATOR_MAIL_FROM || 'null-sender@pivotal-b2b.ai';
 

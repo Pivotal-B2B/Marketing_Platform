@@ -1,7 +1,7 @@
 /**
  * Background Job: API-Free Email Validation
+ * HIGH-PERFORMANCE VERSION with parallel processing
  * Processes contacts with 'Pending_Email_Validation' status
- * Rate-limited, domain-aware validation queue
  */
 
 import cron from 'node-cron';
@@ -11,11 +11,93 @@ import { eq, and, sql } from 'drizzle-orm';
 import { validateAndStoreEmail } from '../lib/email-validation-engine';
 import { finalizeEligibilityAfterEmailValidation } from '../lib/verification-utils';
 
-const BATCH_SIZE = Number(process.env.EMAIL_VALIDATION_BATCH_SIZE || 50);
-const PROCESS_INTERVAL = '*/2 * * * *'; // Every 2 minutes
+// OPTIMIZED SETTINGS FOR HIGH PERFORMANCE
+const BATCH_SIZE = Number(process.env.EMAIL_VALIDATION_BATCH_SIZE || 500); // 10x increase
+const PROCESS_INTERVAL = '*/1 * * * *'; // Every 1 minute (was 2)
 const SKIP_SMTP_DEFAULT = process.env.SKIP_SMTP_VALIDATION === 'true';
+const PARALLEL_LIMIT = Number(process.env.EMAIL_VALIDATION_PARALLEL || 20); // Process 20 emails at once
 
 let isProcessing = false;
+
+/**
+ * Process emails in parallel batches for maximum speed
+ */
+async function processEmailBatch(contacts: any[]): Promise<{ validated: number; failed: number }> {
+  let validated = 0;
+  let failed = 0;
+  
+  // Process in chunks of PARALLEL_LIMIT
+  for (let i = 0; i < contacts.length; i += PARALLEL_LIMIT) {
+    const chunk = contacts.slice(i, i + PARALLEL_LIMIT);
+    
+    // Process all emails in this chunk in parallel
+    const results = await Promise.allSettled(
+      chunk.map(async (contact) => {
+        if (!contact.email || !contact.campaign) {
+          throw new Error('Invalid contact data');
+        }
+        
+        // Validate email
+        const validation = await validateAndStoreEmail(
+          contact.id,
+          contact.email,
+          'api_free',
+          { skipSmtp: SKIP_SMTP_DEFAULT }
+        );
+        
+        // Determine eligibility
+        const finalEligibility = finalizeEligibilityAfterEmailValidation(
+          validation.status,
+          contact.eligibilityStatus || 'Pending_Email_Validation'
+        );
+        
+        // Update contact
+        await db
+          .update(verificationContacts)
+          .set({
+            emailStatus: validation.status,
+            eligibilityStatus: finalEligibility.eligibilityStatus,
+            eligibilityReason: finalEligibility.reason,
+            updatedAt: new Date(),
+          })
+          .where(eq(verificationContacts.id, contact.id));
+        
+        return {
+          email: contact.email,
+          status: validation.status,
+          eligibility: finalEligibility.eligibilityStatus,
+        };
+      })
+    );
+    
+    // Count successes and failures
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        validated++;
+      } else {
+        failed++;
+        const contact = chunk[results.indexOf(result)];
+        console.error(`[EmailValidationJob] Error validating ${contact?.email}:`, result.reason);
+        
+        // Mark as eligible with unknown status (don't block workflow)
+        if (contact?.id) {
+          await db
+            .update(verificationContacts)
+            .set({
+              emailStatus: 'unknown',
+              eligibilityStatus: 'Eligible',
+              eligibilityReason: 'email_validation_failed',
+              updatedAt: new Date(),
+            })
+            .where(eq(verificationContacts.id, contact.id))
+            .catch(() => {}); // Ignore update errors
+        }
+      }
+    }
+  }
+  
+  return { validated, failed };
+}
 
 /**
  * Process a batch of contacts pending email validation
@@ -57,81 +139,16 @@ async function processPendingEmailValidations() {
       return;
     }
     
-    console.log(`[EmailValidationJob] Processing ${pendingContacts.length} contacts`);
+    console.log(`[EmailValidationJob] Processing ${pendingContacts.length} contacts in parallel (max ${PARALLEL_LIMIT} concurrent)`);
+    const startTime = Date.now();
     
-    let validated = 0;
-    let failed = 0;
+    // Process all contacts in parallel batches
+    const { validated, failed } = await processEmailBatch(pendingContacts);
     
-    // Group by domain for rate limiting
-    const byDomain = new Map<string, typeof pendingContacts>();
-    for (const contact of pendingContacts) {
-      if (!contact.email) continue;
-      const domain = contact.email.split('@')[1]?.toLowerCase();
-      if (!domain) continue;
-      if (!byDomain.has(domain)) {
-        byDomain.set(domain, []);
-      }
-      byDomain.get(domain)!.push(contact);
-    }
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    const rate = (validated / parseFloat(duration)).toFixed(1);
     
-    // Process each domain sequentially (rate limiting)
-    for (const [domain, domainContacts] of Array.from(byDomain.entries())) {
-      console.log(`[EmailValidationJob] Processing ${domainContacts.length} contacts for domain: ${domain}`);
-      
-      for (const contact of domainContacts) {
-        if (!contact.email || !contact.campaign) continue;
-        
-        try {
-          // Always use built-in validation
-          const validation = await validateAndStoreEmail(
-            contact.id,
-            contact.email,
-            'api_free',
-            { skipSmtp: SKIP_SMTP_DEFAULT }
-          );
-          
-          // Finalize eligibility based on validation result
-          const finalEligibility = finalizeEligibilityAfterEmailValidation(
-            validation.status,
-            contact.eligibilityStatus || 'Pending_Email_Validation'
-          );
-          
-          // Update contact eligibility status AND email status
-          await db
-            .update(verificationContacts)
-            .set({
-              emailStatus: validation.status,
-              eligibilityStatus: finalEligibility.eligibilityStatus,
-              eligibilityReason: finalEligibility.reason,
-              updatedAt: new Date(),
-            })
-            .where(eq(verificationContacts.id, contact.id));
-          
-          validated++;
-          console.log(`[EmailValidationJob] Validated ${contact.email}: ${validation.status} → ${finalEligibility.eligibilityStatus}`);
-          
-        } catch (error) {
-          failed++;
-          console.error(`[EmailValidationJob] Error validating ${contact.email}:`, error);
-          
-          // Mark as eligible with unknown status (don't block workflow)
-          await db
-            .update(verificationContacts)
-            .set({
-              emailStatus: 'unknown',
-              eligibilityStatus: 'Eligible',
-              eligibilityReason: 'email_validation_failed',
-              updatedAt: new Date(),
-            })
-            .where(eq(verificationContacts.id, contact.id));
-        }
-      }
-      
-      // Rate limiting: small delay between domains
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    
-    console.log(`[EmailValidationJob] Batch complete: ${validated} validated, ${failed} failed`);
+    console.log(`[EmailValidationJob] Batch complete: ${validated} validated, ${failed} failed in ${duration}s (${rate} emails/sec)`);
     
   } catch (error) {
     console.error('[EmailValidationJob] Job error:', error);
@@ -144,7 +161,11 @@ async function processPendingEmailValidations() {
  * Start the email validation background job
  */
 export function startEmailValidationJob() {
-  console.log(`[EmailValidationJob] Starting (interval: ${PROCESS_INTERVAL}, batch: ${BATCH_SIZE})`);
+  console.log(`[EmailValidationJob] Starting HIGH-PERFORMANCE mode:`);
+  console.log(`  - Batch size: ${BATCH_SIZE}`);
+  console.log(`  - Interval: ${PROCESS_INTERVAL}`);
+  console.log(`  - Parallel limit: ${PARALLEL_LIMIT}`);
+  console.log(`  - Theoretical max: ${BATCH_SIZE * 60} emails/hour`);
   
   // Run on startup (after 5 seconds)
   setTimeout(() => {
