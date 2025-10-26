@@ -533,6 +533,246 @@ export function calculatePriorityScore(
 }
 
 /**
+ * Calculate email quality score based on validation status
+ * Returns a score between 0 and 1
+ * - 1.0: safe_to_send, valid (best quality)
+ * - 0.6: send_with_caution, risky, accept_all (medium quality)
+ * - 0.4: unknown (low confidence)
+ * - 0.0: invalid, disabled, disposable, spam_trap (rejected)
+ */
+export function calculateEmailQualityScore(
+  emailValidationStatus?: string | null
+): number {
+  if (!emailValidationStatus) return 0.4; // Unknown/not validated
+  
+  const status = emailValidationStatus.toLowerCase();
+  
+  // Highest quality - verified deliverable
+  if (status === 'safe_to_send' || status === 'valid' || status === 'ok') {
+    return 1.0;
+  }
+  
+  // Medium quality - deliverable with some risk
+  if (status === 'send_with_caution' || status === 'risky' || status === 'accept_all') {
+    return 0.6;
+  }
+  
+  // Low quality - cannot verify
+  if (status === 'unknown') {
+    return 0.4;
+  }
+  
+  // Rejected - invalid/problematic
+  // invalid, disabled, disposable, spam_trap
+  return 0.0;
+}
+
+/**
+ * Calculate phone completeness score based on available phone data
+ * Prioritizes CAV custom fields > mobile > contact > AI > HQ
+ * Returns a score between 0 and 1
+ */
+export function calculatePhoneCompletenessScore(
+  contact: {
+    customFields?: any;
+    contactMobile?: string | null;
+    contactPhone?: string | null;
+    aiEnrichedPhone?: string | null;
+  },
+  account?: {
+    mainPhone?: string | null;
+  }
+): number {
+  // Check CAV custom field phone (highest priority)
+  const cavPhone = contact.customFields?.custom_cav_tel;
+  if (cavPhone && typeof cavPhone === 'string' && cavPhone.trim() !== '') {
+    return 1.0;
+  }
+  
+  // Check mobile phone
+  if (contact.contactMobile && contact.contactMobile.trim() !== '') {
+    return 0.9;
+  }
+  
+  // Check contact phone
+  if (contact.contactPhone && contact.contactPhone.trim() !== '') {
+    return 0.8;
+  }
+  
+  // Check AI enriched phone
+  if (contact.aiEnrichedPhone && contact.aiEnrichedPhone.trim() !== '') {
+    return 0.5;
+  }
+  
+  // Check account HQ phone
+  if (account?.mainPhone && account.mainPhone.trim() !== '') {
+    return 0.3;
+  }
+  
+  // No phone data
+  return 0.0;
+}
+
+/**
+ * Calculate address completeness score based on available address data
+ * Prioritizes CAV custom fields > contact > AI > HQ
+ * Returns a score between 0 and 1
+ * - 1.0: Complete address (street + city + postal code)
+ * - 0.6: Partial address (2 of 3 components)
+ * - 0.3: Minimal address (1 of 3 components)
+ * - 0.0: No address data
+ */
+export function calculateAddressCompletenessScore(
+  contact: {
+    customFields?: any;
+    contactAddress?: string | null;
+    contactCity?: string | null;
+    contactState?: string | null;
+    contactPostalCode?: string | null;
+    aiEnrichedAddress?: string | null;
+  },
+  account?: {
+    hqStreet1?: string | null;
+    hqCity?: string | null;
+    hqPostalCode?: string | null;
+  }
+): number {
+  // Helper to count address components
+  const countComponents = (street?: string | null, city?: string | null, postal?: string | null): number => {
+    let count = 0;
+    if (street && street.trim() !== '') count++;
+    if (city && city.trim() !== '') count++;
+    if (postal && postal.trim() !== '') count++;
+    return count;
+  };
+  
+  // Helper to calculate score from component count
+  const scoreFromCount = (count: number): number => {
+    if (count >= 3) return 1.0; // Complete
+    if (count === 2) return 0.6; // Partial
+    if (count === 1) return 0.3; // Minimal
+    return 0.0; // None
+  };
+  
+  // Check CAV custom fields (highest priority)
+  const cavStreet = contact.customFields?.custom_cav_addr1 || contact.customFields?.custom_cav_addr2 || contact.customFields?.custom_cav_addr3;
+  const cavCity = contact.customFields?.custom_cav_town;
+  const cavPostal = contact.customFields?.custom_cav_postcode;
+  
+  const cavScore = scoreFromCount(countComponents(cavStreet, cavCity, cavPostal));
+  if (cavScore > 0) return cavScore;
+  
+  // Check contact address fields
+  const contactScore = scoreFromCount(countComponents(
+    contact.contactAddress,
+    contact.contactCity,
+    contact.contactPostalCode
+  ));
+  if (contactScore > 0) return contactScore * 0.9; // Slightly lower weight than CAV
+  
+  // Check AI enriched address
+  if (contact.aiEnrichedAddress && contact.aiEnrichedAddress.trim() !== '') {
+    return 0.5; // AI data gets medium score
+  }
+  
+  // Check account HQ address
+  const hqScore = scoreFromCount(countComponents(
+    account?.hqStreet1,
+    account?.hqCity,
+    account?.hqPostalCode
+  ));
+  return hqScore * 0.4; // HQ data gets lowest weight
+}
+
+/**
+ * Calculate comprehensive priority score for lead cap enforcement
+ * Combines email quality, phone/address completeness, seniority, and title alignment
+ * 
+ * Default weights (totaling 1.0):
+ * - Email quality: 30% (critical for verification campaigns)
+ * - Phone completeness: 20%
+ * - Address completeness: 20%
+ * - Seniority: 20%
+ * - Title alignment: 10%
+ */
+export function calculateComprehensivePriorityScore(
+  contact: {
+    title?: string | null;
+    customFields?: any;
+    contactMobile?: string | null;
+    contactPhone?: string | null;
+    aiEnrichedPhone?: string | null;
+    contactAddress?: string | null;
+    contactCity?: string | null;
+    contactState?: string | null;
+    contactPostalCode?: string | null;
+    aiEnrichedAddress?: string | null;
+    emailValidationStatus?: string | null;
+  },
+  account?: {
+    mainPhone?: string | null;
+    hqStreet1?: string | null;
+    hqCity?: string | null;
+    hqPostalCode?: string | null;
+  },
+  campaign?: {
+    priorityConfig?: {
+      targetJobTitles?: string[];
+      seniorityWeight?: number;
+      titleAlignmentWeight?: number;
+      emailQualityWeight?: number;
+      phoneCompletenessWeight?: number;
+      addressCompletenessWeight?: number;
+    };
+  }
+): {
+  emailQualityScore: number;
+  phoneCompletenessScore: number;
+  addressCompletenessScore: number;
+  seniorityLevel: string;
+  titleAlignmentScore: number;
+  comprehensivePriorityScore: number;
+} {
+  // Calculate individual scores
+  const emailQualityScore = calculateEmailQualityScore(contact.emailValidationStatus);
+  const phoneCompletenessScore = calculatePhoneCompletenessScore(contact, account);
+  const addressCompletenessScore = calculateAddressCompletenessScore(contact, account);
+  
+  const seniorityLevel = extractSeniorityLevel(contact.title);
+  const titleAlignmentScore = calculateTitleAlignment(
+    contact.title,
+    campaign?.priorityConfig?.targetJobTitles
+  );
+  
+  // Get weights from campaign config or use defaults
+  const emailWeight = campaign?.priorityConfig?.emailQualityWeight ?? 0.30;
+  const phoneWeight = campaign?.priorityConfig?.phoneCompletenessWeight ?? 0.20;
+  const addressWeight = campaign?.priorityConfig?.addressCompletenessWeight ?? 0.20;
+  const seniorityWeight = campaign?.priorityConfig?.seniorityWeight ?? 0.20;
+  const titleWeight = campaign?.priorityConfig?.titleAlignmentWeight ?? 0.10;
+  
+  // Normalize seniority to 0-1 scale
+  const normalizedSeniority = getSeniorityScore(seniorityLevel) / 5;
+  
+  // Calculate comprehensive score (0-1 range)
+  const comprehensivePriorityScore =
+    (emailWeight * emailQualityScore) +
+    (phoneWeight * phoneCompletenessScore) +
+    (addressWeight * addressCompletenessScore) +
+    (seniorityWeight * normalizedSeniority) +
+    (titleWeight * titleAlignmentScore);
+  
+  return {
+    emailQualityScore,
+    phoneCompletenessScore,
+    addressCompletenessScore,
+    seniorityLevel,
+    titleAlignmentScore,
+    comprehensivePriorityScore,
+  };
+}
+
+/**
  * Get or create account cap status for a campaign-account pair
  */
 export async function getOrCreateAccountCapStatus(
@@ -669,6 +909,196 @@ export async function recalculateAccountCapStatus(
 }
 
 /**
+ * Enforce account lead cap with priority-based selection
+ * This function:
+ * 1. Fetches all qualified contacts per account (Eligible or Pending_Email_Validation)
+ * 2. Calculates comprehensive priority scores (email quality + phone + address + seniority + title)
+ * 3. Selects TOP N contacts per account based on priority score
+ * 4. Marks selected contacts as Eligible
+ * 5. Marks remaining contacts as Ineligible_Cap_Reached
+ * 
+ * @param campaignId - Verification campaign ID
+ * @param cap - Lead cap per account (default: 10)
+ * @returns Statistics about cap enforcement
+ */
+export async function enforceAccountCapWithPriority(
+  campaignId: string,
+  cap: number = 10
+): Promise<{
+  processed: number;
+  accountsProcessed: number;
+  contactsMarkedEligible: number;
+  contactsMarkedCapReached: number;
+  errors: string[];
+}> {
+  const { db } = await import('../db');
+  const { verificationContacts, verificationCampaigns, accounts } = await import('@shared/schema');
+  const { eq, and, inArray, desc, sql } = await import('drizzle-orm');
+  
+  const stats = {
+    processed: 0,
+    accountsProcessed: 0,
+    contactsMarkedEligible: 0,
+    contactsMarkedCapReached: 0,
+    errors: [] as string[],
+  };
+  
+  try {
+    // Get campaign
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId))
+      .limit(1);
+    
+    if (!campaign) {
+      stats.errors.push('Campaign not found');
+      return stats;
+    }
+    
+    // Get all accounts with contacts in this campaign
+    const accountResults = await db
+      .selectDistinct({ accountId: verificationContacts.accountId })
+      .from(verificationContacts)
+      .where(
+        and(
+          eq(verificationContacts.campaignId, campaignId),
+          eq(verificationContacts.deleted, false),
+          sql`${verificationContacts.accountId} IS NOT NULL`
+        )
+      );
+    
+    console.log(`[Cap Enforcement] Processing ${accountResults.length} accounts for campaign ${campaignId}`);
+    
+    // Process each account
+    for (const { accountId } of accountResults) {
+      if (!accountId) continue;
+      
+      try {
+        // Get all potentially eligible contacts for this account (Eligible or those with valid emails)
+        const contacts = await db
+          .select({
+            contact: verificationContacts,
+            account: accounts,
+          })
+          .from(verificationContacts)
+          .leftJoin(accounts, eq(verificationContacts.accountId, accounts.id))
+          .where(
+            and(
+              eq(verificationContacts.campaignId, campaignId),
+              eq(verificationContacts.accountId, accountId),
+              eq(verificationContacts.deleted, false),
+              eq(verificationContacts.suppressed, false),
+              // Only consider contacts with valid/safe emails (data quality baseline)
+              inArray(verificationContacts.emailStatus, ['safe_to_send', 'valid', 'send_with_caution', 'risky', 'accept_all', 'unknown', 'ok'])
+            )
+          );
+        
+        if (contacts.length === 0) {
+          continue;
+        }
+        
+        // Calculate comprehensive priority scores for all contacts
+        const contactsWithScores = contacts.map(({ contact, account }) => {
+          const scores = calculateComprehensivePriorityScore(
+            {
+              title: contact.title,
+              customFields: contact.customFields,
+              contactMobile: contact.mobile,
+              contactPhone: contact.phone,
+              aiEnrichedPhone: contact.aiEnrichedPhone,
+              contactAddress: contact.contactAddress1,
+              contactCity: contact.contactCity,
+              contactState: contact.contactState,
+              contactPostalCode: contact.contactPostal,
+              aiEnrichedAddress: contact.aiEnrichedAddress1,
+              emailValidationStatus: contact.emailStatus,
+            },
+            {
+              mainPhone: account?.mainPhone,
+              hqStreet1: account?.hqStreet1,
+              hqCity: account?.hqCity,
+              hqPostalCode: account?.hqPostalCode,
+            },
+            campaign as any
+          );
+          
+          return {
+            contact,
+            ...scores,
+          };
+        });
+        
+        // Sort by comprehensive priority score (highest first)
+        contactsWithScores.sort((a, b) => b.comprehensivePriorityScore - a.comprehensivePriorityScore);
+        
+        // Select top N contacts (within cap)
+        const topContacts = contactsWithScores.slice(0, cap);
+        const excessContacts = contactsWithScores.slice(cap);
+        
+        // Update top contacts to Eligible with their scores
+        for (const item of topContacts) {
+          await db
+            .update(verificationContacts)
+            .set({
+              eligibilityStatus: 'Eligible',
+              eligibilityReason: 'eligible_top_priority',
+              emailQualityScore: item.emailQualityScore.toFixed(2),
+              phoneCompletenessScore: item.phoneCompletenessScore.toFixed(2),
+              addressCompletenessScore: item.addressCompletenessScore.toFixed(2),
+              comprehensivePriorityScore: item.comprehensivePriorityScore.toFixed(2),
+              seniorityLevel: item.seniorityLevel as any,
+              titleAlignmentScore: item.titleAlignmentScore.toFixed(2),
+              updatedAt: new Date(),
+            })
+            .where(eq(verificationContacts.id, item.contact.id));
+          
+          stats.contactsMarkedEligible++;
+        }
+        
+        // Update excess contacts to Ineligible_Cap_Reached with their scores
+        for (const item of excessContacts) {
+          await db
+            .update(verificationContacts)
+            .set({
+              eligibilityStatus: 'Ineligible_Cap_Reached',
+              eligibilityReason: `account_cap_reached_${cap}`,
+              emailQualityScore: item.emailQualityScore.toFixed(2),
+              phoneCompletenessScore: item.phoneCompletenessScore.toFixed(2),
+              addressCompletenessScore: item.addressCompletenessScore.toFixed(2),
+              comprehensivePriorityScore: item.comprehensivePriorityScore.toFixed(2),
+              seniorityLevel: item.seniorityLevel as any,
+              titleAlignmentScore: item.titleAlignmentScore.toFixed(2),
+              updatedAt: new Date(),
+            })
+            .where(eq(verificationContacts.id, item.contact.id));
+          
+          stats.contactsMarkedCapReached++;
+        }
+        
+        stats.accountsProcessed++;
+        stats.processed += contacts.length;
+        
+        // Recalculate account cap status
+        await recalculateAccountCapStatus(campaignId, accountId);
+        
+      } catch (error: any) {
+        stats.errors.push(`Error processing account ${accountId}: ${error.message}`);
+        console.error(`[Cap Enforcement] Error processing account ${accountId}:`, error);
+      }
+    }
+    
+    console.log(`[Cap Enforcement] Complete: ${stats.accountsProcessed} accounts, ${stats.contactsMarkedEligible} eligible, ${stats.contactsMarkedCapReached} cap reached`);
+    
+  } catch (error: any) {
+    stats.errors.push(`Fatal error: ${error.message}`);
+    console.error('[Cap Enforcement] Fatal error:', error);
+  }
+  
+  return stats;
+}
+
+/**
  * Comprehensive eligibility evaluation with cap enforcement and priority scoring
  * This function:
  * 1. Evaluates basic eligibility (geo, title, email)
@@ -714,17 +1144,6 @@ export async function evaluateEligibilityWithCap(
     campaign.priorityConfig?.titleAlignmentWeight
   );
   
-  // If not basically eligible (including Pending_Email_Validation), return early
-  if (basicEligibility.status !== 'Eligible' && basicEligibility.status !== 'Pending_Email_Validation') {
-    return {
-      eligibilityStatus: basicEligibility.status,
-      eligibilityReason: basicEligibility.reason,
-      seniorityLevel,
-      titleAlignmentScore,
-      priorityScore,
-    };
-  }
-  
   // If pending email validation, return that status (cap check happens after validation)
   if (basicEligibility.status === 'Pending_Email_Validation') {
     return {
@@ -736,7 +1155,18 @@ export async function evaluateEligibilityWithCap(
     };
   }
   
-  // At this point, basicEligibility.status === 'Eligible'
+  // If not basically eligible (Out_of_Scope), return early
+  if (basicEligibility.status === 'Out_of_Scope') {
+    return {
+      eligibilityStatus: basicEligibility.status,
+      eligibilityReason: basicEligibility.reason,
+      seniorityLevel,
+      titleAlignmentScore,
+      priorityScore,
+    };
+  }
+  
+  // At this point, contact passed basic eligibility checks
   // Now check account cap enforcement
   
   // If no account ID, can't check cap - mark eligible

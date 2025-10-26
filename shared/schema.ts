@@ -3561,7 +3561,10 @@ export const verificationCampaigns = pgTable("verification_campaigns", {
     targetSeniorityLevels?: string[];
     seniorityWeight?: number;
     titleAlignmentWeight?: number;
-  }>().default(sql`'{"seniorityWeight": 0.7, "titleAlignmentWeight": 0.3}'::jsonb`),
+    emailQualityWeight?: number;
+    phoneCompletenessWeight?: number;
+    addressCompletenessWeight?: number;
+  }>().default(sql`'{"seniorityWeight": 0.20, "titleAlignmentWeight": 0.10, "emailQualityWeight": 0.30, "phoneCompletenessWeight": 0.20, "addressCompletenessWeight": 0.20}'::jsonb`),
   
   emailValidationProvider: text("email_validation_provider").default("api_free"),
   okEmailStates: text("ok_email_states").array().default(sql`ARRAY['safe_to_send', 'valid']::text[]`),
@@ -3638,6 +3641,13 @@ export const verificationContacts = pgTable("verification_contacts", {
   seniorityLevel: seniorityLevelEnum("seniority_level").default('unknown'),
   titleAlignmentScore: numeric("title_alignment_score", { precision: 3, scale: 2 }),
   priorityScore: numeric("priority_score", { precision: 10, scale: 2 }),
+  
+  // Comprehensive priority score components (for data quality-based cap enforcement)
+  emailQualityScore: numeric("email_quality_score", { precision: 3, scale: 2 }),
+  phoneCompletenessScore: numeric("phone_completeness_score", { precision: 3, scale: 2 }),
+  addressCompletenessScore: numeric("address_completeness_score", { precision: 3, scale: 2 }),
+  comprehensivePriorityScore: numeric("comprehensive_priority_score", { precision: 10, scale: 2 }),
+  
   reservedSlot: boolean("reserved_slot").default(false),
   inSubmissionBuffer: boolean("in_submission_buffer").default(false),
 

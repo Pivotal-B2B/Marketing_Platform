@@ -1083,4 +1083,55 @@ router.post("/api/verification-campaigns/:id/merge-cav-data", async (req, res) =
   }
 });
 
+// Smart Lead Cap Enforcement endpoint (asynchronous)
+router.post("/api/verification-campaigns/:id/enforce-caps", async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    
+    // Verify campaign exists
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    // Get cap limit
+    const cap = campaign.leadCapPerAccount || 10;
+    
+    console.log(`[API] Triggering asynchronous smart cap enforcement for campaign ${campaignId} with cap ${cap}`);
+    
+    // Return immediately with 202 Accepted - job will run in background
+    res.status(202).json({
+      success: true,
+      message: "Smart cap enforcement job started in background",
+      campaignId: campaignId,
+      cap: cap,
+      status: "processing",
+    });
+    
+    // Run smart cap enforcement in background (non-blocking)
+    // Dynamic import to avoid circular dependencies
+    const { enforceAccountCapWithPriority } = await import("../lib/verification-utils");
+    
+    setImmediate(async () => {
+      try {
+        const stats = await enforceAccountCapWithPriority(campaignId, cap);
+        console.log(`[Cap Enforcement] Background job complete for campaign ${campaignId}:`, stats);
+      } catch (error) {
+        console.error(`[Cap Enforcement] Background job error for campaign ${campaignId}:`, error);
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error starting cap enforcement job:", error);
+    res.status(500).json({ 
+      error: "Failed to start cap enforcement job",
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;
