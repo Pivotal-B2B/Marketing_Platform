@@ -1900,8 +1900,8 @@ router.post("/api/verification-campaigns/:campaignId/contacts/revalidate-emails"
       return res.status(404).json({ error: "Campaign not found" });
     }
     
-    // Find all contacts with emails that need validation
-    // Include ALL contacts (Eligible, Out_of_Scope, etc.) with email addresses
+    // Find eligible contacts that need email validation
+    // Only validate potentially eligible contacts (passed geo/title checks)
     const contactsToRevalidate = await db
       .select({
         id: verificationContacts.id,
@@ -1913,7 +1913,9 @@ router.post("/api/verification-campaigns/:campaignId/contacts/revalidate-emails"
         and(
           eq(verificationContacts.campaignId, campaignId),
           eq(verificationContacts.deleted, false),
-          sql`${verificationContacts.email} IS NOT NULL AND ${verificationContacts.email} != ''`
+          sql`${verificationContacts.email} IS NOT NULL AND ${verificationContacts.email} != ''`,
+          // Only validate Eligible contacts (not Out_of_Scope)
+          sql`${verificationContacts.eligibilityStatus} = 'Eligible'`
         )
       );
     
