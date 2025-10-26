@@ -389,7 +389,7 @@ export async function detectAcceptAll(
     const fakeTest = await probeSmtp(host, fakeEmail);
     
     // If BOTH real and fake are accepted → accept-all domain
-    return realTest.rcptOk && fakeTest.rcptOk;
+    return !!(realTest.rcptOk && fakeTest.rcptOk);
     
   } catch (error) {
     console.error('[EmailValidation] Accept-all detection error:', error);
@@ -409,7 +409,7 @@ export async function validateEmail(
     detectAcceptAll?: boolean;
   } = {}
 ): Promise<ValidationResult> {
-  const { skipSmtp = false, useCache = true, detectAcceptAll = false } = options;
+  const { skipSmtp = false, useCache = true, detectAcceptAll: shouldDetectAcceptAll = false } = options;
   
   const result: ValidationResult = {
     status: 'unknown',
@@ -485,7 +485,7 @@ export async function validateEmail(
       }
       
       // Detect accept-all if requested
-      if (detectAcceptAll && smtp.rcptOk) {
+      if (shouldDetectAcceptAll && smtp.rcptOk) {
         const isAcceptAll = await detectAcceptAll(dns.mxHosts[0], email, parsed.domain);
         result.isAcceptAll = isAcceptAll;
         
@@ -550,9 +550,9 @@ export async function validateEmail(
 export async function validateAndStoreEmail(
   contactId: string,
   email: string,
-  provider: 'api_free' | 'emaillistverify' = 'api_free',
+  provider: 'api_free' = 'api_free',
   options: { skipSmtp?: boolean } = {}
-): Promise<ValidationResult> {
+): Promise<ValidationResult & { validatedAt: Date }> {
   const emailLower = email.toLowerCase().trim();
   
   // Run validation
@@ -600,5 +600,5 @@ export async function validateAndStoreEmail(
       }
     });
   
-  return validation;
+  return { ...validation, validatedAt: new Date() };
 }

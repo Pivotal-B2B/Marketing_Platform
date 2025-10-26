@@ -16,7 +16,6 @@ import { evaluateEligibility, computeNormalizedKeys } from "../lib/verification-
 import { applySuppressionForContacts } from "../lib/verification-suppression";
 import { requireAuth } from "../auth";
 import { exportVerificationContactsToCsv, createCsvDownloadResponse } from "../lib/csv-export";
-import { verifyEmailsBulk, type EmailVerificationResult } from "../lib/email-list-verify";
 
 const router = Router();
 
@@ -530,8 +529,7 @@ router.post("/api/verification-contacts/:id/qa", async (req, res) => {
 
 router.post("/api/verification-contacts/:id/validate-email", async (req, res) => {
   try {
-    const { runELV } = await import("../lib/verification-elv");
-    const { verificationEmailValidations } = await import("@shared/schema");
+    const { validateAndStoreEmail } = await import("../lib/email-validation-engine");
     
     const [contact] = await db
       .select()
@@ -542,80 +540,25 @@ router.post("/api/verification-contacts/:id/validate-email", async (req, res) =>
       return res.status(404).json({ error: "Contact not found" });
     }
     
-    // CAT62542 Preconditions: Manual ELV only for Eligible + Validated + Not Suppressed
-    if (
-      contact.eligibilityStatus !== 'Eligible' ||
-      contact.verificationStatus !== 'Validated' ||
-      contact.suppressed === true ||
-      !contact.email
-    ) {
+    // Preconditions: Manual validation only for contacts with email
+    if (!contact.email) {
       return res.status(409).json({ 
         error: "Preconditions not met",
-        details: {
-          eligible: contact.eligibilityStatus === 'Eligible',
-          validated: contact.verificationStatus === 'Validated',
-          notSuppressed: contact.suppressed !== true,
-          hasEmail: !!contact.email
-        }
+        details: { hasEmail: false }
       });
     }
     
-    const emailLower = contact.email.toLowerCase();
-    
-    const existingValidation = await db.execute(sql`
-      SELECT * FROM verification_email_validations
-      WHERE email_lower = ${emailLower}
-        AND checked_at > NOW() - INTERVAL '60 days'
-      ORDER BY checked_at DESC
-      LIMIT 1
-    `);
-    
-    if (existingValidation.rowCount && existingValidation.rowCount > 0) {
-      const cached = existingValidation.rows[0];
-      
-      await db
-        .update(verificationContacts)
-        .set({ emailStatus: cached.status as any, updatedAt: new Date() })
-        .where(eq(verificationContacts.id, contact.id));
-      
-      return res.json({
-        cached: true,
-        status: cached.status,
-        checkedAt: cached.checked_at,
-      });
-    }
-    
-    const apiKey = process.env.EMAIL_LIST_VERIFY_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: "Email validation not configured" });
-    }
-    
-    const result = await runELV(contact.email, apiKey);
-    
-    await db.insert(verificationEmailValidations).values({
-      contactId: contact.id,
-      emailLower: emailLower,
-      provider: "ELV",
-      status: result.status,
-      rawJson: result.raw,
-    }).onConflictDoUpdate({
-      target: [verificationEmailValidations.contactId, verificationEmailValidations.emailLower],
-      set: {
-        status: result.status,
-        rawJson: result.raw,
-        checkedAt: new Date(),
-      },
-    });
-    
-    await db
-      .update(verificationContacts)
-      .set({ emailStatus: result.status, updatedAt: new Date() })
-      .where(eq(verificationContacts.id, contact.id));
+    // Use built-in validator
+    const validation = await validateAndStoreEmail(
+      contact.id,
+      contact.email,
+      'api_free',
+      { skipSmtp: process.env.SKIP_SMTP_VALIDATION === 'true' }
+    );
     
     res.json({
-      cached: false,
-      status: result.status,
-      checkedAt: new Date(),
+      emailStatus: validation.status,
+      checkedAt: validation.validatedAt,
     });
   } catch (error) {
     console.error("Error validating email:", error);
@@ -924,39 +867,19 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-validate-emai
           continue;
         }
         
-        // Call EmailListVerify API
-        const response = await fetch(`https://apps.emaillistverify.com/api/verifyEmail?secret=${process.env.EMAIL_LIST_VERIFY_API_KEY}&email=${encodeURIComponent(contact.email)}`);
-        
-        if (!response.ok) {
-          console.error(`[BULK EMAIL VALIDATION] EmailListVerify API error for ${contact.email}`);
-          continue;
-        }
-        
-        const result = await response.text();
-        const rawStatus = result.trim().toLowerCase();
-        
-        // Map ELV result to our enum values (unknown, ok, invalid, risky)
-        let emailStatus: 'unknown' | 'ok' | 'invalid' | 'risky' = 'unknown';
-        if (rawStatus === 'ok' || rawStatus === 'valid') {
-          emailStatus = 'ok';
-        } else if (rawStatus === 'invalid' || rawStatus === 'bad' || rawStatus === 'email_disabled') {
-          emailStatus = 'invalid';
-        } else if (rawStatus === 'accept_all' || rawStatus === 'disposable' || rawStatus === 'unknown') {
-          emailStatus = 'risky';
-        }
-        
-        // Update contact with validation result
-        await db
-          .update(verificationContacts)
-          .set({
-            emailStatus,
-          })
-          .where(eq(verificationContacts.id, contactId));
+        // Use built-in email validator
+        const { validateAndStoreEmail } = await import('../lib/email-validation-engine');
+        const validation = await validateAndStoreEmail(
+          contactId,
+          contact.email,
+          'api_free',
+          { skipSmtp: process.env.SKIP_SMTP_VALIDATION === 'true' }
+        );
         
         validatedCount++;
-        results.push({ contactId, email: contact.email, status: emailStatus });
+        results.push({ contactId, email: contact.email, status: validation.status });
         
-        console.log(`[BULK EMAIL VALIDATION] Validated ${contact.email} - Status: ${emailStatus}`);
+        console.log(`[BULK EMAIL VALIDATION] Validated ${contact.email} - Status: ${validation.status}`);
       } catch (error) {
         console.error(`[BULK EMAIL VALIDATION] Error validating contact ${contactId}:`, error);
       }

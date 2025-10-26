@@ -32,13 +32,12 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Lead QA Workflow:** Multi-stage workflow (New → Under Review → Approved/Rejected → Published) with checklist validation and agent insights, accessible via a comprehensive lead detail page.
 - **Client Portal (Bridge Model):** Allows clients to specify campaign order requirements via configurable webhooks.
 - **Data Verification (DV) Module:** Project-based workflow for data cleaning and verification with CSV upload, smart field mapping, multi-stage background processing, durable idempotency, smart deduplication, and suppression management. Features configurable campaigns with campaign-specific eligibility rules, enhanced company matching with Public Suffix List, and manual EmailListVerify validation.
-- **Bulk Email Validation:** Job-based validation system with smart caching to minimize API costs and real-time progress tracking. Supports both automated API validation (EmailListVerify) and external validation workflows.
-- **API-Free Email Validation:** Zero-cost email validation system integrated into verification campaign eligibility evaluation:
-  - **Two-Stage Eligibility Flow:** Contacts passing geo/title criteria receive `Pending_Email_Validation` status instead of immediate `Eligible`, queuing them for asynchronous validation. Background job processes validations every 2 minutes with configurable batch size (default: 50 contacts).
-  - **Comprehensive Validation Engine:** Four-stage validation process: (1) Syntax validation (RFC 5322 compliance, format checks), (2) DNS/MX resolution with TTL-based domain caching to minimize lookups, (3) Risk assessment (role accounts, disposable/free providers), (4) Optional SMTP probing (can be disabled to avoid spam flags).
+- **API-Free Email Validation (10-Status System):** Zero-cost email validation system with comprehensive quality assessment. **EmailListVerify integration fully removed** (October 26, 2025):
+  - **10 Validation Statuses:** Granular email quality classification: `safe_to_send` (SMTP-verified, best), `valid` (DNS-verified, high quality), `send_with_caution` (free providers), `risky` (role accounts), `accept_all` (catch-all), `unknown` (cannot verify), `invalid` (syntax/DNS errors), `disabled` (mailbox disabled/full), `disposable` (temp email), `spam_trap` (known trap).
+  - **Two-Stage Eligibility Flow:** Contacts passing geo/title criteria receive `Pending_Email_Validation` status, queuing them for asynchronous validation. Background job processes validations every 2 minutes with configurable batch size (default: 50 contacts).
+  - **Comprehensive Validation Engine:** Four-stage validation process: (1) Syntax validation (RFC 5322 compliance, format checks), (2) DNS/MX resolution with TTL-based domain caching to minimize lookups, (3) Risk assessment (role accounts, disposable/free providers, spam traps), (4) Optional SMTP probing (can be disabled to avoid spam flags).
   - **Domain-Level Caching:** `emailValidationDomainCache` table stores DNS/MX records with TTL-based expiration, reducing redundant lookups for same-domain emails.
-  - **Scoring System:** Weighted validation scores (syntax: 40%, DNS/MX: 30%, risk: 20%, SMTP: 10%) with configurable thresholds determine final eligibility status.
-  - **Status Transitions:** Validation results finalize contact status: `ok`/`accept_all` → `Eligible`, `risky` → `Eligible` (flagged), `invalid`/`disposable` → `Ineligible_Email_Invalid`, `unknown` → `Eligible` (cautious acceptance).
+  - **Intelligent Status Mapping:** `safe_to_send`/`valid` → `Eligible` (high quality), `send_with_caution`/`risky`/`accept_all` → `Eligible` (with warnings), `invalid`/`disabled`/`disposable`/`spam_trap` → `Ineligible_Email_Invalid`, `unknown` → `Eligible` (cautious acceptance to prevent workflow blocking).
   - **Rate Limiting & Concurrency:** Domain-aware batching prevents abuse and respects server limits. Sequential domain processing with 500ms inter-domain delays ensures graceful validation.
 - **External Email Validation Workflow:** Complete workflow for validating emails externally: 1) Export eligible contacts (respects per-account caps), 2) Validate with any service (ZeroBounce, NeverBounce, etc.), 3) Upload results via CSV, 4) Lock validated contacts in submission buffer, 5) Export for client delivery, 6) Clear buffer. Includes submission tracking in `verification_lead_submissions` table.
 - **Lead Cap Enforcement with Priority Scoring:** Intelligent per-account lead cap system with multi-factor priority scoring to optimize lead selection and allocation:
@@ -113,10 +112,12 @@ S3_PUBLIC_BASE=https://cdn.domain.tld  # Optional CDN base URL
 # Security
 JWT_SECRET=your_jwt_secret
 
-# Email Validation (Optional - API-free validation uses DNS only)
-EMAIL_LIST_VERIFY_KEY=your_key   # If using EmailListVerify
-SKIP_SMTP_VALIDATION=true        # Set to true to skip SMTP probing
+# Email Validation (Built-in API-free validation)
+SKIP_SMTP_VALIDATION=true        # Set to true to skip SMTP probing (recommended)
 EMAIL_VALIDATION_BATCH_SIZE=50   # Contacts per validation batch
+DNS_TIMEOUT_MS=3000              # DNS query timeout (default: 3000ms)
+SMTP_CONNECT_TIMEOUT_MS=10000    # SMTP connection timeout (default: 10s)
+DOMAIN_CACHE_TTL_HOURS=24        # Domain cache TTL (default: 24 hours)
 ```
 
 ### Performance Optimizations

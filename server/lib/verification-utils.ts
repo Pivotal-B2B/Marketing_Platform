@@ -128,10 +128,10 @@ export const normalize = {
 /**
  * Two-Stage Eligibility Evaluation
  * Stage 1: Geo/Title criteria (synchronous, fast)
- * Stage 2: Email validation (async, runs only on potential eligibles for api_free provider)
+ * Stage 2: Email validation (async, runs only on potential eligibles)
  * 
- * IMPORTANT: Only campaigns with emailValidationProvider='api_free' use two-stage validation.
- * All other providers (EmailListVerify, external, etc.) return 'Eligible' immediately.
+ * IMPORTANT: All campaigns use two-stage validation with built-in API-free validation.
+ * Contacts passing geo/title checks receive 'Pending_Email_Validation' status.
  */
 export function evaluateEligibility(
   title: string | null | undefined,
@@ -173,22 +173,28 @@ export function evaluateEligibility(
   }
   
   // At this point, contact passed geo/title checks → "potential eligible"
-  // Only use two-stage validation for api_free provider
-  const provider = campaign.emailValidationProvider || 'emaillistverify';
-  if (provider === 'api_free') {
-    return { status: 'Pending_Email_Validation' as const, reason: 'awaiting_email_validation' };
-  }
-  
-  // All other providers: return Eligible immediately (backward compatible)
-  return { status: 'Eligible' as const, reason: 'eligible' };
+  // All campaigns use built-in API-free email validation
+  return { status: 'Pending_Email_Validation' as const, reason: 'awaiting_email_validation' };
 }
 
 /**
  * Finalize eligibility status after email validation completes
  * Updates contact from 'Pending_Email_Validation' to 'Eligible' or 'Ineligible_Email_Invalid'
+ * 
+ * 10-Status Email Validation System:
+ * - safe_to_send: Best quality, verified deliverable → Eligible
+ * - valid: High quality, DNS verified → Eligible
+ * - send_with_caution: Lower confidence (free providers) → Eligible
+ * - risky: Role accounts, may have issues → Eligible
+ * - accept_all: Catch-all domain → Eligible
+ * - unknown: Cannot verify → Eligible (cautious acceptance)
+ * - invalid: Syntax/DNS errors → Ineligible
+ * - disabled: Mailbox disabled/full → Ineligible
+ * - disposable: Temporary email service → Ineligible
+ * - spam_trap: Known spam trap → Ineligible
  */
 export function finalizeEligibilityAfterEmailValidation(
-  emailStatus: 'ok' | 'invalid' | 'risky' | 'accept_all' | 'disposable' | 'unknown',
+  emailStatus: 'unknown' | 'valid' | 'safe_to_send' | 'risky' | 'send_with_caution' | 'accept_all' | 'invalid' | 'disabled' | 'disposable' | 'spam_trap' | 'ok',
   currentEligibilityStatus: string
 ): { eligibilityStatus: 'Eligible' | 'Ineligible_Email_Invalid'; reason: string } {
   // Only finalize if currently pending
@@ -199,22 +205,33 @@ export function finalizeEligibilityAfterEmailValidation(
     };
   }
   
-  // Determine final eligibility based on email validation result
+  // Determine final eligibility based on comprehensive email validation result
   switch (emailStatus) {
-    case 'ok':
-    case 'accept_all': // Accept-all is acceptable (low risk of bounce)
-      return { eligibilityStatus: 'Eligible', reason: 'email_validated_ok' };
+    case 'safe_to_send':
+    case 'valid':
+    case 'ok': // LEGACY: EmailListVerify 'ok' status (treat as high quality)
+      return { eligibilityStatus: 'Eligible', reason: 'email_verified_deliverable' };
     
-    case 'risky': // Risky emails (role accounts, free providers) are still eligible but flagged
-      return { eligibilityStatus: 'Eligible', reason: 'email_risky_but_accepted' };
+    case 'send_with_caution':
+    case 'risky':
+    case 'accept_all':
+      return { eligibilityStatus: 'Eligible', reason: 'email_deliverable_with_risks' };
     
     case 'invalid':
+    case 'disabled':
+      return { eligibilityStatus: 'Ineligible_Email_Invalid', reason: `email_${emailStatus}` };
+    
     case 'disposable':
+    case 'spam_trap':
       return { eligibilityStatus: 'Ineligible_Email_Invalid', reason: `email_${emailStatus}` };
     
     case 'unknown':
     default:
-      // If we can't determine validity, accept with caution
+      // Log unexpected statuses for debugging
+      if (emailStatus && !['unknown', 'valid', 'safe_to_send', 'risky', 'send_with_caution', 'accept_all', 'invalid', 'disabled', 'disposable', 'spam_trap', 'ok'].includes(emailStatus)) {
+        console.warn(`[EmailValidation] Unexpected email status encountered: ${emailStatus}`);
+      }
+      // If we can't determine validity, accept with caution (prevents blocking entire workflow)
       return { eligibilityStatus: 'Eligible', reason: 'email_status_unknown' };
   }
 }

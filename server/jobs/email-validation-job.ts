@@ -82,14 +82,7 @@ async function processPendingEmailValidations() {
         if (!contact.email || !contact.campaign) continue;
         
         try {
-          // Check if campaign uses API-free validation
-          const provider = contact.campaign.emailValidationProvider || 'emaillistverify';
-          if (provider !== 'api_free') {
-            console.log(`[EmailValidationJob] Skipping contact ${contact.id} - provider is ${provider}`);
-            continue;
-          }
-          
-          // Validate email
+          // Always use built-in validation
           const validation = await validateAndStoreEmail(
             contact.id,
             contact.email,

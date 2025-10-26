@@ -3536,7 +3536,8 @@ export const verificationEmailStatusEnum = pgEnum('verification_email_status', [
   'invalid',          // Syntax error or no MX records
   'disabled',         // Mailbox exists but disabled/full/quota exceeded
   'disposable',       // Temporary/disposable email service
-  'spam_trap'         // Known spam trap address
+  'spam_trap',        // Known spam trap address
+  'ok'                // LEGACY: EmailListVerify status (will be migrated to 'safe_to_send')
 ]);
 export const verificationSourceTypeEnum = pgEnum('verification_source_type', ['Client_Provided', 'New_Sourced']);
 export const addressEnrichmentStatusEnum = pgEnum('address_enrichment_status', ['not_needed', 'pending', 'in_progress', 'completed', 'failed']);
@@ -3562,8 +3563,8 @@ export const verificationCampaigns = pgTable("verification_campaigns", {
     titleAlignmentWeight?: number;
   }>().default(sql`'{"seniorityWeight": 0.7, "titleAlignmentWeight": 0.3}'::jsonb`),
   
-  emailValidationProvider: text("email_validation_provider").default("emaillistverify"),
-  okEmailStates: text("ok_email_states").array().default(sql`ARRAY['valid', 'accept_all']::text[]`),
+  emailValidationProvider: text("email_validation_provider").default("api_free"),
+  okEmailStates: text("ok_email_states").array().default(sql`ARRAY['safe_to_send', 'valid']::text[]`),
   
   suppressionMatchFields: text("suppression_match_fields").array().default(sql`ARRAY['email_lower', 'cav_id', 'cav_user_id', 'name_company_hash']::text[]`),
   

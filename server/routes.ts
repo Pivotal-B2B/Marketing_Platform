@@ -11,7 +11,6 @@ import reportingRoutes from './routes/reporting-routes';
 import campaignSuppressionRouter from './routes/campaign-suppression-routes';
 import verificationCampaignsRouter from './routes/verification-campaigns';
 import verificationContactsRouter from './routes/verification-contacts';
-import verificationElvRouter from './routes/verification-elv';
 import verificationSubmissionsRouter from './routes/verification-submissions';
 import verificationSuppressionRouter from './routes/verification-suppression';
 import verificationUploadRouter from './routes/verification-upload';
@@ -6232,7 +6231,6 @@ export function registerRoutes(app: Express) {
 
   app.use(verificationCampaignsRouter);
   app.use(verificationContactsRouter);
-  app.use(verificationElvRouter);
   app.use(verificationSubmissionsRouter);
   app.use(verificationSuppressionRouter);
   app.use(verificationUploadRouter);
