@@ -96,10 +96,11 @@ async function processPendingEmailValidations() {
             contact.eligibilityStatus || 'Pending_Email_Validation'
           );
           
-          // Update contact eligibility status
+          // Update contact eligibility status AND email status
           await db
             .update(verificationContacts)
             .set({
+              emailStatus: validation.status,
               eligibilityStatus: finalEligibility.eligibilityStatus,
               eligibilityReason: finalEligibility.reason,
               updatedAt: new Date(),
@@ -117,6 +118,7 @@ async function processPendingEmailValidations() {
           await db
             .update(verificationContacts)
             .set({
+              emailStatus: 'unknown',
               eligibilityStatus: 'Eligible',
               eligibilityReason: 'email_validation_failed',
               updatedAt: new Date(),
