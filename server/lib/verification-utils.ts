@@ -475,8 +475,14 @@ export function calculateTitleAlignment(
   title?: string | null,
   targetTitles?: string[]
 ): number {
-  if (!title || !targetTitles || targetTitles.length === 0) {
-    return 0.5; // Neutral score if no targets specified
+  // If no title, contact gets zero points (missing data)
+  if (!title) {
+    return 0;
+  }
+  
+  // If title exists but no targets specified, neutral score (can't judge alignment)
+  if (!targetTitles || targetTitles.length === 0) {
+    return 0.5;
   }
   
   const normalized = title.toLowerCase().trim();
