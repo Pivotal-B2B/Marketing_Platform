@@ -1042,4 +1042,45 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
   }
 });
 
+// CAV Address & Phone Merger endpoint
+router.post("/api/verification-campaigns/:id/merge-cav-data", async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    
+    // Verify campaign exists
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    // Dynamic import to avoid circular dependencies
+    const { mergeCavAddressesForCampaign } = await import("../lib/cav-address-merger");
+    
+    // Run the merger
+    const stats = await mergeCavAddressesForCampaign(campaignId);
+    
+    res.json({
+      success: true,
+      message: `CAV data merge complete`,
+      stats: {
+        processed: stats.processed,
+        updated: stats.updated,
+        skipped: stats.skipped,
+        errors: stats.errors,
+      },
+      details: stats.details,
+    });
+  } catch (error) {
+    console.error("Error merging CAV data:", error);
+    res.status(500).json({ 
+      error: "Failed to merge CAV data",
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;
