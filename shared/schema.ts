@@ -3520,7 +3520,19 @@ export const verificationEligibilityStatusEnum = pgEnum('verification_eligibilit
 ]);
 export const verificationStatusEnum = pgEnum('verification_status', ['Pending', 'Validated', 'Replaced', 'Invalid']);
 export const verificationQaStatusEnum = pgEnum('verification_qa_status', ['Unreviewed', 'Flagged', 'Passed', 'Rejected']);
-export const verificationEmailStatusEnum = pgEnum('verification_email_status', ['unknown', 'ok', 'invalid', 'risky', 'accept_all', 'disposable']);
+export const verificationEmailStatusEnum = pgEnum('verification_email_status', [
+  'unknown',          // Cannot verify (SMTP blocked, timeout, etc)
+  'valid',            // High quality, verified deliverable
+  'safe_to_send',     // Verified deliverable, recommended
+  'ok',               // Legacy alias for 'valid'
+  'risky',            // May deliver but has risk factors (role, free provider)
+  'send_with_caution', // Lower confidence, proceed carefully
+  'accept_all',       // Domain accepts all emails (catch-all)
+  'invalid',          // Syntax error or no MX records
+  'disabled',         // Mailbox exists but disabled/full/quota exceeded
+  'disposable',       // Temporary/disposable email service
+  'spam_trap'         // Known spam trap address
+]);
 export const verificationSourceTypeEnum = pgEnum('verification_source_type', ['Client_Provided', 'New_Sourced']);
 export const addressEnrichmentStatusEnum = pgEnum('address_enrichment_status', ['not_needed', 'pending', 'in_progress', 'completed', 'failed']);
 export const phoneEnrichmentStatusEnum = pgEnum('phone_enrichment_status', ['not_needed', 'pending', 'in_progress', 'completed', 'failed']);

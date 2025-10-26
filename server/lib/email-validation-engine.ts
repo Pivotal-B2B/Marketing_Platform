@@ -22,9 +22,24 @@ const VALIDATOR_HELO = process.env.VALIDATOR_HELO || 'validator.pivotal-b2b.ai';
 const VALIDATOR_MAIL_FROM = process.env.VALIDATOR_MAIL_FROM || 'null-sender@pivotal-b2b.ai';
 
 // Risk lists - can be moved to database for dynamic updates
-const ROLE_PREFIXES = ['admin', 'info', 'sales', 'support', 'hr', 'careers', 'hello', 'contact', 'marketing', 'noreply', 'no-reply', 'webmaster', 'postmaster'];
-const FREE_PROVIDERS = ['gmail.com', 'outlook.com', 'yahoo.com', 'icloud.com', 'hotmail.com', 'live.com', 'aol.com', 'msn.com', 'mail.com', 'protonmail.com'];
-const DISPOSABLE_DOMAINS = ['mailinator.com', 'guerrillamail.com', 'temp-mail.org', '10minutemail.com', 'throwaway.email', 'yopmail.com'];
+const ROLE_PREFIXES = ['admin', 'info', 'sales', 'support', 'hr', 'careers', 'hello', 'contact', 'marketing', 'noreply', 'no-reply', 'webmaster', 'postmaster', 'abuse', 'billing'];
+const FREE_PROVIDERS = ['gmail.com', 'outlook.com', 'yahoo.com', 'icloud.com', 'hotmail.com', 'live.com', 'aol.com', 'msn.com', 'mail.com', 'protonmail.com', 'me.com', 'zoho.com'];
+const DISPOSABLE_DOMAINS = ['mailinator.com', 'guerrillamail.com', 'temp-mail.org', '10minutemail.com', 'throwaway.email', 'yopmail.com', 'maildrop.cc', 'tempmail.com', 'getnada.com', 'trashmail.com'];
+
+// Known spam trap patterns and domains
+const SPAM_TRAP_DOMAINS = [
+  'spamtrap.com', 'honeypot.net', 'blackhole.email', 'spam.la',
+  'mailcatch.com', 'abuse.net', 'fbi.gov', 'ftc.gov'
+];
+
+const SPAM_TRAP_PATTERNS = [
+  /^spamtrap@/i,
+  /^honeypot@/i,
+  /^trap@/i,
+  /^abuse@/i,
+  /^postmaster@/i,
+  /^blackhole@/i
+];
 
 export interface ParsedEmail {
   ok: boolean;
@@ -46,6 +61,7 @@ export interface RiskCheck {
   isRole: boolean;
   isFree: boolean;
   isDisposable: boolean;
+  isSpamTrap: boolean;
   reasons: string[];
 }
 
@@ -58,16 +74,32 @@ export interface SmtpProbeResult {
   error?: string;
 }
 
+export type EmailValidationStatus = 
+  | 'unknown'
+  | 'valid'
+  | 'safe_to_send'
+  | 'ok'
+  | 'risky'
+  | 'send_with_caution'
+  | 'accept_all'
+  | 'invalid'
+  | 'disabled'
+  | 'disposable'
+  | 'spam_trap';
+
 export interface ValidationResult {
-  status: 'ok' | 'invalid' | 'risky' | 'accept_all' | 'disposable' | 'unknown';
+  status: EmailValidationStatus;
   confidence: number;
   syntaxValid: boolean;
   hasMx: boolean;
   hasSmtp: boolean;
   smtpAccepted?: boolean;
+  isAcceptAll?: boolean;
+  isDisabled?: boolean;
   isRole: boolean;
   isFree: boolean;
   isDisposable: boolean;
+  isSpamTrap: boolean;
   trace: {
     syntax?: { ok: boolean; reason?: string };
     dns?: DnsResult;
@@ -229,22 +261,26 @@ export async function resolveDomain(domain: string): Promise<DnsResult> {
 
 /**
  * Stage 3: Risk Checks
- * Identifies role accounts, free providers, and disposable domains
+ * Identifies role accounts, free providers, disposable domains, and spam traps
  */
 export function checkRisks(local: string, domain: string): RiskCheck {
   const localLower = local.toLowerCase();
   const domainLower = domain.toLowerCase();
+  const fullEmail = `${localLower}@${domainLower}`;
   
   const isRole = ROLE_PREFIXES.some(prefix => localLower.startsWith(prefix));
   const isFree = FREE_PROVIDERS.includes(domainLower);
   const isDisposable = DISPOSABLE_DOMAINS.includes(domainLower);
+  const isSpamTrap = SPAM_TRAP_DOMAINS.includes(domainLower) || 
+                     SPAM_TRAP_PATTERNS.some(pattern => pattern.test(fullEmail));
   
   const reasons: string[] = [];
   if (isRole) reasons.push('role_account');
   if (isFree) reasons.push('free_provider');
   if (isDisposable) reasons.push('disposable_domain');
+  if (isSpamTrap) reasons.push('spam_trap');
   
-  return { isRole, isFree, isDisposable, reasons };
+  return { isRole, isFree, isDisposable, isSpamTrap, reasons };
 }
 
 /**
@@ -328,17 +364,53 @@ export async function probeSmtp(
 }
 
 /**
- * Complete validation pipeline
- * Runs all stages and returns comprehensive result
+ * Stage 4.5: Accept-All Detection
+ * Tests if a domain accepts all emails (catch-all server)
+ * Probes with both real and fake email to detect accept-all behavior
+ */
+export async function detectAcceptAll(
+  host: string,
+  realEmail: string,
+  domain: string
+): Promise<boolean> {
+  try {
+    // Test real email
+    const realTest = await probeSmtp(host, realEmail);
+    
+    // If real email is NOT accepted, domain is not accept-all
+    if (!realTest.rcptOk) {
+      return false;
+    }
+    
+    // Generate obviously fake email for same domain
+    const fakeLocal = 'nonexistent-test-' + Math.random().toString(36).substr(2, 12);
+    const fakeEmail = `${fakeLocal}@${domain}`;
+    
+    // Test fake email
+    const fakeTest = await probeSmtp(host, fakeEmail);
+    
+    // If BOTH real and fake are accepted → accept-all domain
+    return realTest.rcptOk && fakeTest.rcptOk;
+    
+  } catch (error) {
+    console.error('[EmailValidation] Accept-all detection error:', error);
+    return false; // Assume not accept-all if test fails
+  }
+}
+
+/**
+ * Complete validation pipeline with comprehensive status mapping
+ * Runs all stages and returns detailed result with send recommendations
  */
 export async function validateEmail(
   email: string,
   options: {
     skipSmtp?: boolean;
     useCache?: boolean;
+    detectAcceptAll?: boolean;
   } = {}
 ): Promise<ValidationResult> {
-  const { skipSmtp = false, useCache = true } = options;
+  const { skipSmtp = false, useCache = true, detectAcceptAll = false } = options;
   
   const result: ValidationResult = {
     status: 'unknown',
@@ -349,6 +421,7 @@ export async function validateEmail(
     isRole: false,
     isFree: false,
     isDisposable: false,
+    isSpamTrap: false,
     trace: {}
   };
   
@@ -375,12 +448,20 @@ export async function validateEmail(
     return result;
   }
   
-  // Stage 3: Risk checks
+  // Stage 3: Risk checks (spam traps, disposable, role, free)
   const risk = checkRisks(parsed.local, parsed.domain);
   result.trace.risk = risk;
   result.isRole = risk.isRole;
   result.isFree = risk.isFree;
   result.isDisposable = risk.isDisposable;
+  result.isSpamTrap = risk.isSpamTrap;
+  
+  // High-priority blocks
+  if (result.isSpamTrap) {
+    result.status = 'spam_trap';
+    result.confidence = 100;
+    return result;
+  }
   
   if (result.isDisposable) {
     result.status = 'disposable';
@@ -396,12 +477,42 @@ export async function validateEmail(
       result.hasSmtp = !!smtp.rcptOk;
       result.smtpAccepted = smtp.rcptOk;
       
-      if (smtp.rcptOk) {
-        result.status = 'ok';
+      // Detect disabled/full mailboxes via SMTP codes
+      if (smtp.code && (smtp.code === 550 || smtp.code === 551 || smtp.code === 552 || smtp.code === 553)) {
+        result.status = 'disabled';
+        result.isDisabled = true;
         result.confidence = 90;
+        return result;
+      }
+      
+      // Detect accept-all if requested
+      if (detectAcceptAll && smtp.rcptOk) {
+        const isAcceptAll = await detectAcceptAll(dns.mxHosts[0], email, parsed.domain);
+        result.isAcceptAll = isAcceptAll;
+        
+        if (isAcceptAll) {
+          result.status = 'accept_all';
+          result.confidence = 75;
+          return result;
+        }
+      }
+      
+      // Standard SMTP result mapping
+      if (smtp.rcptOk) {
+        // Map to comprehensive status based on risk factors
+        if (result.isRole) {
+          result.status = 'risky';
+          result.confidence = 75;
+        } else if (result.isFree) {
+          result.status = 'send_with_caution';
+          result.confidence = 80;
+        } else {
+          result.status = 'safe_to_send';
+          result.confidence = 95;
+        }
       } else if (smtp.code && smtp.code >= 500) {
         result.status = 'invalid';
-        result.confidence = 80;
+        result.confidence = 85;
       } else {
         result.status = 'unknown';
         result.confidence = 50;
@@ -412,20 +523,23 @@ export async function validateEmail(
       result.confidence = 60;
     }
   } else {
-    // Skip SMTP, rely on DNS only
+    // DNS-only validation (no SMTP)
     if (dns.hasMX) {
-      result.status = result.isRole || result.isFree ? 'risky' : 'ok';
-      result.confidence = 70;
+      // Map to comprehensive status based on risk factors
+      if (result.isRole) {
+        result.status = 'risky';
+        result.confidence = 65;
+      } else if (result.isFree) {
+        result.status = 'send_with_caution';
+        result.confidence = 70;
+      } else {
+        result.status = 'valid'; // DNS-verified but not SMTP-confirmed
+        result.confidence = 75;
+      }
     } else {
       result.status = 'unknown';
       result.confidence = 50;
     }
-  }
-  
-  // Adjust for risk factors
-  if (result.isRole && result.status === 'ok') {
-    result.status = 'risky';
-    result.confidence = Math.min(result.confidence, 75);
   }
   
   return result;
