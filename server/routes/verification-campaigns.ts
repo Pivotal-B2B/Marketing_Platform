@@ -980,18 +980,38 @@ router.get("/api/verification-campaigns/:id/export-smart", async (req, res) => {
       const completeness = analyzeContactCompleteness(smartData);
       
       if (completeness.isClientReady) {
-        contactsToExport.push({ ...contact, _smartData: smartData });
+        contactsToExport.push({ 
+          ...contact, 
+          _smartData: smartData,
+          _qualityScore: completeness.qualityScore,
+          _blankFields: completeness.blankFieldCount,
+        });
       } else {
         incompleteContacts.push({ 
           id: contact.id, 
           email: contact.email,
-          missingFields: completeness.missingFields 
+          missingFields: completeness.missingFields,
+          blankFieldCount: completeness.blankFieldCount,
+          qualityScore: completeness.qualityScore,
         });
       }
     }
     
-    console.log(`[SMART EXPORT] Filtered ${contactsToExport.length} complete contacts from ${contactsRaw.length} total`);
-    console.log(`[SMART EXPORT] ${incompleteContacts.length} contacts excluded (incomplete data)`);
+    // Calculate quality metrics
+    const avgQualityScore = contactsToExport.length > 0
+      ? Math.round(contactsToExport.reduce((sum, c) => sum + (c._qualityScore || 0), 0) / contactsToExport.length)
+      : 0;
+    
+    const perfectContacts = contactsToExport.filter(c => c._blankFields === 0).length;
+    const goodContacts = contactsToExport.filter(c => c._blankFields === 1).length;
+    const acceptableContacts = contactsToExport.filter(c => c._blankFields >= 2 && c._blankFields < 4).length;
+    
+    console.log(`[SMART EXPORT] ✓ Exporting ${contactsToExport.length} client-ready contacts from ${contactsRaw.length} total`);
+    console.log(`[SMART EXPORT]   • Perfect (0 blanks): ${perfectContacts} contacts`);
+    console.log(`[SMART EXPORT]   • Good (1 blank): ${goodContacts} contacts`);
+    console.log(`[SMART EXPORT]   • Acceptable (2-3 blanks): ${acceptableContacts} contacts`);
+    console.log(`[SMART EXPORT]   • Average Quality Score: ${avgQualityScore}%`);
+    console.log(`[SMART EXPORT] ✗ Excluded ${incompleteContacts.length} contacts (≥4 blanks or missing critical fields)`);
     
     // Mark contacts as submitted if requested
     if (markAsSubmitted === 'true' && contactsToExport.length > 0) {

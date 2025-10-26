@@ -69,7 +69,14 @@ export function hasMinimumAddressQuality(address: { address: any; source: string
 
 /**
  * Analyze contact completeness for export eligibility
- * NEW FLEXIBLE CRITERIA: Export if less than 4 blank fields in address+phone combined
+ * FLEXIBLE CRITERIA: Export if less than 4 blank fields in address+phone combined
+ * 
+ * This allows maximum flexibility while maintaining quality:
+ * - 0 blanks = Perfect (100% quality)
+ * - 1 blank = Good (83% quality)
+ * - 2 blanks = Acceptable (67% quality)
+ * - 3 blanks = Fair (50% quality)
+ * - 4+ blanks = Too incomplete (rejected)
  */
 export function analyzeContactCompleteness(smartData: BestContactData): CompletenessResult {
   const hasCompletePhone = isPhoneComplete(smartData.phone);
@@ -87,8 +94,9 @@ export function analyzeContactCompleteness(smartData: BestContactData): Complete
   // Quality score: 100% if all fields present, decreases by ~16.7% per blank
   const qualityScore = Math.round(((6 - blankFieldCount) / 6) * 100);
   
-  // CLIENT-READY CRITERIA: Less than 4 blank fields AND has minimum address quality
-  const isClientReady = blankFieldCount < 4 && hasMinAddress && hasCompletePhone;
+  // CLIENT-READY CRITERIA: Simply less than 4 blank fields
+  // This is the ONLY requirement - no additional restrictions
+  const isClientReady = blankFieldCount < 4;
   
   // Track missing fields for logging
   const missingFields: string[] = [];
