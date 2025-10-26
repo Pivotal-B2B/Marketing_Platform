@@ -1,6 +1,8 @@
 /**
  * Contact Completeness Validation
  * Determines if a contact has complete information ready for client delivery
+ * 
+ * NEW FLEXIBLE APPROACH: Allows contacts with less than 4 blank fields in address+phone
  */
 
 import type { BestContactData } from './verification-best-data';
@@ -8,8 +10,30 @@ import type { BestContactData } from './verification-best-data';
 export interface CompletenessResult {
   hasCompletePhone: boolean;
   hasCompleteAddress: boolean;
-  isClientReady: boolean; // Both phone and address complete
+  isClientReady: boolean; // Passes export criteria
   missingFields: string[];
+  blankFieldCount: number; // Total blank fields in address+phone
+  qualityScore: number; // 0-100 score based on completeness
+}
+
+/**
+ * Count blank fields in address
+ * Address fields: line1, city, state, postal, country (5 fields total)
+ */
+function countAddressBlankFields(address: { address: any; source: string }): number {
+  if (!address || address.source === 'None') return 5; // All blank
+  
+  const addr = address.address;
+  if (!addr) return 5;
+  
+  let blanks = 0;
+  if (!addr.line1 || addr.line1.trim() === '') blanks++;
+  if (!addr.city || addr.city.trim() === '') blanks++;
+  if (!addr.state || addr.state.trim() === '') blanks++;
+  if (!addr.postal || addr.postal.trim() === '') blanks++;
+  if (!addr.country || addr.country.trim() === '') blanks++;
+  
+  return blanks;
 }
 
 /**
@@ -26,42 +50,64 @@ export function isPhoneComplete(phone: { phone: string; source: string }): boole
 }
 
 /**
- * Check if an address is complete based on smart selection result
- * STRICT CHECK: Must have line1 + city + (state OR postal) + country
+ * Check if an address meets MINIMUM quality standards
+ * Flexible: Must have AT LEAST line1 + city (2 core fields)
+ * Improved from strict "all or nothing" approach
  */
-export function isAddressDataComplete(address: { address: any; source: string; isComplete: boolean }): boolean {
+export function hasMinimumAddressQuality(address: { address: any; source: string }): boolean {
   if (!address || address.source === 'None') return false;
-  if (!address.isComplete) return false;
   
   const addr = address.address;
   if (!addr) return false;
   
-  // CRITICAL: Must have ALL required fields populated
+  // MINIMUM REQUIREMENT: Must have line1 AND city
   const hasLine1 = addr.line1 && addr.line1.trim() !== '';
   const hasCity = addr.city && addr.city.trim() !== '';
-  const hasStateOrPostal = 
-    (addr.state && addr.state.trim() !== '') || 
-    (addr.postal && addr.postal.trim() !== '');
-  const hasCountry = addr.country && addr.country.trim() !== '';
   
-  return hasLine1 && hasCity && hasStateOrPostal && hasCountry;
+  return hasLine1 && hasCity;
 }
 
 /**
  * Analyze contact completeness for export eligibility
+ * NEW FLEXIBLE CRITERIA: Export if less than 4 blank fields in address+phone combined
  */
 export function analyzeContactCompleteness(smartData: BestContactData): CompletenessResult {
   const hasCompletePhone = isPhoneComplete(smartData.phone);
-  const hasCompleteAddress = isAddressDataComplete(smartData.address);
+  const hasMinAddress = hasMinimumAddressQuality(smartData.address);
   
+  // Count blank fields in address (5 possible fields)
+  const addressBlanks = countAddressBlankFields(smartData.address);
+  
+  // Phone counts as 1 blank if missing
+  const phoneBlanks = hasCompletePhone ? 0 : 1;
+  
+  // Total blank fields (max 6: 1 phone + 5 address fields)
+  const blankFieldCount = phoneBlanks + addressBlanks;
+  
+  // Quality score: 100% if all fields present, decreases by ~16.7% per blank
+  const qualityScore = Math.round(((6 - blankFieldCount) / 6) * 100);
+  
+  // CLIENT-READY CRITERIA: Less than 4 blank fields AND has minimum address quality
+  const isClientReady = blankFieldCount < 4 && hasMinAddress && hasCompletePhone;
+  
+  // Track missing fields for logging
   const missingFields: string[] = [];
   if (!hasCompletePhone) missingFields.push('phone');
-  if (!hasCompleteAddress) missingFields.push('address');
+  if (addressBlanks > 0) {
+    const addr = smartData.address.address;
+    if (!addr.line1 || addr.line1.trim() === '') missingFields.push('address.line1');
+    if (!addr.city || addr.city.trim() === '') missingFields.push('address.city');
+    if (!addr.state || addr.state.trim() === '') missingFields.push('address.state');
+    if (!addr.postal || addr.postal.trim() === '') missingFields.push('address.postal');
+    if (!addr.country || addr.country.trim() === '') missingFields.push('address.country');
+  }
   
   return {
     hasCompletePhone,
-    hasCompleteAddress,
-    isClientReady: hasCompletePhone && hasCompleteAddress,
+    hasCompleteAddress: addressBlanks === 0,
+    isClientReady,
     missingFields,
+    blankFieldCount,
+    qualityScore,
   };
 }
