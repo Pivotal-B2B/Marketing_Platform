@@ -129,24 +129,23 @@ function doesCountryMatch(
 
 /**
  * Extract CAV Tel from custom fields
- * Supports various spellings: "CAV Tel", "CAV_Tel", "cavTel", etc.
+ * The custom field is stored as "custom_cav_tel" in the database
  */
 function getCavTel(customFields: any): string | null {
   if (!customFields || typeof customFields !== 'object') return null;
   
-  // Try various key patterns
+  // Try various key patterns (the database uses "custom_cav_tel")
   const patterns = [
-    'CAV Tel',
+    'custom_cav_tel',      // Actual database field name
+    'CAV-Tel',
     'CAV_Tel',
-    'cavTel',
     'cav_tel',
-    'CAT Tel', // User mentioned this variant
-    'CAT_Tel',
   ];
   
   for (const pattern of patterns) {
     if (customFields[pattern]) {
-      return String(customFields[pattern]);
+      const value = String(customFields[pattern]).trim();
+      if (value) return value;
     }
   }
   
@@ -155,32 +154,41 @@ function getCavTel(customFields: any): string | null {
 
 /**
  * Extract CAV Address from custom fields
+ * The custom fields are stored with "custom_" prefix in the database:
+ * custom_cav_addr1, custom_cav_addr2, custom_cav_addr3, custom_cav_town, custom_cav_state, custom_cav_postcode
  */
 function getCavAddress(customFields: any): Partial<AddressComponents> {
   if (!customFields || typeof customFields !== 'object') {
     return {};
   }
   
+  // Helper function to get and clean field value
+  const getField = (fieldName: string): string => {
+    const value = customFields[fieldName];
+    return value ? String(value).trim() : '';
+  };
+  
   return {
-    line1: customFields['CAV Street Address 1'] || customFields['cav_street_address_1'] || '',
-    line2: customFields['CAV Street Address 2'] || customFields['cav_street_address_2'] || '',
-    line3: customFields['CAV Street Address 3'] || customFields['cav_street_address_3'] || '',
-    city: customFields['CAV Town'] || customFields['cav_town'] || '',
-    state: customFields['CAV State'] || customFields['cav_state'] || '',
-    postal: customFields['CAV Postal Code'] || customFields['cav_postal_code'] || '',
+    line1: getField('custom_cav_addr1') || getField('CAV-Addr1') || getField('cav_addr1'),
+    line2: getField('custom_cav_addr2') || getField('CAV-Addr2') || getField('cav_addr2'),
+    line3: getField('custom_cav_addr3') || getField('CAV-Addr3') || getField('cav_addr3'),
+    city: getField('custom_cav_town') || getField('cav_town') || getField('CAV-Town'),
+    state: getField('custom_cav_state') || getField('Cav_State') || getField('cav_state'),
+    postal: getField('custom_cav_postcode') || getField('cav_postcode') || getField('CAV-Postcode'),
     country: '', // CAV fields typically don't have country
   };
 }
 
 /**
  * Select the best phone number from available sources
- * Priority: Mobile > Contact Phone > CAV Tel > AI Enriched > HQ Phone
+ * Priority: CAV Tel > Mobile > Contact Phone > AI Enriched > HQ Phone
+ * CAV Tel is prioritized because it's client-verified data
  */
 export function selectBestPhone(contact: VerificationContactData): BestPhone {
   const candidates: Array<{ value: string | null | undefined; source: PhoneSource }> = [
+    { value: getCavTel(contact.customFields), source: 'CAV Tel' },
     { value: contact.mobile, source: 'Contact Mobile' },
     { value: contact.phone, source: 'Contact Phone' },
-    { value: getCavTel(contact.customFields), source: 'CAV Tel' },
     { value: contact.aiEnrichedPhone, source: 'AI Enriched Phone' },
     { value: contact.hqPhone, source: 'Company HQ Phone' },
   ];
@@ -211,17 +219,24 @@ export function selectBestPhone(contact: VerificationContactData): BestPhone {
 
 /**
  * Select the best address from available sources with country matching
- * Priority: Contact > AI Enriched > Company HQ > CAV Custom Fields
+ * Priority: CAV Custom Fields > Contact > AI Enriched > Company HQ
+ * CAV fields are prioritized because they're client-verified data
  */
 export function selectBestAddress(contact: VerificationContactData): BestAddress {
   const contactCountry = contact.contactCountry;
   
   // Define address candidates with their sources
+  // CAV Custom Fields come FIRST (highest priority)
   const candidates: Array<{
     address: Partial<AddressComponents>;
     source: AddressSource;
     country: string | null | undefined;
   }> = [
+    {
+      address: getCavAddress(contact.customFields),
+      source: 'CAV Custom Fields',
+      country: contactCountry, // Infer from contact country
+    },
     {
       address: {
         line1: contact.contactAddress1 || '',
@@ -260,11 +275,6 @@ export function selectBestAddress(contact: VerificationContactData): BestAddress
       },
       source: 'Company HQ Address',
       country: contact.hqCountry,
-    },
-    {
-      address: getCavAddress(contact.customFields),
-      source: 'CAV Custom Fields',
-      country: contactCountry, // Infer from contact country
     },
   ];
   
