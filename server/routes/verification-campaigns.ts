@@ -1098,6 +1098,47 @@ router.post("/api/verification-campaigns/:id/merge-cav-data", async (req, res) =
   }
 });
 
+// Backfill Account Domains from Contact Emails endpoint
+router.post("/api/verification-campaigns/:id/backfill-domains", async (req, res) => {
+  try {
+    const campaignId = req.params.id;
+    
+    // Verify campaign exists
+    const [campaign] = await db
+      .select()
+      .from(verificationCampaigns)
+      .where(eq(verificationCampaigns.id, campaignId));
+    
+    if (!campaign) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+    
+    // Dynamic import to avoid circular dependencies
+    const { backfillAccountDomainsForCampaign } = await import("../lib/backfill-account-domains");
+    
+    // Run the backfill
+    const stats = await backfillAccountDomainsForCampaign(campaignId);
+    
+    res.json({
+      success: true,
+      message: `Domain backfill complete`,
+      stats: {
+        processed: stats.processed,
+        updated: stats.updated,
+        skipped: stats.skipped,
+        errors: stats.errors,
+      },
+      details: stats.details,
+    });
+  } catch (error) {
+    console.error("Error backfilling domains:", error);
+    res.status(500).json({ 
+      error: "Failed to backfill domains",
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Smart Lead Cap Enforcement endpoint (BullMQ-based)
 router.post("/api/verification-campaigns/:id/enforce-caps", async (req, res) => {
   try {
