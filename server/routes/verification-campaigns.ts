@@ -1176,21 +1176,20 @@ router.post("/api/verification-campaigns/:id/identify-for-enrichment", async (re
     const { identifyContactsForEnrichment, queueForEnrichment } = await import("../lib/continuous-enrichment");
     const result = await identifyContactsForEnrichment(campaignId);
     
-    // Auto-queue for enrichment if requested
-    let queuedCounts = { phone: 0, address: 0, both: 0 };
+    // Auto-queue for enrichment if requested (only contacts missing BOTH fields)
+    let queuedCount = 0;
     if (autoQueue) {
-      queuedCounts.phone = await queueForEnrichment(result.needsPhoneEnrichment, 'phone');
-      queuedCounts.address = await queueForEnrichment(result.needsAddressEnrichment, 'address');
-      queuedCounts.both = await queueForEnrichment(result.needsBothEnrichment, 'both');
+      queuedCount = await queueForEnrichment(result.needsBothEnrichment);
     }
     
     res.json({
       success: true,
       message: autoQueue 
-        ? `Queued ${queuedCounts.phone + queuedCounts.address + queuedCounts.both} contacts for enrichment`
+        ? `Queued ${queuedCount} contacts for enrichment (missing BOTH phone and address)`
         : `Identified ${result.stats.queued} contacts needing enrichment`,
-      ...result,
-      queued: autoQueue ? queuedCounts : undefined,
+      stats: result.stats,
+      queued: result.needsBothEnrichment.length,
+      queuedCount: autoQueue ? queuedCount : undefined,
     });
   } catch (error) {
     console.error("Error identifying contacts for enrichment:", error);

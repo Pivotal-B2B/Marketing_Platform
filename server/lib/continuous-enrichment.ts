@@ -1,6 +1,9 @@
 /**
  * Continuous AI Enrichment System
- * Identifies incomplete Eligible+Validated contacts and queues them for AI enrichment
+ * Identifies contacts missing BOTH Best Phone AND Best Address and queues them for AI enrichment
+ * 
+ * STRATEGY: Only enrich contacts that are missing both phone and address
+ * This prevents wasting AI credits on contacts that already have one of the two critical fields
  */
 
 import { db } from '../db';
@@ -13,30 +16,28 @@ export interface EnrichmentStats {
   scanned: number;
   queued: number;
   alreadyComplete: number;
+  hasPartialData: number; // Has phone OR address (don't enrich)
   errors: number;
 }
 
 /**
- * Identify contacts needing enrichment (Eligible + Validated but incomplete data)
- * Returns list of contact IDs ready for AI enrichment
+ * Identify contacts needing enrichment (Eligible + Validated but missing BOTH phone AND address)
+ * ONLY queues contacts that need both fields - this is more cost-effective
  */
 export async function identifyContactsForEnrichment(campaignId: string): Promise<{
-  needsPhoneEnrichment: string[];
-  needsAddressEnrichment: string[];
   needsBothEnrichment: string[];
   stats: EnrichmentStats;
 }> {
-  console.log(`[CONTINUOUS ENRICHMENT] Scanning campaign ${campaignId} for incomplete contacts`);
+  console.log(`[CONTINUOUS ENRICHMENT] Scanning campaign ${campaignId} for contacts missing BOTH phone AND address`);
   
   const stats: EnrichmentStats = {
     scanned: 0,
     queued: 0,
     alreadyComplete: 0,
+    hasPartialData: 0,
     errors: 0,
   };
   
-  const needsPhoneEnrichment: string[] = [];
-  const needsAddressEnrichment: string[] = [];
   const needsBothEnrichment: string[] = [];
   
   try {
@@ -122,15 +123,14 @@ export async function identifyContactsForEnrichment(campaignId: string): Promise
           const needsPhone = !completeness.hasCompletePhone;
           const needsAddress = !completeness.hasCompleteAddress;
           
+          // CRITICAL: Only queue if missing BOTH phone AND address
           if (needsPhone && needsAddress) {
             needsBothEnrichment.push(contact.id);
-          } else if (needsPhone) {
-            needsPhoneEnrichment.push(contact.id);
-          } else if (needsAddress) {
-            needsAddressEnrichment.push(contact.id);
+            stats.queued++;
+          } else {
+            // Has phone OR address (but not both) - skip enrichment
+            stats.hasPartialData++;
           }
-          
-          stats.queued++;
         }
       } catch (error) {
         console.error(`[CONTINUOUS ENRICHMENT] Error analyzing contact ${contact.id}:`, error);
@@ -140,15 +140,12 @@ export async function identifyContactsForEnrichment(campaignId: string): Promise
     
     console.log(`[CONTINUOUS ENRICHMENT] Summary:
       - Complete: ${stats.alreadyComplete}
-      - Needs phone only: ${needsPhoneEnrichment.length}
-      - Needs address only: ${needsAddressEnrichment.length}
-      - Needs both: ${needsBothEnrichment.length}
+      - Has partial data (skipped): ${stats.hasPartialData}
+      - Missing BOTH (queued): ${needsBothEnrichment.length}
       - Errors: ${stats.errors}
     `);
     
     return {
-      needsPhoneEnrichment,
-      needsAddressEnrichment,
       needsBothEnrichment,
       stats,
     };
@@ -160,41 +157,19 @@ export async function identifyContactsForEnrichment(campaignId: string): Promise
 
 /**
  * Queue contacts for AI enrichment
- * Updates enrichment status flags on contacts
+ * Updates enrichment status flags to mark contacts as pending for BOTH phone and address enrichment
  */
-export async function queueForEnrichment(
-  contactIds: string[],
-  enrichmentType: 'phone' | 'address' | 'both'
-): Promise<number> {
+export async function queueForEnrichment(contactIds: string[]): Promise<number> {
   if (contactIds.length === 0) return 0;
   
-  console.log(`[CONTINUOUS ENRICHMENT] Queuing ${contactIds.length} contacts for ${enrichmentType} enrichment`);
+  console.log(`[CONTINUOUS ENRICHMENT] Queuing ${contactIds.length} contacts for BOTH phone and address enrichment`);
   
-  // Mark contacts as pending enrichment
-  const updateFields: any = {
-    updatedAt: new Date(),
-  };
-  
-  if (enrichmentType === 'phone' || enrichmentType === 'both') {
-    updateFields.phoneEnrichmentStatus = 'pending';
-  }
-  if (enrichmentType === 'address' || enrichmentType === 'both') {
-    updateFields.addressEnrichmentStatus = 'pending';
-  }
-  
+  // Mark contacts as pending enrichment for BOTH fields
   const result = await db.execute(sql`
     UPDATE verification_contacts
     SET 
-      phone_enrichment_status = CASE 
-        WHEN ${enrichmentType === 'phone' || enrichmentType === 'both'} 
-        THEN 'pending'::phone_enrichment_status 
-        ELSE phone_enrichment_status 
-      END,
-      address_enrichment_status = CASE 
-        WHEN ${enrichmentType === 'address' || enrichmentType === 'both'} 
-        THEN 'pending'::address_enrichment_status 
-        ELSE address_enrichment_status 
-      END,
+      phone_enrichment_status = 'pending'::phone_enrichment_status,
+      address_enrichment_status = 'pending'::address_enrichment_status,
       updated_at = NOW()
     WHERE id = ANY(${contactIds})
   `);

@@ -6,6 +6,7 @@
 import { processPendingTranscriptions } from './assemblyai-transcription';
 import { processUnanalyzedLeads } from './ai-qa-analyzer';
 import { startEmailValidationJob } from '../jobs/email-validation-job';
+import { startAiEnrichmentJob } from '../jobs/ai-enrichment-job';
 import { db } from '../db';
 import { agentQueue, campaignQueue } from '@shared/schema';
 import { eq, lt, and, inArray, sql } from 'drizzle-orm';
@@ -105,12 +106,16 @@ export function startBackgroundJobs() {
 
   // Email validation job (cron-based)
   startEmailValidationJob();
+  
+  // AI enrichment job (cron-based, targets contacts missing BOTH phone and address)
+  startAiEnrichmentJob();
 
   console.log('[Background Jobs] All jobs started successfully');
   console.log(`[Background Jobs] - Transcription job: every ${TRANSCRIPTION_JOB_INTERVAL/1000}s`);
   console.log(`[Background Jobs] - AI analysis job: every ${AI_ANALYSIS_JOB_INTERVAL/1000}s`);
   console.log(`[Background Jobs] - Lock sweeper: every ${LOCK_SWEEPER_INTERVAL/1000}s`);
   console.log(`[Background Jobs] - Email validation job: cron-based (every 2 minutes)`);
+  console.log(`[Background Jobs] - AI enrichment job: cron-based (every 15 minutes, targets contacts missing BOTH phone and address)`);
 }
 
 /**
