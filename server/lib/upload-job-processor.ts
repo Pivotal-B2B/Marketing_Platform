@@ -346,6 +346,26 @@ async function processSubmissions(
     .where(eq(verificationUploadJobs.id, jobId));
 
   console.log(`[UPLOAD JOB] Submissions completed: ${successCount} success, ${errors.length} errors`);
+  
+  // CRITICAL: Enforce 2-year submission exclusion after upload
+  // This marks recently submitted contacts as Ineligible_Recently_Submitted
+  if (successCount > 0) {
+    console.log(`[UPLOAD JOB] Enforcing 2-year exclusion for campaign ${campaignId}...`);
+    
+    try {
+      const { enforceSubmissionExclusion } = await import("./submission-exclusion");
+      const exclusionStats = await enforceSubmissionExclusion(campaignId);
+      
+      console.log(`[UPLOAD JOB] ✅ Exclusion enforced:
+        - Recently submitted (excluded): ${exclusionStats.excluded}
+        - Old submissions (reactivated): ${exclusionStats.reactivated}
+        - Total processed: ${exclusionStats.checked}`);
+    } catch (error) {
+      console.error(`[UPLOAD JOB] ⚠️ Failed to enforce submission exclusion:`, error);
+      // Don't fail the entire job if exclusion enforcement fails
+      // Admin can manually trigger enforcement later
+    }
+  }
 }
 
 /**

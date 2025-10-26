@@ -4,9 +4,10 @@ import {
   verificationContacts,
   verificationLeadSubmissions,
   verificationCampaigns,
+  verificationUploadJobs,
   accounts,
 } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import Papa from "papaparse";
 import { normalize } from "../lib/verification-utils";
 
