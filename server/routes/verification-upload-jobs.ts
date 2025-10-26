@@ -33,6 +33,7 @@ router.post("/api/verification-upload-jobs", async (req: Request, res: Response)
       .insert(verificationUploadJobs)
       .values({
         campaignId,
+        jobType: 'contacts',
         csvData,
         fieldMappings: fieldMappings || null,
         updateMode: updateMode || false,
