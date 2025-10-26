@@ -627,8 +627,50 @@ export default function VerificationConsolePage() {
             <CardTitle className="text-sm font-medium">Validated</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-validated-count">
-              {(stats as any)?.validated_count || 0}
+            <div className="space-y-2">
+              <div className="text-2xl font-bold" data-testid="text-validated-count">
+                {(stats as any)?.validated_count || 0}
+              </div>
+              {(stats as any)?.validated_count > 0 && (stats as any)?.ok_email_count === 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(
+                        `/api/verification-campaigns/${campaignId}/contacts/run-email-validation`,
+                        {
+                          method: "POST",
+                          headers: {
+                            "Authorization": `Bearer ${localStorage.getItem('authToken')}`,
+                          },
+                          credentials: "include",
+                        }
+                      );
+                      const data = await res.json();
+                      toast({
+                        title: "Email Validation Started",
+                        description: `Processing ${data.total || 0} contacts...`,
+                      });
+                      // Refresh stats after a delay
+                      setTimeout(() => {
+                        queryClient.invalidateQueries({ queryKey: ["/api/verification-campaigns", campaignId, "stats"] });
+                      }, 2000);
+                    } catch (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to start email validation",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  data-testid="button-run-email-validation"
+                >
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Validate Emails
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

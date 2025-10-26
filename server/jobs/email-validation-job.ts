@@ -75,7 +75,7 @@ async function processPendingEmailValidations() {
     }
     
     // Process each domain sequentially (rate limiting)
-    for (const [domain, domainContacts] of byDomain.entries()) {
+    for (const [domain, domainContacts] of Array.from(byDomain.entries())) {
       console.log(`[EmailValidationJob] Processing ${domainContacts.length} contacts for domain: ${domain}`);
       
       for (const contact of domainContacts) {
@@ -100,7 +100,7 @@ async function processPendingEmailValidations() {
           // Finalize eligibility based on validation result
           const finalEligibility = finalizeEligibilityAfterEmailValidation(
             validation.status,
-            contact.eligibilityStatus
+            contact.eligibilityStatus || 'Pending_Email_Validation'
           );
           
           // Update contact eligibility status

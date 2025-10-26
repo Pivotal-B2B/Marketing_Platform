@@ -16,7 +16,7 @@ import { evaluateEligibility, computeNormalizedKeys } from "../lib/verification-
 import { applySuppressionForContacts } from "../lib/verification-suppression";
 import { requireAuth } from "../auth";
 import { exportVerificationContactsToCsv, createCsvDownloadResponse } from "../lib/csv-export";
-import { verifyEmailsBulk } from "../lib/email-list-verify";
+import { verifyEmailsBulk, type EmailVerificationResult } from "../lib/email-list-verify";
 
 const router = Router();
 
@@ -1039,6 +1039,111 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-mark-validate
   }
 });
 
+// Run Email Validation on Validated Contacts
+router.post("/api/verification-campaigns/:campaignId/contacts/run-email-validation", requireAuth, async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    
+    console.log('[RUN EMAIL VALIDATION] Starting validation for campaign:', campaignId);
+    
+    // Find all validated contacts without email_status set
+    const contactsToValidate = await db
+      .select({
+        id: verificationContacts.id,
+        email: verificationContacts.email,
+      })
+      .from(verificationContacts)
+      .where(
+        and(
+          eq(verificationContacts.campaignId, campaignId),
+          eq(verificationContacts.deleted, false),
+          eq(verificationContacts.verificationStatus, 'Validated'),
+          sql`${verificationContacts.email} IS NOT NULL`,
+          sql`(${verificationContacts.emailStatus} IS NULL OR ${verificationContacts.emailStatus} = 'unknown')`
+        )
+      )
+      .limit(500); // Process in batches to avoid timeout
+    
+    if (contactsToValidate.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: 'No contacts need email validation',
+        validated: 0 
+      });
+    }
+    
+    console.log(`[RUN EMAIL VALIDATION] Found ${contactsToValidate.length} contacts to validate`);
+    
+    // Import validation function
+    const { validateAndStoreEmail } = await import('../lib/email-validation-engine');
+    
+    let validated = 0;
+    let failed = 0;
+    
+    // Group by domain for rate limiting
+    const byDomain = new Map<string, typeof contactsToValidate>();
+    for (const contact of contactsToValidate) {
+      if (!contact.email) continue;
+      const domain = contact.email.split('@')[1]?.toLowerCase();
+      if (!domain) continue;
+      if (!byDomain.has(domain)) {
+        byDomain.set(domain, []);
+      }
+      byDomain.get(domain)!.push(contact);
+    }
+    
+    // Process each domain sequentially (rate limiting)
+    for (const [domain, domainContacts] of Array.from(byDomain.entries())) {
+      console.log(`[RUN EMAIL VALIDATION] Processing ${domainContacts.length} contacts for domain: ${domain}`);
+      
+      for (const contact of domainContacts) {
+        if (!contact.email) continue;
+        
+        try {
+          // Validate email
+          const validation = await validateAndStoreEmail(
+            contact.id,
+            contact.email,
+            'api_free',
+            { skipSmtp: process.env.SKIP_SMTP_VALIDATION === 'true' }
+          );
+          
+          // Update contact with email_status
+          await db
+            .update(verificationContacts)
+            .set({
+              emailStatus: validation.status,
+              updatedAt: new Date(),
+            })
+            .where(eq(verificationContacts.id, contact.id));
+          
+          validated++;
+          console.log(`[RUN EMAIL VALIDATION] Validated ${contact.email}: ${validation.status}`);
+          
+        } catch (error) {
+          failed++;
+          console.error(`[RUN EMAIL VALIDATION] Error validating ${contact.email}:`, error);
+        }
+      }
+      
+      // Rate limiting: small delay between domains
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    console.log(`[RUN EMAIL VALIDATION] Complete: ${validated} validated, ${failed} failed`);
+    
+    res.json({ 
+      success: true, 
+      validated,
+      failed,
+      total: contactsToValidate.length
+    });
+  } catch (error) {
+    console.error("[RUN EMAIL VALIDATION] Error:", error);
+    res.status(500).json({ error: "Failed to run email validation" });
+  }
+});
+
 // Bulk Field Update endpoint
 router.post("/api/verification-campaigns/:campaignId/contacts/bulk-field-update", requireAuth, async (req, res) => {
   try {
@@ -1477,7 +1582,7 @@ export async function processEmailValidationJob(jobId: string) {
         });
         
         // Merge API results with cached results
-        for (const [email, result] of apiResults.entries()) {
+        for (const [email, result] of Array.from(apiResults.entries())) {
           verificationResults.set(email, result);
         }
       } else {
@@ -1530,8 +1635,9 @@ export async function processEmailValidationJob(jobId: string) {
             .onConflictDoNothing();
           
           // Track status counts ONLY after successful update
-          if (result.status in totalStatusCounts) {
-            totalStatusCounts[result.status]++;
+          const statusKey = result.status as keyof typeof totalStatusCounts;
+          if (statusKey in totalStatusCounts) {
+            totalStatusCounts[statusKey]++;
           } else {
             console.warn(`[EMAIL VALIDATION JOB] Job ${jobId}: Unknown status '${result.status}' for ${emailKey}, counting as unknown`);
             totalStatusCounts.unknown++;
