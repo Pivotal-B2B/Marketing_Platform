@@ -334,7 +334,7 @@ export class ManualQueueService {
     if (filters.industries && filters.industries.length > 0) {
       conditions.push(
         sql`${contacts.accountId} IN (
-          SELECT id FROM ${accounts} WHERE ${accounts.industryStandardized} = ANY(${filters.industries})
+          SELECT id FROM ${accounts} WHERE ${accounts.industryStandardized} = ANY(ARRAY[${sql.join(filters.industries.map(i => sql`${i}`), sql`, `)}])
         )`
       );
     }
@@ -342,7 +342,7 @@ export class ManualQueueService {
     if (filters.regions && filters.regions.length > 0) {
       conditions.push(
         sql`${contacts.accountId} IN (
-          SELECT id FROM ${accounts} WHERE ${accounts.hqState} = ANY(${filters.regions})
+          SELECT id FROM ${accounts} WHERE ${accounts.hqState} = ANY(ARRAY[${sql.join(filters.regions.map(r => sql`${r}`), sql`, `)}])
         )`
       );
     }

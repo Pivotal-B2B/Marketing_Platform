@@ -67,7 +67,7 @@ router.post("/api/verification-campaigns/:campaignId/submission/prepare", async 
       await db.execute(sql`
         UPDATE verification_contacts
         SET in_submission_buffer = TRUE, updated_at = NOW()
-        WHERE id = ANY(${contactIds}::varchar[])
+        WHERE id = ANY(ARRAY[${sql.join(contactIds.map(id => sql`${id}`), sql`, `)}])
       `);
     }
     

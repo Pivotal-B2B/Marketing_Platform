@@ -279,7 +279,7 @@ router.post(
                     ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
                   FROM ${contacts} c
                   WHERE 
-                    c.id = ANY(${campaignContactIds})
+                    c.id = ANY(ARRAY[${sql.join(campaignContactIds.map(id => sql`${id}`), sql`, `)}])
                     ${filterPart ? sql`AND ${filterPart}` : sql``}
                 ) t
                 WHERE rn <= ${per_account_cap}
@@ -295,7 +295,7 @@ router.post(
                     ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
                   FROM ${contacts} c
                   WHERE 
-                    c.id = ANY(${campaignContactIds})
+                    c.id = ANY(ARRAY[${sql.join(campaignContactIds.map(id => sql`${id}`), sql`, `)}])
                     ${filterPart ? sql`AND ${filterPart}` : sql``}
                 ) t
                 WHERE rn <= ${per_account_cap}

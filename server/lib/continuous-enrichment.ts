@@ -171,7 +171,7 @@ export async function queueForEnrichment(contactIds: string[]): Promise<number> 
       phone_enrichment_status = 'pending'::phone_enrichment_status,
       address_enrichment_status = 'pending'::address_enrichment_status,
       updated_at = NOW()
-    WHERE id = ANY(${contactIds})
+    WHERE id = ANY(ARRAY[${sql.join(contactIds.map(id => sql`${id}`), sql`, `)}])
   `);
   
   console.log(`[CONTINUOUS ENRICHMENT] Updated enrichment status for ${result.rowCount} contacts`);

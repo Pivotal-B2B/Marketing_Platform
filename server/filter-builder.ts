@@ -244,7 +244,7 @@ function buildCompanyFieldCondition(
       if (values.length === 1) {
         return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${compareColumn} = ${values[0]})`;
       }
-      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${compareColumn} = ANY(${values}))`;
+      return sql`${contacts.accountId} IS NOT NULL AND EXISTS (SELECT 1 FROM ${accounts} WHERE ${accounts.id} = ${contacts.accountId} AND ${compareColumn} = ANY(ARRAY[${sql.join(values.map(v => sql`${v}`), sql`, `)}]))`;
     
     case 'not_equals':
       // Multi-value AND: not equals ALL of the values
@@ -392,7 +392,7 @@ function buildRegularFieldCondition(
       if (values.length === 1) {
         return isEnumField ? sql`${compareColumn} = ${values[0]}` : eq(column, values[0]);
       }
-      return isEnumField ? sql`${compareColumn} = ANY(${values})` : inArray(column, values);
+      return isEnumField ? sql`${compareColumn} = ANY(ARRAY[${sql.join(values.map(v => sql`${v}`), sql`, `)}])` : inArray(column, values);
     
     case 'not_equals':
       // Multi-value AND: not equals ALL of the values
