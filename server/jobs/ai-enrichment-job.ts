@@ -33,7 +33,7 @@ async function processEnrichmentQueue(): Promise<void> {
     const activeCampaigns = await db.execute(sql`
       SELECT id, name
       FROM verification_campaigns
-      WHERE deleted = FALSE
+      WHERE status = 'active'
       ORDER BY created_at DESC
     `);
     

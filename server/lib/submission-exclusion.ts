@@ -78,7 +78,7 @@ export async function enforceSubmissionExclusion(campaignId: string): Promise<Ex
         SET 
           eligibility_status = 'Ineligible_Recently_Submitted',
           updated_at = NOW()
-        WHERE id = ANY(${recentContactIds})
+        WHERE id = ANY(ARRAY[${sql.join(recentContactIds.map(id => sql`${id}`), sql`, `)}])
           AND campaign_id = ${campaignId}
           AND eligibility_status != 'Ineligible_Recently_Submitted'
       `);
@@ -95,7 +95,7 @@ export async function enforceSubmissionExclusion(campaignId: string): Promise<Ex
         SET 
           eligibility_status = 'Pending_Email_Validation',
           updated_at = NOW()
-        WHERE id = ANY(${oldContactIds})
+        WHERE id = ANY(ARRAY[${sql.join(oldContactIds.map(id => sql`${id}`), sql`, `)}])
           AND campaign_id = ${campaignId}
           AND eligibility_status = 'Ineligible_Recently_Submitted'
       `);
