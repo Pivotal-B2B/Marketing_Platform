@@ -2246,8 +2246,9 @@ export function registerRoutes(app: Express) {
         }
 
         // Resolve contacts from lists (with batching for large lists)
-        if (audienceRefs.selectedLists && Array.isArray(audienceRefs.selectedLists)) {
-          for (const listId of audienceRefs.selectedLists) {
+        const listIds = audienceRefs.lists || audienceRefs.selectedLists || [];
+        if (Array.isArray(listIds) && listIds.length > 0) {
+          for (const listId of listIds) {
             const list = await storage.getList(listId);
             if (list && list.recordIds && list.recordIds.length > 0) {
               // Batch large lists to avoid SQL query limits
