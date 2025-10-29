@@ -315,7 +315,7 @@ export function Step4Compliance({ data, onNext, campaignType }: Step4Props) {
           <AlertDescription>
             <p className="font-medium">Campaign-Level Email Suppressions</p>
             <p className="text-sm text-muted-foreground mt-1">
-              After creating this campaign, you can upload a CSV of email addresses to exclude from this specific campaign only. This is separate from the global suppression list.
+              After creating this campaign, click the "Suppressions" button in the campaign card to upload a CSV of email addresses to exclude from this specific campaign only. Campaign-level suppressions are separate from the global suppression list and only affect this campaign.
             </p>
           </AlertDescription>
         </Alert>

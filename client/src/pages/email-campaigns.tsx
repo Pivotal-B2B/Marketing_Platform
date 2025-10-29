@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Mail, Play, BarChart3, Loader2 } from "lucide-react";
+import { Plus, Search, Mail, Play, BarChart3, Loader2, Shield } from "lucide-react";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -214,6 +215,12 @@ export default function EmailCampaignsPage() {
                         Launch
                       </Button>
                     )}
+                    <Link href={`/campaigns/${campaign.id}/suppressions`}>
+                      <Button variant="outline" size="sm" data-testid={`button-manage-suppressions-${campaign.id}`}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        Suppressions
+                      </Button>
+                    </Link>
                     <Button variant="outline" size="sm" data-testid={`button-view-stats-${campaign.id}`}>
                       <BarChart3 className="mr-2 h-4 w-4" />
                       Stats
