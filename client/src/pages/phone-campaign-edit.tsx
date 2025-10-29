@@ -15,6 +15,7 @@ import { ArrowLeft, Save, Phone, Users, Shield, Settings } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PhoneCampaignSuppressionManager } from "@/components/phone-campaign-suppression-manager";
 
 export default function PhoneCampaignEditPage() {
   const [, params] = useRoute("/campaigns/phone/:id/edit");
@@ -429,19 +430,7 @@ export default function PhoneCampaignEditPage() {
 
         {/* Suppressions Tab */}
         <TabsContent value="suppressions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>DNC / Suppression List</CardTitle>
-              <CardDescription>
-                Manage phone numbers to exclude from this campaign (Do Not Call)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                Phone suppression management coming soon. For now, you can manage global DNC lists through the main Suppressions page.
-              </p>
-            </CardContent>
-          </Card>
+          <PhoneCampaignSuppressionManager campaignId={campaignId!} />
         </TabsContent>
 
         {/* Settings Tab */}

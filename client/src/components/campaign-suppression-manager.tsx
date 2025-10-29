@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+
+interface SuppressionResponse<T> {
+  data: T[];
+  total: number;
+  limit?: number;
+  offset?: number;
+}
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +61,7 @@ export function CampaignSuppressionManager({
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
 
   // Fetch current suppressions
-  const { data: suppressionsData, isLoading } = useQuery({
+  const { data: suppressionsData, isLoading } = useQuery<SuppressionResponse<SuppressionEmail>>({
     queryKey: ['/api/campaigns', campaignId, 'suppressions', 'emails'],
     enabled: !!campaignId,
   });

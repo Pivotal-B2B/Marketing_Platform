@@ -5,6 +5,7 @@ import { Step2TelemarketingContent } from "@/components/campaign-builder/step2-t
 import { Step2bDialModeConfig } from "@/components/campaign-builder/step2b-dial-mode-config";
 import { Step3Scheduling } from "@/components/campaign-builder/step3-scheduling";
 import { Step4Compliance } from "@/components/campaign-builder/step4-compliance";
+import { Step4bSuppressions } from "@/components/campaign-builder/step4b-suppressions";
 import { Step5Summary } from "@/components/campaign-builder/step5-summary";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -43,6 +44,12 @@ export default function TelemarketingCreatePage() {
       title: "Compliance",
       description: "Automated DNC checks and compliance verification",
       component: Step4Compliance,
+    },
+    {
+      id: "suppressions",
+      title: "Suppressions",
+      description: "Optional campaign-level exclusions (accounts, contacts, domains)",
+      component: Step4bSuppressions,
     },
     {
       id: "summary",
