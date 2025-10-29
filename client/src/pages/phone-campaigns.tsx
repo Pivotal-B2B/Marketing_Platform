@@ -89,7 +89,7 @@ export default function PhoneCampaignsPage() {
     queryFn: async () => {
       const stats: Record<string, any> = {};
       for (const campaign of campaigns) {
-        const [queueRes, agentsRes] = await Promise.all([
+        const [queueRes, agentsRes, suppressionStatsRes] = await Promise.all([
           fetch(`/api/campaigns/${campaign.id}/queue`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -99,17 +99,25 @@ export default function PhoneCampaignsPage() {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
+          }),
+          fetch(`/api/campaigns/${campaign.id}/suppressions/stats`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
           })
         ]);
         if (queueRes.ok && agentsRes.ok) {
           const queue = await queueRes.json();
           const agents = await agentsRes.json();
+          const suppressionStats = suppressionStatsRes.ok ? await suppressionStatsRes.json() : null;
+          
           stats[campaign.id] = {
             total: queue.length,
             queued: queue.filter((q: any) => q.status === 'queued').length,
             inProgress: queue.filter((q: any) => q.status === 'in_progress').length,
             completed: queue.filter((q: any) => q.status === 'done').length,
-            agents: agents.length
+            agents: agents.length,
+            suppression: suppressionStats
           };
         }
       }
@@ -572,6 +580,57 @@ export default function PhoneCampaignsPage() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Suppression Match Statistics */}
+                  {queueStats[campaign.id]?.suppression && queueStats[campaign.id]?.suppression.totalSuppressed > 0 && (
+                    <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                          <span className="text-sm font-semibold text-red-700 dark:text-red-300">
+                            Suppression Matches
+                          </span>
+                        </div>
+                        <Badge variant="destructive" className="text-xs">
+                          {queueStats[campaign.id]?.suppression.totalSuppressed} contacts ({Math.round((queueStats[campaign.id]?.suppression.suppressionRate || 0) * 100)}%)
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {queueStats[campaign.id]?.suppression.suppressedByAccount > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-red-600/80 dark:text-red-400/80">By Account:</span>
+                            <span className="font-medium text-red-700 dark:text-red-300">
+                              {queueStats[campaign.id]?.suppression.suppressedByAccount}
+                            </span>
+                          </div>
+                        )}
+                        {queueStats[campaign.id]?.suppression.suppressedByContact > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-red-600/80 dark:text-red-400/80">By Contact:</span>
+                            <span className="font-medium text-red-700 dark:text-red-300">
+                              {queueStats[campaign.id]?.suppression.suppressedByContact}
+                            </span>
+                          </div>
+                        )}
+                        {queueStats[campaign.id]?.suppression.suppressedByDomain > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-red-600/80 dark:text-red-400/80">By Domain:</span>
+                            <span className="font-medium text-red-700 dark:text-red-300">
+                              {queueStats[campaign.id]?.suppression.suppressedByDomain}
+                            </span>
+                          </div>
+                        )}
+                        {queueStats[campaign.id]?.suppression.suppressedByEmail > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-red-600/80 dark:text-red-400/80">By Email:</span>
+                            <span className="font-medium text-red-700 dark:text-red-300">
+                              {queueStats[campaign.id]?.suppression.suppressedByEmail}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-2 border-t">

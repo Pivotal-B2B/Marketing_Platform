@@ -8,6 +8,7 @@ import {
   accounts,
   contacts,
   campaigns,
+  agentQueue,
   insertCampaignSuppressionAccountSchema,
   insertCampaignSuppressionContactSchema,
   insertCampaignSuppressionEmailSchema,
@@ -205,6 +206,131 @@ router.delete('/:campaignId/suppressions/accounts/bulk', async (req: Request, re
   }
 });
 
+/**
+ * POST /api/campaigns/:campaignId/suppressions/accounts/upload
+ * Upload CSV file with accounts to suppress (supports account_id, domain, or company_name columns)
+ * Body: { csvContent: string }
+ */
+router.post('/:campaignId/suppressions/accounts/upload', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = (req as any).user?.id;
+    const { csvContent } = z.object({ csvContent: z.string() }).parse(req.body);
+
+    // Validate campaign exists
+    const [campaign] = await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Parse CSV
+    const accountIdentifiers: Array<{ type: 'id' | 'domain' | 'company', value: string }> = [];
+    const stream = Readable.from([csvContent]);
+
+    await new Promise<void>((resolve, reject) => {
+      stream
+        .pipe(csv.parse({ headers: true, trim: true }))
+        .on('data', (row: any) => {
+          // Try to extract account identifier from various column names
+          const accountId = row.account_id || row.accountId || row.AccountID || row['Account ID'];
+          const domain = row.domain || row.Domain || row.DOMAIN;
+          const companyName = row.company_name || row.companyName || row['Company Name'] || 
+                            row.company || row.Company || row.COMPANY;
+
+          if (accountId && typeof accountId === 'string') {
+            accountIdentifiers.push({ type: 'id', value: accountId.trim() });
+          } else if (domain && typeof domain === 'string') {
+            accountIdentifiers.push({ type: 'domain', value: domain.trim().toLowerCase() });
+          } else if (companyName && typeof companyName === 'string') {
+            accountIdentifiers.push({ type: 'company', value: companyName.trim() });
+          }
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    if (accountIdentifiers.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid identifiers found in CSV. CSV must have "account_id", "domain", or "company_name" column.' 
+      });
+    }
+
+    // Find matching accounts
+    const matchedAccountIds = new Set<string>();
+
+    // Match by account ID
+    const directIds = accountIdentifiers.filter(i => i.type === 'id').map(i => i.value);
+    if (directIds.length > 0) {
+      const found = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(inArray(accounts.id, directIds));
+      found.forEach(a => matchedAccountIds.add(a.id));
+    }
+
+    // Match by domain (case-insensitive)
+    const domains = accountIdentifiers.filter(i => i.type === 'domain').map(i => i.value);
+    for (const domain of domains) {
+      const found = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(sql`LOWER(${accounts.domain}) = ${domain.toLowerCase()}`);
+      found.forEach(a => matchedAccountIds.add(a.id));
+    }
+
+    // Match by company name (case-insensitive exact match)
+    const companyNames = accountIdentifiers.filter(i => i.type === 'company').map(i => i.value);
+    for (const companyName of companyNames) {
+      const found = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(sql`LOWER(${accounts.name}) = LOWER(${companyName})`);
+      found.forEach(a => matchedAccountIds.add(a.id));
+    }
+
+    if (matchedAccountIds.size === 0) {
+      return res.status(400).json({ 
+        error: 'No matching accounts found in database for the provided identifiers.' 
+      });
+    }
+
+    // Insert suppressions
+    const suppressionsToInsert = Array.from(matchedAccountIds).map(accountId => ({
+      campaignId,
+      accountId,
+      reason: 'CSV bulk upload',
+      addedBy: userId,
+    }));
+
+    const inserted = await db
+      .insert(campaignSuppressionAccounts)
+      .values(suppressionsToInsert)
+      .onConflictDoNothing({
+        target: [campaignSuppressionAccounts.campaignId, campaignSuppressionAccounts.accountId]
+      })
+      .returning();
+
+    res.status(201).json({
+      message: `Successfully processed CSV upload`,
+      totalIdentifiers: accountIdentifiers.length,
+      matchedAccounts: matchedAccountIds.size,
+      added: inserted.length,
+      duplicates: matchedAccountIds.size - inserted.length,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error uploading campaign account suppressions:', error);
+    res.status(500).json({ error: 'Failed to upload campaign account suppressions' });
+  }
+});
+
 // ============================================================================
 // CAMPAIGN SUPPRESSION - CONTACTS
 // ============================================================================
@@ -385,6 +511,290 @@ router.delete('/:campaignId/suppressions/contacts/bulk', async (req: Request, re
     }
     console.error('Error bulk deleting campaign contact suppressions:', error);
     res.status(500).json({ error: 'Failed to bulk delete campaign contact suppressions' });
+  }
+});
+
+/**
+ * POST /api/campaigns/:campaignId/suppressions/contacts/upload
+ * Upload CSV file with contacts to suppress (supports contact_id or email columns)
+ * Body: { csvContent: string }
+ */
+router.post('/:campaignId/suppressions/contacts/upload', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = (req as any).user?.id;
+    const { csvContent } = z.object({ csvContent: z.string() }).parse(req.body);
+
+    // Validate campaign exists
+    const [campaign] = await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Parse CSV
+    const contactIdentifiers: Array<{ type: 'id' | 'email', value: string }> = [];
+    const stream = Readable.from([csvContent]);
+
+    await new Promise<void>((resolve, reject) => {
+      stream
+        .pipe(csv.parse({ headers: true, trim: true }))
+        .on('data', (row: any) => {
+          // Try to extract contact identifier from various column names
+          const contactId = row.contact_id || row.contactId || row.ContactID || row['Contact ID'];
+          const email = row.email || row.Email || row.EMAIL || 
+                       row['e-mail'] || row['E-mail'] || row['E-Mail'] ||
+                       row['Email Address'] || row['email_address'];
+
+          if (contactId && typeof contactId === 'string') {
+            contactIdentifiers.push({ type: 'id', value: contactId.trim() });
+          } else if (email && typeof email === 'string') {
+            const trimmedEmail = email.trim().toLowerCase();
+            // Basic email validation
+            if (trimmedEmail.includes('@') && trimmedEmail.includes('.')) {
+              contactIdentifiers.push({ type: 'email', value: trimmedEmail });
+            }
+          }
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    if (contactIdentifiers.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid identifiers found in CSV. CSV must have "contact_id" or "email" column.' 
+      });
+    }
+
+    // Find matching contacts
+    const matchedContactIds = new Set<string>();
+
+    // Match by contact ID
+    const directIds = contactIdentifiers.filter(i => i.type === 'id').map(i => i.value);
+    if (directIds.length > 0) {
+      const found = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(inArray(contacts.id, directIds));
+      found.forEach(c => matchedContactIds.add(c.id));
+    }
+
+    // Match by email
+    const emails = contactIdentifiers.filter(i => i.type === 'email').map(i => i.value);
+    if (emails.length > 0) {
+      const found = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(inArray(sql`LOWER(${contacts.email})`, emails));
+      found.forEach(c => matchedContactIds.add(c.id));
+    }
+
+    if (matchedContactIds.size === 0) {
+      return res.status(400).json({ 
+        error: 'No matching contacts found in database for the provided identifiers.' 
+      });
+    }
+
+    // Insert suppressions
+    const suppressionsToInsert = Array.from(matchedContactIds).map(contactId => ({
+      campaignId,
+      contactId,
+      reason: 'CSV bulk upload',
+      addedBy: userId,
+    }));
+
+    const inserted = await db
+      .insert(campaignSuppressionContacts)
+      .values(suppressionsToInsert)
+      .onConflictDoNothing({
+        target: [campaignSuppressionContacts.campaignId, campaignSuppressionContacts.contactId]
+      })
+      .returning();
+
+    res.status(201).json({
+      message: `Successfully processed CSV upload`,
+      totalIdentifiers: contactIdentifiers.length,
+      matchedContacts: matchedContactIds.size,
+      added: inserted.length,
+      duplicates: matchedContactIds.size - inserted.length,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error uploading campaign contact suppressions:', error);
+    res.status(500).json({ error: 'Failed to upload campaign contact suppressions' });
+  }
+});
+
+/**
+ * GET /api/campaigns/:campaignId/suppressions/stats
+ * Get suppression match statistics for campaign queue
+ * Returns counts of how many queue contacts match suppression lists
+ */
+router.get('/:campaignId/suppressions/stats', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+
+    // Get all contacts in campaign agent queue (for manual dial) or campaign queue (for power dial)
+    const queueContacts = await db
+      .select({
+        contactId: agentQueue.contactId,
+        accountId: agentQueue.accountId,
+      })
+      .from(agentQueue)
+      .where(eq(agentQueue.campaignId, campaignId));
+
+    if (queueContacts.length === 0) {
+      return res.json({
+        totalContacts: 0,
+        suppressedByAccount: 0,
+        suppressedByContact: 0,
+        suppressedByDomain: 0,
+        suppressedByEmail: 0,
+        totalSuppressed: 0,
+        suppressionRate: 0,
+      });
+    }
+
+    const contactIds = queueContacts.map(c => c.contactId);
+    const accountIds = Array.from(new Set(queueContacts.map(c => c.accountId)));
+
+    // Get contacts with their account data for domain/email matching
+    const contactsWithAccounts = await db
+      .select({
+        contactId: contacts.id,
+        accountId: contacts.accountId,
+        email: contacts.email,
+        accountDomain: accounts.domain,
+      })
+      .from(contacts)
+      .leftJoin(accounts, eq(contacts.accountId, accounts.id))
+      .where(inArray(contacts.id, contactIds));
+
+    // Check account suppressions
+    const suppressedAccountIds = new Set<string>();
+    if (accountIds.length > 0) {
+      const accountSuppressions = await db
+        .select({ accountId: campaignSuppressionAccounts.accountId })
+        .from(campaignSuppressionAccounts)
+        .where(
+          and(
+            eq(campaignSuppressionAccounts.campaignId, campaignId),
+            inArray(campaignSuppressionAccounts.accountId, accountIds)
+          )
+        );
+      accountSuppressions.forEach(s => suppressedAccountIds.add(s.accountId));
+    }
+
+    // Check contact suppressions
+    const suppressedContactIds = new Set<string>();
+    const contactSuppressions = await db
+      .select({ contactId: campaignSuppressionContacts.contactId })
+      .from(campaignSuppressionContacts)
+      .where(
+        and(
+          eq(campaignSuppressionContacts.campaignId, campaignId),
+          inArray(campaignSuppressionContacts.contactId, contactIds)
+        )
+      );
+    contactSuppressions.forEach(s => suppressedContactIds.add(s.contactId));
+
+    // Check domain suppressions
+    const allDomains = contactsWithAccounts
+      .map(c => c.accountDomain?.toLowerCase())
+      .filter(d => d) as string[];
+    
+    const suppressedDomains = new Set<string>();
+    if (allDomains.length > 0) {
+      const domainSuppressions = await db
+        .select({ domainNorm: campaignSuppressionDomains.domainNorm })
+        .from(campaignSuppressionDomains)
+        .where(eq(campaignSuppressionDomains.campaignId, campaignId));
+      
+      domainSuppressions.forEach(s => suppressedDomains.add(s.domainNorm));
+    }
+
+    // Check email suppressions
+    const allEmails = contactsWithAccounts
+      .map(c => c.email?.toLowerCase())
+      .filter(e => e) as string[];
+    
+    const suppressedEmails = new Set<string>();
+    if (allEmails.length > 0) {
+      const emailSuppressions = await db
+        .select({ emailNorm: campaignSuppressionEmails.emailNorm })
+        .from(campaignSuppressionEmails)
+        .where(eq(campaignSuppressionEmails.campaignId, campaignId));
+      
+      emailSuppressions.forEach(s => suppressedEmails.add(s.emailNorm));
+    }
+
+    // Calculate matches
+    const totalSuppressedContacts = new Set<string>();
+    let suppressedByAccount = 0;
+    let suppressedByContact = 0;
+    let suppressedByDomain = 0;
+    let suppressedByEmail = 0;
+
+    for (const contact of contactsWithAccounts) {
+      let isSuppressed = false;
+
+      // Check account suppression
+      if (contact.accountId && suppressedAccountIds.has(contact.accountId)) {
+        suppressedByAccount++;
+        isSuppressed = true;
+      }
+
+      // Check contact suppression
+      if (suppressedContactIds.has(contact.contactId)) {
+        suppressedByContact++;
+        isSuppressed = true;
+      }
+
+      // Check domain suppression
+      if (contact.accountDomain) {
+        const domainNorm = contact.accountDomain.toLowerCase().replace(/^www\./, '');
+        if (suppressedDomains.has(domainNorm)) {
+          suppressedByDomain++;
+          isSuppressed = true;
+        }
+      }
+
+      // Check email suppression
+      if (contact.email) {
+        const emailNorm = contact.email.toLowerCase();
+        if (suppressedEmails.has(emailNorm)) {
+          suppressedByEmail++;
+          isSuppressed = true;
+        }
+      }
+
+      if (isSuppressed) {
+        totalSuppressedContacts.add(contact.contactId);
+      }
+    }
+
+    const totalContacts = queueContacts.length;
+    const totalSuppressed = totalSuppressedContacts.size;
+    const suppressionRate = totalContacts > 0 ? totalSuppressed / totalContacts : 0;
+
+    res.json({
+      totalContacts,
+      suppressedByAccount,
+      suppressedByContact,
+      suppressedByDomain,
+      suppressedByEmail,
+      totalSuppressed,
+      suppressionRate,
+    });
+  } catch (error) {
+    console.error('Error calculating suppression stats:', error);
+    res.status(500).json({ error: 'Failed to calculate suppression statistics' });
   }
 });
 
@@ -816,6 +1226,90 @@ router.delete('/:campaignId/suppressions/domains/:id', async (req: Request, res:
   } catch (error) {
     console.error('Error deleting campaign domain suppression:', error);
     res.status(500).json({ error: 'Failed to delete campaign domain suppression' });
+  }
+});
+
+/**
+ * POST /api/campaigns/:campaignId/suppressions/domains/upload
+ * Upload CSV file with domains/companies to suppress (supports domain or company_name columns)
+ * Body: { csvContent: string }
+ */
+router.post('/:campaignId/suppressions/domains/upload', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = (req as any).user?.id;
+    const { csvContent } = z.object({ csvContent: z.string() }).parse(req.body);
+
+    // Validate campaign exists
+    const [campaign] = await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Parse CSV
+    const domainEntries: Array<{ domain: string; companyName: string | null }> = [];
+    const stream = Readable.from([csvContent]);
+
+    await new Promise<void>((resolve, reject) => {
+      stream
+        .pipe(csv.parse({ headers: true, trim: true }))
+        .on('data', (row: any) => {
+          // Try to extract domain or company name from various column names
+          const domain = row.domain || row.Domain || row.DOMAIN;
+          const companyName = row.company_name || row.companyName || row['Company Name'] || 
+                            row.company || row.Company || row.COMPANY;
+
+          if (domain && typeof domain === 'string') {
+            const domainNorm = domain.trim().toLowerCase().replace(/^www\./, '');
+            domainEntries.push({ domain: domainNorm, companyName: null });
+          } else if (companyName && typeof companyName === 'string') {
+            const companyNorm = companyName.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            domainEntries.push({ domain: companyNorm, companyName: companyName.trim() });
+          }
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    if (domainEntries.length === 0) {
+      return res.status(400).json({ 
+        error: 'No valid entries found in CSV. CSV must have "domain" or "company_name" column.' 
+      });
+    }
+
+    // Insert suppressions
+    const suppressionsToInsert = domainEntries.map(entry => ({
+      campaignId,
+      domain: entry.domain,
+      domainNorm: entry.domain,
+      companyName: entry.companyName,
+      reason: 'CSV bulk upload',
+      addedBy: userId,
+    }));
+
+    const inserted = await db
+      .insert(campaignSuppressionDomains)
+      .values(suppressionsToInsert)
+      .onConflictDoNothing()
+      .returning();
+
+    res.status(201).json({
+      message: `Successfully processed CSV upload`,
+      totalEntries: domainEntries.length,
+      added: inserted.length,
+      duplicates: domainEntries.length - inserted.length,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error uploading campaign domain suppressions:', error);
+    res.status(500).json({ error: 'Failed to upload campaign domain suppressions' });
   }
 });
 

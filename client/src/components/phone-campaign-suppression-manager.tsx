@@ -437,7 +437,7 @@ export function PhoneCampaignSuppressionManager({
                   <DialogHeader>
                     <DialogTitle>Upload Account Suppressions</DialogTitle>
                     <DialogDescription>
-                      Paste CSV content with "account_id" or "domain" column
+                      Paste CSV content with "account_id", "domain", or "company_name" column
                     </DialogDescription>
                   </DialogHeader>
                   <Textarea
@@ -450,7 +450,7 @@ export function PhoneCampaignSuppressionManager({
                   <Alert>
                     <AlertCircle className="w-4 h-4" />
                     <AlertDescription className="text-sm">
-                      CSV must have "account_id" or "domain" column. Duplicates will be skipped.
+                      CSV must have "account_id", "domain", or "company_name" column. System will automatically match accounts. Duplicates will be skipped.
                     </AlertDescription>
                   </Alert>
                   <DialogFooter>
@@ -602,7 +602,7 @@ export function PhoneCampaignSuppressionManager({
                     <DialogHeader>
                       <DialogTitle>Upload Domain Suppressions</DialogTitle>
                       <DialogDescription>
-                        Paste CSV content with "domain" column
+                        Paste CSV content with "domain" or "company_name" column
                       </DialogDescription>
                     </DialogHeader>
                     <Textarea
@@ -615,7 +615,7 @@ export function PhoneCampaignSuppressionManager({
                     <Alert>
                       <AlertCircle className="w-4 h-4" />
                       <AlertDescription className="text-sm">
-                        CSV must have "domain" column. Duplicates will be skipped.
+                        CSV must have "domain" or "company_name" column. Duplicates will be skipped.
                       </AlertDescription>
                     </Alert>
                     <DialogFooter>
@@ -965,7 +965,7 @@ export function PhoneCampaignSuppressionManager({
                     <DialogHeader>
                       <DialogTitle>Upload Domain Suppressions</DialogTitle>
                       <DialogDescription>
-                        Paste CSV content with "domain" column
+                        Paste CSV content with "domain" or "company_name" column
                       </DialogDescription>
                     </DialogHeader>
                     <Textarea
@@ -978,7 +978,7 @@ export function PhoneCampaignSuppressionManager({
                     <Alert>
                       <AlertCircle className="w-4 h-4" />
                       <AlertDescription className="text-sm">
-                        CSV must have "domain" column. Duplicates will be skipped.
+                        CSV must have "domain" or "company_name" column. Duplicates will be skipped.
                       </AlertDescription>
                     </Alert>
                     <DialogFooter>
