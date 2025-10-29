@@ -5,6 +5,8 @@
  * selection caps, and RBAC rules across all modules.
  */
 
+import { ACCOUNT_FIELD_LABELS, ACCOUNT_ADDRESS_LABELS, CONTACT_FIELD_LABELS, CONTACT_ADDRESS_LABELS } from "./field-labels";
+
 /**
  * Filter Operators for Advanced Filtering
  * 
@@ -118,7 +120,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   // Multi-select dropdowns (DB-backed)
   industries: {
     type: "multi",
-    label: "Industries",
+    label: ACCOUNT_FIELD_LABELS.industryStandardized,
     max: 10,
     source: "industries",
     category: "Company Information",
@@ -126,7 +128,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   companySizes: {
     type: "multi",
-    label: "Company Size",
+    label: ACCOUNT_FIELD_LABELS.employeesSizeRange,
     max: 10,
     source: "company-sizes",
     category: "Company Information",
@@ -134,7 +136,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   companyRevenue: {
     type: "multi",
-    label: "Company Revenue",
+    label: ACCOUNT_FIELD_LABELS.annualRevenue,
     max: 10,
     source: "company-revenue",
     category: "Company Information",
@@ -142,7 +144,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   seniorityLevels: {
     type: "multi",
-    label: "Seniority Level",
+    label: CONTACT_FIELD_LABELS.seniorityLevel,
     max: 10,
     source: "seniority-levels",
     category: "Contact Information",
@@ -150,7 +152,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   technologies: {
     type: "multi",
-    label: "Technologies",
+    label: ACCOUNT_FIELD_LABELS.techStack,
     max: 10,
     source: "technologies",
     category: "Company Information",
@@ -158,7 +160,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   departments: {
     type: "multi",
-    label: "Department",
+    label: CONTACT_FIELD_LABELS.department,
     max: 10,
     source: "departments",
     category: "Contact Information",
@@ -175,14 +177,14 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   // Geography - Contact (scoped dependencies: Country → State → City)
   contactCountry: {
     type: "typeahead",
-    label: "Contact Country",
+    label: CONTACT_ADDRESS_LABELS.country,
     max: 10,
     source: "countries",
     category: "Contact Geography"
   },
   contactState: {
     type: "typeahead",
-    label: "Contact State / Province",
+    label: CONTACT_ADDRESS_LABELS.state,
     max: 5,
     source: "states",
     parents: ["contactCountry"],
@@ -190,7 +192,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   contactCity: {
     type: "typeahead",
-    label: "Contact City",
+    label: CONTACT_ADDRESS_LABELS.city,
     max: 5,
     source: "cities",
     parents: ["contactCountry", "contactState"],
@@ -200,14 +202,14 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   // Geography - Account (scoped dependencies: Country → State → City)
   accountCountry: {
     type: "typeahead",
-    label: "Account HQ Country",
+    label: ACCOUNT_ADDRESS_LABELS.hqCountry,
     max: 10,
     source: "countries",
     category: "Account Geography"
   },
   accountState: {
     type: "typeahead",
-    label: "Account HQ State / Province",
+    label: ACCOUNT_ADDRESS_LABELS.hqState,
     max: 5,
     source: "states",
     parents: ["accountCountry"],
@@ -215,7 +217,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   accountCity: {
     type: "typeahead",
-    label: "Account HQ City",
+    label: ACCOUNT_ADDRESS_LABELS.hqCity,
     max: 5,
     source: "cities",
     parents: ["accountCountry", "accountState"],
@@ -372,7 +374,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   // NEW CONTACT FILTERS
   jobTitle: {
     type: "typeahead",
-    label: "Job Title",
+    label: CONTACT_FIELD_LABELS.jobTitle,
     max: 10,
     source: "job-titles",
     category: "Contact Information",
@@ -380,13 +382,13 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   directPhone: {
     type: "text",
-    label: "Direct Phone",
+    label: CONTACT_FIELD_LABELS.directPhone,
     placeholder: "Enter phone number...",
     category: "Contact Information"
   },
   mobilePhone: {
     type: "text",
-    label: "Mobile Phone",
+    label: CONTACT_FIELD_LABELS.mobilePhone,
     placeholder: "Enter mobile number...",
     category: "Contact Information"
   },
@@ -414,27 +416,27 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   contactLinkedinUrl: {
     type: "text",
-    label: "Contact LinkedIn URL",
+    label: CONTACT_FIELD_LABELS.linkedinUrl,
     placeholder: "Enter LinkedIn URL...",
     category: "Contact Information"
   },
   list: {
     type: "typeahead",
-    label: "Source List",
+    label: CONTACT_FIELD_LABELS.list,
     max: 10,
     source: "source-lists",
     category: "Lists & Segments"
   },
   accountName: {
     type: "typeahead",
-    label: "Account Name",
+    label: ACCOUNT_FIELD_LABELS.name,
     max: 10,
     source: "account-names",
     category: "Company Information"
   },
   accountDomain: {
     type: "typeahead",
-    label: "Account Domain",
+    label: ACCOUNT_FIELD_LABELS.domain,
     max: 10,
     source: "account-domains",
     category: "Company Information"
@@ -443,26 +445,26 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   // NEW ACCOUNT FILTERS
   domain: {
     type: "typeahead",
-    label: "Company Domain",
+    label: ACCOUNT_FIELD_LABELS.domain,
     max: 10,
     source: "domains",
     category: "Company Information"
   },
   accountMainPhone: {
     type: "text",
-    label: "Company Phone",
+    label: ACCOUNT_FIELD_LABELS.mainPhone,
     placeholder: "Enter company phone...",
     category: "Company Information"
   },
   accountLinkedinUrl: {
     type: "text",
-    label: "Company LinkedIn URL",
+    label: ACCOUNT_FIELD_LABELS.linkedinUrl,
     placeholder: "Enter LinkedIn URL...",
     category: "Company Information"
   },
   accountDescription: {
     type: "text",
-    label: "Company Description",
+    label: ACCOUNT_FIELD_LABELS.description,
     placeholder: "Search in descriptions...",
     category: "Company Information"
   },
@@ -476,7 +478,7 @@ export const BASE_FILTERS: Record<FilterField, FilterFieldConfig> = {
   },
   yearFounded: {
     type: "number",
-    label: "Year Founded",
+    label: ACCOUNT_FIELD_LABELS.yearFounded,
     placeholder: "Enter year...",
     category: "Company Information"
   },
