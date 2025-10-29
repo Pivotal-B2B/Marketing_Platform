@@ -37,18 +37,7 @@ export default function PhoneCampaignEditPage() {
 
   // Fetch campaign data
   const { data: campaign, isLoading: campaignLoading } = useQuery<any>({
-    queryKey: ['/api/campaigns', campaignId],
-    queryFn: async () => {
-      const response = await fetch(`/api/campaigns/${campaignId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch campaign');
-      }
-      return response.json();
-    },
+    queryKey: [`/api/campaigns/${campaignId}`],
     enabled: !!campaignId,
   });
 
