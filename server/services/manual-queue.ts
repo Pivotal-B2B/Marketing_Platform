@@ -3,6 +3,7 @@ import type { AgentQueue, Contact, Campaign, ManualQueueFilters } from "@shared/
 import { eq, and, or, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { agentQueue, contacts, accounts, campaigns, suppressionEmails, suppressionPhones, campaignSuppressionAccounts, campaignSuppressionContacts, campaignSuppressionEmails, campaignSuppressionDomains } from "@shared/schema";
+import { getBestPhoneForContact, normalizePhoneWithCountryCode } from "../lib/phone-utils";
 
 interface QueueConfig {
   lockTimeoutSec: number; // How long a contact stays locked before auto-release
@@ -72,7 +73,7 @@ export class ManualQueueService {
       
       const alreadyQueuedSet = new Set(alreadyQueued.map(q => q.contactId));
 
-      // Filter contacts using in-memory suppression check
+      // Filter contacts using in-memory suppression check AND phone country validation
       const contactsToAdd = eligibleContacts.filter(contact => {
         // Skip if already queued
         if (alreadyQueuedSet.has(contact.id)) {
@@ -80,7 +81,18 @@ export class ManualQueueService {
         }
 
         // Check suppression using prefetched sets (in-memory)
-        return !this.isContactSuppressedBulk(contact, suppressionSets);
+        if (this.isContactSuppressedBulk(contact, suppressionSets)) {
+          return false;
+        }
+
+        // PHONE COUNTRY VALIDATION: Only include contacts with phone matching their country
+        const bestPhone = getBestPhoneForContact(contact);
+        if (!bestPhone.phone) {
+          console.log(`[ManualQueue] Contact ${contact.id} filtered: no valid phone matching country ${contact.country}`);
+          return false;
+        }
+
+        return true;
       });
 
       console.log(`[ManualQueue] Filtered ${eligibleContacts.length} contacts: ${contactsToAdd.length} to add, ${eligibleContacts.length - contactsToAdd.length} suppressed/queued`);
@@ -90,17 +102,52 @@ export class ManualQueueService {
         return { added: 0, skipped: eligibleContacts.length };
       }
 
-      const queueEntries = contactsToAdd.map(contact => ({
-        id: sql`gen_random_uuid()`,
-        agentId,
-        campaignId,
-        contactId: contact.id,
-        accountId: contact.accountId,
-        queueState: 'queued' as const,
-        priority: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
+      // Update contacts with normalized phone numbers if needed
+      const contactUpdates: Array<{id: string, directPhoneE164?: string, mobilePhoneE164?: string}> = [];
+      
+      const queueEntries = contactsToAdd.map(contact => {
+        // Normalize and update phone numbers
+        const bestPhone = getBestPhoneForContact(contact);
+        
+        // Update E164 fields if missing
+        if (bestPhone.type === 'direct' && !contact.directPhoneE164 && contact.directPhone) {
+          const normalized = normalizePhoneWithCountryCode(contact.directPhone, contact.country);
+          if (normalized.e164) {
+            contactUpdates.push({ id: contact.id, directPhoneE164: normalized.e164 });
+          }
+        } else if (bestPhone.type === 'mobile' && !contact.mobilePhoneE164 && contact.mobilePhone) {
+          const normalized = normalizePhoneWithCountryCode(contact.mobilePhone, contact.country);
+          if (normalized.e164) {
+            contactUpdates.push({ id: contact.id, mobilePhoneE164: normalized.e164 });
+          }
+        }
+
+        return {
+          id: sql`gen_random_uuid()`,
+          agentId,
+          campaignId,
+          contactId: contact.id,
+          accountId: contact.accountId,
+          queueState: 'queued' as const,
+          priority: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+      });
+
+      // Update contacts with normalized phone numbers
+      for (const update of contactUpdates) {
+        await db
+          .update(contacts)
+          .set({
+            directPhoneE164: update.directPhoneE164,
+            mobilePhoneE164: update.mobilePhoneE164,
+            updatedAt: new Date(),
+          })
+          .where(eq(contacts.id, update.id));
+      }
+
+      console.log(`[ManualQueue] Updated ${contactUpdates.length} contacts with normalized phone numbers`);
 
       // Bulk insert with conflict handling
       const result = await db.insert(agentQueue)

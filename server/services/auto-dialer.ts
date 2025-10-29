@@ -2,6 +2,10 @@ import { storage } from "../storage";
 import type { AgentStatus, Campaign } from "@shared/schema";
 import { isWithinBusinessHours, type BusinessHoursConfig } from "../utils/business-hours";
 import { VoicemailPolicyExecutor } from "./voicemail-policy-executor";
+import { getBestPhoneForContact, normalizePhoneWithCountryCode } from "../lib/phone-utils";
+import { db } from "../db";
+import { contacts } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 interface DialerConfig {
   pollingIntervalMs: number;
@@ -267,19 +271,54 @@ export class PowerDialerEngine {
       const agent = sortedAgents[i];
 
       try {
+        // Get full contact details for validation
+        const fullContact = await storage.getContact(contact.contactId);
+        
+        if (!fullContact) {
+          console.log(`[AutoDialer] Contact ${contact.contactId} not found, skipping`);
+          await storage.updateQueueStatus(contact.id, 'removed', 'Contact not found');
+          continue;
+        }
+
+        // PHONE COUNTRY VALIDATION: Only call contacts with phone matching their country
+        const bestPhone = getBestPhoneForContact(fullContact);
+        if (!bestPhone.phone) {
+          console.log(`[AutoDialer] Contact ${contact.contactId} has no valid phone matching country ${fullContact.country}, skipping`);
+          await storage.updateQueueStatus(contact.id, 'removed', 'No valid phone for country');
+          continue;
+        }
+
+        // Update contact with normalized phone if needed
+        if (bestPhone.type === 'direct' && !fullContact.directPhoneE164 && fullContact.directPhone) {
+          const normalized = normalizePhoneWithCountryCode(fullContact.directPhone, fullContact.country);
+          if (normalized.e164) {
+            await db
+              .update(contacts)
+              .set({ directPhoneE164: normalized.e164, updatedAt: new Date() })
+              .where(eq(contacts.id, fullContact.id));
+            console.log(`[AutoDialer] Updated contact ${fullContact.id} with normalized direct phone`);
+          }
+        } else if (bestPhone.type === 'mobile' && !fullContact.mobilePhoneE164 && fullContact.mobilePhone) {
+          const normalized = normalizePhoneWithCountryCode(fullContact.mobilePhone, fullContact.country);
+          if (normalized.e164) {
+            await db
+              .update(contacts)
+              .set({ mobilePhoneE164: normalized.e164, updatedAt: new Date() })
+              .where(eq(contacts.id, fullContact.id));
+            console.log(`[AutoDialer] Updated contact ${fullContact.id} with normalized mobile phone`);
+          }
+        }
+
         // Check business hours if enabled
         if (campaign.businessHoursConfig) {
           const config = campaign.businessHoursConfig as BusinessHoursConfig;
           
-          // Get full contact details for timezone detection
-          const fullContact = await storage.getContact(contact.contactId);
-          
-          const contactTimezoneInfo = fullContact ? {
+          const contactTimezoneInfo = {
             timezone: fullContact.timezone,
             city: fullContact.city,
             state: fullContact.state,
             country: fullContact.country,
-          } : undefined;
+          };
 
           const canCall = isWithinBusinessHours(config, contactTimezoneInfo);
           
