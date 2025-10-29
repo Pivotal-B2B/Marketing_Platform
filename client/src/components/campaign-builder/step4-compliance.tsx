@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, CheckCircle, XCircle, AlertCircle, Shield, Users } from "lucide-react";
+import { ChevronRight, CheckCircle, XCircle, AlertCircle, Shield, Users, Mail } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Step4Props {
   data: any;
@@ -305,6 +306,19 @@ export function Step4Compliance({ data, onNext, campaignType }: Step4Props) {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Campaign-Level Email Suppressions Info */}
+      {campaignType === "email" && (
+        <Alert>
+          <Mail className="w-4 h-4" />
+          <AlertDescription>
+            <p className="font-medium">Campaign-Level Email Suppressions</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              After creating this campaign, you can upload a CSV of email addresses to exclude from this specific campaign only. This is separate from the global suppression list.
+            </p>
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Compliance Header */}
