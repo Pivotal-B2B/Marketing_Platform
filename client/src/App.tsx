@@ -27,6 +27,7 @@ import EmailCampaignsPage from "@/pages/email-campaigns";
 import EmailCampaignCreatePage from "@/pages/email-campaign-create";
 import TelemarketingCreatePage from "@/pages/telemarketing-create";
 import PhoneCampaignsPage from "@/pages/phone-campaigns";
+import PhoneCampaignEditPage from "@/pages/phone-campaign-edit";
 import CampaignConfigPage from "@/pages/campaign-config";
 import CampaignSuppressionsPage from "@/pages/campaign-suppressions";
 import LeadsPage from "@/pages/leads";
@@ -111,6 +112,7 @@ function AuthenticatedApp() {
               <Route path="/campaigns/email" component={EmailCampaignsPage} />
               <Route path="/campaigns/telemarketing/create" component={TelemarketingCreatePage} />
               <Route path="/campaigns/telemarketing" component={PhoneCampaignsPage} />
+              <Route path="/campaigns/phone/:id/edit" component={PhoneCampaignEditPage} />
               <Route path="/campaigns/:id/suppressions" component={CampaignSuppressionsPage} />
               <Route path="/campaigns/:id/queue" component={CampaignQueuePage} />
               <Route path="/campaigns/config" component={CampaignConfigPage} />

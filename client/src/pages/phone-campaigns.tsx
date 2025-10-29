@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Phone, Plus, Search, Play, Pause, BarChart, UserPlus, Users, CheckCircle2, AlertCircle, MoreVertical, Copy, Trash2, CheckSquare, Loader2 } from "lucide-react";
+import { Phone, Plus, Search, Play, Pause, BarChart, UserPlus, Users, CheckCircle2, AlertCircle, MoreVertical, Copy, Trash2, CheckSquare, Loader2, Edit } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -624,6 +624,13 @@ export default function PhoneCampaignsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Campaign Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setLocation(`/campaigns/phone/${campaign.id}/edit`)}
+                          data-testid={`menu-edit-${campaign.id}`}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit Campaign
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => {
                             setSelectedCampaign(campaign);
