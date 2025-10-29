@@ -427,13 +427,13 @@ export default function ContactDetailPage() {
                     {contact.timeInCurrentPosition && (
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.timeInCurrentPosition}</p>
-                        <p className="font-medium text-sm">{contact.timeInCurrentPosition} ({contact.timeInCurrentPositionMonths} months)</p>
+                        <p className="font-medium text-sm">{contact.timeInCurrentPosition}{contact.timeInCurrentPositionMonths ? ` (${contact.timeInCurrentPositionMonths} months)` : ''}</p>
                       </div>
                     )}
                     {contact.timeInCurrentCompany && (
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.timeInCurrentCompany}</p>
-                        <p className="font-medium text-sm">{contact.timeInCurrentCompany} ({contact.timeInCurrentCompanyMonths} months)</p>
+                        <p className="font-medium text-sm">{contact.timeInCurrentCompany}{contact.timeInCurrentCompanyMonths ? ` (${contact.timeInCurrentCompanyMonths} months)` : ''}</p>
                       </div>
                     )}
                   </div>

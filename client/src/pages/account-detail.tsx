@@ -61,6 +61,7 @@ import { ListSegmentMembership } from "@/components/list-segment-membership";
 import { ActivityLogTimeline } from "@/components/activity-log-timeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Import Card components
 import type { FilterGroup } from "@/types/filters"; // Assuming FilterGroup type is here
+import { ACCOUNT_FIELD_LABELS, ACCOUNT_ADDRESS_LABELS } from "@shared/field-labels";
 
 export default function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -354,7 +355,7 @@ export default function AccountDetailPage() {
             >
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Industry</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_FIELD_LABELS.industryStandardized}</p>
                   <p className="font-medium">{account.industryStandardized || "-"}</p>
                   {account.industrySecondary && account.industrySecondary.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
@@ -368,7 +369,7 @@ export default function AccountDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Employee Size</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_FIELD_LABELS.employeesSizeRange}</p>
                   <p className="font-medium flex items-center gap-2">
                     <Users className="w-4 h-4 text-muted-foreground" />
                     {account.employeesSizeRange || "-"}
@@ -389,7 +390,7 @@ export default function AccountDetailPage() {
                 )}
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Annual Revenue</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_FIELD_LABELS.annualRevenue}</p>
                   <p className="font-medium flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-muted-foreground" />
                     {account.annualRevenue || "-"}
@@ -398,7 +399,7 @@ export default function AccountDetailPage() {
 
                 {(account.minAnnualRevenue || account.maxAnnualRevenue) && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Revenue Range</p>
+                    <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_FIELD_LABELS.revenueRange}</p>
                     <p className="font-medium">
                       {account.minAnnualRevenue && account.maxAnnualRevenue 
                         ? `$${account.minAnnualRevenue} - $${account.maxAnnualRevenue}`
@@ -410,7 +411,7 @@ export default function AccountDetailPage() {
                 )}
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">HQ City</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_ADDRESS_LABELS.hqCity}</p>
                   <p className="font-medium flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
                     {account.hqCity || "-"}
@@ -418,27 +419,27 @@ export default function AccountDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">HQ State</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_ADDRESS_LABELS.hqState}</p>
                   <p className="font-medium">{account.hqState || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">HQ Postal Code</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_ADDRESS_LABELS.hqPostalCode}</p>
                   <p className="font-medium">{account.hqPostalCode || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">HQ Country</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_ADDRESS_LABELS.hqCountry}</p>
                   <p className="font-medium">{account.hqCountry || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Year Founded</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_FIELD_LABELS.yearFounded}</p>
                   <p className="font-medium">{account.yearFounded || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Main HQ Phone</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_FIELD_LABELS.mainPhone}</p>
                   {account.mainPhoneE164 ? (
                     <div className="space-y-1">
                       <a href={`tel:${account.mainPhoneE164}`} className="font-medium font-mono text-primary hover:underline flex items-center gap-2">
@@ -455,30 +456,30 @@ export default function AccountDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">HQ Street Address 1</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_ADDRESS_LABELS.hqStreet1}</p>
                   <p className="font-medium">{account.hqStreet1 || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">HQ Street Address 2</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_ADDRESS_LABELS.hqStreet2}</p>
                   <p className="font-medium">{account.hqStreet2 || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">HQ Street Address 3</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_ADDRESS_LABELS.hqStreet3}</p>
                   <p className="font-medium">{account.hqStreet3 || "-"}</p>
                 </div>
 
                 {account.list && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">List</p>
+                    <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_FIELD_LABELS.list}</p>
                     <Badge variant="secondary">{account.list}</Badge>
                   </div>
                 )}
 
                 {account.description && (
                   <div className="col-span-2">
-                    <p className="text-sm text-muted-foreground mb-1">Description</p>
+                    <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_FIELD_LABELS.description}</p>
                     <p className="text-sm">{account.description}</p>
                   </div>
                 )}
@@ -487,7 +488,7 @@ export default function AccountDetailPage() {
               {/* Full Address String */}
               {account.companyLocation && (
                 <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm text-muted-foreground mb-1">Full Address String</p>
+                  <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_ADDRESS_LABELS.companyLocation}</p>
                   <p className="font-medium text-sm">{account.companyLocation}</p>
                 </div>
               )}
@@ -1039,7 +1040,7 @@ export default function AccountDetailPage() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Account Name *</Label>
+                <Label htmlFor="name">{ACCOUNT_FIELD_LABELS.name} *</Label>
                 <Input
                   id="name"
                   value={editForm.name}
@@ -1047,7 +1048,7 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="domain">Domain</Label>
+                <Label htmlFor="domain">{ACCOUNT_FIELD_LABELS.domain}</Label>
                 <Input
                   id="domain"
                   value={editForm.domain}
@@ -1057,7 +1058,7 @@ export default function AccountDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="industry">Industry</Label>
+                <Label htmlFor="industry">{ACCOUNT_FIELD_LABELS.industryStandardized}</Label>
                 <Input
                   id="industry"
                   value={editForm.industryStandardized}
@@ -1065,7 +1066,7 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="employees">Employee Size Range</Label>
+                <Label htmlFor="employees">{ACCOUNT_FIELD_LABELS.employeesSizeRange}</Label>
                 <Input
                   id="employees"
                   value={editForm.employeesSizeRange}
@@ -1075,7 +1076,7 @@ export default function AccountDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="minEmployeesSize">Min Employees Size</Label>
+                <Label htmlFor="minEmployeesSize">{ACCOUNT_FIELD_LABELS.minEmployeesSize}</Label>
                 <Input
                   id="minEmployeesSize"
                   type="number"
@@ -1085,7 +1086,7 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="maxEmployeesSize">Max Employees Size</Label>
+                <Label htmlFor="maxEmployeesSize">{ACCOUNT_FIELD_LABELS.maxEmployeesSize}</Label>
                 <Input
                   id="maxEmployeesSize"
                   type="number"
@@ -1097,7 +1098,7 @@ export default function AccountDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="revenue">Annual Revenue</Label>
+                <Label htmlFor="revenue">{ACCOUNT_FIELD_LABELS.annualRevenue}</Label>
                 <Input
                   id="revenue"
                   value={editForm.annualRevenue}
@@ -1105,7 +1106,7 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="yearFounded">Year Founded</Label>
+                <Label htmlFor="yearFounded">{ACCOUNT_FIELD_LABELS.yearFounded}</Label>
                 <Input
                   id="yearFounded"
                   type="number"
@@ -1116,7 +1117,7 @@ export default function AccountDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="minAnnualRevenue">Min Annual Revenue</Label>
+                <Label htmlFor="minAnnualRevenue">{ACCOUNT_FIELD_LABELS.minAnnualRevenue}</Label>
                 <Input
                   id="minAnnualRevenue"
                   type="number"
@@ -1126,7 +1127,7 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="maxAnnualRevenue">Max Annual Revenue</Label>
+                <Label htmlFor="maxAnnualRevenue">{ACCOUNT_FIELD_LABELS.maxAnnualRevenue}</Label>
                 <Input
                   id="maxAnnualRevenue"
                   type="number"
@@ -1138,7 +1139,7 @@ export default function AccountDetailPage() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
+                <Label htmlFor="city">{ACCOUNT_ADDRESS_LABELS.hqCity}</Label>
                 <Input
                   id="city"
                   value={editForm.hqCity}
@@ -1146,7 +1147,7 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
+                <Label htmlFor="state">{ACCOUNT_ADDRESS_LABELS.hqState}</Label>
                 <Input
                   id="state"
                   value={editForm.hqState}
@@ -1154,7 +1155,7 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="country">Country</Label>
+                <Label htmlFor="country">{ACCOUNT_ADDRESS_LABELS.hqCountry}</Label>
                 <Input
                   id="country"
                   value={editForm.hqCountry}
@@ -1164,7 +1165,7 @@ export default function AccountDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">Main HQ Phone</Label>
+                <Label htmlFor="phone">{ACCOUNT_FIELD_LABELS.mainPhone}</Label>
                 <Input
                   id="phone"
                   value={editForm.mainPhone}
@@ -1172,7 +1173,7 @@ export default function AccountDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="linkedin">LinkedIn URL</Label>
+                <Label htmlFor="linkedin">{ACCOUNT_FIELD_LABELS.linkedinUrl}</Label>
                 <Input
                   id="linkedin"
                   value={editForm.linkedinUrl}
@@ -1181,7 +1182,7 @@ export default function AccountDetailPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="list">List</Label>
+              <Label htmlFor="list">{ACCOUNT_FIELD_LABELS.list}</Label>
               <Input
                 id="list"
                 value={editForm.list}
@@ -1190,7 +1191,7 @@ export default function AccountDetailPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{ACCOUNT_FIELD_LABELS.description}</Label>
               <Textarea
                 id="description"
                 value={editForm.description}
