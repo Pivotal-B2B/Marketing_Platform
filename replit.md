@@ -25,7 +25,7 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 **Technical Implementations & Features:**
 - **AI-Powered Quality Assurance:** Integrates AssemblyAI for call transcription and Replit AI (OpenAI-compatible) for lead qualification scoring, account enrichment, and multi-factor scoring. Includes AI-powered local office enrichment.
 - **Data Management:** Unified CSV Import/Export System with intelligent deduplication/upsert logic, dynamic custom fields, smart company name normalization, and RBAC-enforced filter visibility.
-- **Compliance & Suppression:** Multi-tier suppression system (campaign-level and global) for emails (unsubscribe) and phones (Do Not Call) with RESTful API support and a strict 4-rule suppression system.
+- **Compliance & Suppression:** Multi-tier suppression system (campaign-level and global) for emails (unsubscribe) and phones (Do Not Call) with RESTful API support and a strict 4-rule suppression system. Campaign-level phone suppression supports CSV upload and manual entry for accounts, contacts, and domains. Informational wizard step guides users to configure suppressions post-creation via the Suppressions tab in campaign edit page.
 - **Campaign Management:** Supports Email campaigns (HTML editor, personalization, tracking) and Telemarketing campaigns with a dual dialer strategy (Manual/Power Dial), active call script assignment, and Telnyx call recording integration.
 - **Lead QA Workflow:** Multi-stage workflow (New → Under Review → Approved/Rejected → Published) with checklist validation and agent insights.
 - **Client Portal (Bridge Model):** Allows clients to specify campaign order requirements via configurable webhooks.
