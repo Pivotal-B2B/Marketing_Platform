@@ -50,14 +50,31 @@ export const CONTACT_FIELD_LABELS = {
   phoneAiConfidence: "Phone AI Confidence",
   phoneVerifiedAt: "Phone Verified At",
   
+  // Consent & Compliance
+  consentBasis: "Consent Basis",
+  consentSource: "Consent Source",
+  consentTimestamp: "Consent Timestamp",
+  
   // Other
   intentTopics: "Intent Topics",
   tags: "Tags",
   list: "List",
   sourceSystem: "Source System",
   sourceRecordId: "Source Record ID",
+  sourceUpdatedAt: "sourceUpdatedAt",
   ownerId: "Owner",
   researchDate: "Research Date",
+  customFields: "customFields",
+  accountId: "accountId",
+  
+  // Record Status
+  isInvalid: "isInvalid",
+  invalidReason: "invalidReason",
+  invalidatedAt: "invalidatedAt",
+  invalidatedBy: "invalidatedBy",
+  deletedAt: "deletedAt",
+  createdAt: "createdAt",
+  updatedAt: "updatedAt",
 } as const;
 
 // ============================================
@@ -94,8 +111,8 @@ export const ACCOUNT_FIELD_LABELS = {
   industrySecondary: "Secondary Industries",
   industryCode: "Industry Code",
   industryRaw: "Industry (Raw)",
-  sicCode: "sic_code",
-  naicsCode: "naics_code",
+  sicCode: "SIC Code",
+  naicsCode: "NAICS Code",
   
   // AI Industry Enrichment
   industryAiSuggested: "AI Suggested Industry",
@@ -139,17 +156,29 @@ export const ACCOUNT_FIELD_LABELS = {
   // Hierarchy & Organization
   parentAccountId: "Parent Account",
   tags: "Tags",
+  accountTags: "account_tags",
   ownerId: "Owner",
   list: "List",
+  customFields: "customFields",
+  accountCustomFields: "account_customFields",
   
   // Source & Tracking
   sourceSystem: "Source System",
   sourceRecordId: "Source Record ID",
-  sourceUpdatedAt: "Source Updated At",
+  sourceUpdatedAt: "sourceUpdatedAt",
   
   // AI Enrichment
   aiEnrichmentData: "AI Enrichment Data",
   aiEnrichmentDate: "Last AI Enrichment",
+  
+  // Record Status
+  deletedAt: "deletedAt",
+  createdAt: "createdAt",
+  updatedAt: "updatedAt",
+  
+  // Additional Fields for Export
+  industryAiReviewedBy: "industryAiReviewedBy",
+  industryAiReviewedAt: "industryAiReviewedAt",
 } as const;
 
 // ============================================
