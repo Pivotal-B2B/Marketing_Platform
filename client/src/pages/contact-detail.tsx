@@ -45,6 +45,7 @@ import { HeaderActionBar } from "@/components/shared/header-action-bar";
 import { SectionCard } from "@/components/shared/section-card";
 import { ListSegmentMembership } from "@/components/list-segment-membership";
 import { ActivityLogTimeline } from "@/components/activity-log-timeline";
+import { CONTACT_FIELD_LABELS, CONTACT_ADDRESS_LABELS } from "@shared/field-labels";
 
 export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -280,7 +281,7 @@ export default function ContactDetailPage() {
             >
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Email</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.email}</p>
                   <p className="font-mono text-sm flex items-center gap-2">
                     <Mail className="w-4 h-4 text-muted-foreground" />
                     {contact.email}
@@ -288,7 +289,7 @@ export default function ContactDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Phone</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.directPhone}</p>
                   <p className="font-mono text-sm flex items-center gap-2">
                     <Phone className="w-4 h-4 text-muted-foreground" />
                     {contact.directPhone || "-"}
@@ -296,7 +297,7 @@ export default function ContactDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Job Title</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.jobTitle}</p>
                   <p className="font-medium flex items-center gap-2">
                     <Briefcase className="w-4 h-4 text-muted-foreground" />
                     {contact.jobTitle || "-"}
@@ -304,17 +305,17 @@ export default function ContactDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Department</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.department}</p>
                   <p className="font-medium">{contact.department || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Seniority</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.seniorityLevel}</p>
                   <p className="font-medium">{contact.seniorityLevel || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Direct Work Phone</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.directPhone}</p>
                   {contact.directPhoneE164 ? (
                     <div className="space-y-1">
                       <a href={`tel:${contact.directPhoneE164}`} className="font-medium text-primary hover:underline flex items-center gap-2">
@@ -331,7 +332,7 @@ export default function ContactDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Mobile Direct</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.mobilePhone}</p>
                   {contact.mobilePhoneE164 ? (
                     <a href={`tel:${contact.mobilePhoneE164}`} className="font-medium text-primary hover:underline flex items-center gap-2">
                       <Phone className="w-4 h-4" />
@@ -343,14 +344,14 @@ export default function ContactDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Email Status</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.emailVerificationStatus}</p>
                   <Badge variant={contact.emailVerificationStatus === 'valid' ? 'default' : 'secondary'}>
                     {contact.emailVerificationStatus || 'unknown'}
                   </Badge>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">City</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_ADDRESS_LABELS.city}</p>
                   <p className="font-medium flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
                     {contact.city || "-"}
@@ -358,22 +359,22 @@ export default function ContactDetailPage() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">State</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_ADDRESS_LABELS.state}</p>
                   <p className="font-medium">{contact.state || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">County</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_ADDRESS_LABELS.county}</p>
                   <p className="font-medium">{contact.county || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Postal Code</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_ADDRESS_LABELS.postalCode}</p>
                   <p className="font-medium">{contact.postalCode || "-"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Country</p>
+                  <p className="text-sm text-muted-foreground mb-1">{CONTACT_ADDRESS_LABELS.country}</p>
                   <p className="font-medium">{contact.country || "-"}</p>
                 </div>
               </div>
@@ -385,13 +386,13 @@ export default function ContactDetailPage() {
                   <div className="space-y-3">
                     {contact.address && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Street Address</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_ADDRESS_LABELS.address}</p>
                         <p className="font-medium text-sm">{contact.address}</p>
                       </div>
                     )}
                     {contact.contactLocation && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Full Location String</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_ADDRESS_LABELS.contactLocation}</p>
                         <p className="font-medium text-sm">{contact.contactLocation}</p>
                       </div>
                     )}
@@ -419,20 +420,20 @@ export default function ContactDetailPage() {
                   <div className="grid grid-cols-2 gap-4">
                     {contact.formerPosition && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Former Position</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.formerPosition}</p>
                         <p className="font-medium text-sm">{contact.formerPosition}</p>
                       </div>
                     )}
                     {contact.timeInCurrentPosition && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Time in Current Position</p>
-                        <p className="font-medium text-sm">{contact.timeInCurrentPosition}</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.timeInCurrentPosition}</p>
+                        <p className="font-medium text-sm">{contact.timeInCurrentPosition} ({contact.timeInCurrentPositionMonths} months)</p>
                       </div>
                     )}
                     {contact.timeInCurrentCompany && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Time at Company</p>
-                        <p className="font-medium text-sm">{contact.timeInCurrentCompany}</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.timeInCurrentCompany}</p>
+                        <p className="font-medium text-sm">{contact.timeInCurrentCompany} ({contact.timeInCurrentCompanyMonths} months)</p>
                       </div>
                     )}
                   </div>
@@ -446,7 +447,7 @@ export default function ContactDetailPage() {
                   <div className="grid grid-cols-2 gap-4">
                     {contact.emailAiConfidence && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Email Confidence</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.emailAiConfidence}</p>
                         <Badge variant="secondary" className="text-xs">
                           {Math.round(parseFloat(contact.emailAiConfidence) * 100)}% confidence
                         </Badge>
@@ -454,7 +455,7 @@ export default function ContactDetailPage() {
                     )}
                     {contact.phoneAiConfidence && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Phone Confidence</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.phoneAiConfidence}</p>
                         <Badge variant="secondary" className="text-xs">
                           {Math.round(parseFloat(contact.phoneAiConfidence) * 100)}% confidence
                         </Badge>
@@ -462,13 +463,13 @@ export default function ContactDetailPage() {
                     )}
                     {contact.sourceSystem && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Source System</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.sourceSystem}</p>
                         <p className="font-medium text-sm">{contact.sourceSystem}</p>
                       </div>
                     )}
                     {contact.researchDate && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Research Date</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.researchDate}</p>
                         <p className="font-medium text-sm">
                           {new Date(contact.researchDate).toLocaleDateString()}
                         </p>
@@ -476,13 +477,13 @@ export default function ContactDetailPage() {
                     )}
                     {contact.timezone && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">Timezone</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_ADDRESS_LABELS.timezone}</p>
                         <p className="font-medium text-sm">{contact.timezone}</p>
                       </div>
                     )}
                     {contact.list && (
                       <div>
-                        <p className="text-sm text-muted-foreground mb-1">List</p>
+                        <p className="text-sm text-muted-foreground mb-1">{CONTACT_FIELD_LABELS.list}</p>
                         <p className="font-medium text-sm">{contact.list}</p>
                       </div>
                     )}
@@ -797,7 +798,7 @@ export default function ContactDetailPage() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">{CONTACT_FIELD_LABELS.firstName}</Label>
                 <Input
                   id="firstName"
                   value={editForm.firstName}
@@ -805,7 +806,7 @@ export default function ContactDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName">{CONTACT_FIELD_LABELS.lastName}</Label>
                 <Input
                   id="lastName"
                   value={editForm.lastName}
@@ -815,7 +816,7 @@ export default function ContactDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
+                <Label htmlFor="email">{CONTACT_FIELD_LABELS.email} *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -824,7 +825,7 @@ export default function ContactDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="directPhone">Direct Phone</Label>
+                <Label htmlFor="directPhone">{CONTACT_FIELD_LABELS.directPhone}</Label>
                 <Input
                   id="directPhone"
                   value={editForm.directPhone}
@@ -834,7 +835,7 @@ export default function ContactDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="jobTitle">Job Title</Label>
+                <Label htmlFor="jobTitle">{CONTACT_FIELD_LABELS.jobTitle}</Label>
                 <Input
                   id="jobTitle"
                   value={editForm.jobTitle}
@@ -842,7 +843,7 @@ export default function ContactDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
+                <Label htmlFor="department">{CONTACT_FIELD_LABELS.department}</Label>
                 <Input
                   id="department"
                   value={editForm.department}
@@ -851,7 +852,7 @@ export default function ContactDetailPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="seniorityLevel">Seniority Level</Label>
+              <Label htmlFor="seniorityLevel">{CONTACT_FIELD_LABELS.seniorityLevel}</Label>
               <Input
                 id="seniorityLevel"
                 value={editForm.seniorityLevel}
