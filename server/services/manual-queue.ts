@@ -103,22 +103,23 @@ export class ManualQueueService {
       }
 
       // Update contacts with normalized phone numbers if needed
-      const contactUpdates: Array<{id: string, directPhoneE164?: string, mobilePhoneE164?: string}> = [];
+      const directPhoneUpdates: Array<{id: string, directPhoneE164: string}> = [];
+      const mobilePhoneUpdates: Array<{id: string, mobilePhoneE164: string}> = [];
       
       const queueEntries = contactsToAdd.map(contact => {
-        // Normalize and update phone numbers
+        // Normalize and update phone numbers - ONLY update the specific field that needs normalization
         const bestPhone = getBestPhoneForContact(contact);
         
         // Update E164 fields if missing
         if (bestPhone.type === 'direct' && !contact.directPhoneE164 && contact.directPhone) {
           const normalized = normalizePhoneWithCountryCode(contact.directPhone, contact.country);
           if (normalized.e164) {
-            contactUpdates.push({ id: contact.id, directPhoneE164: normalized.e164 });
+            directPhoneUpdates.push({ id: contact.id, directPhoneE164: normalized.e164 });
           }
         } else if (bestPhone.type === 'mobile' && !contact.mobilePhoneE164 && contact.mobilePhone) {
           const normalized = normalizePhoneWithCountryCode(contact.mobilePhone, contact.country);
           if (normalized.e164) {
-            contactUpdates.push({ id: contact.id, mobilePhoneE164: normalized.e164 });
+            mobilePhoneUpdates.push({ id: contact.id, mobilePhoneE164: normalized.e164 });
           }
         }
 
@@ -135,19 +136,29 @@ export class ManualQueueService {
         };
       });
 
-      // Update contacts with normalized phone numbers
-      for (const update of contactUpdates) {
+      // Update contacts with normalized phone numbers - separate updates to avoid data loss
+      for (const update of directPhoneUpdates) {
         await db
           .update(contacts)
           .set({
             directPhoneE164: update.directPhoneE164,
+            updatedAt: new Date(),
+          })
+          .where(eq(contacts.id, update.id));
+      }
+
+      for (const update of mobilePhoneUpdates) {
+        await db
+          .update(contacts)
+          .set({
             mobilePhoneE164: update.mobilePhoneE164,
             updatedAt: new Date(),
           })
           .where(eq(contacts.id, update.id));
       }
 
-      console.log(`[ManualQueue] Updated ${contactUpdates.length} contacts with normalized phone numbers`);
+      const totalUpdates = directPhoneUpdates.length + mobilePhoneUpdates.length;
+      console.log(`[ManualQueue] Updated ${totalUpdates} contacts with normalized phone numbers (${directPhoneUpdates.length} direct, ${mobilePhoneUpdates.length} mobile)`);
 
       // Bulk insert with conflict handling
       const result = await db.insert(agentQueue)
