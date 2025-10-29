@@ -42,7 +42,7 @@ import {
   userIdSchema
 } from "./validation/schemas";
 import { db } from "./db";
-import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts, lists, segments, leads, verificationCampaigns, verificationContacts, verificationLeadSubmissions } from "@shared/schema";
+import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts, lists, segments, leads, verificationCampaigns, verificationContacts, verificationLeadSubmissions, suppressionPhones } from "@shared/schema";
 import {
   insertAccountSchema,
   insertContactSchema,
