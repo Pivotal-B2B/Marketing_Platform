@@ -2406,13 +2406,6 @@ export function registerRoutes(app: Express) {
       const { assignedAgents, ...campaignData } = req.body;
       const campaign = await storage.createCampaign(campaignData);
 
-      // If agents are assigned, store them in campaign metadata or separate table
-      if (assignedAgents && Array.isArray(assignedAgents) && assignedAgents.length > 0) {
-        await storage.updateCampaign(campaign.id, {
-          metadata: { ...campaign.metadata, assignedAgents }
-        });
-      }
-
       // Auto-populate queue from audience if defined
       if (campaign.audienceRefs && campaign.type === 'call') {
         const audienceRefs = campaign.audienceRefs as any;
