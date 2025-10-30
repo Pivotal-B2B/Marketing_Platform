@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -325,7 +325,7 @@ export default function AgentConsolePage() {
   const dialMode = campaignDetails?.dialMode || 'manual';
   const amdEnabled = campaignDetails?.powerSettings?.amd?.enabled ?? false;
 
-  // Simplified compact script renderer - optimized for minimal scrolling
+  // Professional script renderer with improved readability
   const renderFormattedScript = (script: string) => {
     if (!script) return null;
 
@@ -333,7 +333,7 @@ export default function AgentConsolePage() {
     const paragraphs = script.split(/\n\n+/);
     
     return (
-      <div className="space-y-2.5">
+      <div className="space-y-4">
         {paragraphs.map((paragraph, pIndex) => {
           const lines = paragraph.split('\n').filter(l => l.trim());
           if (lines.length === 0) return null;
@@ -344,9 +344,9 @@ export default function AgentConsolePage() {
           return (
             <div 
               key={pIndex}
-              className="p-2.5 rounded-lg border border-indigo-200/50 bg-gradient-to-br from-indigo-50/30 to-purple-50/20"
+              className="p-4 rounded-lg border bg-card shadow-sm hover-elevate transition-all"
             >
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {lines.map((line, lineIndex) => {
                   const bulletMatch = line.match(/^(\s*)([-*•]|\d+\.)\s+(.*)$/);
                   
@@ -357,13 +357,15 @@ export default function AgentConsolePage() {
                     return (
                       <div 
                         key={lineIndex}
-                        className="flex items-start gap-2 leading-snug"
-                        style={{ marginLeft: `${indentLevel * 1}rem` }}
+                        className="flex items-start gap-3 leading-relaxed"
+                        style={{ marginLeft: `${indentLevel * 1.25}rem` }}
                       >
-                        <div className="flex-shrink-0 mt-0.5 text-indigo-600 font-semibold text-xs">
-                          {bullet.match(/\d+\./) ? bullet : '•'}
+                        <div className="flex-shrink-0 mt-1 h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-primary font-semibold text-xs">
+                            {bullet.match(/\d+\./) ? bullet.replace('.', '') : '•'}
+                          </span>
                         </div>
-                        <div className="text-gray-800 text-xs flex-1">
+                        <div className="text-foreground text-sm flex-1">
                           {renderLineWithBoldPlaceholders(content)}
                         </div>
                       </div>
@@ -375,10 +377,10 @@ export default function AgentConsolePage() {
                   return (
                     <div 
                       key={lineIndex} 
-                      className={`leading-snug ${
+                      className={`leading-relaxed ${
                         isFirstLine 
-                          ? 'text-sm font-bold text-indigo-700 border-b border-indigo-200 pb-1 mb-1' 
-                          : 'text-xs text-gray-800'
+                          ? 'text-base font-bold text-primary border-b pb-2 mb-2' 
+                          : 'text-sm text-foreground'
                       }`}
                     >
                       {renderLineWithBoldPlaceholders(line)}
@@ -407,7 +409,7 @@ export default function AgentConsolePage() {
         const replacedValue = replacePlaceholders(part);
         
         return (
-          <span key={i} className="font-bold text-indigo-700 bg-indigo-50/50 px-1 rounded">
+          <span key={i} className="font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
             {replacedValue}
           </span>
         );
@@ -1447,36 +1449,39 @@ export default function AgentConsolePage() {
 
           {/* BOTTOM SPLIT: Script | Dispositions - Premium Design */}
           <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-            {/* LEFT: SCRIPT PANEL - Enhanced Card */}
-            <div className="w-full lg:flex-[2] border-b lg:border-b-0 lg:border-r p-3 md:p-4 bg-gradient-to-br from-indigo-50/50 via-purple-50/30 to-pink-50/20 min-h-[300px] lg:min-h-0">
-              <Card className="border-0 shadow-2xl h-full flex flex-col bg-white/80 backdrop-blur-sm">
-                <CardHeader className="pb-3 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border-b border-purple-100 flex-shrink-0">
-                  <CardTitle className="flex items-center gap-3 text-base">
-                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                      <FileText className="h-4 w-4 text-white" />
+            {/* LEFT: SCRIPT PANEL - Professional Design */}
+            <div className="w-full lg:flex-[2] border-b lg:border-b-0 lg:border-r p-4 bg-background min-h-[300px] lg:min-h-0">
+              <Card className="shadow-lg h-full flex flex-col">
+                <CardHeader className="pb-4 border-b flex-shrink-0">
+                  <CardTitle className="flex items-center gap-3 text-lg">
+                    <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shadow-md">
+                      <FileText className="h-5 w-5 text-primary-foreground" />
                     </div>
-                    <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent font-bold">Call Script</span>
+                    <span className="font-bold text-foreground">Call Script</span>
                   </CardTitle>
+                  <CardDescription className="text-sm mt-1">
+                    Follow this script to guide the conversation
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="flex-1 min-h-0 pt-2 px-3">
+                <CardContent className="flex-1 min-h-0 pt-4 px-4">
                   {(assignedScript?.content || campaignDetails?.callScript) ? (
-                    <div className="p-3 bg-gradient-to-br from-slate-50 to-gray-50 rounded-lg border border-gray-200/50 h-full overflow-auto">
+                    <div className="h-full overflow-auto pr-2">
                       {renderFormattedScript(assignedScript?.content || campaignDetails?.callScript || '')}
                     </div>
                   ) : (
-                    <div className="space-y-2 h-full flex flex-col justify-center">
-                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-xs leading-relaxed text-gray-700">
+                    <div className="space-y-3 h-full flex flex-col justify-center">
+                      <div className="p-4 bg-muted rounded-lg border">
+                        <p className="text-sm leading-relaxed">
                           "Hello, this is [Your Name] calling from Pivotal CRM. May I speak with{' '}
-                          <span className="font-bold text-indigo-700">
+                          <span className="font-semibold text-primary">
                             {currentQueueItem?.contactName || '[Contact Name]'}
                           </span>?"
                         </p>
                       </div>
-                      <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                        <p className="text-xs leading-relaxed text-gray-700">
+                      <div className="p-4 bg-muted rounded-lg border">
+                        <p className="text-sm leading-relaxed">
                           "I'm calling to discuss how our B2B solutions can help{' '}
-                          <span className="font-bold text-purple-700">
+                          <span className="font-semibold text-primary">
                             {currentQueueItem?.accountName || '[Company Name]'}
                           </span>{' '}
                           streamline their customer engagement..."
