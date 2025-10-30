@@ -184,36 +184,81 @@ function getCavAddress(customFields: any): Partial<AddressComponents> {
 }
 
 /**
- * Select the best phone number from available sources
+ * Select the best phone number from available sources with STRICT country matching
  * Priority: CAV Tel > Mobile > Contact Phone > AI Enriched > HQ Phone
  * CAV Tel is prioritized because it's client-verified data
+ * 
+ * CRITICAL: Enforces strict country matching to prevent HQ phones from wrong countries
+ * Example: UK contact should NOT get USA company HQ phone
  */
 export function selectBestPhone(contact: VerificationContactData): BestPhone {
-  const candidates: Array<{ value: string | null | undefined; source: PhoneSource }> = [
-    { value: getCavTel(contact.customFields), source: 'CAV Tel' },
-    { value: contact.mobile, source: 'Contact Mobile' },
-    { value: contact.phone, source: 'Contact Phone' },
-    { value: contact.aiEnrichedPhone, source: 'AI Enriched Phone' },
-    { value: contact.hqPhone, source: 'Company HQ Phone' },
+  const contactCountry = contact.contactCountry;
+  
+  // Define phone candidates with their country metadata
+  // CAV/Mobile/Contact phones can have missing country (inferred from contact)
+  // AI/HQ phones MUST match contact country exactly
+  const candidates: Array<{
+    value: string | null | undefined;
+    source: PhoneSource;
+    country: string | null | undefined;
+    allowMissingCountry: boolean; // Controls strict country matching
+  }> = [
+    {
+      value: getCavTel(contact.customFields),
+      source: 'CAV Tel',
+      country: contactCountry, // Infer from contact country
+      allowMissingCountry: true, // CAV is verified, allow missing country
+    },
+    {
+      value: contact.mobile,
+      source: 'Contact Mobile',
+      country: contactCountry, // Infer from contact country
+      allowMissingCountry: true, // Contact-level phone assumed to be in contact's country
+    },
+    {
+      value: contact.phone,
+      source: 'Contact Phone',
+      country: contactCountry, // Infer from contact country
+      allowMissingCountry: true, // Contact-level phone assumed to be in contact's country
+    },
+    {
+      value: contact.aiEnrichedPhone,
+      source: 'AI Enriched Phone',
+      country: contact.aiEnrichedCountry, // Compare AI enrichment's country against contact
+      allowMissingCountry: true, // Allow if AI enrichment has no country field
+    },
+    {
+      value: contact.hqPhone,
+      source: 'Company HQ Phone',
+      country: contact.hqCountry, // HQ has its own country
+      allowMissingCountry: false, // CRITICAL: HQ phone MUST match contact country (STRICT)
+    },
   ];
   
-  // Find first non-empty candidate
+  // Find first non-empty candidate that matches contact country
   for (const candidate of candidates) {
-    if (candidate.value && candidate.value.trim() !== '') {
+    const hasValue = candidate.value && candidate.value.trim() !== '';
+    const countryMatches = doesCountryMatch(
+      contactCountry,
+      candidate.country,
+      candidate.allowMissingCountry
+    );
+    
+    if (hasValue && countryMatches) {
       const phoneFormatted = formatPhoneWithCountryCode(
-        candidate.value,
-        contact.contactCountry
+        candidate.value!,
+        contactCountry
       );
       
       return {
-        phone: candidate.value,
-        phoneFormatted: phoneFormatted || candidate.value,
+        phone: candidate.value!,
+        phoneFormatted: phoneFormatted || candidate.value!,
         source: candidate.source,
       };
     }
   }
   
-  // No phone found
+  // No phone found that matches country
   return {
     phone: '',
     phoneFormatted: '',
