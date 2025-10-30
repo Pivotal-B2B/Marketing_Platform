@@ -2525,21 +2525,30 @@ export function registerRoutes(app: Express) {
 
   app.post("/api/campaigns/:id/launch", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
     try {
+      console.log(`[LAUNCH CAMPAIGN] Starting launch for campaign ${req.params.id}`);
+      
       const campaign = await storage.getCampaign(req.params.id);
       if (!campaign) {
+        console.log(`[LAUNCH CAMPAIGN] Campaign not found: ${req.params.id}`);
         return res.status(404).json({ message: "Campaign not found" });
       }
 
+      console.log(`[LAUNCH CAMPAIGN] Found campaign: ${campaign.name}, type: ${campaign.type}`);
+
       // TODO: Add pre-launch guards (audience validation, suppression checks, etc.)
 
+      console.log(`[LAUNCH CAMPAIGN] Updating campaign status to active...`);
       const updated = await storage.updateCampaign(req.params.id, {
         status: 'active',
         launchedAt: new Date()
       });
 
+      console.log(`[LAUNCH CAMPAIGN] Successfully launched campaign ${req.params.id}`);
+      invalidateDashboardCache();
       res.json(updated);
     } catch (error) {
-      res.status(500).json({ message: "Failed to launch campaign" });
+      console.error(`[LAUNCH CAMPAIGN] Error launching campaign ${req.params.id}:`, error);
+      res.status(500).json({ message: "Failed to launch campaign", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
