@@ -2578,10 +2578,21 @@ export function registerRoutes(app: Express) {
       // TODO: Add pre-launch guards (audience validation, suppression checks, etc.)
 
       console.log(`[LAUNCH CAMPAIGN] Updating campaign status to active...`);
-      const updated = await storage.updateCampaign(req.params.id, {
-        status: 'active',
-        launchedAt: new Date()
-      });
+      
+      // Update status and launchedAt using direct database query
+      const [updated] = await db
+        .update(campaigns)
+        .set({ 
+          status: 'active',
+          launchedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(campaigns.id, req.params.id))
+        .returning();
+
+      if (!updated) {
+        throw new Error('Failed to update campaign');
+      }
 
       console.log(`[LAUNCH CAMPAIGN] Successfully launched campaign ${req.params.id}`);
       invalidateDashboardCache();
