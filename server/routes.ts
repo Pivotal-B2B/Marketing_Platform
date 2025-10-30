@@ -3881,8 +3881,8 @@ export function registerRoutes(app: Express) {
         // Define final dispositions (contact should be removed from campaign immediately)
         const finalDispositions = ['qualified', 'lead', 'not_interested', 'dnc-request', 'callback-requested'];
         
-        // Define retry dispositions (contact should be requeued after delay)
-        const retryDispositions = ['no-answer', 'busy', 'voicemail'];
+        // Define retry dispositions (contact should be requeued after delay for ALL agents)
+        const retryDispositions = ['no-answer', 'busy', 'voicemail', 'voicemail_left'];
         
         // Define invalid dispositions (contact should be marked invalid and removed)
         const invalidDispositions = ['wrong_number', 'invalid_data'];
@@ -3904,14 +3904,14 @@ export function registerRoutes(app: Express) {
             console.log(`[DISPOSITION] ✅ Successfully removed from ${removed.length} agents' queues`);
           }
         } else if (retryDispositions.includes(disposition)) {
-          // Requeue with 3-day delay
-          console.log(`[DISPOSITION] Retry disposition "${disposition}" - requeuing contact ${contactId} with 3-day delay`);
+          // Requeue with 3-day delay for ALL agents (CRITICAL FIX: Update all agents, not just current)
+          console.log(`[DISPOSITION] Retry disposition "${disposition}" - requeuing contact ${contactId} with 3-day delay for ALL agents`);
           
           const retryDate = new Date();
           retryDate.setDate(retryDate.getDate() + 3);
           
-          // Update queue item to schedule for retry
-          await db.update(agentQueue)
+          // Update queue items for ALL agents (remove agentId filter to prevent reappearing to other agents)
+          const updated = await db.update(agentQueue)
             .set({
               queueState: 'queued',
               scheduledFor: retryDate,
@@ -3922,12 +3922,13 @@ export function registerRoutes(app: Express) {
             .where(
               and(
                 eq(agentQueue.contactId, contactId),
-                eq(agentQueue.campaignId, campaignId),
-                eq(agentQueue.agentId, agentId)
+                eq(agentQueue.campaignId, campaignId)
+                // REMOVED: eq(agentQueue.agentId, agentId) - This was causing contacts to reappear to other agents!
               )
-            );
+            )
+            .returning({ agentId: agentQueue.agentId });
           
-          console.log(`[DISPOSITION] ✅ Contact requeued for retry at ${retryDate.toISOString()}`);
+          console.log(`[DISPOSITION] ✅ Contact requeued for ${updated.length} agents at ${retryDate.toISOString()}`);
         } else if (invalidDispositions.includes(disposition)) {
           // Mark contact as invalid and remove from campaign
           console.log(`[DISPOSITION] Invalid disposition "${disposition}" - marking contact ${contactId} as invalid`);
