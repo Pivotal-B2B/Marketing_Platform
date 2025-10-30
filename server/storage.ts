@@ -698,11 +698,16 @@ export class DatabaseStorage implements IStorage {
     const row = result[0];
     return {
       ...row.contacts,
+      // Include HQ phone data for phone prioritization logic
+      hqPhone: row.accounts?.mainPhone,
+      hqPhoneE164: row.accounts?.mainPhoneE164,
+      hqCountry: row.accounts?.hqCountry,
       account: row.accounts ? {
         id: row.accounts.id,
         name: row.accounts.name,
         mainPhone: row.accounts.mainPhone,
         mainPhoneE164: row.accounts.mainPhoneE164,
+        hqCountry: row.accounts.hqCountry,
       } : undefined
     } as any;
   }
@@ -1745,9 +1750,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async assignQueueToAgents(campaignId: string, agentIds: string[], mode: 'round_robin' | 'weighted' = 'round_robin'): Promise<{ assigned: number }> {
-    // Get all unassigned queued items for this campaign
+    console.log(`[assignQueueToAgents] Starting assignment for campaign ${campaignId}, ${agentIds.length} agents, mode: ${mode}`);
+    
+    // Get all unassigned queued items for this campaign (only IDs and priority for performance)
     const queueItems = await db
-      .select()
+      .select({ id: campaignQueue.id, priority: campaignQueue.priority })
       .from(campaignQueue)
       .where(and(
         eq(campaignQueue.campaignId, campaignId),
@@ -1757,20 +1764,20 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
 
     if (queueItems.length === 0 || agentIds.length === 0) {
+      console.log(`[assignQueueToAgents] No items to assign (items: ${queueItems.length}, agents: ${agentIds.length})`);
       return { assigned: 0 };
     }
 
-    let assignedCount = 0;
+    console.log(`[assignQueueToAgents] Found ${queueItems.length} unassigned queue items`);
+
+    // Build assignment map: queueItemId -> agentId
+    const assignments = new Map<string, string>();
 
     if (mode === 'round_robin') {
       // Round robin assignment
       for (let i = 0; i < queueItems.length; i++) {
         const agentId = agentIds[i % agentIds.length];
-        await db
-          .update(campaignQueue)
-          .set({ agentId, updatedAt: new Date() })
-          .where(eq(campaignQueue.id, queueItems[i].id));
-        assignedCount++;
+        assignments.set(queueItems[i].id, agentId);
       }
     } else if (mode === 'weighted') {
       // For weighted, distribute evenly (can be enhanced with actual weights later)
@@ -1780,11 +1787,7 @@ export class DatabaseStorage implements IStorage {
       for (const agentId of agentIds) {
         const endIndex = Math.min(currentIndex + itemsPerAgent, queueItems.length);
         for (let i = currentIndex; i < endIndex; i++) {
-          await db
-            .update(campaignQueue)
-            .set({ agentId, updatedAt: new Date() })
-            .where(eq(campaignQueue.id, queueItems[i].id));
-          assignedCount++;
+          assignments.set(queueItems[i].id, agentId);
         }
         currentIndex = endIndex;
       }
@@ -1792,14 +1795,43 @@ export class DatabaseStorage implements IStorage {
       // Assign remaining items in round-robin
       for (let i = currentIndex; i < queueItems.length; i++) {
         const agentId = agentIds[(i - currentIndex) % agentIds.length];
-        await db
-          .update(campaignQueue)
-          .set({ agentId, updatedAt: new Date() })
-          .where(eq(campaignQueue.id, queueItems[i].id));
-        assignedCount++;
+        assignments.set(queueItems[i].id, agentId);
       }
     }
 
+    // PERFORMANCE FIX: Bulk update in batches instead of individual queries
+    // This prevents system hang with large datasets (84K+ contacts)
+    const BATCH_SIZE = 500;
+    const entries = Array.from(assignments.entries());
+    let assignedCount = 0;
+
+    console.log(`[assignQueueToAgents] Updating ${entries.length} queue items in batches of ${BATCH_SIZE}...`);
+
+    for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+      const batch = entries.slice(i, Math.min(i + BATCH_SIZE, entries.length));
+      
+      // Use CASE statement for bulk update with different agent IDs per row
+      const ids = batch.map(([id]) => id);
+      const caseStatements = batch.map(([id, agentId]) => 
+        `WHEN id = '${id}' THEN '${agentId}'`
+      ).join(' ');
+      
+      await db.execute(sql.raw(`
+        UPDATE campaign_queue
+        SET 
+          agent_id = CASE ${caseStatements} END,
+          updated_at = NOW()
+        WHERE id IN (${ids.map(id => `'${id}'`).join(', ')})
+      `));
+      
+      assignedCount += batch.length;
+      
+      if ((i + BATCH_SIZE) % 5000 === 0 || i + BATCH_SIZE >= entries.length) {
+        console.log(`[assignQueueToAgents] Progress: ${Math.min(i + BATCH_SIZE, entries.length)}/${entries.length} items assigned`);
+      }
+    }
+
+    console.log(`[assignQueueToAgents] ✅ Successfully assigned ${assignedCount} queue items to ${agentIds.length} agents`);
     return { assigned: assignedCount };
   }
 

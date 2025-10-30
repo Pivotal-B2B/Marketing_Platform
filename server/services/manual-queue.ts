@@ -110,7 +110,7 @@ export class ManualQueueService {
         // Normalize and update phone numbers - ONLY update the specific field that needs normalization
         const bestPhone = getBestPhoneForContact(contact);
         
-        // Update E164 fields if missing
+        // Update E164 fields if missing (only for contact-owned phones, not HQ)
         if (bestPhone.type === 'direct' && !contact.directPhoneE164 && contact.directPhone) {
           const normalized = normalizePhoneWithCountryCode(contact.directPhone, contact.country);
           if (normalized.e164) {
@@ -122,6 +122,7 @@ export class ManualQueueService {
             mobilePhoneUpdates.push({ id: contact.id, mobilePhoneE164: normalized.e164 });
           }
         }
+        // Note: 'hq' phone type is read-only from account table, no update needed
 
         return {
           id: sql`gen_random_uuid()`,
@@ -376,6 +377,7 @@ export class ManualQueueService {
 
   /**
    * Get eligible contacts based on filters
+   * INCLUDES account/HQ phone data for phone prioritization logic
    */
   private async getEligibleContacts(
     campaignId: string,
@@ -413,10 +415,22 @@ export class ManualQueueService {
       conditions.push(sql`(${contacts.directPhone} IS NOT NULL AND ${contacts.directPhone} != '') OR (${contacts.mobilePhone} IS NOT NULL AND ${contacts.mobilePhone} != '')`);
     }
 
-    const eligibleContacts = await db.query.contacts.findMany({
-      where: conditions.length > 0 ? and(...conditions) : undefined,
-      limit,
-    });
+    // Join with accounts to get HQ phone data for fallback logic
+    const results = await db
+      .select()
+      .from(contacts)
+      .leftJoin(accounts, eq(contacts.accountId, accounts.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .limit(limit);
+
+    // Map results to include HQ phone data on contact objects
+    const eligibleContacts = results.map(row => ({
+      ...row.contacts,
+      // Include HQ phone data for phone prioritization logic
+      hqPhone: row.accounts?.mainPhone,
+      hqPhoneE164: row.accounts?.mainPhoneE164,
+      hqCountry: row.accounts?.hqCountry,
+    })) as Contact[];
 
     return eligibleContacts;
   }

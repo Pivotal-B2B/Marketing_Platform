@@ -2398,29 +2398,62 @@ export function registerRoutes(app: Express) {
           }
         }
 
-        // Remove duplicates and filter valid contacts
+        // Remove duplicates and filter contacts with accountId
         const uniqueContacts = Array.from(
           new Map(contacts.map(c => [c.id, c])).values()
         );
-        const validContacts = uniqueContacts.filter(c => c.accountId);
+        const contactsWithAccount = uniqueContacts.filter(c => c.accountId);
 
-        // Enqueue all valid contacts (skip if already in queue)
-        let enqueuedCount = 0;
-        for (const contact of validContacts) {
-          try {
-            await storage.enqueueContact(
-              campaign.id,
-              contact.id,
-              contact.accountId!,
-              0
-            );
-            enqueuedCount++;
-          } catch (error) {
-            // Skip contacts that can't be enqueued (e.g., already in queue)
+        // PHONE VALIDATION: Filter contacts with callable phone numbers
+        // Fetch full contact data with account/HQ phone info if not already present
+        const contactIds = contactsWithAccount.map(c => c.id);
+        if (contactIds.length === 0) {
+          console.log(`[Campaign Creation] No contacts with account found for campaign ${campaign.id}`);
+        } else {
+          const fullContacts = await db
+            .select()
+            .from(contactsTable)
+            .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
+            .where(inArray(contactsTable.id, contactIds));
+
+          const contactsWithCallablePhones = fullContacts.filter(row => {
+            const contact = row.contacts;
+            const account = row.accounts;
+            
+            const bestPhone = getBestPhoneForContact({
+              directPhone: contact.directPhone,
+              directPhoneE164: contact.directPhoneE164,
+              mobilePhone: contact.mobilePhone,
+              mobilePhoneE164: contact.mobilePhoneE164,
+              country: contact.country,
+              hqPhone: account?.mainPhone,
+              hqPhoneE164: account?.mainPhoneE164,
+              hqCountry: account?.hqCountry,
+            });
+            
+            return bestPhone.phone !== null;
+          });
+
+          console.log(`[Campaign Creation] Phone validation: ${contactsWithCallablePhones.length}/${contactIds.length} contacts have callable phones`);
+
+          // Enqueue contacts with callable phones only
+          let enqueuedCount = 0;
+          for (const row of contactsWithCallablePhones) {
+            try {
+              await storage.enqueueContact(
+                campaign.id,
+                row.contacts.id,
+                row.contacts.accountId!,
+                0
+              );
+              enqueuedCount++;
+            } catch (error) {
+              // Skip contacts that can't be enqueued (e.g., already in queue)
+            }
           }
-        }
 
-        console.log(`[Campaign Creation] Auto-populated ${enqueuedCount} contacts to queue for campaign ${campaign.id}`);
+          console.log(`[Campaign Creation] Auto-populated ${enqueuedCount} contacts to queue for campaign ${campaign.id}`);
+        }
       }
 
       invalidateDashboardCache();
@@ -2670,11 +2703,43 @@ export function registerRoutes(app: Express) {
             // Combine both suppression sets
             const allSuppressedIds = new Set([...suppressedContactIds, ...dncContactIds]);
             
-            // Filter to eligible contacts only
-            const eligibleContacts = validContacts.filter(c => !allSuppressedIds.has(c.id));
+            // Filter to non-suppressed contacts
+            const nonSuppressedContacts = validContacts.filter(c => !allSuppressedIds.has(c.id));
             const suppressedCount = allSuppressedIds.size;
             
-            console.log(`[ASSIGN AGENTS] Filtered ${validContacts.length} contacts: ${eligibleContacts.length} eligible, ${suppressedCount} suppressed`);
+            console.log(`[ASSIGN AGENTS] Suppression check: ${nonSuppressedContacts.length}/${validContacts.length} contacts not suppressed`);
+            
+            // PHONE VALIDATION: Filter contacts with callable phone numbers
+            const nonSuppressedContactIds = nonSuppressedContacts.map(c => c.id);
+            const fullContactsForPhoneCheck = await db
+              .select()
+              .from(contactsTable)
+              .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
+              .where(inArray(contactsTable.id, nonSuppressedContactIds));
+
+            const contactsWithCallablePhones = fullContactsForPhoneCheck.filter(row => {
+              const contact = row.contacts;
+              const account = row.accounts;
+              
+              const bestPhone = getBestPhoneForContact({
+                directPhone: contact.directPhone,
+                directPhoneE164: contact.directPhoneE164,
+                mobilePhone: contact.mobilePhone,
+                mobilePhoneE164: contact.mobilePhoneE164,
+                country: contact.country,
+                hqPhone: account?.mainPhone,
+                hqPhoneE164: account?.mainPhoneE164,
+                hqCountry: account?.hqCountry,
+              });
+              
+              return bestPhone.phone !== null;
+            });
+
+            const eligibleContacts = contactsWithCallablePhones.map(row => row.contacts);
+            const noPhoneCount = nonSuppressedContacts.length - eligibleContacts.length;
+            
+            console.log(`[ASSIGN AGENTS] Phone validation: ${eligibleContacts.length}/${nonSuppressedContacts.length} contacts have callable phones`);
+            console.log(`[ASSIGN AGENTS] Final: ${eligibleContacts.length} eligible, ${suppressedCount} suppressed, ${noPhoneCount} no phone`);
             
             // MANUAL DIAL: Populate agent_queue with eligible campaign contacts for each agent
             // Build all queue items for bulk insert (much faster than individual inserts)
@@ -2733,13 +2798,42 @@ export function registerRoutes(app: Express) {
             });
           } else {
             // POWER DIAL: Populate campaign_queue and assign to agents via round-robin
+            
+            // PHONE VALIDATION: Filter contacts with callable phone numbers
+            const contactIds = validContacts.map(c => c.id);
+            const fullContacts = await db
+              .select()
+              .from(contactsTable)
+              .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
+              .where(inArray(contactsTable.id, contactIds));
+
+            const contactsWithCallablePhones = fullContacts.filter(row => {
+              const contact = row.contacts;
+              const account = row.accounts;
+              
+              const bestPhone = getBestPhoneForContact({
+                directPhone: contact.directPhone,
+                directPhoneE164: contact.directPhoneE164,
+                mobilePhone: contact.mobilePhone,
+                mobilePhoneE164: contact.mobilePhoneE164,
+                country: contact.country,
+                hqPhone: account?.mainPhone,
+                hqPhoneE164: account?.mainPhoneE164,
+                hqCountry: account?.hqCountry,
+              });
+              
+              return bestPhone.phone !== null;
+            });
+
+            console.log(`[POWER DIAL] Phone validation: ${contactsWithCallablePhones.length}/${validContacts.length} contacts have callable phones`);
+            
             let enqueuedCount = 0;
-            for (const contact of validContacts) {
+            for (const row of contactsWithCallablePhones) {
               try {
                 await storage.enqueueContact(
                   req.params.id,
-                  contact.id,
-                  contact.accountId!,
+                  row.contacts.id,
+                  row.contacts.accountId!,
                   0
                 );
                 enqueuedCount++;
@@ -2756,6 +2850,7 @@ export function registerRoutes(app: Express) {
               queueItemsAssigned: assignResult.assigned,
               contactsEnqueued: enqueuedCount,
               totalContactsProcessed: validContacts.length,
+              contactsWithCallablePhones: contactsWithCallablePhones.length,
               mode: 'power'
             });
           }
@@ -2897,24 +2992,53 @@ export function registerRoutes(app: Express) {
       }
 
       // Filter out contacts without accountId
-      const validContacts = uniqueContacts.filter(c => c.accountId);
-      const skippedCount = uniqueContacts.length - validContacts.length;
+      const contactsWithAccount = uniqueContacts.filter(c => c.accountId);
+      const skippedNoAccount = uniqueContacts.length - contactsWithAccount.length;
 
-      if (validContacts.length === 0) {
+      if (contactsWithAccount.length === 0) {
         return res.status(400).json({
           message: "No contacts with account IDs found. All contacts must be associated with an account."
         });
       }
 
-      // Enqueue all valid contacts
+      // PHONE VALIDATION: Filter contacts with callable phone numbers
+      const contactIds = contactsWithAccount.map(c => c.id);
+      const fullContacts = await db
+        .select()
+        .from(contactsTable)
+        .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
+        .where(inArray(contactsTable.id, contactIds));
+
+      const contactsWithCallablePhones = fullContacts.filter(row => {
+        const contact = row.contacts;
+        const account = row.accounts;
+        
+        const bestPhone = getBestPhoneForContact({
+          directPhone: contact.directPhone,
+          directPhoneE164: contact.directPhoneE164,
+          mobilePhone: contact.mobilePhone,
+          mobilePhoneE164: contact.mobilePhoneE164,
+          country: contact.country,
+          hqPhone: account?.mainPhone,
+          hqPhoneE164: account?.mainPhoneE164,
+          hqCountry: account?.hqCountry,
+        });
+        
+        return bestPhone.phone !== null;
+      });
+
+      const skippedNoPhone = contactsWithAccount.length - contactsWithCallablePhones.length;
+      console.log(`[Queue Populate] Phone validation: ${contactsWithCallablePhones.length}/${contactsWithAccount.length} contacts have callable phones`);
+
+      // Enqueue contacts with callable phones only
       const enqueued = [];
       let alreadyQueued = 0;
-      for (const contact of validContacts) {
+      for (const row of contactsWithCallablePhones) {
         try {
           const queueItem = await storage.enqueueContact(
             req.params.id,
-            contact.id,
-            contact.accountId!,
+            row.contacts.id,
+            row.contacts.accountId!,
             0 // default priority
           );
           enqueued.push(queueItem);

@@ -215,6 +215,11 @@ export function validatePhoneCountryMatch(
 /**
  * Get best phone number from contact with country validation
  * Returns the phone that matches the contact's country
+ * 
+ * Phone Priority (all with country matching):
+ * 1. Contact direct phone (directPhoneE164 / directPhone)
+ * 2. Contact mobile phone (mobilePhoneE164 / mobilePhone)
+ * 3. Company HQ phone (ONLY if hqCountry matches contactCountry)
  */
 export function getBestPhoneForContact(contact: {
   directPhone?: string | null;
@@ -222,24 +227,27 @@ export function getBestPhoneForContact(contact: {
   mobilePhone?: string | null;
   mobilePhoneE164?: string | null;
   country?: string | null;
-}): { phone: string | null; type: 'direct' | 'mobile' | null } {
-  const { country } = contact;
+  hqPhone?: string | null;
+  hqPhoneE164?: string | null;
+  hqCountry?: string | null;
+}): { phone: string | null; type: 'direct' | 'mobile' | 'hq' | null } {
+  const { country, hqCountry } = contact;
 
-  // Try direct phone first (E164 format preferred)
+  // PRIORITY 1: Try contact direct phone (E164 format preferred)
   if (contact.directPhoneE164) {
     if (validatePhoneCountryMatch(contact.directPhoneE164, country)) {
       return { phone: contact.directPhoneE164, type: 'direct' };
     }
   }
 
-  // Try mobile phone (E164 format)
+  // PRIORITY 2: Try contact mobile phone (E164 format)
   if (contact.mobilePhoneE164) {
     if (validatePhoneCountryMatch(contact.mobilePhoneE164, country)) {
       return { phone: contact.mobilePhoneE164, type: 'mobile' };
     }
   }
 
-  // Try normalizing direct phone
+  // PRIORITY 3: Try normalizing contact direct phone
   if (contact.directPhone) {
     const result = normalizePhoneWithCountryCode(contact.directPhone, country);
     if (result.e164 && result.countryMatches) {
@@ -247,7 +255,7 @@ export function getBestPhoneForContact(contact: {
     }
   }
 
-  // Try normalizing mobile phone
+  // PRIORITY 4: Try normalizing contact mobile phone
   if (contact.mobilePhone) {
     const result = normalizePhoneWithCountryCode(contact.mobilePhone, country);
     if (result.e164 && result.countryMatches) {
@@ -255,5 +263,34 @@ export function getBestPhoneForContact(contact: {
     }
   }
 
+  // PRIORITY 5 (FALLBACK): Try company HQ phone - STRICT COUNTRY MATCHING
+  // Only use HQ phone if company's country matches contact's country
+  if (contact.hqPhoneE164 && country && hqCountry) {
+    // Normalize both countries for comparison
+    const contactCountryNorm = normalizeCountryToCode(country);
+    const hqCountryNorm = normalizeCountryToCode(hqCountry);
+    
+    if (contactCountryNorm && hqCountryNorm && contactCountryNorm === hqCountryNorm) {
+      // Country match! Now validate the phone number is also valid for that country
+      if (validatePhoneCountryMatch(contact.hqPhoneE164, country)) {
+        return { phone: contact.hqPhoneE164, type: 'hq' };
+      }
+    }
+  }
+
+  // Try normalizing HQ phone (with same strict country matching)
+  if (contact.hqPhone && country && hqCountry) {
+    const contactCountryNorm = normalizeCountryToCode(country);
+    const hqCountryNorm = normalizeCountryToCode(hqCountry);
+    
+    if (contactCountryNorm && hqCountryNorm && contactCountryNorm === hqCountryNorm) {
+      const result = normalizePhoneWithCountryCode(contact.hqPhone, hqCountry);
+      if (result.e164 && result.countryMatches) {
+        return { phone: result.e164, type: 'hq' };
+      }
+    }
+  }
+
+  // No valid phone found
   return { phone: null, type: null };
 }

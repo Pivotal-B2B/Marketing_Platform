@@ -5,8 +5,9 @@ import { requireAuth, requireRole } from '../auth';
 import { requireFeatureFlag } from '../feature-flags';
 import { z } from 'zod';
 import { buildFilterQuery } from '../filter-builder';
-import { contacts, campaigns, agentQueue, campaignAudienceSnapshots, lists, segments } from '@shared/schema';
+import { contacts, accounts, campaigns, agentQueue, campaignAudienceSnapshots, lists, segments } from '@shared/schema';
 import type { FilterGroup } from '@shared/filter-types';
+import { getBestPhoneForContact } from '../lib/phone-utils';
 
 const router = Router();
 
@@ -322,10 +323,10 @@ router.post(
             : await query;
         }
 
-        // Step 4: Filter out contacts already assigned to other agents (collision prevention)
+        // Step 4: PHONE VALIDATION - Fetch full contact data and filter for callable numbers
         const contactIds = eligibleContacts.map(c => c.id);
         
-        console.log('[queues:set] Step 4 - Eligible contacts:', contactIds.length);
+        console.log('[queues:set] Step 4 - Eligible contacts before phone validation:', contactIds.length);
         
         if (contactIds.length === 0) {
           console.log('[queues:set] No eligible contacts found');
@@ -336,14 +337,54 @@ router.post(
           };
         }
 
-        let availableContacts = eligibleContacts;
-        let skipped = 0;
+        // Fetch full contact data with account/HQ phone info for validation
+        const fullContacts = await tx
+          .select()
+          .from(contacts)
+          .leftJoin(accounts, eq(contacts.accountId, accounts.id))
+          .where(inArray(contacts.id, contactIds));
+
+        // Filter contacts with callable phone numbers (contact phone OR HQ phone with country match)
+        const contactsWithCallablePhones = fullContacts.filter(row => {
+          const contact = row.contacts;
+          const account = row.accounts;
+          
+          // Check if contact has a valid callable phone
+          const bestPhone = getBestPhoneForContact({
+            directPhone: contact.directPhone,
+            directPhoneE164: contact.directPhoneE164,
+            mobilePhone: contact.mobilePhone,
+            mobilePhoneE164: contact.mobilePhoneE164,
+            country: contact.country,
+            hqPhone: account?.mainPhone,
+            hqPhoneE164: account?.mainPhoneE164,
+            hqCountry: account?.hqCountry,
+          });
+          
+          if (!bestPhone.phone) {
+            console.log(`[queues:set] Contact ${contact.id} filtered: no valid callable phone`);
+            return false;
+          }
+          
+          return true;
+        }).map(row => ({
+          id: row.contacts.id,
+          accountId: row.contacts.accountId,
+        }));
+
+        console.log(`[queues:set] Phone validation: ${contactsWithCallablePhones.length}/${contactIds.length} contacts have callable phones`);
+
+        const skippedNoPhone = contactIds.length - contactsWithCallablePhones.length;
+        let availableContacts = contactsWithCallablePhones;
+        let skippedCollision = 0;
 
         // Collision prevention (only if sharing is disabled)
         if (!allow_sharing) {
           console.log('[queues:set] Collision prevention enabled - checking for conflicts');
           // Only check active states from OTHER agents - released/completed contacts can be reassigned
           const activeStates: Array<'queued' | 'locked' | 'in_progress'> = ['queued', 'locked', 'in_progress'];
+          
+          const callableContactIds = contactsWithCallablePhones.map(c => c.id);
           
           const existingAssignments = await tx.select({
             contactId: agentQueue.contactId,
@@ -352,7 +393,7 @@ router.post(
           .where(
             and(
               eq(agentQueue.campaignId, campaignId),
-              inArray(agentQueue.contactId, contactIds),
+              inArray(agentQueue.contactId, callableContactIds),
               inArray(agentQueue.queueState, activeStates),
               sql`${agentQueue.agentId} != ${agent_id}`
             )
@@ -361,14 +402,17 @@ router.post(
           console.log('[queues:set] Existing assignments in campaign (other agents):', existingAssignments.length);
 
           const assignedContactIds = new Set(existingAssignments.map(a => a.contactId));
-          availableContacts = eligibleContacts.filter(c => !assignedContactIds.has(c.id));
-          skipped = contactIds.length - availableContacts.length;
+          availableContacts = contactsWithCallablePhones.filter(c => !assignedContactIds.has(c.id));
+          skippedCollision = contactsWithCallablePhones.length - availableContacts.length;
 
           console.log('[queues:set] Available contacts after collision check:', availableContacts.length);
-          console.log('[queues:set] Skipped due to collision:', skipped);
+          console.log('[queues:set] Skipped due to collision:', skippedCollision);
+          console.log('[queues:set] Total skipped (no phone + collision):', skippedNoPhone + skippedCollision);
         } else {
           console.log('[queues:set] Contact sharing enabled - allowing duplicates across agents');
         }
+
+        const totalSkipped = skippedNoPhone + skippedCollision;
 
         // Step 5: Delete existing entries for this agent + contacts (to avoid unique constraint violation)
         if (availableContacts.length > 0) {
@@ -403,7 +447,9 @@ router.post(
         return {
           released,
           assigned: availableContacts.length,
-          skipped_due_to_collision: skipped,
+          skipped_due_to_collision: skippedCollision,
+          skipped_no_phone: skippedNoPhone,
+          total_skipped: totalSkipped,
         };
       });
 

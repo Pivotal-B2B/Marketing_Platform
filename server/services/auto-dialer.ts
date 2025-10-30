@@ -288,7 +288,7 @@ export class PowerDialerEngine {
           continue;
         }
 
-        // Update contact with normalized phone if needed
+        // Update contact with normalized phone if needed (only for contact-owned phones, not HQ)
         if (bestPhone.type === 'direct' && !fullContact.directPhoneE164 && fullContact.directPhone) {
           const normalized = normalizePhoneWithCountryCode(fullContact.directPhone, fullContact.country);
           if (normalized.e164) {
@@ -308,6 +308,7 @@ export class PowerDialerEngine {
             console.log(`[AutoDialer] Updated contact ${fullContact.id} with normalized mobile phone`);
           }
         }
+        // Note: 'hq' phone type is read-only from account table, no update needed
 
         // Check business hours if enabled
         if (campaign.businessHoursConfig) {
