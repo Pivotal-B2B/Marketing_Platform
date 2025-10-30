@@ -11,6 +11,7 @@ import {
   Headphones,
   Activity,
   Database,
+  Phone,
 } from "lucide-react";
 import {
   Sidebar,
@@ -87,6 +88,7 @@ const getNavSections = (): NavSection[] => [
           { title: "All Contacts", url: "/contacts", roles: ["admin", "campaign_manager", "data_ops"] },
           { title: "Segments & Lists", url: "/segments?entity=contact", roles: ["admin", "campaign_manager", "data_ops"] },
           { title: "Bulk Import", url: "/imports", roles: ["admin", "data_ops"] },
+          { title: "Phone Bulk Editor", url: "/phone-bulk-editor", roles: ["admin", "data_ops"] },
         ],
       },
     ],

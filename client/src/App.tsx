@@ -63,6 +63,7 @@ import VerificationConsolePage from "@/pages/verification-console";
 import VerificationUploadPage from "@/pages/verification-upload";
 import VerificationSuppressionUploadPage from "@/pages/verification-suppression-upload";
 import AdminDataManagementPage from "@/pages/admin-data-management";
+import PhoneBulkEditorPage from "@/pages/phone-bulk-editor";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -135,6 +136,7 @@ function AuthenticatedApp() {
         <Route path="/call-reports" component={CallReportsPage} />
         <Route path="/call-reports/details" component={CallReportsDetailsPage} />
           <Route path="/engagement-analytics" component={EngagementAnalyticsPage} />
+              <Route path="/phone-bulk-editor" component={PhoneBulkEditorPage} />
               <Route path="/settings/users" component={UserManagementPage} />
               <Route path="/settings/data-management" component={AdminDataManagementPage} />
               <Route path="/settings/compliance" component={SettingsPage} />
