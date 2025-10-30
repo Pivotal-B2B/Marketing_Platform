@@ -1258,12 +1258,13 @@ export const campaignSuppressionEmails = pgTable("campaign_suppression_emails", 
 
 // Campaign Suppression - Domains
 // Suppress specific domains/companies from specific campaigns
+// domain can be NULL for company-name-only suppressions (uses domainNorm for matching)
 export const campaignSuppressionDomains = pgTable("campaign_suppression_domains", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   campaignId: varchar("campaign_id").references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
-  domain: text("domain").notNull(), // e.g., "acme.com"
-  domainNorm: text("domain_norm").notNull(), // Normalized for matching
-  companyName: text("company_name"), // Optional company name for reference
+  domain: text("domain"), // e.g., "acme.com" or NULL for company name suppressions
+  domainNorm: text("domain_norm").notNull(), // Normalized for matching (always required)
+  companyName: text("company_name"), // Original company name for display
   reason: text("reason"),
   addedBy: varchar("added_by").references(() => users.id, { onDelete: 'set null' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

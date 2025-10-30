@@ -1517,9 +1517,9 @@ router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: 
     if (results.companyNames.size > 0) {
       const companySuppressions = Array.from(results.companyNames).map(name => ({
         campaignId,
-        domain: null,
-        domainNorm: normalizeCompanyName(name),
-        companyName: name,
+        domain: null, // NULL for company-name-only suppressions
+        domainNorm: normalizeCompanyName(name), // Normalized for matching
+        companyName: name, // Original for display
         reason: 'Smart CSV upload',
         addedBy: userId,
       }));
