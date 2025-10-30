@@ -3589,10 +3589,32 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      // 3. QUALIFIED DISPOSITION - Add to campaign-level suppression
-      if (disposition === 'qualified' && contact && contactId && campaignId) {
+      // 3. QUALIFIED/LEAD DISPOSITION - Add to campaign-level suppression
+      // Check if this disposition represents a qualified lead (by name or system action)
+      const qualifyingDispositions = ['qualified', 'lead'];
+      let isQualified = qualifyingDispositions.includes(disposition);
+      
+      // Also check if disposition has systemAction === 'converted_qualified'
+      if (!isQualified) {
         try {
-          console.log(`[DISPOSITION] Qualified call - adding to campaign suppression for contact ${contactId}`);
+          const { dispositions: dispositionsTable } = await import('@shared/schema');
+          const [dispositionRecord] = await db
+            .select({ systemAction: dispositionsTable.systemAction })
+            .from(dispositionsTable)
+            .where(eq(dispositionsTable.label, disposition))
+            .limit(1);
+          
+          if (dispositionRecord?.systemAction === 'converted_qualified') {
+            isQualified = true;
+          }
+        } catch (error) {
+          console.error('[DISPOSITION] Error checking disposition system action:', error);
+        }
+      }
+      
+      if (isQualified && contact && contactId && campaignId) {
+        try {
+          console.log(`[DISPOSITION] Qualified/Lead call - adding to campaign suppression for contact ${contactId}`);
           
           // Add contact to campaign suppression list (prevents re-calling in this campaign)
           const { campaignSuppressionContacts } = await import('@shared/schema');
@@ -3601,7 +3623,7 @@ export function registerRoutes(app: Express) {
             .values({
               campaignId,
               contactId,
-              reason: 'Qualified - successful call',
+              reason: `Qualified - ${disposition}`,
               addedBy: agentId,
             })
             .onConflictDoNothing(); // Ignore if already suppressed
@@ -3623,24 +3645,20 @@ export function registerRoutes(app: Express) {
             if (campaign?.accountCapEnabled && campaign.accountCapValue) {
               console.log(`[DISPOSITION] Checking per-account cap for account ${contact.accountId} (mode: ${campaign.accountCapMode}, cap: ${campaign.accountCapValue})`);
               
-              // Count successful calls for this account in this campaign
-              // For now, count qualified dispositions (can be extended to other positive dispositions)
-              const [capResult] = await db
-                .select({ count: sql<number>`count(*)` })
-                .from(calls)
-                .where(
-                  and(
-                    eq(calls.campaignId, campaignId),
-                    eq(calls.accountId, contact.accountId),
-                    eq(calls.disposition, 'qualified')
-                  )
-                );
+              // Use the new batch account cap checking logic
+              const { batchCheckAccountCaps } = await import('./lib/campaign-suppression');
+              const capResults = await batchCheckAccountCaps(campaignId, [contact.accountId]);
+              const capStatus = capResults.get(contact.accountId);
               
-              const qualifiedCount = Number(capResult?.count || 0);
-              console.log(`[DISPOSITION] Account has ${qualifiedCount} qualified calls, cap is ${campaign.accountCapValue}`);
+              // Log current status
+              console.log(`[DISPOSITION] Account has ${capStatus?.currentCount || 0} counted items (mode: ${campaign.accountCapMode}), cap is ${campaign.accountCapValue}`);
               
-              // If cap is reached, auto-suppress the entire account from this campaign
-              if (qualifiedCount >= campaign.accountCapValue) {
+              // Check if this disposition pushes the account over the cap
+              const qualifiedCount = (capStatus?.currentCount || 0) + 1; // Include this current call
+              const reachedCap = qualifiedCount >= campaign.accountCapValue;
+              
+              // If cap is reached or exceeded, auto-suppress the entire account from this campaign
+              if (reachedCap) {
                 console.log(`[DISPOSITION] ⚠️ Account cap reached! Auto-suppressing account ${contact.accountId} from campaign ${campaignId}`);
                 
                 const { campaignSuppressionAccounts } = await import('@shared/schema');
@@ -3677,7 +3695,7 @@ export function registerRoutes(app: Express) {
       if (contactId && campaignId) {
         try {
           // Define final dispositions (contact should be removed from campaign immediately)
-          const finalDispositions = ['qualified', 'not_interested', 'dnc-request', 'callback-requested'];
+          const finalDispositions = ['qualified', 'lead', 'not_interested', 'dnc-request', 'callback-requested'];
           
           // Define retry dispositions (contact should be requeued after delay)
           const retryDispositions = ['no-answer', 'busy', 'voicemail'];
