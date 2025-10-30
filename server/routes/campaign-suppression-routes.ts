@@ -1427,6 +1427,7 @@ router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: 
     const hasHeaders = looksLikeHeader && lines.length > 1;
     
     console.log('[SMART UPLOAD] Detected format:', hasHeaders ? 'CSV with headers' : 'Headerless list');
+    console.log('[SMART UPLOAD] Processing CSV lines:', lines.length);
     
     const stream = Readable.from([csvContent]);
     
@@ -1512,6 +1513,12 @@ router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: 
         .on('error', reject);
     });
 
+    console.log('[SMART UPLOAD] Results collected:', {
+      companyNames: results.companyNames.size,
+      emails: results.emails.size,
+      domains: results.domains.size,
+    });
+
     // Insert company name suppressions (as domains)
     const companyInserted = [];
     if (results.companyNames.size > 0) {
@@ -1573,6 +1580,12 @@ router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: 
       
       domainInserted.push(...inserted);
     }
+
+    console.log('[SMART UPLOAD] Insertion complete:', {
+      companyInserted: companyInserted.length,
+      emailInserted: emailInserted.length,
+      domainInserted: domainInserted.length,
+    });
 
     res.status(201).json({
       message: 'Successfully processed smart CSV upload',
