@@ -255,84 +255,71 @@ router.post(
         // Step 4: Apply agent's filters WITHIN campaign audience
         console.log('[queues:set] Received filters:', JSON.stringify(filters, null, 2));
         
-        const whereConditions: any[] = [
-          inArray(contacts.id, campaignContactIds) // ALWAYS constrain to campaign audience
-        ];
+        // For large campaigns, batch the inArray to avoid PostgreSQL parameter limits
+        let eligibleContacts: any[] = [];
+        const BATCH_SIZE = 500;
         
-        if (filters && filters.conditions && filters.conditions.length > 0) {
-          console.log('[queues:set] Filter conditions found:', filters.conditions.length);
-          const filterSQL = buildFilterQuery(filters as FilterGroup, contacts);
-          if (filterSQL) {
-            whereConditions.push(filterSQL);
-            console.log('[queues:set] Applying agent filters within campaign audience');
+        // Build filter SQL once (applies to all batches)
+        const filterPart = filters && filters.conditions && filters.conditions.length > 0 
+          ? buildFilterQuery(filters as FilterGroup, contacts) 
+          : undefined;
+        
+        // Process campaign contact IDs in batches
+        for (let i = 0; i < campaignContactIds.length; i += BATCH_SIZE) {
+          const batch = campaignContactIds.slice(i, i + BATCH_SIZE);
+          
+          if (per_account_cap) {
+            // Use window function to limit contacts per account
+            const baseQuery = sql`
+              SELECT id, account_id
+              FROM (
+                SELECT 
+                  c.id,
+                  c.account_id,
+                  ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
+                FROM ${contacts} c
+                WHERE 
+                  c.id = ANY(ARRAY[${sql.join(batch.map(id => sql`${id}`), sql`, `)}])
+                  ${filterPart ? sql`AND ${filterPart}` : sql``}
+              ) t
+              WHERE rn <= ${per_account_cap}
+              ORDER BY id
+            `;
+            
+            const queryResult = await tx.execute(baseQuery);
+            const batchResults = queryResult.rows.map((row: any) => ({
+              id: row.id,
+              accountId: row.account_id,
+            }));
+            eligibleContacts.push(...batchResults);
           } else {
-            console.log('[queues:set] buildFilterQuery returned undefined - filters not applied!');
+            // Simple query without per-account cap
+            const whereConditions: any[] = [inArray(contacts.id, batch)];
+            if (filterPart) {
+              whereConditions.push(filterPart);
+            }
+            
+            const batchResults = await tx.select({
+              id: contacts.id,
+              accountId: contacts.accountId,
+            })
+            .from(contacts)
+            .where(and(...whereConditions))
+            .orderBy(contacts.id);
+            
+            eligibleContacts.push(...batchResults);
           }
-        } else {
-          console.log('[queues:set] No filter conditions provided or filters is empty');
+          
+          // Stop if we've reached max_queue_size
+          if (max_queue_size && eligibleContacts.length >= max_queue_size) {
+            eligibleContacts = eligibleContacts.slice(0, max_queue_size);
+            break;
+          }
         }
-
-        let eligibleContacts;
-
-        // Apply per-account cap if specified
-        if (per_account_cap) {
-          // Use window function to limit contacts per account
-          const filterPart = filters && filters.conditions && filters.conditions.length > 0 
-            ? buildFilterQuery(filters as FilterGroup, contacts) 
-            : undefined;
-          
-          // ALWAYS constrain to campaign audience
-          const baseQuery = max_queue_size
-            ? sql`
-                SELECT id, account_id
-                FROM (
-                  SELECT 
-                    c.id,
-                    c.account_id,
-                    ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
-                  FROM ${contacts} c
-                  WHERE 
-                    c.id = ANY(ARRAY[${sql.join(campaignContactIds.map(id => sql`${id}`), sql`, `)}])
-                    ${filterPart ? sql`AND ${filterPart}` : sql``}
-                ) t
-                WHERE rn <= ${per_account_cap}
-                ORDER BY id
-                LIMIT ${max_queue_size}
-              `
-            : sql`
-                SELECT id, account_id
-                FROM (
-                  SELECT 
-                    c.id,
-                    c.account_id,
-                    ROW_NUMBER() OVER (PARTITION BY c.account_id ORDER BY c.id) as rn
-                  FROM ${contacts} c
-                  WHERE 
-                    c.id = ANY(ARRAY[${sql.join(campaignContactIds.map(id => sql`${id}`), sql`, `)}])
-                    ${filterPart ? sql`AND ${filterPart}` : sql``}
-                ) t
-                WHERE rn <= ${per_account_cap}
-                ORDER BY id
-              `;
-          
-          const queryResult = await tx.execute(baseQuery);
-          eligibleContacts = queryResult.rows.map((row: any) => ({
-            id: row.id,
-            accountId: row.account_id,
-          }));
-        } else {
-          // Simple query without per-account cap
-          let query = tx.select({
-            id: contacts.id,
-            accountId: contacts.accountId,
-          })
-          .from(contacts)
-          .where(and(...whereConditions))
-          .orderBy(contacts.id);
-
-          eligibleContacts = max_queue_size 
-            ? await query.limit(max_queue_size)
-            : await query;
+        
+        console.log(`[queues:set] Eligible contacts after filtering: ${eligibleContacts.length}`);
+        if (filterPart) {
+          console.log('[queues:set] Agent filters applied within campaign audience');
         }
 
         // Step 4: PHONE VALIDATION - Fetch full contact data and filter for callable numbers
@@ -349,12 +336,17 @@ router.post(
           };
         }
 
-        // Fetch full contact data with account/HQ phone info for validation
-        const fullContacts = await tx
-          .select()
-          .from(contacts)
-          .leftJoin(accounts, eq(contacts.accountId, accounts.id))
-          .where(inArray(contacts.id, contactIds));
+        // Fetch full contact data with account/HQ phone info for validation (batch to avoid parameter limits)
+        const fullContacts: any[] = [];
+        for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
+          const batch = contactIds.slice(i, i + BATCH_SIZE);
+          const batchResults = await tx
+            .select()
+            .from(contacts)
+            .leftJoin(accounts, eq(contacts.accountId, accounts.id))
+            .where(inArray(contacts.id, batch));
+          fullContacts.push(...batchResults);
+        }
 
         // Filter contacts with callable phone numbers (contact phone OR HQ phone with country match)
         const contactsWithCallablePhones = fullContacts.filter(row => {
@@ -395,19 +387,25 @@ router.post(
         // Query for contacts that STILL EXIST in queue with future scheduledFor dates
         const callableContactIds = contactsWithCallablePhones.map(c => c.id);
         
-        const scheduledContacts = await tx.select({
-          contactId: agentQueue.contactId,
-          scheduledFor: agentQueue.scheduledFor,
-        })
-        .from(agentQueue)
-        .where(
-          and(
-            eq(agentQueue.campaignId, campaignId),
-            eq(agentQueue.agentId, agent_id),
-            inArray(agentQueue.contactId, callableContactIds),
-            sql`${agentQueue.scheduledFor} IS NOT NULL AND ${agentQueue.scheduledFor} > NOW()`
-          )
-        );
+        // Batch to avoid parameter limits
+        const scheduledContacts: any[] = [];
+        for (let i = 0; i < callableContactIds.length; i += BATCH_SIZE) {
+          const batch = callableContactIds.slice(i, i + BATCH_SIZE);
+          const batchResults = await tx.select({
+            contactId: agentQueue.contactId,
+            scheduledFor: agentQueue.scheduledFor,
+          })
+          .from(agentQueue)
+          .where(
+            and(
+              eq(agentQueue.campaignId, campaignId),
+              eq(agentQueue.agentId, agent_id),
+              inArray(agentQueue.contactId, batch),
+              sql`${agentQueue.scheduledFor} IS NOT NULL AND ${agentQueue.scheduledFor} > NOW()`
+            )
+          );
+          scheduledContacts.push(...batchResults);
+        }
 
         console.log('[queues:set] Contacts preserved with future scheduled dates:', scheduledContacts.length);
         
@@ -427,18 +425,25 @@ router.post(
           // Only check active states from OTHER agents - released/completed contacts can be reassigned
           const activeStates: Array<'queued' | 'locked' | 'in_progress'> = ['queued', 'locked', 'in_progress'];
           
-          const existingAssignments = await tx.select({
-            contactId: agentQueue.contactId,
-          })
-          .from(agentQueue)
-          .where(
-            and(
-              eq(agentQueue.campaignId, campaignId),
-              inArray(agentQueue.contactId, availableContacts.map(c => c.id)),
-              inArray(agentQueue.queueState, activeStates),
-              sql`${agentQueue.agentId} != ${agent_id}`
-            )
-          );
+          // Batch to avoid parameter limits
+          const availableContactIds = availableContacts.map(c => c.id);
+          const existingAssignments: any[] = [];
+          for (let i = 0; i < availableContactIds.length; i += BATCH_SIZE) {
+            const batch = availableContactIds.slice(i, i + BATCH_SIZE);
+            const batchResults = await tx.select({
+              contactId: agentQueue.contactId,
+            })
+            .from(agentQueue)
+            .where(
+              and(
+                eq(agentQueue.campaignId, campaignId),
+                inArray(agentQueue.contactId, batch),
+                inArray(agentQueue.queueState, activeStates),
+                sql`${agentQueue.agentId} != ${agent_id}`
+              )
+            );
+            existingAssignments.push(...batchResults);
+          }
 
           console.log('[queues:set] Existing assignments in campaign (other agents):', existingAssignments.length);
 
@@ -460,14 +465,18 @@ router.post(
           const availableContactIds = availableContacts.map(c => c.id);
           
           console.log('[queues:set] Deleting old entries for', availableContactIds.length, 'contacts');
-          await tx.delete(agentQueue)
-            .where(
-              and(
-                eq(agentQueue.agentId, agent_id),
-                eq(agentQueue.campaignId, campaignId),
-                inArray(agentQueue.contactId, availableContactIds)
-              )
-            );
+          // Batch delete to avoid parameter limits
+          for (let i = 0; i < availableContactIds.length; i += BATCH_SIZE) {
+            const batch = availableContactIds.slice(i, i + BATCH_SIZE);
+            await tx.delete(agentQueue)
+              .where(
+                and(
+                  eq(agentQueue.agentId, agent_id),
+                  eq(agentQueue.campaignId, campaignId),
+                  inArray(agentQueue.contactId, batch)
+                )
+              );
+          }
           
           console.log('[queues:set] Inserting', availableContacts.length, 'new contacts for agent', agent_id);
           await tx.insert(agentQueue)

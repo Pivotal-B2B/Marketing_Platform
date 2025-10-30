@@ -104,10 +104,17 @@ router.post('/:campaignId/suppressions/accounts', async (req: Request, res: Resp
     }
 
     // Validate accounts exist
-    const existingAccounts = await db
-      .select({ id: accounts.id })
-      .from(accounts)
-      .where(inArray(accounts.id, accountIds));
+    // Batch to avoid PostgreSQL parameter limits
+    const existingAccounts: any[] = [];
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < accountIds.length; i += BATCH_SIZE) {
+      const batch = accountIds.slice(i, i + BATCH_SIZE);
+      const batchResults = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(inArray(accounts.id, batch));
+      existingAccounts.push(...batchResults);
+    }
 
     if (existingAccounts.length !== accountIds.length) {
       return res.status(400).json({ error: 'One or more accounts not found' });
@@ -276,11 +283,16 @@ router.post('/:campaignId/suppressions/accounts/upload', async (req: Request, re
     // Match by account ID (bulk query)
     const directIds = accountIdentifiers.filter(i => i.type === 'id').map(i => i.value);
     if (directIds.length > 0) {
-      const found = await db
-        .select({ id: accounts.id })
-        .from(accounts)
-        .where(inArray(accounts.id, directIds));
-      found.forEach(a => matchedAccountIds.add(a.id));
+      // Batch to avoid parameter limits
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < directIds.length; i += BATCH_SIZE) {
+        const batch = directIds.slice(i, i + BATCH_SIZE);
+        const found = await db
+          .select({ id: accounts.id })
+          .from(accounts)
+          .where(inArray(accounts.id, batch));
+        found.forEach(a => matchedAccountIds.add(a.id));
+      }
     }
 
     // Match by domain (bulk query with case-insensitive OR conditions)
@@ -430,10 +442,17 @@ router.post('/:campaignId/suppressions/contacts', async (req: Request, res: Resp
     }
 
     // Validate contacts exist
-    const existingContacts = await db
-      .select({ id: contacts.id })
-      .from(contacts)
-      .where(inArray(contacts.id, contactIds));
+    // Batch to avoid PostgreSQL parameter limits
+    const existingContacts: any[] = [];
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
+      const batch = contactIds.slice(i, i + BATCH_SIZE);
+      const batchResults = await db
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(inArray(contacts.id, batch));
+      existingContacts.push(...batchResults);
+    }
 
     if (existingContacts.length !== contactIds.length) {
       return res.status(400).json({ error: 'One or more contacts not found' });
@@ -591,24 +610,32 @@ router.post('/:campaignId/suppressions/contacts/upload', async (req: Request, re
     // Find matching contacts
     const matchedContactIds = new Set<string>();
 
-    // Match by contact ID
+    // Match by contact ID (batch to avoid parameter limits)
     const directIds = contactIdentifiers.filter(i => i.type === 'id').map(i => i.value);
     if (directIds.length > 0) {
-      const found = await db
-        .select({ id: contacts.id })
-        .from(contacts)
-        .where(inArray(contacts.id, directIds));
-      found.forEach(c => matchedContactIds.add(c.id));
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < directIds.length; i += BATCH_SIZE) {
+        const batch = directIds.slice(i, i + BATCH_SIZE);
+        const found = await db
+          .select({ id: contacts.id })
+          .from(contacts)
+          .where(inArray(contacts.id, batch));
+        found.forEach(c => matchedContactIds.add(c.id));
+      }
     }
 
-    // Match by email
+    // Match by email (batch to avoid parameter limits)
     const emails = contactIdentifiers.filter(i => i.type === 'email').map(i => i.value);
     if (emails.length > 0) {
-      const found = await db
-        .select({ id: contacts.id })
-        .from(contacts)
-        .where(inArray(sql`LOWER(${contacts.email})`, emails));
-      found.forEach(c => matchedContactIds.add(c.id));
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < emails.length; i += BATCH_SIZE) {
+        const batch = emails.slice(i, i + BATCH_SIZE);
+        const found = await db
+          .select({ id: contacts.id })
+          .from(contacts)
+          .where(inArray(sql`LOWER(${contacts.email})`, batch));
+        found.forEach(c => matchedContactIds.add(c.id));
+      }
     }
 
     if (matchedContactIds.size === 0) {
@@ -682,45 +709,57 @@ router.get('/:campaignId/suppressions/stats', async (req: Request, res: Response
     const contactIds = queueContacts.map(c => c.contactId);
     const accountIds = Array.from(new Set(queueContacts.map(c => c.accountId)));
 
-    // Get contacts with their account data for domain/email matching
-    const contactsWithAccounts = await db
-      .select({
-        contactId: contacts.id,
-        accountId: contacts.accountId,
-        email: contacts.email,
-        accountDomain: accounts.domain,
-      })
-      .from(contacts)
-      .leftJoin(accounts, eq(contacts.accountId, accounts.id))
-      .where(inArray(contacts.id, contactIds));
-
-    // Check account suppressions
-    const suppressedAccountIds = new Set<string>();
-    if (accountIds.length > 0) {
-      const accountSuppressions = await db
-        .select({ accountId: campaignSuppressionAccounts.accountId })
-        .from(campaignSuppressionAccounts)
-        .where(
-          and(
-            eq(campaignSuppressionAccounts.campaignId, campaignId),
-            inArray(campaignSuppressionAccounts.accountId, accountIds)
-          )
-        );
-      accountSuppressions.forEach(s => suppressedAccountIds.add(s.accountId));
+    // Get contacts with their account data for domain/email matching (batch to avoid parameter limits)
+    const contactsWithAccounts: any[] = [];
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
+      const batch = contactIds.slice(i, i + BATCH_SIZE);
+      const batchResults = await db
+        .select({
+          contactId: contacts.id,
+          accountId: contacts.accountId,
+          email: contacts.email,
+          accountDomain: accounts.domain,
+        })
+        .from(contacts)
+        .leftJoin(accounts, eq(contacts.accountId, accounts.id))
+        .where(inArray(contacts.id, batch));
+      contactsWithAccounts.push(...batchResults);
     }
 
-    // Check contact suppressions
+    // Check account suppressions (batch to avoid parameter limits)
+    const suppressedAccountIds = new Set<string>();
+    if (accountIds.length > 0) {
+      for (let i = 0; i < accountIds.length; i += BATCH_SIZE) {
+        const batch = accountIds.slice(i, i + BATCH_SIZE);
+        const accountSuppressions = await db
+          .select({ accountId: campaignSuppressionAccounts.accountId })
+          .from(campaignSuppressionAccounts)
+          .where(
+            and(
+              eq(campaignSuppressionAccounts.campaignId, campaignId),
+              inArray(campaignSuppressionAccounts.accountId, batch)
+            )
+          );
+        accountSuppressions.forEach(s => suppressedAccountIds.add(s.accountId));
+      }
+    }
+
+    // Check contact suppressions (batch to avoid parameter limits)
     const suppressedContactIds = new Set<string>();
-    const contactSuppressions = await db
-      .select({ contactId: campaignSuppressionContacts.contactId })
-      .from(campaignSuppressionContacts)
-      .where(
-        and(
-          eq(campaignSuppressionContacts.campaignId, campaignId),
-          inArray(campaignSuppressionContacts.contactId, contactIds)
-        )
-      );
-    contactSuppressions.forEach(s => suppressedContactIds.add(s.contactId));
+    for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
+      const batch = contactIds.slice(i, i + BATCH_SIZE);
+      const contactSuppressions = await db
+        .select({ contactId: campaignSuppressionContacts.contactId })
+        .from(campaignSuppressionContacts)
+        .where(
+          and(
+            eq(campaignSuppressionContacts.campaignId, campaignId),
+            inArray(campaignSuppressionContacts.contactId, batch)
+          )
+        );
+      contactSuppressions.forEach(s => suppressedContactIds.add(s.contactId));
+    }
 
     // Check domain suppressions
     const allDomains = contactsWithAccounts
@@ -834,37 +873,49 @@ router.get('/:campaignId/suppressions/check', async (req: Request, res: Response
       suppressedContacts: [],
     };
 
-    // Check account suppressions
+    // Check account suppressions (batch to avoid parameter limits)
     if (accountIds && typeof accountIds === 'string') {
       const accountIdArray = accountIds.split(',').filter(Boolean);
       if (accountIdArray.length > 0) {
-        const suppressed = await db
-          .select({ accountId: campaignSuppressionAccounts.accountId })
-          .from(campaignSuppressionAccounts)
-          .where(
-            and(
-              eq(campaignSuppressionAccounts.campaignId, campaignId),
-              inArray(campaignSuppressionAccounts.accountId, accountIdArray)
-            )
-          );
-        result.suppressedAccounts = suppressed.map(s => s.accountId);
+        const BATCH_SIZE = 500;
+        const allSuppressed: any[] = [];
+        for (let i = 0; i < accountIdArray.length; i += BATCH_SIZE) {
+          const batch = accountIdArray.slice(i, i + BATCH_SIZE);
+          const suppressed = await db
+            .select({ accountId: campaignSuppressionAccounts.accountId })
+            .from(campaignSuppressionAccounts)
+            .where(
+              and(
+                eq(campaignSuppressionAccounts.campaignId, campaignId),
+                inArray(campaignSuppressionAccounts.accountId, batch)
+              )
+            );
+          allSuppressed.push(...suppressed);
+        }
+        result.suppressedAccounts = allSuppressed.map(s => s.accountId);
       }
     }
 
-    // Check contact suppressions
+    // Check contact suppressions (batch to avoid parameter limits)
     if (contactIds && typeof contactIds === 'string') {
       const contactIdArray = contactIds.split(',').filter(Boolean);
       if (contactIdArray.length > 0) {
-        const suppressed = await db
-          .select({ contactId: campaignSuppressionContacts.contactId })
-          .from(campaignSuppressionContacts)
-          .where(
-            and(
-              eq(campaignSuppressionContacts.campaignId, campaignId),
-              inArray(campaignSuppressionContacts.contactId, contactIdArray)
-            )
-          );
-        result.suppressedContacts = suppressed.map(s => s.contactId);
+        const BATCH_SIZE = 500;
+        const allSuppressed: any[] = [];
+        for (let i = 0; i < contactIdArray.length; i += BATCH_SIZE) {
+          const batch = contactIdArray.slice(i, i + BATCH_SIZE);
+          const suppressed = await db
+            .select({ contactId: campaignSuppressionContacts.contactId })
+            .from(campaignSuppressionContacts)
+            .where(
+              and(
+                eq(campaignSuppressionContacts.campaignId, campaignId),
+                inArray(campaignSuppressionContacts.contactId, batch)
+              )
+            );
+          allSuppressed.push(...suppressed);
+        }
+        result.suppressedContacts = allSuppressed.map(s => s.contactId);
       }
     }
 
