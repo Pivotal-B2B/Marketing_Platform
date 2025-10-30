@@ -238,6 +238,9 @@ export function validatePhoneCountryMatch(
  * 1. Contact direct phone (E164 or raw) - Accept ANY valid parseable phone
  * 2. Contact mobile phone (E164 or raw) - Accept ANY valid parseable phone
  * 3. Company HQ phone - Accept ANY valid parseable phone
+ * 
+ * CRITICAL: Properly handles trunk prefixes (e.g., UK "0" prefix)
+ * Example: "4401908802874" → "+441908802874" (removes "0" trunk prefix)
  */
 export function getBestPhoneForContact(contact: {
   directPhone?: string | null;
@@ -250,24 +253,86 @@ export function getBestPhoneForContact(contact: {
   hqCountry?: string | null;
 }): { phone: string | null; type: 'direct' | 'mobile' | 'hq' | null } {
   
-  // Helper: Try to parse any phone string into E.164
-  const tryParsePhone = (phone: string | null | undefined): string | null => {
+  // Helper: Try to parse any phone string into E.164 with proper trunk prefix handling
+  const tryParsePhone = (phone: string | null | undefined, hintCountry?: string | null): string | null => {
     if (!phone) return null;
+    
+    const phoneStr = phone.trim();
+    if (!phoneStr) return null;
+    
+    // Clean phone - remove non-digit characters except leading +
+    let cleanPhone = phoneStr.replace(/[^\d+]/g, '');
+    if (!cleanPhone) return null;
+    
+    // Get country code hint if provided
+    const countryCode = hintCountry ? normalizeCountryToCode(hintCountry) : null;
+    
     try {
-      let phoneToTest = phone.trim();
-      
-      // If phone doesn't start with + but starts with digits, try adding + prefix
-      if (!phoneToTest.startsWith('+') && /^\d/.test(phoneToTest)) {
-        phoneToTest = '+' + phoneToTest;
+      // Strategy 1: Try parsing with country hint (handles trunk prefixes automatically)
+      if (countryCode) {
+        // Try with country code context (libphonenumber-js handles trunk prefix removal)
+        const parsed = parsePhoneNumber(cleanPhone, countryCode);
+        if (parsed && parsed.isValid()) {
+          return parsed.format('E.164');
+        }
       }
       
-      const parsed = parsePhoneNumber(phoneToTest);
-      if (parsed && parsed.isValid()) {
-        return parsed.format('E.164');
+      // Strategy 2: Try parsing as international format (with + prefix)
+      if (cleanPhone.startsWith('+')) {
+        const parsed = parsePhoneNumber(cleanPhone);
+        if (parsed && parsed.isValid()) {
+          return parsed.format('E.164');
+        }
+      }
+      
+      // Strategy 3: Try adding + prefix and parsing (handles "4401908..." → "+4401908...")
+      // BUT libphonenumber needs country hint to remove trunk prefix
+      if (!cleanPhone.startsWith('+')) {
+        // First, try with + prefix as-is (might work for clean E.164 without +)
+        try {
+          const withPlus = '+' + cleanPhone;
+          const parsed = parsePhoneNumber(withPlus);
+          if (parsed && parsed.isValid()) {
+            return parsed.format('E.164');
+          }
+        } catch (e) {
+          // Not a valid international number, continue
+        }
+        
+        // If we have a country hint, try parsing without + using country code
+        // This lets libphonenumber-js handle trunk prefixes correctly
+        if (countryCode) {
+          // Remove leading country code if present to let parser add it correctly
+          const callingCode = getCountryCallingCode(countryCode);
+          let phoneWithoutCountryCode = cleanPhone;
+          
+          if (cleanPhone.startsWith(callingCode)) {
+            phoneWithoutCountryCode = cleanPhone.substring(callingCode.length);
+          }
+          
+          const parsed = parsePhoneNumber(phoneWithoutCountryCode, countryCode);
+          if (parsed && parsed.isValid()) {
+            return parsed.format('E.164');
+          }
+        }
+      }
+      
+      // Strategy 4: Try common country codes (GB, US, etc.) as fallback
+      const commonCountries: CountryCode[] = ['GB', 'US', 'CA', 'AU', 'DE', 'FR'];
+      for (const tryCountry of commonCountries) {
+        try {
+          const parsed = parsePhoneNumber(cleanPhone, tryCountry);
+          if (parsed && parsed.isValid()) {
+            return parsed.format('E.164');
+          }
+        } catch (e) {
+          // Try next country
+        }
       }
     } catch (error) {
       // Ignore parsing errors
     }
+    
     return null;
   };
 
@@ -298,25 +363,25 @@ export function getBestPhoneForContact(contact: {
   }
 
   // PRIORITY 3: Try parsing contact direct phone - ULTRA LENIENT
-  // Accept ANY parseable phone (no country matching required)
+  // Accept ANY parseable phone (use country hint to handle trunk prefixes)
   if (contact.directPhone) {
-    const parsed = tryParsePhone(contact.directPhone);
+    const parsed = tryParsePhone(contact.directPhone, contact.country);
     if (parsed) {
       return { phone: parsed, type: 'direct' };
     }
   }
 
   // PRIORITY 4: Try parsing contact mobile phone - ULTRA LENIENT
-  // Accept ANY parseable phone (no country matching required)
+  // Accept ANY parseable phone (use country hint to handle trunk prefixes)
   if (contact.mobilePhone) {
-    const parsed = tryParsePhone(contact.mobilePhone);
+    const parsed = tryParsePhone(contact.mobilePhone, contact.country);
     if (parsed) {
       return { phone: parsed, type: 'mobile' };
     }
   }
 
   // PRIORITY 5 (FALLBACK): Company HQ phone - ULTRA LENIENT
-  // Accept ANY parseable HQ phone (no country matching required)
+  // Accept ANY parseable HQ phone (use HQ country hint for trunk prefixes)
   if (contact.hqPhoneE164) {
     try {
       const parsed = parsePhoneNumber(contact.hqPhoneE164);
@@ -328,9 +393,9 @@ export function getBestPhoneForContact(contact: {
     }
   }
 
-  // Try parsing HQ phone from raw format
+  // Try parsing HQ phone from raw format (use HQ country hint)
   if (contact.hqPhone) {
-    const parsed = tryParsePhone(contact.hqPhone);
+    const parsed = tryParsePhone(contact.hqPhone, contact.hqCountry);
     if (parsed) {
       return { phone: parsed, type: 'hq' };
     }

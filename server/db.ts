@@ -12,13 +12,13 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Optimized connection pool for high concurrency (3+ concurrent agents)
+// Optimized connection pool for 10+ concurrent agents + background jobs
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
-  max: 50, // Increased for multiple agents + background jobs
-  min: 5, // Keep minimum connections ready
+  max: 100, // Increased for 10 agents (10 per agent) + 30 for background jobs
+  min: 10, // Keep 10 connections ready (1 per agent baseline)
   idleTimeoutMillis: 60000, // Keep connections alive longer (60s)
-  connectionTimeoutMillis: 20000, // More patience for slow queries (20s)
+  connectionTimeoutMillis: 30000, // More patience for complex queries (30s)
   maxUses: 7500, // Recycle connections periodically to prevent stale connections
 });
 export const db = drizzle({ client: pool, schema });
