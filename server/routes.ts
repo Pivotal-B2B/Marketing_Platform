@@ -3433,9 +3433,17 @@ export function registerRoutes(app: Express) {
               contactId: agentQueue.contactId,
               contactName: sql<string>`COALESCE(${contacts.fullName}, CONCAT(${contacts.firstName}, ' ', ${contacts.lastName}))`.as('contactName'),
               contactEmail: contacts.email,
-              contactPhone: contacts.directPhone,
+              // Get all phone fields to determine best phone
+              contactDirectPhone: contacts.directPhone,
+              contactDirectPhoneE164: contacts.directPhoneE164,
+              contactMobilePhone: contacts.mobilePhone,
+              contactMobilePhoneE164: contacts.mobilePhoneE164,
+              contactCountry: contacts.country,
               accountId: agentQueue.accountId,
               accountName: accounts.name,
+              accountHqPhone: accounts.mainPhone,
+              accountHqPhoneE164: accounts.mainPhoneE164,
+              accountHqCountry: accounts.hqCountry,
               priority: agentQueue.priority,
               status: agentQueue.queueState,
               createdAt: agentQueue.createdAt,
@@ -3454,8 +3462,39 @@ export function registerRoutes(app: Express) {
             )
             .orderBy(desc(agentQueue.priority), agentQueue.createdAt);
 
-          console.log(`[AGENT QUEUE] Manual queue returned ${manualQueue.length} items`);
-          return res.json(manualQueue);
+          // Process each queue item to get best phone
+          const processedQueue = manualQueue.map(item => {
+            const bestPhone = getBestPhoneForContact({
+              directPhone: item.contactDirectPhone,
+              directPhoneE164: item.contactDirectPhoneE164,
+              mobilePhone: item.contactMobilePhone,
+              mobilePhoneE164: item.contactMobilePhoneE164,
+              country: item.contactCountry,
+              hqPhone: item.accountHqPhone,
+              hqPhoneE164: item.accountHqPhoneE164,
+              hqCountry: item.accountHqCountry,
+            });
+
+            return {
+              id: item.id,
+              campaignId: item.campaignId,
+              campaignName: item.campaignName,
+              contactId: item.contactId,
+              contactName: item.contactName,
+              contactEmail: item.contactEmail,
+              contactPhone: bestPhone.phone,
+              phoneType: bestPhone.type,
+              accountId: item.accountId,
+              accountName: item.accountName,
+              priority: item.priority,
+              status: item.status,
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt,
+            };
+          });
+
+          console.log(`[AGENT QUEUE] Manual queue returned ${processedQueue.length} items`);
+          return res.json(processedQueue);
         } else if (campaign?.dialMode === 'power') {
           // Power dial: query campaign_queue (auto-assigned queue)
           const powerQueue = await db
@@ -3466,9 +3505,17 @@ export function registerRoutes(app: Express) {
               contactId: campaignQueue.contactId,
               contactName: sql<string>`COALESCE(${contacts.fullName}, CONCAT(${contacts.firstName}, ' ', ${contacts.lastName}))`.as('contactName'),
               contactEmail: contacts.email,
-              contactPhone: contacts.directPhone,
+              // Get all phone fields to determine best phone
+              contactDirectPhone: contacts.directPhone,
+              contactDirectPhoneE164: contacts.directPhoneE164,
+              contactMobilePhone: contacts.mobilePhone,
+              contactMobilePhoneE164: contacts.mobilePhoneE164,
+              contactCountry: contacts.country,
               accountId: campaignQueue.accountId,
               accountName: accounts.name,
+              accountHqPhone: accounts.mainPhone,
+              accountHqPhoneE164: accounts.mainPhoneE164,
+              accountHqCountry: accounts.hqCountry,
               priority: campaignQueue.priority,
               status: campaignQueue.status,
               createdAt: campaignQueue.createdAt,
@@ -3487,8 +3534,39 @@ export function registerRoutes(app: Express) {
             )
             .orderBy(desc(campaignQueue.priority), campaignQueue.createdAt);
 
-          console.log(`[AGENT QUEUE] Power queue returned ${powerQueue.length} items`);
-          return res.json(powerQueue);
+          // Process each queue item to get best phone
+          const processedQueue = powerQueue.map(item => {
+            const bestPhone = getBestPhoneForContact({
+              directPhone: item.contactDirectPhone,
+              directPhoneE164: item.contactDirectPhoneE164,
+              mobilePhone: item.contactMobilePhone,
+              mobilePhoneE164: item.contactMobilePhoneE164,
+              country: item.contactCountry,
+              hqPhone: item.accountHqPhone,
+              hqPhoneE164: item.accountHqPhoneE164,
+              hqCountry: item.accountHqCountry,
+            });
+
+            return {
+              id: item.id,
+              campaignId: item.campaignId,
+              campaignName: item.campaignName,
+              contactId: item.contactId,
+              contactName: item.contactName,
+              contactEmail: item.contactEmail,
+              contactPhone: bestPhone.phone,
+              phoneType: bestPhone.type,
+              accountId: item.accountId,
+              accountName: item.accountName,
+              priority: item.priority,
+              status: item.status,
+              createdAt: item.createdAt,
+              updatedAt: item.updatedAt,
+            };
+          });
+
+          console.log(`[AGENT QUEUE] Power queue returned ${processedQueue.length} items`);
+          return res.json(processedQueue);
         }
       }
 

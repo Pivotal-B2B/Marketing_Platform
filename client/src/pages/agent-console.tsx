@@ -33,6 +33,7 @@ import { useTelnyxWebRTC } from "@/hooks/useTelnyxWebRTC";
 import { useAuth } from "@/contexts/AuthContext";
 import type { CallState } from "@/hooks/useTelnyxWebRTC";
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { CONTACT_FIELD_LABELS, ACCOUNT_FIELD_LABELS } from '@shared/field-labels';
 import { QueueControls } from "@/components/queue-controls";
 
 // Backwards compatibility type alias
@@ -52,6 +53,20 @@ function normalizePhoneToE164(phone: string | null, country: string = 'US'): str
   }
   
   return null;
+}
+
+// Get phone type label using standardized field labels
+function getPhoneTypeLabel(phoneType: 'direct' | 'mobile' | 'hq' | null): string {
+  switch (phoneType) {
+    case 'direct':
+      return CONTACT_FIELD_LABELS.directPhone; // "Contact_Phone"
+    case 'mobile':
+      return CONTACT_FIELD_LABELS.mobilePhone; // "Contact_Mobile"
+    case 'hq':
+      return ACCOUNT_FIELD_LABELS.mainPhone; // "Company_Main_Phone"
+    default:
+      return 'Phone';
+  }
 }
 
 // Contact type with additional fields
@@ -81,6 +96,7 @@ type QueueItem = {
   contactName: string;
   contactEmail: string | null;
   contactPhone: string | null;
+  phoneType: 'direct' | 'mobile' | 'hq' | null;
   accountId: string;
   accountName: string | null;
   priority: number;
