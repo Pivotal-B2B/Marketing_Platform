@@ -669,23 +669,23 @@ export default function ContactDetailPage() {
                 
                 const quality = getQualityBadge(completeness);
                 
-                // Field name mapping for display
+                // Field name mapping for display using centralized labels
                 const fieldLabels: Record<string, string> = {
-                  firstName: 'First Name',
-                  lastName: 'Last Name',
-                  jobTitle: 'Job Title',
-                  department: 'Department',
-                  seniorityLevel: 'Seniority',
-                  directPhone: 'Direct Phone',
-                  mobilePhone: 'Mobile Phone',
-                  city: 'City',
-                  state: 'State',
-                  postalCode: 'Postal Code',
-                  country: 'Country',
-                  linkedinUrl: 'LinkedIn',
+                  firstName: CONTACT_FIELD_LABELS.firstName,
+                  lastName: CONTACT_FIELD_LABELS.lastName,
+                  jobTitle: CONTACT_FIELD_LABELS.jobTitle,
+                  department: CONTACT_FIELD_LABELS.department,
+                  seniorityLevel: CONTACT_FIELD_LABELS.seniorityLevel,
+                  directPhone: CONTACT_FIELD_LABELS.directPhone,
+                  mobilePhone: CONTACT_FIELD_LABELS.mobilePhone,
+                  city: CONTACT_ADDRESS_LABELS.city,
+                  state: CONTACT_ADDRESS_LABELS.state,
+                  postalCode: CONTACT_ADDRESS_LABELS.postalCode,
+                  country: CONTACT_ADDRESS_LABELS.country,
+                  linkedinUrl: CONTACT_FIELD_LABELS.linkedinUrl,
                   accountId: 'Account',
-                  address: 'Address',
-                  timezone: 'Timezone'
+                  address: CONTACT_ADDRESS_LABELS.address,
+                  timezone: CONTACT_ADDRESS_LABELS.timezone
                 };
                 
                 return (

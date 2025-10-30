@@ -939,24 +939,24 @@ export default function AccountDetailPage() {
                 
                 const quality = getQualityBadge(completeness);
                 
-                // Field name mapping for display
+                // Field name mapping for display using centralized labels
                 const fieldLabels: Record<string, string> = {
-                  domain: 'Domain',
-                  industryStandardized: 'Industry',
-                  employeesSizeRange: 'Employee Size',
-                  annualRevenue: 'Annual Revenue',
-                  hqCity: 'HQ City',
-                  hqState: 'HQ State',
-                  hqPostalCode: 'Postal Code',
-                  hqCountry: 'Country',
-                  hqStreet1: 'Street Address',
-                  mainPhone: 'Main Phone',
-                  yearFounded: 'Year Founded',
-                  description: 'Description',
-                  linkedinUrl: 'LinkedIn',
-                  companyLocation: 'Full Address',
-                  sicCode: 'SIC Code',
-                  naicsCode: 'NAICS Code'
+                  domain: ACCOUNT_FIELD_LABELS.domain,
+                  industryStandardized: ACCOUNT_FIELD_LABELS.industryStandardized,
+                  employeesSizeRange: ACCOUNT_FIELD_LABELS.employeesSizeRange,
+                  annualRevenue: ACCOUNT_FIELD_LABELS.annualRevenue,
+                  hqCity: ACCOUNT_ADDRESS_LABELS.hqCity,
+                  hqState: ACCOUNT_ADDRESS_LABELS.hqState,
+                  hqPostalCode: ACCOUNT_ADDRESS_LABELS.hqPostalCode,
+                  hqCountry: ACCOUNT_ADDRESS_LABELS.hqCountry,
+                  hqStreet1: ACCOUNT_ADDRESS_LABELS.hqStreet1,
+                  mainPhone: ACCOUNT_FIELD_LABELS.mainPhone,
+                  yearFounded: ACCOUNT_FIELD_LABELS.yearFounded,
+                  description: ACCOUNT_FIELD_LABELS.description,
+                  linkedinUrl: ACCOUNT_FIELD_LABELS.linkedinUrl,
+                  companyLocation: ACCOUNT_ADDRESS_LABELS.companyLocation,
+                  sicCode: ACCOUNT_FIELD_LABELS.sicCode,
+                  naicsCode: ACCOUNT_FIELD_LABELS.naicsCode
                 };
                 
                 return (
