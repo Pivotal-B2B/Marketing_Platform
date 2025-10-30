@@ -132,6 +132,7 @@ export default function AgentConsolePage() {
   const [qualificationData, setQualificationData] = useState<any>({});
   const [dispositionSaved, setDispositionSaved] = useState(false);
   const [callMadeToContact, setCallMadeToContact] = useState(false);
+  const [showKeypad, setShowKeypad] = useState(false);
 
   // Fetch SIP trunk credentials
   const { data: sipConfig } = useQuery<{
@@ -1190,24 +1191,39 @@ export default function AgentConsolePage() {
                   </div>
                 </div>
 
-                {/* DTMF Keypad - Shows during active call */}
+                {/* DTMF Keypad Toggle & Keypad - Shows during active call */}
                 {callStatus === 'active' && (
-                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
-                    <div className="text-[10px] text-white/70 text-center mb-2">Dial Extensions</div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
-                        <Button
-                          key={digit}
-                          variant="outline"
-                          size="icon"
-                          onClick={() => sendDTMF?.(digit)}
-                          className="bg-white/20 hover:bg-white/30 border-white/30 text-white text-base font-bold"
-                          data-testid={`button-dtmf-${digit}`}
-                        >
-                          {digit}
-                        </Button>
-                      ))}
-                    </div>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowKeypad(!showKeypad)}
+                      className="w-full bg-white/10 hover:bg-white/20 border-white/30 text-white text-xs"
+                      data-testid="button-toggle-keypad"
+                    >
+                      <Hash className="h-3 w-3 mr-2" />
+                      {showKeypad ? 'Hide Keypad' : 'Show Keypad'}
+                    </Button>
+                    
+                    {showKeypad && (
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
+                        <div className="text-[10px] text-white/70 text-center mb-2">Dial Extensions</div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
+                            <Button
+                              key={digit}
+                              variant="outline"
+                              size="icon"
+                              onClick={() => sendDTMF?.(digit)}
+                              className="bg-white/20 hover:bg-white/30 border-white/30 text-white text-base font-bold"
+                              data-testid={`button-dtmf-${digit}`}
+                            >
+                              {digit}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1352,24 +1368,39 @@ export default function AgentConsolePage() {
                     )}
                   </div>
 
-                  {/* DTMF Keypad - Shows during active call */}
+                  {/* DTMF Keypad Toggle & Keypad - Shows during active call */}
                   {callStatus === 'active' && (
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20 shadow-xl">
-                      <div className="text-xs text-white/80 text-center mb-2 font-medium">Dial Extensions</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
-                          <Button
-                            key={digit}
-                            variant="outline"
-                            size="icon"
-                            onClick={() => sendDTMF?.(digit)}
-                            className="bg-white/20 hover:bg-white/30 border-white/30 text-white text-base font-bold"
-                            data-testid={`button-dtmf-${digit}`}
-                          >
-                            {digit}
-                          </Button>
-                        ))}
-                      </div>
+                    <div className="space-y-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowKeypad(!showKeypad)}
+                        className="bg-white/10 hover:bg-white/20 border-white/30 text-white text-xs"
+                        data-testid="button-toggle-keypad-desktop"
+                      >
+                        <Hash className="h-3 w-3 mr-2" />
+                        {showKeypad ? 'Hide Keypad' : 'Show Keypad'}
+                      </Button>
+                      
+                      {showKeypad && (
+                        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20 shadow-xl">
+                          <div className="text-xs text-white/80 text-center mb-2 font-medium">Dial Extensions</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
+                              <Button
+                                key={digit}
+                                variant="outline"
+                                size="icon"
+                                onClick={() => sendDTMF?.(digit)}
+                                className="bg-white/20 hover:bg-white/30 border-white/30 text-white text-base font-bold"
+                                data-testid={`button-dtmf-${digit}`}
+                              >
+                                {digit}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
