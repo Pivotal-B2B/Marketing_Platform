@@ -146,11 +146,11 @@ export default function UserManagementPage() {
   const handleSaveUser = () => {
     if (editingUser) {
       // Editing existing user - validate fields
-      if (!username || !email) {
+      if (!username) {
         toast({
           variant: "destructive",
           title: "Validation Error",
-          description: "Username and email are required",
+          description: "Username is required",
         });
         return;
       }
@@ -167,7 +167,7 @@ export default function UserManagementPage() {
       // Update existing user
       const data: any = {
         username,
-        email,
+        email: email || null,
         firstName: firstName || null,
         lastName: lastName || null,
       };
@@ -183,11 +183,11 @@ export default function UserManagementPage() {
       });
     } else {
       // Creating new user - validate all required fields
-      if (!username || !email || !password) {
+      if (!username || !password || !firstName || !lastName) {
         toast({
           variant: "destructive",
           title: "Validation Error",
-          description: "Please fill in all required fields",
+          description: "Username, password, first name, and last name are required",
         });
         return;
       }
@@ -204,10 +204,10 @@ export default function UserManagementPage() {
       // Create new user
       const data = {
         username,
-        email,
+        email: email || undefined,
         password,
-        firstName: firstName || null,
-        lastName: lastName || null,
+        firstName,
+        lastName,
         role: selectedRoles[0] || 'agent', // Legacy role field
       };
       createUserMutation.mutate(data);
@@ -286,8 +286,28 @@ export default function UserManagementPage() {
                     placeholder="john.doe"
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>First Name *</Label>
+                    <Input
+                      data-testid="input-firstname"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="John"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Last Name *</Label>
+                    <Input
+                      data-testid="input-lastname"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <Label>Email *</Label>
+                  <Label>Email (optional)</Label>
                   <Input
                     data-testid="input-email"
                     type="email"
@@ -305,26 +325,6 @@ export default function UserManagementPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={editingUser ? "Leave blank to keep current" : "••••••••"}
                   />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>First Name</Label>
-                    <Input
-                      data-testid="input-firstname"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="John"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Last Name</Label>
-                    <Input
-                      data-testid="input-lastname"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Doe"
-                    />
-                  </div>
                 </div>
               </>
               

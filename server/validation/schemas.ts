@@ -21,11 +21,11 @@ export const registerSchema = z.object({
 
 // User management schemas
 export const createUserSchema = z.object({
-  username: z.string().min(3).max(50),
-  email: z.string().email(),
-  password: z.string().min(8),
-  firstName: z.string().max(100).optional(),
-  lastName: z.string().max(100).optional(),
+  username: z.string().min(3, 'Username must be at least 3 characters').max(50),
+  email: z.string().email('Invalid email address').optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().min(1, 'First name is required').max(100),
+  lastName: z.string().min(1, 'Last name is required').max(100),
   role: z.enum(['admin', 'campaign_manager', 'quality_analyst', 'agent']),
 });
 
