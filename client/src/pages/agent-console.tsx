@@ -33,6 +33,10 @@ import {
   Hash,
   Settings,
   Volume2,
+  Circle,
+  ArrowRight,
+  Star,
+  Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -358,9 +362,39 @@ export default function AgentConsolePage() {
     enabled: !!currentQueueItem?.contactId && !!selectedCampaignId,
   });
 
-  // Clean, readable script renderer
+  // Clean, readable script renderer with stylish bullet points
   const renderFormattedScript = (script: string) => {
     if (!script) return null;
+
+    // Helper to get bullet icon based on prefix
+    const getBulletIcon = (bullet: string) => {
+      // Check for special bullet markers: ✓, ★, →, ○
+      if (bullet.includes('✓') || bullet.includes('✔')) {
+        return <Check className="h-4 w-4 text-emerald-600" />;
+      }
+      if (bullet.includes('★') || bullet.includes('⭐')) {
+        return <Star className="h-4 w-4 text-amber-500" />;
+      }
+      if (bullet.includes('→') || bullet.includes('➜')) {
+        return <ArrowRight className="h-4 w-4 text-blue-600" />;
+      }
+      if (bullet.includes('○') || bullet.includes('◦')) {
+        return <Circle className="h-3.5 w-3.5 text-muted-foreground" />;
+      }
+      
+      // Numbered bullets
+      if (bullet.match(/\d+\./)) {
+        const num = bullet.replace('.', '');
+        return (
+          <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <span className="text-primary font-bold text-xs">{num}</span>
+          </div>
+        );
+      }
+      
+      // Default bullet
+      return <CheckCircle2 className="h-4 w-4 text-primary" />;
+    };
 
     // Split into paragraphs (double line breaks)
     const paragraphs = script.split(/\n\n+/);
@@ -372,12 +406,12 @@ export default function AgentConsolePage() {
           if (lines.length === 0) return null;
           
           // Check if this paragraph has bullets
-          const hasBullets = lines.some(line => line.match(/^(\s*)([-*•]|\d+\.)\s+/));
+          const hasBullets = lines.some(line => line.match(/^(\s*)([-*•✓✔★⭐→➜○◦]|\d+\.)\s+/));
           
           return (
             <div key={pIndex} className="space-y-2.5">
               {lines.map((line, lineIndex) => {
-                const bulletMatch = line.match(/^(\s*)([-*•]|\d+\.)\s+(.*)$/);
+                const bulletMatch = line.match(/^(\s*)([-*•✓✔★⭐→➜○◦]|\d+\.)\s+(.*)$/);
                 
                 if (bulletMatch) {
                   const [, indent, bullet, content] = bulletMatch;
@@ -386,12 +420,12 @@ export default function AgentConsolePage() {
                   return (
                     <div 
                       key={lineIndex}
-                      className="flex items-start gap-2.5 leading-relaxed"
+                      className="flex items-start gap-3 leading-relaxed"
                       style={{ marginLeft: `${indentLevel * 1.5}rem` }}
                     >
-                      <span className="text-primary font-bold text-base mt-0.5 flex-shrink-0 w-4">
-                        {bullet.match(/\d+\./) ? bullet.replace('.', '') + '.' : '•'}
-                      </span>
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getBulletIcon(bullet)}
+                      </div>
                       <div className="text-foreground text-[15px] flex-1 leading-relaxed">
                         {renderLineWithBoldPlaceholders(content)}
                       </div>
