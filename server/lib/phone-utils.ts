@@ -216,10 +216,10 @@ export function validatePhoneCountryMatch(
  * Get best phone number from contact with country validation
  * Returns the phone that matches the contact's country
  * 
- * Phone Priority (all with country matching):
- * 1. Contact direct phone (directPhoneE164 / directPhone)
- * 2. Contact mobile phone (mobilePhoneE164 / mobilePhone)
- * 3. Company HQ phone (ONLY if hqCountry matches contactCountry)
+ * Phone Priority:
+ * 1. Contact direct phone (directPhoneE164 / directPhone) - LENIENT (accepts even without country)
+ * 2. Contact mobile phone (mobilePhoneE164 / mobilePhone) - LENIENT (accepts even without country)
+ * 3. Company HQ phone - STRICT (ONLY if hqCountry matches contactCountry)
  */
 export function getBestPhoneForContact(contact: {
   directPhone?: string | null;
@@ -233,37 +233,67 @@ export function getBestPhoneForContact(contact: {
 }): { phone: string | null; type: 'direct' | 'mobile' | 'hq' | null } {
   const { country, hqCountry } = contact;
 
-  // PRIORITY 1: Try contact direct phone (E164 format preferred)
+  // PRIORITY 1: Contact direct phone (E164 format preferred) - LENIENT
+  // Accept the phone even if country is missing (contact's own phone is trusted)
   if (contact.directPhoneE164) {
-    if (validatePhoneCountryMatch(contact.directPhoneE164, country)) {
+    // If country exists, validate it matches. If no country, accept it anyway.
+    if (!country || validatePhoneCountryMatch(contact.directPhoneE164, country)) {
       return { phone: contact.directPhoneE164, type: 'direct' };
     }
   }
 
-  // PRIORITY 2: Try contact mobile phone (E164 format)
+  // PRIORITY 2: Contact mobile phone (E164 format) - LENIENT
+  // Accept the phone even if country is missing (contact's own phone is trusted)
   if (contact.mobilePhoneE164) {
-    if (validatePhoneCountryMatch(contact.mobilePhoneE164, country)) {
+    // If country exists, validate it matches. If no country, accept it anyway.
+    if (!country || validatePhoneCountryMatch(contact.mobilePhoneE164, country)) {
       return { phone: contact.mobilePhoneE164, type: 'mobile' };
     }
   }
 
-  // PRIORITY 3: Try normalizing contact direct phone
+  // PRIORITY 3: Try normalizing contact direct phone - LENIENT
+  // If country is missing, try to parse as international format
   if (contact.directPhone) {
-    const result = normalizePhoneWithCountryCode(contact.directPhone, country);
-    if (result.e164 && result.countryMatches) {
-      return { phone: result.e164, type: 'direct' };
+    if (country) {
+      const result = normalizePhoneWithCountryCode(contact.directPhone, country);
+      if (result.e164 && result.countryMatches) {
+        return { phone: result.e164, type: 'direct' };
+      }
+    } else {
+      // No country set - try to parse as international number
+      try {
+        const parsed = parsePhoneNumber(contact.directPhone.trim());
+        if (parsed && parsed.isValid()) {
+          return { phone: parsed.format('E.164'), type: 'direct' };
+        }
+      } catch (error) {
+        // Ignore parsing errors for non-E164 formats
+      }
     }
   }
 
-  // PRIORITY 4: Try normalizing contact mobile phone
+  // PRIORITY 4: Try normalizing contact mobile phone - LENIENT
+  // If country is missing, try to parse as international format
   if (contact.mobilePhone) {
-    const result = normalizePhoneWithCountryCode(contact.mobilePhone, country);
-    if (result.e164 && result.countryMatches) {
-      return { phone: result.e164, type: 'mobile' };
+    if (country) {
+      const result = normalizePhoneWithCountryCode(contact.mobilePhone, country);
+      if (result.e164 && result.countryMatches) {
+        return { phone: result.e164, type: 'mobile' };
+      }
+    } else {
+      // No country set - try to parse as international number
+      try {
+        const parsed = parsePhoneNumber(contact.mobilePhone.trim());
+        if (parsed && parsed.isValid()) {
+          return { phone: parsed.format('E.164'), type: 'mobile' };
+        }
+      } catch (error) {
+        // Ignore parsing errors for non-E164 formats
+      }
     }
   }
 
-  // PRIORITY 5 (FALLBACK): Try company HQ phone - STRICT COUNTRY MATCHING
+  // PRIORITY 5 (FALLBACK): Company HQ phone - STRICT COUNTRY MATCHING
   // Only use HQ phone if company's country matches contact's country
   if (contact.hqPhoneE164 && country && hqCountry) {
     // Normalize both countries for comparison
