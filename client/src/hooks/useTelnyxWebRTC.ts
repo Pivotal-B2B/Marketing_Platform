@@ -327,9 +327,12 @@ export function useTelnyxWebRTC({
         callerNumber: callerIdNumber,
         hasClient: !!client,
         isConnected,
+        selectedMicId,
+        selectedSpeakerId,
       });
 
-      const call = client.newCall({
+      // Build call options with audio constraints if devices are selected
+      const callOptions: any = {
         destinationNumber: phoneNumber,
         callerNumber: callerIdNumber,
         audio: true,
@@ -338,7 +341,17 @@ export function useTelnyxWebRTC({
         remoteElement: 'remoteAudio',
         // Enable call recording (stored in Telnyx)
         record: 'record-from-answer',
-      } as any); // Type assertion needed as SDK types may not include all parameters
+      };
+
+      // Apply microphone device constraint if selected
+      if (selectedMicId) {
+        callOptions.audio = {
+          deviceId: { exact: selectedMicId }
+        };
+        console.log('Using selected microphone:', selectedMicId);
+      }
+
+      const call = client.newCall(callOptions);
 
       console.log('Call object created - ID:', call?.id, 'State:', call?.state);
 
@@ -350,6 +363,23 @@ export function useTelnyxWebRTC({
 
       setActiveCall(call);
       updateCallState('connecting');
+
+      // Apply speaker to remote audio element once call is active
+      if (selectedSpeakerId) {
+        // Wait a bit for the remote audio element to be created
+        setTimeout(() => {
+          const audioElement = document.getElementById('remoteAudio') as HTMLAudioElement;
+          if (audioElement && 'setSinkId' in audioElement) {
+            (audioElement as any).setSinkId(selectedSpeakerId)
+              .then(() => {
+                console.log('Applied selected speaker:', selectedSpeakerId);
+              })
+              .catch((error: any) => {
+                console.error('Failed to apply speaker:', error);
+              });
+          }
+        }, 500);
+      }
 
       toast({
         title: "Dialing",
@@ -371,7 +401,7 @@ export function useTelnyxWebRTC({
       });
       updateCallState('idle');
     }
-  }, [client, isConnected, activeCall, updateCallState, toast]);
+  }, [client, isConnected, activeCall, updateCallState, toast, selectedMicId, selectedSpeakerId]);
 
   // Hangup call
   const hangup = useCallback(() => {
