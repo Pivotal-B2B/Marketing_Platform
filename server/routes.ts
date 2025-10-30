@@ -2296,12 +2296,17 @@ export function registerRoutes(app: Express) {
 
       const accountMap = new Map<string, string>();
       if (accountIds.length > 0) {
-        const accounts = await db
-          .select({ id: accountsTable.id, name: accountsTable.name })
-          .from(accountsTable)
-          .where(inArray(accountsTable.id, accountIds));
+        // Batch to avoid PostgreSQL parameter limits (max ~1000)
+        const batchSize = 500;
+        for (let i = 0; i < accountIds.length; i += batchSize) {
+          const batch = accountIds.slice(i, i + batchSize);
+          const accounts = await db
+            .select({ id: accountsTable.id, name: accountsTable.name })
+            .from(accountsTable)
+            .where(inArray(accountsTable.id, batch));
 
-        accounts.forEach(acc => accountMap.set(acc.id, acc.name));
+          accounts.forEach(acc => accountMap.set(acc.id, acc.name));
+        }
       }
 
       // Enrich items with account names from the batch fetch
@@ -2346,13 +2351,19 @@ export function registerRoutes(app: Express) {
         return res.json([]);
       }
 
-      // Get the actual account records
-      const accounts = await db
-        .select()
-        .from(accountsTable)
-        .where(inArray(accountsTable.id, accountIds));
+      // Get the actual account records (batch to avoid PostgreSQL parameter limits)
+      const allAccounts: any[] = [];
+      const batchSize = 500;
+      for (let i = 0; i < accountIds.length; i += batchSize) {
+        const batch = accountIds.slice(i, i + batchSize);
+        const accounts = await db
+          .select()
+          .from(accountsTable)
+          .where(inArray(accountsTable.id, batch));
+        allAccounts.push(...accounts);
+      }
 
-      res.json(accounts);
+      res.json(allAccounts);
     } catch (error: any) {
       console.error('Error fetching domain set accounts:', error);
       res.status(500).json({ error: error.message });
@@ -2594,11 +2605,18 @@ export function registerRoutes(app: Express) {
         if (contactIds.length === 0) {
           console.log(`[Campaign Creation] No contacts with account found for campaign ${campaign.id}`);
         } else {
-          const fullContacts = await db
-            .select()
-            .from(contactsTable)
-            .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
-            .where(inArray(contactsTable.id, contactIds));
+          // Batch to avoid PostgreSQL parameter limits
+          const fullContacts: any[] = [];
+          const batchSize = 500;
+          for (let i = 0; i < contactIds.length; i += batchSize) {
+            const batch = contactIds.slice(i, i + batchSize);
+            const batchResults = await db
+              .select()
+              .from(contactsTable)
+              .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
+              .where(inArray(contactsTable.id, batch));
+            fullContacts.push(...batchResults);
+          }
 
           const contactsWithCallablePhones = fullContacts.filter(row => {
             const contact = row.contacts;
@@ -3060,13 +3078,19 @@ export function registerRoutes(app: Express) {
           } else {
             // POWER DIAL: Populate campaign_queue and assign to agents via round-robin
             
-            // PHONE VALIDATION: Filter contacts with callable phone numbers
+            // PHONE VALIDATION: Filter contacts with callable phone numbers (batch to avoid parameter limits)
             const contactIds = validContacts.map(c => c.id);
-            const fullContacts = await db
-              .select()
-              .from(contactsTable)
-              .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
-              .where(inArray(contactsTable.id, contactIds));
+            const fullContacts: any[] = [];
+            const batchSize = 500;
+            for (let i = 0; i < contactIds.length; i += batchSize) {
+              const batch = contactIds.slice(i, i + batchSize);
+              const batchResults = await db
+                .select()
+                .from(contactsTable)
+                .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
+                .where(inArray(contactsTable.id, batch));
+              fullContacts.push(...batchResults);
+            }
 
             const contactsWithCallablePhones = fullContacts.filter(row => {
               const contact = row.contacts;
@@ -3262,13 +3286,19 @@ export function registerRoutes(app: Express) {
         });
       }
 
-      // PHONE VALIDATION: Filter contacts with callable phone numbers
+      // PHONE VALIDATION: Filter contacts with callable phone numbers (batch to avoid parameter limits)
       const contactIds = contactsWithAccount.map(c => c.id);
-      const fullContacts = await db
-        .select()
-        .from(contactsTable)
-        .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
-        .where(inArray(contactsTable.id, contactIds));
+      const fullContacts: any[] = [];
+      const batchSize = 500;
+      for (let i = 0; i < contactIds.length; i += batchSize) {
+        const batch = contactIds.slice(i, i + batchSize);
+        const batchResults = await db
+          .select()
+          .from(contactsTable)
+          .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
+          .where(inArray(contactsTable.id, batch));
+        fullContacts.push(...batchResults);
+      }
 
       const contactsWithCallablePhones = fullContacts.filter(row => {
         const contact = row.contacts;
