@@ -13,6 +13,12 @@ Pivotal CRM is an enterprise-grade B2B customer relationship management platform
 ## System Architecture
 The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCSS, and shadcn/ui** for the frontend, and **Node.js + Express + TypeScript** with a **PostgreSQL (Neon) database via Drizzle ORM** for the backend. JWT authentication provides role-based access control.
 
+**Performance Optimizations (October 2025):**
+- **Database Indexing**: Added 12 critical indexes on frequently filtered fields (email_verification_status, city, state, country, deleted_at, department, seniority_level for contacts; hq_city, hq_state, hq_country, deleted_at, industry_standardized for accounts)
+- **COUNT Query Optimization**: Implemented getAccountsCount() and getContactsCount() methods using efficient SQL COUNT queries instead of loading full datasets
+- **Dashboard Caching**: Added 5-minute in-memory cache to /api/dashboard/stats endpoint with automatic invalidation on data mutations
+- **Query Limits**: Optional limit parameter on getAccounts/getContacts methods (no default to preserve export functionality)
+
 **UI/UX Design:**
 - **Color Scheme:** Primary Royal Blue with Teal accent, adaptive light/dark surfaces, and semantic status colors.
 - **Typography:** Inter font for text, JetBrains Mono for data.

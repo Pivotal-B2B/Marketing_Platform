@@ -450,6 +450,7 @@ export function registerRoutes(app: Express) {
     try {
       const validated = insertAccountSchema.parse(req.body);
       const account = await storage.createAccount(validated);
+      invalidateDashboardCache();
       res.status(201).json(account);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -564,6 +565,7 @@ export function registerRoutes(app: Express) {
       results.created = createdCount;
       results.updated = updatedCount;
 
+      invalidateDashboardCache();
       res.status(200).json(results);
     } catch (error) {
       console.error("Batch import error:", error);
@@ -577,6 +579,7 @@ export function registerRoutes(app: Express) {
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
       }
+      invalidateDashboardCache();
       res.json(account);
     } catch (error) {
       res.status(500).json({ message: "Failed to update account" });
@@ -630,6 +633,7 @@ export function registerRoutes(app: Express) {
   app.delete("/api/accounts/:id", requireAuth, requireRole('admin'), async (req, res) => {
     try {
       await storage.deleteAccount(req.params.id);
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete account" });
@@ -861,6 +865,7 @@ export function registerRoutes(app: Express) {
       results.created = createdCount;
       results.updated = updatedCount;
 
+      invalidateDashboardCache();
       res.status(200).json(results);
     } catch (error) {
       console.error("Batch import error:", error);
@@ -924,6 +929,7 @@ export function registerRoutes(app: Express) {
       // Create contact
       const contact = await storage.createContact(validatedContact);
 
+      invalidateDashboardCache();
       res.status(201).json({
         contact,
         account,
@@ -971,6 +977,7 @@ export function registerRoutes(app: Express) {
       }
 
       const newContact = await storage.createContact(contactData);
+      invalidateDashboardCache();
       res.json(newContact);
     } catch (error: any) {
       console.error('Error creating contact:', error);
@@ -1014,6 +1021,7 @@ export function registerRoutes(app: Express) {
   app.delete("/api/contacts/:id", requireAuth, requireRole('admin'), async (req, res) => {
     try {
       await storage.deleteContact(req.params.id);
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete contact" });
@@ -2287,6 +2295,7 @@ export function registerRoutes(app: Express) {
         console.log(`[Campaign Creation] Auto-populated ${enqueuedCount} contacts to queue for campaign ${campaign.id}`);
       }
 
+      invalidateDashboardCache();
       res.status(201).json(campaign);
     } catch (error) {
       console.error('Campaign creation error:', error);
@@ -2300,6 +2309,7 @@ export function registerRoutes(app: Express) {
       if (!campaign) {
         return res.status(404).json({ message: "Campaign not found" });
       }
+      invalidateDashboardCache();
       res.json(campaign);
     } catch (error) {
       res.status(500).json({ message: "Failed to update campaign" });
@@ -4073,6 +4083,7 @@ export function registerRoutes(app: Express) {
     try {
       const validated = insertLeadSchema.parse(req.body);
       const lead = await storage.createLead(validated);
+      invalidateDashboardCache();
       res.status(201).json(lead);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -4287,43 +4298,58 @@ export function registerRoutes(app: Express) {
   });
 
   // ==================== DASHBOARD STATS ====================
+  
+  let dashboardStatsCache: { data: any; timestamp: number } | null = null;
+  const CACHE_TTL_MS = 5 * 60 * 1000;
+  
+  function invalidateDashboardCache() {
+    dashboardStatsCache = null;
+  }
 
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     try {
-      const [
-        accounts,
-        contacts,
-        campaigns,
-        leads
-      ] = await Promise.all([
-        storage.getAccounts(),
-        storage.getContacts(),
-        storage.getCampaigns(),
-        storage.getLeads()
-      ]);
-
-      const activeCampaigns = campaigns.filter(c => c.status === 'active');
-      const emailCampaigns = activeCampaigns.filter(c => c.type === 'email').length;
-      const callCampaigns = activeCampaigns.filter(c => c.type === 'call').length;
+      const now = Date.now();
+      
+      if (dashboardStatsCache && (now - dashboardStatsCache.timestamp) < CACHE_TTL_MS) {
+        return res.json(dashboardStatsCache.data);
+      }
 
       const thisMonth = new Date();
       thisMonth.setDate(1);
       thisMonth.setHours(0, 0, 0, 0);
 
-      const leadsThisMonth = leads.filter(l =>
-        l.createdAt && new Date(l.createdAt) >= thisMonth
-      ).length;
+      const [
+        totalAccounts,
+        totalContacts,
+        allCampaigns,
+        leadsThisMonthResult
+      ] = await Promise.all([
+        storage.getAccountsCount(),
+        storage.getContactsCount(),
+        db.select({ id: campaigns.id, type: campaigns.type, status: campaigns.status }).from(campaigns),
+        db.select({ count: sql<number>`count(*)::int` })
+          .from(leads)
+          .where(sql`${leads.createdAt} >= ${thisMonth}`)
+      ]);
 
-      res.json({
-        totalAccounts: accounts.length,
-        totalContacts: contacts.length,
+      const activeCampaigns = allCampaigns.filter(c => c.status === 'active');
+      const emailCampaigns = activeCampaigns.filter(c => c.type === 'email').length;
+      const callCampaigns = activeCampaigns.filter(c => c.type === 'call').length;
+
+      const statsData = {
+        totalAccounts,
+        totalContacts,
         activeCampaigns: activeCampaigns.length,
         activeCampaignsBreakdown: {
           email: emailCampaigns,
           telemarketing: callCampaigns
         },
-        leadsThisMonth
-      });
+        leadsThisMonth: leadsThisMonthResult[0]?.count || 0
+      };
+
+      dashboardStatsCache = { data: statsData, timestamp: now };
+
+      res.json(statsData);
     } catch (error) {
       console.error("Dashboard stats error:", error);
       res.status(500).json({

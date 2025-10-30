@@ -98,7 +98,8 @@ export interface IStorage {
   getAllUsersWithRoles(): Promise<Array<{ id: string; username: string; roles: string[] }>>;
 
   // Accounts
-  getAccounts(filters?: FilterGroup): Promise<Account[]>;
+  getAccounts(filters?: FilterGroup, limit?: number): Promise<Account[]>;
+  getAccountsCount(filters?: FilterGroup): Promise<number>;
   getAccount(id: string): Promise<Account | undefined>;
   getAccountsByIds(ids: string[]): Promise<Account[]>;
   getAccountByDomain(domain: string): Promise<Account | undefined>;
@@ -109,7 +110,8 @@ export interface IStorage {
   deleteAccount(id: string): Promise<void>;
 
   // Contacts
-  getContacts(filters?: FilterGroup): Promise<Contact[]>;
+  getContacts(filters?: FilterGroup, limit?: number): Promise<Contact[]>;
+  getContactsCount(filters?: FilterGroup): Promise<number>;
   getContact(id: string): Promise<Contact | undefined>;
   getContactsByIds(ids: string[]): Promise<Contact[]>;
   getContactsByAccountId(accountId: string): Promise<Contact[]>;
@@ -582,7 +584,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Accounts
-  async getAccounts(filters?: FilterGroup): Promise<Account[]> {
+  async getAccounts(filters?: FilterGroup, limit?: number): Promise<Account[]> {
     let query = db.select().from(accounts);
 
     if (filters) {
@@ -592,7 +594,22 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return await query.orderBy(desc(accounts.createdAt));
+    const orderedQuery = query.orderBy(desc(accounts.createdAt));
+    return limit ? await orderedQuery.limit(limit) : await orderedQuery;
+  }
+
+  async getAccountsCount(filters?: FilterGroup): Promise<number> {
+    let query = db.select({ count: sql<number>`count(*)::int` }).from(accounts);
+
+    if (filters) {
+      const filterCondition = buildFilterQuery(filters, accounts);
+      if (filterCondition) {
+        query = query.where(filterCondition) as any;
+      }
+    }
+
+    const result = await query;
+    return result[0]?.count || 0;
   }
 
   async getAccount(id: string): Promise<Account | undefined> {
@@ -639,7 +656,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Contacts
-  async getContacts(filters?: FilterGroup): Promise<Contact[]> {
+  async getContacts(filters?: FilterGroup, limit?: number): Promise<Contact[]> {
     let query = db.select().from(contacts);
 
     if (filters) {
@@ -649,7 +666,22 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return await query.orderBy(desc(contacts.createdAt));
+    const orderedQuery = query.orderBy(desc(contacts.createdAt));
+    return limit ? await orderedQuery.limit(limit) : await orderedQuery;
+  }
+
+  async getContactsCount(filters?: FilterGroup): Promise<number> {
+    let query = db.select({ count: sql<number>`count(*)::int` }).from(contacts);
+
+    if (filters) {
+      const filterCondition = buildFilterQuery(filters, contacts);
+      if (filterCondition) {
+        query = query.where(filterCondition) as any;
+      }
+    }
+
+    const result = await query;
+    return result[0]?.count || 0;
   }
 
   async getContact(id: string): Promise<Contact | undefined> {
