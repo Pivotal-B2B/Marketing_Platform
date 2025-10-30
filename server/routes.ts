@@ -6892,4 +6892,182 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to delete all data" });
     }
   });
+
+  // =============================================================================
+  // PHONE BULK EDITOR ROUTES
+  // =============================================================================
+
+  // Search for contacts and accounts with phone pattern matching
+  app.post("/api/phone-bulk/search", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { searchType, phonePattern, additionalFilters } = req.body;
+
+      if (!searchType || !phonePattern) {
+        return res.status(400).json({ message: "searchType and phonePattern are required" });
+      }
+
+      const results: any[] = [];
+
+      // Helper function to check if phone matches pattern
+      const matchesPattern = (phone: string | null, pattern: string): boolean => {
+        if (!phone) return false;
+        // Remove all non-digit characters for comparison
+        const cleanPhone = phone.replace(/[^0-9+]/g, '');
+        const cleanPattern = pattern.replace(/[^0-9+]/g, '');
+        return cleanPhone.includes(cleanPattern);
+      };
+
+      if (searchType === 'contacts' || searchType === 'both') {
+        // Build filter for contacts
+        const contactFilters: FilterGroup | undefined = additionalFilters ? {
+          operator: 'and',
+          conditions: additionalFilters
+        } : undefined;
+
+        const allContacts = await storage.getContacts(contactFilters);
+        
+        // Filter by phone pattern
+        const matchingContacts = allContacts.filter(contact => 
+          matchesPattern(contact.phone, phonePattern) ||
+          matchesPattern(contact.mobile, phonePattern) ||
+          matchesPattern(contact.tel, phonePattern)
+        );
+
+        // Map to result format
+        results.push(...matchingContacts.map(contact => ({
+          id: contact.id,
+          type: 'contact',
+          name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+          email: contact.email,
+          phone: contact.phone,
+          mobile: contact.mobile,
+          tel: contact.tel,
+          company: contact.companyName,
+          accountId: contact.accountId,
+          title: contact.title,
+          department: contact.department,
+          city: contact.city,
+          state: contact.state,
+          country: contact.country,
+          seniorityLevel: contact.seniorityLevel,
+          jobFunction: contact.jobFunction
+        })));
+      }
+
+      if (searchType === 'accounts' || searchType === 'both') {
+        // Build filter for accounts
+        const accountFilters: FilterGroup | undefined = additionalFilters ? {
+          operator: 'and',
+          conditions: additionalFilters
+        } : undefined;
+
+        const allAccounts = await storage.getAccounts(accountFilters);
+        
+        // Filter by phone pattern
+        const matchingAccounts = allAccounts.filter(account => 
+          matchesPattern(account.hqPhone, phonePattern)
+        );
+
+        // Map to result format
+        results.push(...matchingAccounts.map(account => ({
+          id: account.id,
+          type: 'account',
+          name: account.companyName,
+          email: null,
+          phone: account.hqPhone,
+          mobile: null,
+          tel: null,
+          company: account.companyName,
+          accountId: account.id,
+          website: account.website,
+          industry: account.industry,
+          companySize: account.companySize,
+          revenue: account.revenue,
+          hqCity: account.hqCity,
+          hqState: account.hqState,
+          hqCountry: account.hqCountry,
+          hqAddress: account.hqAddress
+        })));
+      }
+
+      res.json({
+        results,
+        total: results.length,
+        searchType,
+        phonePattern
+      });
+
+    } catch (error) {
+      console.error('Phone bulk search error:', error);
+      res.status(500).json({ message: "Failed to search phone numbers" });
+    }
+  });
+
+  // Bulk update phone numbers
+  app.post("/api/phone-bulk/update", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { updates } = req.body;
+
+      if (!updates || !Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ message: "updates array is required" });
+      }
+
+      let contactsUpdated = 0;
+      let accountsUpdated = 0;
+
+      for (const update of updates) {
+        const { id, type, fieldUpdates } = update;
+
+        if (!id || !type || !fieldUpdates) {
+          continue;
+        }
+
+        if (type === 'contact') {
+          // Update contact phone fields
+          const updateData: any = {};
+          if (fieldUpdates.phone !== undefined) updateData.phone = fieldUpdates.phone;
+          if (fieldUpdates.mobile !== undefined) updateData.mobile = fieldUpdates.mobile;
+          if (fieldUpdates.tel !== undefined) updateData.tel = fieldUpdates.tel;
+
+          if (Object.keys(updateData).length > 0) {
+            await db.update(contacts)
+              .set(updateData)
+              .where(eq(contacts.id, id));
+            contactsUpdated++;
+          }
+        } else if (type === 'account') {
+          // Update account phone fields
+          const updateData: any = {};
+          if (fieldUpdates.phone !== undefined) updateData.hqPhone = fieldUpdates.phone;
+
+          if (Object.keys(updateData).length > 0) {
+            await db.update(accounts)
+              .set(updateData)
+              .where(eq(accounts.id, id));
+            accountsUpdated++;
+          }
+        }
+      }
+
+      // Log the bulk update
+      await storage.createActivityLog({
+        entityType: 'user',
+        entityId: req.user!.userId,
+        action: 'phone_bulk_update',
+        description: `Bulk updated ${contactsUpdated} contacts and ${accountsUpdated} accounts`,
+        createdBy: req.user!.userId,
+      });
+
+      res.json({
+        message: "Phone numbers updated successfully",
+        contactsUpdated,
+        accountsUpdated,
+        totalUpdated: contactsUpdated + accountsUpdated
+      });
+
+    } catch (error) {
+      console.error('Phone bulk update error:', error);
+      res.status(500).json({ message: "Failed to update phone numbers" });
+    }
+  });
 }
