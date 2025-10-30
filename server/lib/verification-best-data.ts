@@ -231,7 +231,7 @@ export function selectBestPhone(contact: VerificationContactData): BestPhone {
       value: contact.hqPhone,
       source: 'Company HQ Phone',
       country: contact.hqCountry, // HQ has its own country
-      allowMissingCountry: false, // CRITICAL: HQ phone MUST match contact country (STRICT)
+      allowMissingCountry: true, // Allow if HQ country is missing (legacy data), but STRICT when HQ country exists
     },
   ];
   

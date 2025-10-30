@@ -427,7 +427,22 @@ export function registerRoutes(app: Express) {
           return res.status(400).json({ message: "Invalid filters format" });
         }
       }
-      const accounts = await storage.getAccounts(filters);
+      // Add default limit of 1000 to prevent loading all accounts at once
+      // Can be overridden with ?limit=5000 or ?limit=0 for no limit
+      let limit: number | undefined = 1000; // Default to 1000 records
+      if (req.query.limit !== undefined) {
+        if (req.query.limit === '0') {
+          limit = undefined; // No limit for exports
+        } else {
+          const parsedLimit = parseInt(req.query.limit as string);
+          if (isNaN(parsedLimit) || parsedLimit < 0) {
+            return res.status(400).json({ message: "Invalid limit parameter. Must be a positive number or 0." });
+          }
+          limit = parsedLimit;
+        }
+      }
+      
+      const accounts = await storage.getAccounts(filters, limit);
       res.json(accounts);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch accounts" });
@@ -665,7 +680,22 @@ export function registerRoutes(app: Express) {
         }
       }
 
-      const contacts = await storage.getContacts(filters);
+      // Add default limit of 1000 to prevent loading all contacts at once
+      // Can be overridden with ?limit=5000 or ?limit=0 for no limit
+      let limit: number | undefined = 1000; // Default to 1000 records
+      if (req.query.limit !== undefined) {
+        if (req.query.limit === '0') {
+          limit = undefined; // No limit for exports
+        } else {
+          const parsedLimit = parseInt(req.query.limit as string);
+          if (isNaN(parsedLimit) || parsedLimit < 0) {
+            return res.status(400).json({ message: "Invalid limit parameter. Must be a positive number or 0." });
+          }
+          limit = parsedLimit;
+        }
+      }
+
+      const contacts = await storage.getContacts(filters, limit);
       res.json(contacts);
     } catch (error) {
       console.error("Error fetching contacts:", error);
