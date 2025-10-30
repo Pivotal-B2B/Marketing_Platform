@@ -1414,6 +1414,104 @@ export function registerRoutes(app: Express) {
     }
   });
 
+  // Batch reformat all phone numbers to fix inconsistent E.164 formatting
+  app.post("/api/admin/reformat-all-phones", requireAuth, requireRole('admin'), async (req, res) => {
+    try {
+      console.log('[BATCH REFORMAT] Starting phone number reformatting for all contacts and accounts...');
+      
+      let contactsUpdated = 0;
+      let accountsUpdated = 0;
+      const batchSize = 500;
+      let offset = 0;
+      
+      // Process contacts in batches
+      console.log('[BATCH REFORMAT] Processing contacts...');
+      while (true) {
+        const contacts = await db.select().from(contactsTable).limit(batchSize).offset(offset);
+        if (contacts.length === 0) break;
+        
+        for (const contact of contacts) {
+          let needsUpdate = false;
+          const updates: any = {};
+          
+          // Reformat directPhone if exists
+          if (contact.directPhone) {
+            const reformatted = normalizePhoneE164(contact.directPhone, contact.contactCountry || undefined);
+            if (reformatted && reformatted !== contact.directPhoneE164) {
+              updates.directPhoneE164 = reformatted;
+              needsUpdate = true;
+            }
+          }
+          
+          // Reformat mobilePhone if exists
+          if (contact.mobilePhone) {
+            const reformatted = normalizePhoneE164(contact.mobilePhone, contact.contactCountry || undefined);
+            if (reformatted && reformatted !== contact.mobilePhoneE164) {
+              updates.mobilePhoneE164 = reformatted;
+              needsUpdate = true;
+            }
+          }
+          
+          // Update if needed
+          if (needsUpdate) {
+            await db.update(contactsTable)
+              .set(updates)
+              .where(eq(contactsTable.id, contact.id));
+            contactsUpdated++;
+          }
+        }
+        
+        offset += batchSize;
+        console.log(`[BATCH REFORMAT] Processed ${offset} contacts, updated ${contactsUpdated} so far...`);
+      }
+      
+      // Process accounts in batches
+      console.log('[BATCH REFORMAT] Processing accounts...');
+      offset = 0;
+      while (true) {
+        const accounts = await db.select().from(accountsTable).limit(batchSize).offset(offset);
+        if (accounts.length === 0) break;
+        
+        for (const account of accounts) {
+          let needsUpdate = false;
+          const updates: any = {};
+          
+          // Reformat mainPhone if exists
+          if (account.mainPhone) {
+            const reformatted = normalizePhoneE164(account.mainPhone, account.hqCountry || undefined);
+            if (reformatted && reformatted !== account.mainPhoneE164) {
+              updates.mainPhoneE164 = reformatted;
+              needsUpdate = true;
+            }
+          }
+          
+          // Update if needed
+          if (needsUpdate) {
+            await db.update(accountsTable)
+              .set(updates)
+              .where(eq(accountsTable.id, account.id));
+            accountsUpdated++;
+          }
+        }
+        
+        offset += batchSize;
+        console.log(`[BATCH REFORMAT] Processed ${offset} accounts, updated ${accountsUpdated} so far...`);
+      }
+      
+      console.log(`[BATCH REFORMAT] ✅ Complete! Updated ${contactsUpdated} contacts and ${accountsUpdated} accounts`);
+      
+      res.json({
+        success: true,
+        contactsUpdated,
+        accountsUpdated,
+        message: `Successfully reformatted ${contactsUpdated} contact phone numbers and ${accountsUpdated} account phone numbers`
+      });
+    } catch (error) {
+      console.error('[BATCH REFORMAT] Error:', error);
+      res.status(500).json({ message: "Failed to reformat phone numbers", error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // Detect duplicate accounts by domain
   app.get("/api/accounts/duplicates", requireAuth, requireRole('admin', 'data_ops'), async (req, res) => {
     try {

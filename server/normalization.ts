@@ -1,4 +1,5 @@
 // Normalization utilities for data quality and deduplication
+import { formatPhoneWithCountryCode } from './lib/phone-formatter.js';
 
 /**
  * Normalizes an email address for deduplication
@@ -188,43 +189,14 @@ export function getCountryCodeFromName(countryName: string): string {
 /**
  * Validates and normalizes a phone number to E.164 format
  * Returns null if invalid
+ * 
+ * Uses the fixed phone formatter that properly handles country-specific formatting
+ * This properly formats UK numbers: 01908802874 → +441908802874 (not +4401908802874)
  */
 export function normalizePhoneE164(phone: string, country?: string): string | null {
   if (!phone) return null;
   
-  // Remove all non-digit characters except leading +
-  let cleaned = phone.trim();
-  const hasPlus = cleaned.startsWith('+');
-  let digits = cleaned.replace(/\D/g, '');
-  
-  // If already has country code (starts with + or has 11+ digits), use as-is
-  if (hasPlus || digits.length >= 11) {
-    // Basic validation (E.164: + followed by 1-15 digits)
-    if (digits.length < 7 || digits.length > 15) {
-      return null;
-    }
-    return '+' + digits;
-  }
-  
-  // Get country code from country name
-  const countryCode = country ? getCountryCodeFromName(country) : '1';
-  
-  // For 10-digit numbers (common in US/Canada), prepend country code
-  if (digits.length === 10 && countryCode === '1') {
-    return '+1' + digits;
-  }
-  
-  // For other countries, check if length makes sense
-  if (digits.length >= 7 && digits.length <= 12) {
-    return '+' + countryCode + digits;
-  }
-  
-  // Basic validation failed
-  if (digits.length < 7 || digits.length > 15) {
-    return null;
-  }
-  
-  return '+' + countryCode + digits;
+  return formatPhoneWithCountryCode(phone, country);
 }
 
 /**

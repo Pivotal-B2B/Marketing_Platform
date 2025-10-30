@@ -334,20 +334,20 @@ function getCountryCode(countryName: string | null | undefined): CountryCode | n
  * This properly handles country-specific rules for trunk prefixes (leading zeros)
  * @param phone - The phone number to format
  * @param country - The country name to derive the country code from
- * @returns Formatted phone number in E.164 format without + (e.g., "441908802874")
+ * @returns Formatted phone number in E.164 format WITH + prefix (e.g., "+441908802874")
  */
-export function formatPhoneWithCountryCode(phone: string | null | undefined, country: string | null | undefined): string {
-  // Return empty if no phone number
+export function formatPhoneWithCountryCode(phone: string | null | undefined, country: string | null | undefined): string | null {
+  // Return null if no phone number
   if (!phone || phone.trim() === '') {
-    return '';
+    return null;
   }
   
   // Clean the phone number
   const cleanedPhone = cleanPhoneNumber(phone);
   
-  // Return as-is if empty after cleaning
+  // Return null if empty after cleaning
   if (!cleanedPhone) {
-    return '';
+    return null;
   }
   
   // Get country code
@@ -360,34 +360,61 @@ export function formatPhoneWithCountryCode(phone: string | null | undefined, cou
       const phoneNumber = parsePhoneNumber(cleanedPhone, countryCode);
       
       if (phoneNumber && phoneNumber.isValid()) {
-        // Return E.164 format without the + prefix and with space after country code
-        const e164 = phoneNumber.format('E.164').replace('+', '');
-        // Add space after country code for readability
-        const callingCode = phoneNumber.countryCallingCode;
-        const nationalNumber = e164.substring(callingCode.length);
-        return `${callingCode} ${nationalNumber}`;
+        // Return proper E.164 format WITH + prefix
+        return phoneNumber.format('E.164');
       }
     } catch (error) {
-      // Parsing failed, fall through to manual formatting
+      // Parsing failed, fall through to auto-detection
     }
+  }
+  
+  // SPECIAL FIX: UK numbers with "0" after country code (e.g., "4401908802874")
+  // This is a common data quality issue where trunk prefix wasn't removed
+  if (cleanedPhone.startsWith('440') && cleanedPhone.length >= 12) {
+    // Remove the trunk prefix "0" after "44"
+    const fixedPhone = '44' + cleanedPhone.substring(3);
+    try {
+      const phoneNumber = parsePhoneNumber('+' + fixedPhone);
+      if (phoneNumber && phoneNumber.isValid()) {
+        return phoneNumber.format('E.164');
+      }
+    } catch (error) {
+      // Fix didn't work, continue with auto-detection
+    }
+  }
+  
+  // Try auto-detection by parsing with + prefix (international format)
+  // This handles cases like "441768772044" → "+441768772044" → detects UK, formats correctly
+  try {
+    const phoneNumber = parsePhoneNumber('+' + cleanedPhone);
+    
+    if (phoneNumber && phoneNumber.isValid()) {
+      // Auto-detected! Return proper E.164 format
+      return phoneNumber.format('E.164');
+    }
+  } catch (error) {
+    // Auto-detection failed, fall through to manual formatting
   }
   
   // Fallback to manual formatting if libphonenumber-js fails
   const dialCode = getCountryDialCode(country);
   
-  // If no dial code found, return cleaned phone as-is
+  // If no dial code found, try one last thing: assume it already has country code
   if (!dialCode) {
-    return cleanedPhone;
+    // If number looks international (11+ digits), add + and return
+    if (cleanedPhone.length >= 11) {
+      return `+${cleanedPhone}`;
+    }
+    return null;
   }
   
-  // If phone already has the country code, format it correctly
+  // If phone already has the country code, format it correctly with + prefix
   if (hasCountryCode(phone, dialCode)) {
-    const numberWithoutCode = cleanedPhone.substring(dialCode.length);
-    return `${dialCode} ${numberWithoutCode}`;
+    return `+${cleanedPhone}`;
   }
   
-  // Add country code prefix
-  return `${dialCode} ${cleanedPhone}`;
+  // Add country code prefix with + sign
+  return `+${dialCode}${cleanedPhone}`;
 }
 
 /**
