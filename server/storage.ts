@@ -686,32 +686,7 @@ export class DatabaseStorage implements IStorage {
 
   async getContact(id: string): Promise<Contact | undefined> {
     const result = await db
-      .select({
-        id: contacts.id,
-        firstName: contacts.firstName,
-        lastName: contacts.lastName,
-        fullName: contacts.fullName,
-        email: contacts.email,
-        directPhone: contacts.directPhone,
-        directPhoneE164: contacts.directPhoneE164,
-        mobilePhone: contacts.mobilePhone,
-        mobilePhoneE164: contacts.mobilePhoneE164,
-        jobTitle: contacts.jobTitle,
-        accountId: contacts.accountId,
-        linkedinUrl: contacts.linkedinUrl,
-        emailVerificationStatus: contacts.emailVerificationStatus,
-        phoneStatus: contacts.phoneStatus,
-        tags: contacts.tags,
-        customFields: contacts.customFields,
-        createdAt: contacts.createdAt,
-        deletedAt: contacts.deletedAt,
-        account: {
-          id: accounts.id,
-          name: accounts.name,
-          mainPhone: accounts.mainPhone,
-          mainPhoneE164: accounts.mainPhoneE164,
-        },
-      })
+      .select()
       .from(contacts)
       .leftJoin(accounts, eq(contacts.accountId, accounts.id))
       .where(eq(contacts.id, id));
@@ -721,8 +696,15 @@ export class DatabaseStorage implements IStorage {
     }
 
     const row = result[0];
-    // TypeScript will handle the type inference properly here
-    return row as any;
+    return {
+      ...row.contacts,
+      account: row.accounts ? {
+        id: row.accounts.id,
+        name: row.accounts.name,
+        mainPhone: row.accounts.mainPhone,
+        mainPhoneE164: row.accounts.mainPhoneE164,
+      } : undefined
+    } as any;
   }
 
   async getContactsByAccountId(accountId: string): Promise<Contact[]> {
