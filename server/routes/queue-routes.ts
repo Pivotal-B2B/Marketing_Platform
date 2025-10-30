@@ -248,16 +248,23 @@ router.post(
         }
 
         // Step 4: Apply agent's filters WITHIN campaign audience
+        console.log('[queues:set] Received filters:', JSON.stringify(filters, null, 2));
+        
         const whereConditions: any[] = [
           inArray(contacts.id, campaignContactIds) // ALWAYS constrain to campaign audience
         ];
         
         if (filters && filters.conditions && filters.conditions.length > 0) {
+          console.log('[queues:set] Filter conditions found:', filters.conditions.length);
           const filterSQL = buildFilterQuery(filters as FilterGroup, contacts);
           if (filterSQL) {
             whereConditions.push(filterSQL);
             console.log('[queues:set] Applying agent filters within campaign audience');
+          } else {
+            console.log('[queues:set] buildFilterQuery returned undefined - filters not applied!');
           }
+        } else {
+          console.log('[queues:set] No filter conditions provided or filters is empty');
         }
 
         let eligibleContacts;
