@@ -193,30 +193,25 @@ export default function AgentConsolePage() {
     enabled: !!currentQueueItem?.contactId,
   });
 
-  // Compute valid phone options
+  // Compute valid phone options from queue item (already has best phone selected)
   const validPhoneOptions = useMemo(() => {
-    if (!contactDetails) return [];
+    if (!currentQueueItem?.contactPhone) return [];
     
     const options: Array<{ type: 'direct' | 'company' | 'manual'; number: string; label: string }> = [];
     
-    if (contactDetails.directPhone && normalizePhoneToE164(contactDetails.directPhone)) {
-      options.push({
-        type: 'direct',
-        number: contactDetails.directPhone,
-        label: `Direct: ${contactDetails.directPhone}`
-      });
-    }
+    // Queue already provides the best phone and its type
+    const phoneLabel = currentQueueItem.phoneType 
+      ? getPhoneTypeLabel(currentQueueItem.phoneType)
+      : 'Phone';
     
-    if (contactDetails.account?.mainPhone && normalizePhoneToE164(contactDetails.account.mainPhone)) {
-      options.push({
-        type: 'company',
-        number: contactDetails.account.mainPhone,
-        label: `Company: ${contactDetails.account.mainPhone}`
-      });
-    }
+    options.push({
+      type: currentQueueItem.phoneType === 'hq' ? 'company' : 'direct',
+      number: currentQueueItem.contactPhone,
+      label: `${phoneLabel}: ${currentQueueItem.contactPhone}`
+    });
     
     return options;
-  }, [contactDetails]);
+  }, [currentQueueItem]);
 
   // Auto-select first valid phone number when contact changes
   useEffect(() => {
