@@ -1433,41 +1433,78 @@ router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: 
     await new Promise<void>((resolve, reject) => {
       csv.parseStream(stream, { headers: hasHeaders, trim: true })
         .on('data', (row: any) => {
-          let value: string | null = null;
-          
           if (hasHeaders) {
-            // Try to find data in various column names
-            value = (
-              row.value || 
-              row.company_name || 
-              row.companyName || 
-              row.company || 
+            // Process email column
+            const emailValue = (
               row.email || 
               row.Email ||
-              row.domain ||
-              row.Domain ||
-              Object.values(row)[0] // Fallback to first column
+              row.EMAIL
             )?.toString().trim();
+            
+            if (emailValue && emailValue.includes('@') && emailValue.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+              results.emails.add(emailValue.toLowerCase());
+              const domain = extractDomain(emailValue);
+              if (domain) {
+                results.domains.add(domain);
+              }
+            }
+            
+            // Process company name column (support both "Company Name" with space and variations)
+            const companyValue = (
+              row['Company Name'] ||  // With space
+              row['company name'] ||   // Lowercase with space
+              row.company_name ||      // With underscore
+              row.companyName ||       // CamelCase
+              row.company ||           // Single word
+              row.Company ||           // Capitalized
+              row.COMPANY              // All caps
+            )?.toString().trim();
+            
+            if (companyValue) {
+              const normalized = normalizeCompanyName(companyValue);
+              if (normalized) {
+                results.companyNames.add(companyValue); // Store original for display
+              }
+            }
+            
+            // Fallback: if no email or company found, try to infer from any value
+            if (!emailValue && !companyValue) {
+              const fallbackValue = Object.values(row)[0]?.toString().trim();
+              if (fallbackValue) {
+                if (fallbackValue.includes('@') && fallbackValue.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+                  results.emails.add(fallbackValue.toLowerCase());
+                  const domain = extractDomain(fallbackValue);
+                  if (domain) {
+                    results.domains.add(domain);
+                  }
+                } else {
+                  const normalized = normalizeCompanyName(fallbackValue);
+                  if (normalized) {
+                    results.companyNames.add(fallbackValue);
+                  }
+                }
+              }
+            }
           } else {
             // Headerless: row is an array, take first element
-            value = (Array.isArray(row) ? row[0] : Object.values(row)[0])?.toString().trim();
-          }
-
-          if (!value) return;
-
-          // Check if it's an email
-          if (value.includes('@') && value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-            results.emails.add(value.toLowerCase());
-            const domain = extractDomain(value);
-            if (domain) {
-              results.domains.add(domain);
-            }
-          } 
-          // Otherwise treat as company name
-          else {
-            const normalized = normalizeCompanyName(value);
-            if (normalized) {
-              results.companyNames.add(value); // Store original for display
+            const value = (Array.isArray(row) ? row[0] : Object.values(row)[0])?.toString().trim();
+            
+            if (!value) return;
+            
+            // Check if it's an email
+            if (value.includes('@') && value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+              results.emails.add(value.toLowerCase());
+              const domain = extractDomain(value);
+              if (domain) {
+                results.domains.add(domain);
+              }
+            } 
+            // Otherwise treat as company name
+            else {
+              const normalized = normalizeCompanyName(value);
+              if (normalized) {
+                results.companyNames.add(value); // Store original for display
+              }
             }
           }
         })

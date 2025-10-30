@@ -26,6 +26,10 @@ import {
   CheckCircle2,
   ExternalLink,
   Linkedin,
+  MessageSquare,
+  Target,
+  Lightbulb,
+  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -325,7 +329,8 @@ export default function AgentConsolePage() {
         border: 'border-blue-200/60',
         bullet: 'text-blue-600',
         text: 'text-gray-800',
-        icon: '💬',
+        icon: MessageSquare,
+        iconBg: 'from-blue-500 to-indigo-600',
         shadow: 'shadow-blue-100/50'
       },
       { 
@@ -333,7 +338,8 @@ export default function AgentConsolePage() {
         border: 'border-purple-200/60',
         bullet: 'text-purple-600',
         text: 'text-gray-800',
-        icon: '🎯',
+        icon: Target,
+        iconBg: 'from-purple-500 to-pink-600',
         shadow: 'shadow-purple-100/50'
       },
       { 
@@ -341,7 +347,8 @@ export default function AgentConsolePage() {
         border: 'border-emerald-200/60',
         bullet: 'text-emerald-600',
         text: 'text-gray-800',
-        icon: '✅',
+        icon: CheckCircle2,
+        iconBg: 'from-emerald-500 to-teal-600',
         shadow: 'shadow-emerald-100/50'
       },
       { 
@@ -349,7 +356,8 @@ export default function AgentConsolePage() {
         border: 'border-orange-200/60',
         bullet: 'text-orange-600',
         text: 'text-gray-800',
-        icon: '⚡',
+        icon: Zap,
+        iconBg: 'from-orange-500 to-amber-600',
         shadow: 'shadow-orange-100/50'
       },
       { 
@@ -357,7 +365,8 @@ export default function AgentConsolePage() {
         border: 'border-rose-200/60',
         bullet: 'text-rose-600',
         text: 'text-gray-800',
-        icon: '💡',
+        icon: Lightbulb,
+        iconBg: 'from-rose-500 to-pink-600',
         shadow: 'shadow-rose-100/50'
       },
       { 
@@ -365,7 +374,8 @@ export default function AgentConsolePage() {
         border: 'border-cyan-200/60',
         bullet: 'text-cyan-600',
         text: 'text-gray-800',
-        icon: '🚀',
+        icon: Sparkles,
+        iconBg: 'from-cyan-500 to-sky-600',
         shadow: 'shadow-cyan-100/50'
       },
     ];
@@ -377,6 +387,7 @@ export default function AgentConsolePage() {
           if (lines.length === 0) return null;
           
           const scheme = colorSchemes[pIndex % colorSchemes.length];
+          const IconComponent = scheme.icon;
           
           // Check if this paragraph has bullets
           const hasBullets = lines.some(line => line.match(/^(\s*)([-*•]|\d+\.)\s+/));
@@ -384,14 +395,14 @@ export default function AgentConsolePage() {
           return (
             <div 
               key={pIndex}
-              className={`relative p-4 rounded-xl border-2 bg-gradient-to-br ${scheme.bg} ${scheme.border} ${scheme.shadow} shadow-lg transform transition-all hover:scale-[1.01] hover:shadow-xl`}
+              className={`relative p-4 rounded-xl border-2 bg-gradient-to-br ${scheme.bg} ${scheme.border} ${scheme.shadow} shadow-lg transition-shadow hover:shadow-xl`}
             >
               {/* Decorative corner accent */}
               <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-white/40 to-transparent rounded-bl-3xl"></div>
               
               {/* Icon indicator */}
-              <div className="absolute -top-3 -left-3 text-2xl bg-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg border-2 border-white">
-                {scheme.icon}
+              <div className={`absolute -top-3 -left-3 bg-gradient-to-br ${scheme.iconBg} rounded-full w-10 h-10 flex items-center justify-center shadow-lg border-2 border-white`}>
+                <IconComponent className="h-5 w-5 text-white" />
               </div>
               
               <div className="space-y-2 pt-2">
@@ -405,10 +416,10 @@ export default function AgentConsolePage() {
                     return (
                       <div 
                         key={lineIndex}
-                        className="flex items-start gap-3 leading-relaxed group"
+                        className="flex items-start gap-3 leading-relaxed"
                         style={{ marginLeft: `${indentLevel * 1.25}rem` }}
                       >
-                        <div className={`flex-shrink-0 mt-1 w-6 h-6 rounded-lg ${scheme.bullet} bg-white/60 flex items-center justify-center font-bold text-sm shadow-sm group-hover:scale-110 transition-transform`}>
+                        <div className={`flex-shrink-0 mt-1 w-6 h-6 rounded-lg ${scheme.bullet} bg-white/60 flex items-center justify-center font-bold text-sm shadow-sm`}>
                           {bullet.match(/\d+\./) ? bullet.charAt(0) : '•'}
                         </div>
                         <div className={`${scheme.text} text-sm flex-1 font-medium`}>
