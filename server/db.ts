@@ -12,10 +12,25 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
+// PRODUCTION DATABASE OVERRIDE
+// Workaround for Replit deployment secret bug - hardcode production database URL
+// This bypasses the deployment secret that keeps reverting to old database
+let databaseUrl = process.env.DATABASE_URL;
+
+if (process.env.REPLIT_DEPLOYMENT === '1') {
+  // Running in production deployment - use hardcoded production database
+  const PRODUCTION_DB_URL = "postgresql://neondb_owner:npg_7sYERC3kqXcd@ep-mute-sky-ahoyd10z-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require";
+  console.log('[DB] Production deployment detected - using override database URL');
+  console.log('[DB] Target database: ep-mute-sky-ahoyd10z (Production)');
+  databaseUrl = PRODUCTION_DB_URL;
+} else {
+  console.log('[DB] Development mode - using DATABASE_URL from environment');
+  console.log('[DB] Database endpoint:', databaseUrl.match(/ep-[^.]+/)?.[0] || 'unknown');
+}
+
 // Ensure DATABASE_URL uses Neon's connection pooler for high concurrency
 // This prevents "too many connections" errors by using pooling infrastructure
 // Only add -pooler if it's not already present
-let databaseUrl = process.env.DATABASE_URL;
 const hasPooler = databaseUrl.includes('-pooler');
 
 if (!hasPooler) {
