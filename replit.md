@@ -26,7 +26,7 @@ The system uses a modern web stack: **React 18 + Vite, TypeScript, TailwindCSS, 
 - **AI-Powered Quality Assurance:** Integrates AssemblyAI for call transcription and Replit AI for lead qualification, account enrichment, and multi-factor scoring.
 - **Data Management:** Unified CSV Import/Export System with intelligent deduplication/upsert, dynamic custom fields, smart company name normalization, and RBAC-enforced filter visibility. Includes a centralized field label system (`shared/field-labels.ts`) for all UI, CSV, filter, and form fields.
 - **Compliance & Suppression:** Multi-tier suppression system (campaign-level and global) for emails (unsubscribe) and phones (Do Not Call) with RESTful API support and dynamic account cap enforcement. Auto-suppression on Qualified/Lead disposition.
-- **Campaign Management:** Supports Email campaigns (HTML editor, personalization, tracking) and Telemarketing campaigns with dual dialer strategy (Manual/Power Dial), active call script assignment, and Telnyx call recording integration.
+- **Campaign Management:** Supports Email campaigns (HTML editor, personalization, tracking) and Telemarketing campaigns with dual dialer strategy (Manual/Power Dial), active call script assignment, Telnyx call recording integration, and intelligent retry scheduling with preserved delays for voicemail/callback dispositions.
 - **Lead QA Workflow:** Multi-stage workflow (New → Under Review → Approved/Rejected → Published) with checklist validation and agent insights.
 - **Client Portal (Bridge Model):** Allows clients to specify campaign order requirements via configurable webhooks.
 - **Data Verification (DV) Module:** Project-based workflow for data cleaning and verification with CSV upload, smart field mapping, background processing, and deduplication.
@@ -38,6 +38,7 @@ The system uses a modern web stack: **React 18 + Vite, TypeScript, TailwindCSS, 
 - **Continuous AI Enrichment Workflow:** Background system that continuously identifies and queues eligible and validated contacts missing both best phone and best address for AI enrichment.
 - **Security & User Management:** JWT token generation, bcrypt password hashing, and multi-role user management with RBAC.
 - **Call Reporting System:** Comprehensive analytics and reporting for telemarketing campaigns.
+- **Queue Management with Retry Preservation:** Advanced agent queue system with intelligent contact scheduling. When agents set dispositions like voicemail or callback-requested, contacts are scheduled for retry after a 3-day delay. Queue refresh operations preserve these scheduled retry dates, preventing contacts from reappearing prematurely.
 - **Email Infrastructure Settings:** Enterprise-grade email deliverability management including domain authentication, tracking domains, and sender profiles.
 - **S3-First File Architecture:** Production-grade file handling with direct-to-S3 uploads, streaming CSV processing, and presigned URLs.
 - **BullMQ Job Queue System:** Asynchronous job processing with Redis-backed queues for CSV import, with worker architecture, retry logic, and job monitoring.
