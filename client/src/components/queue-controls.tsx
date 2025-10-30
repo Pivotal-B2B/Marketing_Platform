@@ -196,51 +196,100 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
       <>
         {/* Replace Queue Dialog */}
         <AlertDialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
-          <AlertDialogContent className="max-w-xl w-[90vw] max-h-[85vh] overflow-y-auto">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-base">Set Queue Filters</AlertDialogTitle>
-              <AlertDialogDescription className="text-sm">
-                Add filters to queue specific contacts
+          <AlertDialogContent className="max-w-5xl w-[95vw] max-h-[90vh] flex flex-col p-0">
+            <AlertDialogHeader className="px-6 pt-6 pb-4 border-b">
+              <AlertDialogTitle className="text-lg font-semibold">Set Queue Filters</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm text-muted-foreground">
+                Configure filters to queue specific contacts for calling. Use AND/OR logic to combine multiple criteria.
               </AlertDialogDescription>
             </AlertDialogHeader>
 
-            <div className="space-y-4 py-2">
-              <SidebarFilters
-                entityType="contact"
-                onApplyFilter={(filter) => setFilterGroup(filter || undefined)}
-                initialFilter={filterGroup}
-                embedded={true}
-              />
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column: Filter Builder (takes 2/3 width on large screens) */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter Criteria</h3>
+                    {filterGroup?.conditions && filterGroup.conditions.length > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {filterGroup.conditions.length} {filterGroup.conditions.length === 1 ? 'filter' : 'filters'}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <SidebarFilters
+                    entityType="contact"
+                    onApplyFilter={(filter) => setFilterGroup(filter || undefined)}
+                    initialFilter={filterGroup}
+                    embedded={true}
+                  />
+                </div>
 
-              <Separator />
+                {/* Right Column: Settings & Summary */}
+                <div className="space-y-6">
+                  {/* Queue Settings */}
+                  <div className="space-y-4 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Queue Settings</h3>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="maxQueueSize" className="text-sm font-medium">Max Queue Size</Label>
+                      <Input
+                        id="maxQueueSize"
+                        type="number"
+                        min="1"
+                        placeholder="300"
+                        value={maxQueueSize}
+                        onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : 300)}
+                        data-testid="input-max-queue-size"
+                        className="h-9"
+                      />
+                      <p className="text-xs text-muted-foreground">Maximum contacts to queue (leave empty for no limit)</p>
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="maxQueueSize" className="text-sm font-medium">Max Queue Size</Label>
-                <Input
-                  id="maxQueueSize"
-                  type="number"
-                  min="1"
-                  placeholder="300"
-                  value={maxQueueSize}
-                  onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : 300)}
-                  data-testid="input-max-queue-size"
-                  className="h-9"
-                />
-                <p className="text-xs text-muted-foreground">Maximum number of contacts to queue</p>
+                  {/* Info Panel */}
+                  <div className="p-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30">
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-2 text-xs text-blue-900 dark:text-blue-100">
+                        <p className="font-medium">How it works:</p>
+                        <ul className="space-y-1 list-disc list-inside text-blue-800 dark:text-blue-200">
+                          <li>Add filters to narrow down contacts</li>
+                          <li>Apply filters to see result count</li>
+                          <li>Click "Set Queue" to replace your current queue</li>
+                          <li>Only contacts with valid phone numbers will be queued</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <AlertDialogFooter className="gap-2">
-              <AlertDialogCancel disabled={isPending} data-testid="button-cancel-replace" className="h-9">Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => replaceQueueMutation.mutate()}
-                disabled={isPending}
-                data-testid="button-confirm-replace"
-                className="h-9"
-              >
-                {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Set Queue
-              </AlertDialogAction>
+            <AlertDialogFooter className="px-6 py-4 border-t bg-slate-50 dark:bg-slate-900/50">
+              <div className="flex items-center justify-between w-full">
+                <div className="text-sm text-muted-foreground">
+                  {filterGroup?.conditions && filterGroup.conditions.length > 0 ? (
+                    <span>Filters configured and ready to apply</span>
+                  ) : (
+                    <span>No filters configured - will queue all campaign contacts</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <AlertDialogCancel disabled={isPending} data-testid="button-cancel-replace" className="h-9">
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => replaceQueueMutation.mutate()}
+                    disabled={isPending}
+                    data-testid="button-confirm-replace"
+                    className="h-9"
+                  >
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Set Queue
+                  </AlertDialogAction>
+                </div>
+              </div>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

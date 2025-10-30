@@ -164,75 +164,115 @@ export function SidebarFilters({
 
   // Sidebar Content Component (reused for both desktop and mobile)
   const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900">
-      {/* Header */}
-      <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-        <div className="flex items-center justify-between mb-1.5">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filters</h2>
-          {activeFilterCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {activeFilterCount}
-            </Badge>
+    <div className={`flex flex-col ${embedded ? 'h-auto' : 'h-full'} bg-white dark:bg-slate-900`}>
+      {/* Header - Hidden when embedded since parent provides header */}
+      {!embedded && (
+        <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+          <div className="flex items-center justify-between mb-1.5">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Filters</h2>
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {activeFilterCount}
+              </Badge>
+            )}
+          </div>
+          
+          {/* Result Count */}
+          {filterGroup.conditions.length > 0 && (
+            <p
+              className="text-xs text-slate-500 dark:text-slate-400"
+              data-testid="text-result-count"
+            >
+              {isCountLoading ? (
+                "Counting..."
+              ) : (
+                <>
+                  Showing{" "}
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    {resultsCount.toLocaleString()}
+                  </span>{" "}
+                  {resultsCount === 1 ? "result" : "results"}
+                </>
+              )}
+            </p>
           )}
         </div>
-        
-        {/* Result Count */}
-        {filterGroup.conditions.length > 0 && (
-          <p
-            className="text-xs text-slate-500 dark:text-slate-400"
-            data-testid="text-result-count"
-          >
-            {isCountLoading ? (
-              "Counting..."
-            ) : (
-              <>
-                Showing{" "}
-                <span className="font-semibold text-slate-900 dark:text-slate-100">
-                  {resultsCount.toLocaleString()}
-                </span>{" "}
-                {resultsCount === 1 ? "result" : "results"}
-              </>
+      )}
+
+      {/* Result Count & Logic Toggle - Compact version for embedded mode */}
+      {embedded && (
+        <div className="px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800/30 mb-3">
+          <div className="flex items-center justify-between gap-4">
+            {/* Result Count */}
+            <div className="flex-1">
+              {filterGroup.conditions.length > 0 && (
+                <p
+                  className="text-xs text-slate-600 dark:text-slate-400"
+                  data-testid="text-result-count"
+                >
+                  {isCountLoading ? (
+                    <span className="flex items-center gap-2">
+                      <div className="h-3 w-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      Counting results...
+                    </span>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-lg text-slate-900 dark:text-slate-100">
+                        {resultsCount.toLocaleString()}
+                      </span>{" "}
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {resultsCount === 1 ? "contact found" : "contacts found"}
+                      </span>
+                    </>
+                  )}
+                </p>
+              )}
+              {filterGroup.conditions.length === 0 && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Add filters to narrow down contacts
+                </p>
+              )}
+            </div>
+            
+            {/* AND/OR Logic Toggle */}
+            {activeFilterCount > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Match:</span>
+                <ToggleGroup
+                  type="single"
+                  value={filterGroup.logic}
+                  onValueChange={(value) => {
+                    if (value === "AND" || value === "OR") {
+                      setFilterGroup({ ...filterGroup, logic: value });
+                    }
+                  }}
+                  className="bg-slate-200 dark:bg-slate-800 rounded-md p-0.5"
+                >
+                  <ToggleGroupItem
+                    value="AND"
+                    className="px-2.5 py-0.5 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
+                    data-testid="toggle-logic-and"
+                  >
+                    ALL
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="OR"
+                    className="px-2.5 py-0.5 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
+                    data-testid="toggle-logic-or"
+                  >
+                    ANY
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
             )}
-          </p>
-        )}
-        
-        {/* AND/OR Logic Toggle */}
-        {activeFilterCount > 1 && (
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Match:</span>
-            <ToggleGroup
-              type="single"
-              value={filterGroup.logic}
-              onValueChange={(value) => {
-                if (value === "AND" || value === "OR") {
-                  setFilterGroup({ ...filterGroup, logic: value });
-                }
-              }}
-              className="bg-slate-200 dark:bg-slate-800 rounded-md p-0.5"
-            >
-              <ToggleGroupItem
-                value="AND"
-                className="px-2.5 py-0.5 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
-                data-testid="toggle-logic-and"
-              >
-                ALL (AND)
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="OR"
-                className="px-2.5 py-0.5 text-xs font-medium data-[state=on]:bg-blue-600 data-[state=on]:text-white"
-                data-testid="toggle-logic-or"
-              >
-                ANY (OR)
-              </ToggleGroupItem>
-            </ToggleGroup>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Body - Filter Conditions */}
       <div className="flex-shrink-0">
-        <ScrollArea className="max-h-[calc(100vh-280px)]">
-          <div className="px-2 pt-2 pb-2 space-y-1.5">
+        <ScrollArea className={embedded ? "max-h-[50vh]" : "max-h-[calc(100vh-280px)]"}>
+          <div className={`${embedded ? 'px-0' : 'px-2'} pt-2 pb-2 space-y-2`}>
             {filterGroup.conditions.map((condition) => (
               <div key={condition.id}>
                 <UnifiedFilterRow
@@ -255,11 +295,11 @@ export function SidebarFilters({
         </ScrollArea>
         
         {/* Add Condition Button */}
-        <div className="px-2 pb-2 pt-1">
+        <div className={`${embedded ? 'px-0' : 'px-2'} pb-2 pt-1`}>
           <Button
             variant="outline"
             onClick={addCondition}
-            className="w-full border-dashed border-2 hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+            className="w-full border-dashed border-2 hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors h-10"
             data-testid="button-add-condition"
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -269,22 +309,23 @@ export function SidebarFilters({
       </div>
 
       {/* Footer - Actions */}
-      <div className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-shrink-0">
-        <div className="flex items-center justify-between gap-2">
+      <div className={`${embedded ? 'p-0 pt-3' : 'p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50'} flex-shrink-0`}>
+        <div className="flex items-center justify-between gap-3">
           <Button
             variant="ghost"
             onClick={handleClear}
             disabled={activeFilterCount === 0 || isApplying}
-            className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100"
+            className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 h-10"
             data-testid="button-clear-filters"
           >
-            Clear
+            <X className="mr-2 h-4 w-4" />
+            Clear All
           </Button>
           <div className="flex-1">
             <Button
               onClick={handleApply}
               disabled={isApplying || validFilterCount === 0}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm disabled:opacity-50 disabled:cursor-not-allowed h-10"
               data-testid="button-apply-filters"
             >
               {isApplying ? (
