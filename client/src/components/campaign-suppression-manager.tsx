@@ -105,11 +105,11 @@ export function CampaignSuppressionManager({ campaignId }: CampaignSuppressionMa
         title: "✅ Smart Upload Complete",
         description: (
           <div className="space-y-1">
-            <p><strong>{data.totalAdded}</strong> suppressions added</p>
+            <p><strong>{data?.totalAdded || 0}</strong> suppressions added</p>
             <p className="text-xs">
-              Companies: {data.summary.companyNames.added} | 
-              Emails: {data.summary.emails.added} | 
-              Domains: {data.summary.domains.added}
+              Companies: {data?.summary?.companyNames?.added || 0} | 
+              Emails: {data?.summary?.emails?.added || 0} | 
+              Domains: {data?.summary?.domains?.added || 0}
             </p>
           </div>
         ),
