@@ -82,19 +82,28 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
   // Set Queue (Replace) mutation
   const replaceQueueMutation = useMutation({
     mutationFn: async () => {
-      console.log('[QUEUE_CONTROLS] Sending queue set request with filters:', filterGroup);
+      console.log('[QUEUE_CONTROLS] Sending queue set request with filters:', JSON.stringify(filterGroup, null, 2));
+      console.log('[QUEUE_CONTROLS] Filter conditions:', filterGroup?.conditions);
+      if (filterGroup?.conditions && filterGroup.conditions.length > 0) {
+        console.log('[QUEUE_CONTROLS] First condition:', filterGroup.conditions[0]);
+        console.log('[QUEUE_CONTROLS] First condition values:', filterGroup.conditions[0].values);
+      }
+      
+      const payload = {
+        agent_id: effectiveAgentId,
+        filters: filterGroup || undefined,
+        per_account_cap: null,
+        max_queue_size: maxQueueSize || null,
+        keep_in_progress: true,
+        allow_sharing: true,
+      };
+      
+      console.log('[QUEUE_CONTROLS] Full payload:', JSON.stringify(payload, null, 2));
       
       const response = await apiRequest(
         'POST',
         `/api/campaigns/${campaignId}/queues/set`,
-        {
-          agent_id: effectiveAgentId,
-          filters: filterGroup || undefined,
-          per_account_cap: null,
-          max_queue_size: maxQueueSize || null,
-          keep_in_progress: true,
-          allow_sharing: true, // Allow multiple agents to queue the same contacts
-        }
+        payload
       );
       return response.json();
     },
