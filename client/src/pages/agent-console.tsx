@@ -426,7 +426,7 @@ export default function AgentConsolePage() {
                       <div className="flex-shrink-0 mt-0.5">
                         {getBulletIcon(bullet)}
                       </div>
-                      <div className="text-foreground text-[15px] flex-1 leading-relaxed">
+                      <div className="text-foreground text-[15px] flex-1 leading-relaxed font-normal">
                         {renderLineWithBoldPlaceholders(content)}
                       </div>
                     </div>
@@ -441,7 +441,7 @@ export default function AgentConsolePage() {
                     className={`leading-relaxed ${
                       isHeading 
                         ? 'text-lg font-bold text-foreground mb-2' 
-                        : 'text-[15px] text-foreground/90'
+                        : 'text-[15px] text-foreground/90 font-normal'
                     }`}
                   >
                     {renderLineWithBoldPlaceholders(line)}
@@ -1523,20 +1523,20 @@ export default function AgentConsolePage() {
                     renderFormattedScript(assignedScript?.content || campaignDetails?.callScript || '')
                   ) : (
                     <div className="space-y-5 text-foreground/80">
-                      <p className="text-base leading-relaxed">
-                        "Hello, this is <strong>[Your Name]</strong> calling from Pivotal CRM. May I speak with{' '}
-                        <strong className="text-primary">
+                      <p className="text-base leading-relaxed font-normal">
+                        "Hello, this is [Your Name] calling from Pivotal CRM. May I speak with{' '}
+                        <span className="font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
                           {currentQueueItem?.contactName || '[Contact Name]'}
-                        </strong>?"
+                        </span>?"
                       </p>
-                      <p className="text-base leading-relaxed">
+                      <p className="text-base leading-relaxed font-normal">
                         "I'm calling to discuss how our B2B solutions can help{' '}
-                        <strong className="text-primary">
+                        <span className="font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
                           {currentQueueItem?.accountName || '[Company Name]'}
-                        </strong>{' '}
+                        </span>{' '}
                         streamline their customer engagement..."
                       </p>
-                      <p className="text-base leading-relaxed text-foreground/70 italic">
+                      <p className="text-base leading-relaxed text-foreground/70 italic font-normal">
                         "We specialize in Account-Based Marketing. Do you have a few minutes to discuss your marketing challenges?"
                       </p>
                     </div>
