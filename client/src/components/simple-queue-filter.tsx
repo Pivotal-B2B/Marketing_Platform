@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,8 +11,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X } from "lucide-react";
-import type { FilterGroup } from "@shared/filter-types";
+import { Plus, X, Loader2 } from "lucide-react";
+import type { FilterGroup, Operator } from "@shared/filter-types";
+import { apiRequest } from "@/lib/queryClient";
 
 interface SimpleQueueFilterProps {
   onChange: (filters: FilterGroup | null) => void;
@@ -19,9 +21,21 @@ interface SimpleQueueFilterProps {
 
 export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
   const [field, setField] = useState("jobTitle");
-  const [operator, setOperator] = useState("contains");
+  const [operator, setOperator] = useState<Operator>("contains");
   const [inputValue, setInputValue] = useState("");
   const [chips, setChips] = useState<string[]>([]);
+  const [currentFilter, setCurrentFilter] = useState<FilterGroup | null>(null);
+
+  // Fetch real-time count
+  const { data: countData, isLoading: isCountLoading } = useQuery({
+    queryKey: ['/api/filters/count/contact', currentFilter],
+    queryFn: async () => {
+      if (!currentFilter) return { count: 0 };
+      const response = await apiRequest('POST', '/api/filters/count/contact', currentFilter);
+      return response.json();
+    },
+    enabled: !!currentFilter,
+  });
 
   const handleAddChip = () => {
     if (inputValue.trim()) {
@@ -29,8 +43,8 @@ export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
       setChips(newChips);
       setInputValue("");
       
-      // Immediately emit the updated filter
-      onChange({
+      // Create the updated filter
+      const filter: FilterGroup = {
         logic: "AND",
         conditions: [{
           id: Date.now().toString(),
@@ -38,7 +52,10 @@ export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
           operator,
           values: newChips
         }]
-      });
+      };
+      
+      setCurrentFilter(filter);
+      onChange(filter);
     }
   };
 
@@ -48,7 +65,7 @@ export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
     
     // Emit updated filter or null if no chips
     if (newChips.length > 0) {
-      onChange({
+      const filter: FilterGroup = {
         logic: "AND",
         conditions: [{
           id: Date.now().toString(),
@@ -56,8 +73,11 @@ export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
           operator,
           values: newChips
         }]
-      });
+      };
+      setCurrentFilter(filter);
+      onChange(filter);
     } else {
+      setCurrentFilter(null);
       onChange(null);
     }
   };
@@ -65,6 +85,7 @@ export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
   const handleClearAll = () => {
     setChips([]);
     setInputValue("");
+    setCurrentFilter(null);
     onChange(null);
   };
 
@@ -91,14 +112,14 @@ export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
 
         <div className="space-y-2">
           <Label className="text-sm">Operator</Label>
-          <Select value={operator} onValueChange={setOperator}>
+          <Select value={operator} onValueChange={(value) => setOperator(value as Operator)}>
             <SelectTrigger className="h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="contains">Contains</SelectItem>
               <SelectItem value="equals">Equals</SelectItem>
-              <SelectItem value="starts_with">Starts With</SelectItem>
+              <SelectItem value="begins_with">Begins With</SelectItem>
               <SelectItem value="ends_with">Ends With</SelectItem>
             </SelectContent>
           </Select>
@@ -171,9 +192,23 @@ export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
         </div>
       )}
 
-      {chips.length === 0 && (
+      {chips.length === 0 ? (
         <div className="text-center py-4 text-sm text-muted-foreground border border-dashed rounded-md">
           No filters applied - all contacts will be queued
+        </div>
+      ) : (
+        <div className="flex items-center justify-center gap-2 py-3 text-sm border rounded-md bg-muted/50">
+          {isCountLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-muted-foreground">Counting matches...</span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium text-primary">{countData?.count?.toLocaleString() || 0}</span>
+              <span className="text-muted-foreground">contacts match your filters</span>
+            </>
+          )}
         </div>
       )}
     </div>
