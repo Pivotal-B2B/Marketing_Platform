@@ -633,12 +633,31 @@ export default function AgentConsolePage() {
 
     // Use contact's country for phone validation, fallback to GB (UK) for UKEF campaigns
     const contactCountry = fullContactDetails?.country || 'GB';
-    const e164Phone = normalizePhoneToE164(phoneNumber, contactCountry);
+    
+    // Debug logging
+    console.log('🔍 Phone Validation Debug:', {
+      phoneNumber,
+      contactCountry,
+      phoneType: selectedPhoneType,
+      label: phoneLabel
+    });
+    
+    let e164Phone = normalizePhoneToE164(phoneNumber, contactCountry);
+    
+    // If validation fails with contact country, try with explicit +44 if it's a UK number
+    if (!e164Phone && contactCountry === 'GB') {
+      // Try adding +44 if not present
+      const withCountryCode = phoneNumber.startsWith('+') ? phoneNumber : `+44${phoneNumber.replace(/^0/, '')}`;
+      console.log('🔄 Retry with country code:', withCountryCode);
+      e164Phone = normalizePhoneToE164(withCountryCode, 'GB');
+    }
+    
+    console.log('✅ E164 Result:', e164Phone);
     
     if (!e164Phone) {
       toast({
         title: "Invalid phone number",
-        description: `${phoneLabel} "${phoneNumber}" is not a valid phone number for ${contactCountry}. Try with country code (e.g., +44 for UK).`,
+        description: `Cannot validate "${phoneNumber}". Please ensure it's in correct format (UK: +44xxxxxxxxxx or 0xxxxxxxxxx)`,
         variant: "destructive",
       });
       return;
