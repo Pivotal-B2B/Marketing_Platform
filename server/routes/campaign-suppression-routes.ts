@@ -1531,13 +1531,20 @@ router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: 
         addedBy: userId,
       }));
 
-      const inserted = await db
-        .insert(campaignSuppressionDomains)
-        .values(companySuppressions)
-        .onConflictDoNothing()
-        .returning();
+      console.log('[SMART UPLOAD] Attempting to insert', companySuppressions.length, 'company suppressions');
       
-      companyInserted.push(...inserted);
+      try {
+        const inserted = await db
+          .insert(campaignSuppressionDomains)
+          .values(companySuppressions)
+          .onConflictDoNothing()
+          .returning();
+        
+        companyInserted.push(...inserted);
+        console.log('[SMART UPLOAD] Company suppressions inserted:', inserted.length, 'out of', companySuppressions.length);
+      } catch (error) {
+        console.error('[SMART UPLOAD] Error inserting company suppressions:', error);
+      }
     }
 
     // Insert email suppressions
@@ -1551,13 +1558,20 @@ router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: 
         addedBy: userId,
       }));
 
-      const inserted = await db
-        .insert(campaignSuppressionEmails)
-        .values(emailSuppressions)
-        .onConflictDoNothing()
-        .returning();
+      console.log('[SMART UPLOAD] Attempting to insert', emailSuppressions.length, 'email suppressions');
       
-      emailInserted.push(...inserted);
+      try {
+        const inserted = await db
+          .insert(campaignSuppressionEmails)
+          .values(emailSuppressions)
+          .onConflictDoNothing()
+          .returning();
+        
+        emailInserted.push(...inserted);
+        console.log('[SMART UPLOAD] Email suppressions inserted:', inserted.length, 'out of', emailSuppressions.length);
+      } catch (error) {
+        console.error('[SMART UPLOAD] Error inserting email suppressions:', error);
+      }
     }
 
     // Insert domain suppressions (extracted from emails)
@@ -1572,13 +1586,20 @@ router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: 
         addedBy: userId,
       }));
 
-      const inserted = await db
-        .insert(campaignSuppressionDomains)
-        .values(domainSuppressions)
-        .onConflictDoNothing()
-        .returning();
+      console.log('[SMART UPLOAD] Attempting to insert', domainSuppressions.length, 'domain suppressions');
       
-      domainInserted.push(...inserted);
+      try {
+        const inserted = await db
+          .insert(campaignSuppressionDomains)
+          .values(domainSuppressions)
+          .onConflictDoNothing()
+          .returning();
+        
+        domainInserted.push(...inserted);
+        console.log('[SMART UPLOAD] Domain suppressions inserted:', inserted.length, 'out of', domainSuppressions.length);
+      } catch (error) {
+        console.error('[SMART UPLOAD] Error inserting domain suppressions:', error);
+      }
     }
 
     console.log('[SMART UPLOAD] Insertion complete:', {
