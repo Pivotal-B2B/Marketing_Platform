@@ -676,4 +676,74 @@ router.get(
   }
 );
 
+/**
+ * GET /api/campaigns/:campaignId/queues/related-contacts/:contactId
+ * Get other contacts from the same account that are in the agent's queue
+ * 
+ * Returns:
+ * - Array of contacts from the same account in the agent's queue
+ */
+router.get(
+  '/campaigns/:campaignId/queues/related-contacts/:contactId',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { campaignId, contactId } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'unauthorized' });
+      }
+
+      // First, get the account ID for the current contact
+      const currentContact = await db
+        .select({ accountId: contacts.accountId })
+        .from(contacts)
+        .where(eq(contacts.id, contactId))
+        .limit(1);
+
+      if (currentContact.length === 0 || !currentContact[0].accountId) {
+        return res.json([]);
+      }
+
+      const accountId = currentContact[0].accountId;
+
+      // Get other contacts from the same account in the agent's queue
+      const relatedContacts = await db
+        .select({
+          id: contacts.id,
+          fullName: contacts.fullName,
+          firstName: contacts.firstName,
+          lastName: contacts.lastName,
+          email: contacts.email,
+          directPhone: contacts.directPhone,
+          mobilePhone: contacts.mobilePhone,
+          jobTitle: contacts.jobTitle,
+          seniorityLevel: contacts.seniorityLevel,
+          queueState: agentQueue.queueState,
+          queueId: agentQueue.id,
+          priority: agentQueue.priority,
+          scheduledFor: agentQueue.scheduledFor,
+        })
+        .from(agentQueue)
+        .innerJoin(contacts, eq(agentQueue.contactId, contacts.id))
+        .where(
+          and(
+            eq(agentQueue.agentId, userId),
+            eq(agentQueue.campaignId, campaignId),
+            eq(agentQueue.accountId, accountId),
+            sql`${agentQueue.contactId} != ${contactId}`, // Exclude current contact
+            inArray(agentQueue.queueState, ['queued', 'in_progress'])
+          )
+        )
+        .orderBy(agentQueue.priority, agentQueue.queuedAt);
+
+      res.json(relatedContacts);
+    } catch (error) {
+      console.error('Error fetching related contacts:', error);
+      res.status(500).json({ error: 'Failed to fetch related contacts' });
+    }
+  }
+);
+
 export default router;

@@ -325,6 +325,28 @@ export default function AgentConsolePage() {
   const dialMode = campaignDetails?.dialMode || 'manual';
   const amdEnabled = campaignDetails?.powerSettings?.amd?.enabled ?? false;
 
+  // Fetch related contacts from the same company
+  const { data: relatedContacts = [] } = useQuery<Array<{
+    id: string;
+    fullName: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    directPhone: string | null;
+    mobilePhone: string | null;
+    jobTitle: string | null;
+    seniorityLevel: string | null;
+    queueState: 'queued' | 'in_progress' | 'locked' | 'released';
+    queueId: string;
+    priority: number;
+    scheduledFor: string | null;
+  }>>({
+    queryKey: currentQueueItem?.contactId && selectedCampaignId 
+      ? [`/api/campaigns/${selectedCampaignId}/queues/related-contacts/${currentQueueItem.contactId}`]
+      : [],
+    enabled: !!currentQueueItem?.contactId && !!selectedCampaignId,
+  });
+
   // Professional script renderer with improved readability
   const renderFormattedScript = (script: string) => {
     if (!script) return null;
@@ -1501,6 +1523,68 @@ export default function AgentConsolePage() {
             {/* RIGHT: DISPOSITIONS PANEL - Premium Cards */}
             <div className="w-full lg:flex-1 p-2 md:p-3 bg-gradient-to-br from-slate-50 to-gray-50 min-h-0 overflow-auto">
               <div className="p-4 space-y-4">
+                {/* Related Contacts from Same Company */}
+                {relatedContacts.length > 0 && (
+                  <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
+                    <CardHeader className="pb-2 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border-b border-purple-100">
+                      <CardTitle className="text-sm font-bold flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+                          <Building2 className="h-3 w-3 text-white" />
+                        </div>
+                        Other Contacts at {currentQueueItem?.accountName}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        {relatedContacts.length} other {relatedContacts.length === 1 ? 'contact' : 'contacts'} in your queue
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-3">
+                      <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                        {relatedContacts.map((contact) => (
+                          <div
+                            key={contact.id}
+                            className="p-2.5 rounded-lg border bg-gradient-to-r from-purple-50/50 to-indigo-50/30 hover-elevate transition-all"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-gray-900 truncate">
+                                    {contact.fullName}
+                                  </p>
+                                  <Badge 
+                                    variant={contact.queueState === 'in_progress' ? 'default' : 'secondary'}
+                                    className="text-[10px] px-1.5 py-0"
+                                  >
+                                    {contact.queueState === 'in_progress' ? 'Active' : 'Queued'}
+                                  </Badge>
+                                </div>
+                                {contact.jobTitle && (
+                                  <p className="text-xs text-gray-600 truncate mt-0.5">
+                                    {contact.jobTitle}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-3 mt-1">
+                                  {contact.email && (
+                                    <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                      <Mail className="h-2.5 w-2.5" />
+                                      <span className="truncate max-w-[120px]">{contact.email}</span>
+                                    </div>
+                                  )}
+                                  {(contact.directPhone || contact.mobilePhone) && (
+                                    <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                      <Phone className="h-2.5 w-2.5" />
+                                      <span>{contact.directPhone || contact.mobilePhone}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Call Notes - Enhanced */}
                 <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm">
                   <CardHeader className="pb-2 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-b border-blue-100">
