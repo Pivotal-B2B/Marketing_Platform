@@ -299,15 +299,50 @@ export default function PhoneCampaignEditPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="script">Call Script Content</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="script">Call Script Content</Label>
+                  <div className="text-xs text-muted-foreground">
+                    Use special bullets: ✓ (checkmark), ★ (star), → (arrow), ○ (circle), 1. (numbered)
+                  </div>
+                </div>
                 <Textarea
                   id="script"
                   value={callScript}
                   onChange={(e) => setCallScript(e.target.value)}
-                  placeholder="Enter your call script here..."
-                  rows={10}
+                  placeholder="Enter your call script here...&#10;&#10;Example:&#10;Opening&#10;✓ Introduce yourself&#10;✓ Confirm contact name&#10;&#10;Key Benefits&#10;★ 40% faster lead qualification&#10;★ Reduces manual data entry&#10;&#10;Next Steps&#10;→ Schedule demo&#10;→ Send follow-up"
+                  rows={12}
                   data-testid="textarea-script"
+                  className="font-mono text-sm"
                 />
+                <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-foreground">📋 Stylish Bullet Points Guide</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <code className="px-1.5 py-0.5 bg-background rounded">✓</code>
+                      <span>Green checkmark (important steps)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="px-1.5 py-0.5 bg-background rounded">★</code>
+                      <span>Gold star (key benefits)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="px-1.5 py-0.5 bg-background rounded">→</code>
+                      <span>Blue arrow (next steps)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="px-1.5 py-0.5 bg-background rounded">○</code>
+                      <span>Gray circle (optional items)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="px-1.5 py-0.5 bg-background rounded">1. 2. 3.</code>
+                      <span>Numbered steps (sequential)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <code className="px-1.5 py-0.5 bg-background rounded">- * •</code>
+                      <span>Default bullets (standard)</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
