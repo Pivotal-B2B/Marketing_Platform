@@ -1,4 +1,4 @@
-import { parse as parseDomain } from 'tldts';
+import tldts from 'tldts';
 
 /**
  * Data Normalization Utilities
@@ -34,7 +34,7 @@ export function normalizeDomain(input: string | null | undefined): string | null
     domain = domain.split(':')[0];
     
     // Use tldts to extract root domain (handles subdomains correctly)
-    const parsed = parseDomain(domain);
+    const parsed = tldts.parse(domain);
     if (parsed.domain) {
       return parsed.domain.toLowerCase();
     }

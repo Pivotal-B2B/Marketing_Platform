@@ -1,4 +1,4 @@
-import { getDomain } from 'tldts';
+import tldts from 'tldts';
 
 /**
  * Domain normalization and matching utilities for Phase 21 Domain Sets
@@ -59,7 +59,7 @@ export function extractRootDomain(input: string): string {
   
   // tldts.getDomain() correctly extracts the root domain using public suffix list
   // It handles URLs, hostnames, and normalized domains
-  const rootDomain = getDomain(input);
+  const rootDomain = tldts.getDomain(input);
   
   // Return the extracted domain or empty string if invalid
   return rootDomain || '';

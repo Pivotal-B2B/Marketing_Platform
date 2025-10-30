@@ -9,7 +9,7 @@ import {
   accounts as accountsTable,
 } from '@shared/schema';
 import { eq, and, or, inArray, sql } from 'drizzle-orm';
-import { getDomainFromUrl } from 'tldts';
+import tldts from 'tldts';
 
 /**
  * Extract domain from email address
@@ -43,7 +43,7 @@ export function normalizeDomain(domain: string | null): string | null {
   normalized = normalized.replace(/\/$/, '');
   
   // Extract just the domain if it's a full URL
-  const parsed = getDomainFromUrl(normalized);
+  const parsed = tldts.getDomainFromUrl(normalized);
   if (parsed) {
     normalized = parsed;
   }
