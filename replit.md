@@ -19,6 +19,7 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **Dashboard Caching**: Added 5-minute in-memory cache to /api/dashboard/stats endpoint with automatic invalidation on data mutations
 - **Query Limits**: Optional limit parameter on getAccounts/getContacts methods (no default to preserve export functionality)
 - **Critical Bug Fix**: Fixed getContact() query that only fetched 18 fields instead of all contact data, causing most contact information to appear empty in detail pages
+- **Phone Formatting Fix**: Corrected E.164 formatting for international phone numbers using libphonenumber-js, properly handling country-specific trunk prefix rules (e.g., UK numbers now format as 441908802874 instead of 4401908802874)
 
 **Field Label Standardization (October 2025):**
 - **Centralized Label System**: All UI labels, CSV headers, filter labels, and form fields use centralized constants from `shared/field-labels.ts`

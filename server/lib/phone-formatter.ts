@@ -3,6 +3,8 @@
  * Formats phone numbers with country code prefix in the format: "country_code number"
  */
 
+import { parsePhoneNumber, CountryCode } from 'libphonenumber-js';
+
 // Comprehensive country-to-dial-code mapping
 const COUNTRY_DIAL_CODES: Record<string, string> = {
   // A
@@ -282,10 +284,57 @@ function hasCountryCode(phone: string, countryCode: string): boolean {
 }
 
 /**
- * Format phone number with country code prefix
+ * Map country name to ISO country code
+ */
+function getCountryCode(countryName: string | null | undefined): CountryCode | null {
+  if (!countryName) return null;
+  
+  const normalized = countryName.toLowerCase().trim();
+  
+  // Check if already a 2-letter code
+  if (normalized.length === 2) {
+    return normalized.toUpperCase() as CountryCode;
+  }
+  
+  // Map common country names to ISO codes
+  const countryMap: Record<string, CountryCode> = {
+    'united kingdom': 'GB',
+    'uk': 'GB',
+    'united states': 'US',
+    'usa': 'US',
+    'us': 'US',
+    'germany': 'DE',
+    'france': 'FR',
+    'italy': 'IT',
+    'spain': 'ES',
+    'canada': 'CA',
+    'australia': 'AU',
+    'india': 'IN',
+    'china': 'CN',
+    'japan': 'JP',
+    'south korea': 'KR',
+    'netherlands': 'NL',
+    'belgium': 'BE',
+    'switzerland': 'CH',
+    'austria': 'AT',
+    'sweden': 'SE',
+    'norway': 'NO',
+    'denmark': 'DK',
+    'poland': 'PL',
+    'ireland': 'IE',
+    'portugal': 'PT',
+    'greece': 'GR',
+  };
+  
+  return countryMap[normalized] || null;
+}
+
+/**
+ * Format phone number with country code prefix using libphonenumber-js
+ * This properly handles country-specific rules for trunk prefixes (leading zeros)
  * @param phone - The phone number to format
- * @param country - The country name to derive the dial code from
- * @returns Formatted phone number as "country_code number" (e.g., "91 1234567890")
+ * @param country - The country name to derive the country code from
+ * @returns Formatted phone number in E.164 format without + (e.g., "441908802874")
  */
 export function formatPhoneWithCountryCode(phone: string | null | undefined, country: string | null | undefined): string {
   // Return empty if no phone number
@@ -302,21 +351,43 @@ export function formatPhoneWithCountryCode(phone: string | null | undefined, cou
   }
   
   // Get country code
-  const countryCode = getCountryDialCode(country);
+  const countryCode = getCountryCode(country);
   
-  // If no country code found, return cleaned phone as-is
-  if (!countryCode) {
+  // Try to parse using libphonenumber-js for proper E.164 formatting
+  if (countryCode) {
+    try {
+      // Try parsing with the country code
+      const phoneNumber = parsePhoneNumber(cleanedPhone, countryCode);
+      
+      if (phoneNumber && phoneNumber.isValid()) {
+        // Return E.164 format without the + prefix and with space after country code
+        const e164 = phoneNumber.format('E.164').replace('+', '');
+        // Add space after country code for readability
+        const callingCode = phoneNumber.countryCallingCode;
+        const nationalNumber = e164.substring(callingCode.length);
+        return `${callingCode} ${nationalNumber}`;
+      }
+    } catch (error) {
+      // Parsing failed, fall through to manual formatting
+    }
+  }
+  
+  // Fallback to manual formatting if libphonenumber-js fails
+  const dialCode = getCountryDialCode(country);
+  
+  // If no dial code found, return cleaned phone as-is
+  if (!dialCode) {
     return cleanedPhone;
   }
   
   // If phone already has the country code, format it correctly
-  if (hasCountryCode(phone, countryCode)) {
-    const numberWithoutCode = cleanedPhone.substring(countryCode.length);
-    return `${countryCode} ${numberWithoutCode}`;
+  if (hasCountryCode(phone, dialCode)) {
+    const numberWithoutCode = cleanedPhone.substring(dialCode.length);
+    return `${dialCode} ${numberWithoutCode}`;
   }
   
   // Add country code prefix
-  return `${countryCode} ${cleanedPhone}`;
+  return `${dialCode} ${cleanedPhone}`;
 }
 
 /**
