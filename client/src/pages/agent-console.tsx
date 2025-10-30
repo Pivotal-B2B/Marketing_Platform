@@ -311,6 +311,78 @@ export default function AgentConsolePage() {
   const dialMode = campaignDetails?.dialMode || 'manual';
   const amdEnabled = campaignDetails?.powerSettings?.amd?.enabled ?? false;
 
+  // Function to render formatted script with auto bullets, bold placeholders, and reduced line spacing
+  const renderFormattedScript = (script: string) => {
+    if (!script) return null;
+
+    // Split into lines first (before replacing placeholders)
+    const lines = script.split('\n');
+    
+    return (
+      <div className="space-y-1.5">
+        {lines.map((line, index) => {
+          // Skip empty lines (but preserve them as spacing)
+          if (line.trim() === '') {
+            return <div key={index} className="h-1" />;
+          }
+
+          // Check if line is a bullet point
+          const bulletMatch = line.match(/^(\s*)([-*•]|\d+\.)\s+(.*)$/);
+          
+          if (bulletMatch) {
+            const [, indent, bullet, content] = bulletMatch;
+            const indentLevel = indent.length / 2; // Assume 2 spaces per indent level
+            
+            return (
+              <div 
+                key={index} 
+                className="flex items-start gap-2.5 leading-snug"
+                style={{ marginLeft: `${indentLevel * 1.25}rem` }}
+              >
+                <span className="text-indigo-600 font-bold flex-shrink-0 mt-0.5 text-base">
+                  {bullet.match(/\d+\./) ? bullet : '•'}
+                </span>
+                <div className="text-gray-700 text-sm flex-1">
+                  {renderLineWithBoldPlaceholders(content)}
+                </div>
+              </div>
+            );
+          }
+          
+          // Regular line (not a bullet) - preserve whitespace
+          return (
+            <div key={index} className="text-sm leading-snug text-gray-700 whitespace-pre-wrap">
+              {renderLineWithBoldPlaceholders(line)}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Helper function to render text with bold placeholders (replaces AND styles them)
+  const renderLineWithBoldPlaceholders = (text: string) => {
+    // Match both {{...}} and [...] patterns
+    const parts = text.split(/(\{\{[^}]+\}\}|\[[^\]]+\])/g);
+    
+    return parts.map((part, i) => {
+      // Check if this part is a placeholder and replace it with styled data
+      const placeholder = part.match(/^\{\{([^}]+)\}\}$/) || part.match(/^\[([^\]]+)\]$/);
+      
+      if (placeholder) {
+        // Get the replaced value
+        const replacedValue = replacePlaceholders(part);
+        
+        return (
+          <span key={i} className="font-bold text-indigo-700 bg-indigo-50/50 px-1 rounded">
+            {replacedValue}
+          </span>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   // Function to replace placeholders in call script with actual contact/account/agent data
   const replacePlaceholders = (script: string): string => {
     if (!script) return '';
@@ -1223,9 +1295,7 @@ export default function AgentConsolePage() {
                 <CardContent className="flex-1 min-h-0 pt-3">
                   {(assignedScript?.content || campaignDetails?.callScript) ? (
                     <div className="p-5 bg-gradient-to-br from-white to-purple-50/30 rounded-xl border-2 border-purple-100 shadow-inner h-full overflow-auto">
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">
-                        {replacePlaceholders(assignedScript?.content || campaignDetails?.callScript || '')}
-                      </p>
+                      {renderFormattedScript(assignedScript?.content || campaignDetails?.callScript || '')}
                     </div>
                   ) : (
                     <div className="space-y-3 h-full flex flex-col justify-center">
