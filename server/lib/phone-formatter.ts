@@ -368,14 +368,16 @@ export function formatPhoneWithCountryCode(phone: string | null | undefined, cou
     }
   }
   
-  // SPECIAL FIX: UK numbers with "0" after country code (e.g., "4401908802874")
+  // SPECIAL FIX: UK numbers with "0" after country code (e.g., "4401908802874" or already with + as "+4401908802874")
   // This is a common data quality issue where trunk prefix wasn't removed
+  // CRITICAL: These numbers will NOT connect to UK - the 0 after 44 must be removed
   if (cleanedPhone.startsWith('440') && cleanedPhone.length >= 12) {
     // Remove the trunk prefix "0" after "44"
     const fixedPhone = '44' + cleanedPhone.substring(3);
     try {
       const phoneNumber = parsePhoneNumber('+' + fixedPhone);
       if (phoneNumber && phoneNumber.isValid()) {
+        console.log(`[Phone Fix] UK number corrected: 440... → +44... (removed leading 0)`);
         return phoneNumber.format('E.164');
       }
     } catch (error) {

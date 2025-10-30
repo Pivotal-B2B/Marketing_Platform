@@ -51,8 +51,19 @@ type CallStatus = CallState | 'wrap-up';
 function normalizePhoneToE164(phone: string | null, country: string = 'US'): string | null {
   if (!phone) return null;
   
+  let cleanedPhone = phone.trim();
+  
+  // CRITICAL FIX: UK numbers with leading 0 after country code (+440...)
+  // These calls will NOT connect - the 0 must be removed after +44
+  // Examples: +4401234567890 → +441234567890, +447012345678 → +447012345678
+  if (cleanedPhone.match(/^\+440\d{10,}$/)) {
+    // Remove the 0 after +44
+    cleanedPhone = '+44' + cleanedPhone.substring(4);
+    console.log('🔧 Fixed UK number: removed leading 0 after +44:', cleanedPhone);
+  }
+  
   try {
-    const phoneNumber = parsePhoneNumberFromString(phone, country as any);
+    const phoneNumber = parsePhoneNumberFromString(cleanedPhone, country as any);
     if (phoneNumber && phoneNumber.isValid()) {
       return phoneNumber.number;
     }
