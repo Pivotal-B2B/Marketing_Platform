@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Pencil, Trash2, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import type { User as UserType } from "@shared/schema";
 
 type UserWithRoles = Omit<UserType, 'password'> & { roles?: string[] };
@@ -26,6 +27,7 @@ const AVAILABLE_ROLES = [
 
 export default function UserManagementPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserWithRoles | null>(null);
   
@@ -72,17 +74,54 @@ export default function UserManagementPage() {
     },
   });
 
-  const updateRolesMutation = useMutation({
-    mutationFn: async ({ userId, roles }: { userId: string; roles: string[] }) => {
-      return await apiRequest('PUT', `/api/users/${userId}/roles`, { roles });
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: any }) => {
+      return await apiRequest('PUT', `/api/users/${userId}`, data);
     },
-    onSuccess: () => {
+    onSuccess: async (user: any) => {
+      // After updating user, update roles
+      if (editingUser && selectedRoles.length > 0) {
+        try {
+          await apiRequest('PUT', `/api/users/${user.id}/roles`, { roles: selectedRoles });
+        } catch (error) {
+          console.error('Failed to update roles:', error);
+          toast({
+            variant: "destructive",
+            title: "Partial Success",
+            description: "User details updated but roles update failed. Please try updating roles again.",
+          });
+          queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+          resetForm();
+          setDialogOpen(false);
+          return;
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       resetForm();
       setDialogOpen(false);
       toast({
         title: "Success",
-        description: "User roles updated successfully",
+        description: "User updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest('DELETE', `/api/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
       });
     },
     onError: (error: Error) => {
@@ -106,7 +145,16 @@ export default function UserManagementPage() {
 
   const handleSaveUser = () => {
     if (editingUser) {
-      // Editing existing user - only validate roles
+      // Editing existing user - validate fields
+      if (!username || !email) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Username and email are required",
+        });
+        return;
+      }
+
       if (selectedRoles.length === 0) {
         toast({
           variant: "destructive",
@@ -116,10 +164,22 @@ export default function UserManagementPage() {
         return;
       }
 
-      // Update existing user roles
-      updateRolesMutation.mutate({
+      // Update existing user
+      const data: any = {
+        username,
+        email,
+        firstName: firstName || null,
+        lastName: lastName || null,
+      };
+      
+      // Only include password if it's provided
+      if (password) {
+        data.password = password;
+      }
+
+      updateUserMutation.mutate({
         userId: editingUser.id,
-        roles: selectedRoles,
+        data,
       });
     } else {
       // Creating new user - validate all required fields
@@ -205,66 +265,68 @@ export default function UserManagementPage() {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>{editingUser ? 'Edit User Roles' : 'Create User'}</DialogTitle>
+              <DialogTitle>{editingUser ? 'Edit User' : 'Create User'}</DialogTitle>
               <DialogDescription>
-                {editingUser ? `Update roles for ${editingUser.username}` : 'Add a new user to the system'}
+                {editingUser ? `Update details for ${editingUser.username}` : 'Add a new user to the system'}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              {!editingUser && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Username *</Label>
-                    <Input
-                      data-testid="input-username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="john.doe"
-                      disabled={!!editingUser}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email *</Label>
-                    <Input
-                      data-testid="input-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="john.doe@company.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Password *</Label>
-                    <Input
-                      data-testid="input-password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>First Name</Label>
-                      <Input
-                        data-testid="input-firstname"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        placeholder="John"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Last Name</Label>
-                      <Input
-                        data-testid="input-lastname"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        placeholder="Doe"
-                      />
-                    </div>
-                  </div>
-                </>
+              {editingUser && (
+                <div className="p-3 bg-muted rounded-md text-sm">
+                  <p className="text-muted-foreground">Leave password blank to keep current password</p>
+                </div>
               )}
+              <>
+                <div className="space-y-2">
+                  <Label>Username *</Label>
+                  <Input
+                    data-testid="input-username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="john.doe"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email *</Label>
+                  <Input
+                    data-testid="input-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="john.doe@company.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Password {editingUser ? '(optional)' : '*'}</Label>
+                  <Input
+                    data-testid="input-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={editingUser ? "Leave blank to keep current" : "••••••••"}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>First Name</Label>
+                    <Input
+                      data-testid="input-firstname"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="John"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Last Name</Label>
+                    <Input
+                      data-testid="input-lastname"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                    />
+                  </div>
+                </div>
+              </>
               
               <div className="space-y-3">
                 <Label>Roles *</Label>
@@ -297,10 +359,10 @@ export default function UserManagementPage() {
               </Button>
               <Button 
                 onClick={handleSaveUser} 
-                disabled={createUserMutation.isPending || updateRolesMutation.isPending}
+                disabled={createUserMutation.isPending || updateUserMutation.isPending}
                 data-testid="button-save-user"
               >
-                {(createUserMutation.isPending || updateRolesMutation.isPending) ? 'Saving...' : (editingUser ? 'Update Roles' : 'Create User')}
+                {(createUserMutation.isPending || updateUserMutation.isPending) ? 'Saving...' : (editingUser ? 'Update User' : 'Create User')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -379,6 +441,11 @@ export default function UserManagementPage() {
                             data-testid={`button-edit-user-${user.id}`}
                             onClick={() => {
                               setEditingUser(user);
+                              setUsername(user.username);
+                              setEmail(user.email);
+                              setFirstName(user.firstName || '');
+                              setLastName(user.lastName || '');
+                              setPassword('');
                               setSelectedRoles(user.roles || [user.role]);
                               setDialogOpen(true);
                             }}
@@ -388,10 +455,16 @@ export default function UserManagementPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled
-                            title="Delete functionality coming soon"
+                            data-testid={`button-delete-user-${user.id}`}
+                            disabled={user.id === currentUser?.id}
+                            title={user.id === currentUser?.id ? "Cannot delete your own account" : "Delete user"}
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete user "${user.username}"? This action cannot be undone.`)) {
+                                deleteUserMutation.mutate(user.id);
+                              }
+                            }}
                           >
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            <Trash2 className={`h-4 w-4 ${user.id === currentUser?.id ? 'text-muted-foreground' : 'text-red-500'}`} />
                           </Button>
                         </div>
                       </TableCell>
