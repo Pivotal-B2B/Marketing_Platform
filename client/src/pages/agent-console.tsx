@@ -631,12 +631,14 @@ export default function AgentConsolePage() {
       return;
     }
 
-    const e164Phone = normalizePhoneToE164(phoneNumber);
+    // Use contact's country for phone validation, fallback to GB (UK) for UKEF campaigns
+    const contactCountry = fullContactDetails?.country || 'GB';
+    const e164Phone = normalizePhoneToE164(phoneNumber, contactCountry);
     
     if (!e164Phone) {
       toast({
         title: "Invalid phone number",
-        description: `${phoneLabel} "${phoneNumber}" is not a valid phone number`,
+        description: `${phoneLabel} "${phoneNumber}" is not a valid phone number for ${contactCountry}. Try with country code (e.g., +44 for UK).`,
         variant: "destructive",
       });
       return;
