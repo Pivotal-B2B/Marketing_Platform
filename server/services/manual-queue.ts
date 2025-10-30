@@ -4,6 +4,7 @@ import { eq, and, or, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { agentQueue, contacts, accounts, campaigns, suppressionEmails, suppressionPhones, campaignSuppressionAccounts, campaignSuppressionContacts, campaignSuppressionEmails, campaignSuppressionDomains } from "@shared/schema";
 import { getBestPhoneForContact, normalizePhoneWithCountryCode } from "../lib/phone-utils";
+import { batchCheckAccountCaps, batchCheckCampaignSuppression } from "../lib/campaign-suppression";
 
 interface QueueConfig {
   lockTimeoutSec: number; // How long a contact stays locked before auto-release
@@ -48,12 +49,6 @@ export class ManualQueueService {
         return { added: 0, skipped: 0 };
       }
 
-      // PERFORMANCE OPTIMIZATION: Prefetch all suppression sets in bulk
-      const suppressionSets = await this.prefetchSuppressionSets(
-        campaignId, 
-        eligibleContacts
-      );
-
       // Get already queued contacts in this campaign (bulk check)
       const contactIds = eligibleContacts.map(c => c.id);
       const alreadyQueued = await db
@@ -73,15 +68,60 @@ export class ManualQueueService {
       
       const alreadyQueuedSet = new Set(alreadyQueued.map(q => q.contactId));
 
-      // Filter contacts using in-memory suppression check AND phone country validation
+      // STEP 1: Bulk check account caps (more efficient than per-account checks)
+      const accountIds = eligibleContacts.map(c => c.accountId).filter((id): id is string => Boolean(id));
+      const uniqueAccountIds = Array.from(new Set(accountIds));
+      const accountCapResults = await batchCheckAccountCaps(campaignId, uniqueAccountIds);
+
+      // STEP 2: Bulk check campaign-level suppressions (includes domain/company matching + cap=1 logic)
+      const suppressionResults = await batchCheckCampaignSuppression(campaignId, contactIds);
+
+      // STEP 3: Prefetch global suppression sets (email/phone DNC)
+      const globalSuppressionSets = await this.prefetchGlobalSuppressionSets(eligibleContacts);
+
+      // Filter contacts using bulk suppression results, account caps, global DNC, AND phone country validation
       const contactsToAdd = eligibleContacts.filter(contact => {
         // Skip if already queued
         if (alreadyQueuedSet.has(contact.id)) {
           return false;
         }
 
-        // Check suppression using prefetched sets (in-memory)
-        if (this.isContactSuppressedBulk(contact, suppressionSets)) {
+        // Check account cap enforcement
+        if (contact.accountId) {
+          const capCheck = accountCapResults.get(contact.accountId);
+          if (capCheck?.capReached) {
+            console.log(`[ManualQueue] Contact ${contact.id} filtered: ${capCheck.reason}`);
+            return false;
+          }
+        }
+
+        // Check campaign-level suppression (includes domain/company name matching + cap=1 logic)
+        // DEFENSIVE: Default to not suppressed if contact wasn't in the batch (shouldn't happen)
+        const suppressionCheck = suppressionResults.get(contact.id);
+        if (suppressionCheck === undefined) {
+          console.warn(`[ManualQueue] Contact ${contact.id} missing from suppression results - treating as not suppressed`);
+          // Continue processing - don't block contacts that weren't checked
+        } else if (suppressionCheck.suppressed) {
+          console.log(`[ManualQueue] Contact ${contact.id} suppressed: ${suppressionCheck.reason}`);
+          return false;
+        }
+
+        // Check global email suppression (DNC)
+        if (contact.email) {
+          const emailNorm = contact.email.toLowerCase().trim();
+          if (globalSuppressionSets.emailsNorm.has(emailNorm)) {
+            console.log(`[ManualQueue] Email ${contact.email} is globally suppressed`);
+            return false;
+          }
+        }
+
+        // Check global phone suppression (DNC)
+        if (contact.directPhoneE164 && globalSuppressionSets.phonesE164.has(contact.directPhoneE164)) {
+          console.log(`[ManualQueue] Direct phone is on global DNC`);
+          return false;
+        }
+        if (contact.mobilePhoneE164 && globalSuppressionSets.phonesE164.has(contact.mobilePhoneE164)) {
+          console.log(`[ManualQueue] Mobile phone is on global DNC`);
           return false;
         }
 
@@ -436,23 +476,15 @@ export class ManualQueueService {
   }
 
   /**
-   * Prefetch all suppression sets for a campaign in bulk (single query per set)
-   * Returns in-memory sets for fast filtering
+   * Prefetch global suppression sets (email/phone DNC) in bulk
+   * Campaign-level suppressions are handled by batchCheckCampaignSuppression
    */
-  private async prefetchSuppressionSets(
-    campaignId: string,
+  private async prefetchGlobalSuppressionSets(
     contacts: Contact[]
   ): Promise<{
-    campaignContactIds: Set<string>;
-    campaignAccountIds: Set<string>;
-    campaignEmailsNorm: Set<string>;
-    campaignDomainsNorm: Set<string>;
-    globalEmailsNorm: Set<string>;
-    globalPhonesE164: Set<string>;
-    accountDomains: Map<string, string>; // contactId -> accountDomain
+    emailsNorm: Set<string>;
+    phonesE164: Set<string>;
   }> {
-    const contactIds = contacts.map(c => c.id);
-    const accountIds = contacts.map(c => c.accountId).filter(Boolean) as string[];
     const emails = contacts.map(c => c.email).filter(Boolean) as string[];
     const emailsNorm = emails.map(e => e.toLowerCase().trim());
     
@@ -463,57 +495,8 @@ export class ManualQueueService {
       if (contact.mobilePhoneE164) phones.push(contact.mobilePhoneE164);
     }
 
-    // Parallel bulk queries for all suppression sets
-    const [
-      campaignContacts,
-      campaignAccounts,
-      campaignEmails,
-      campaignDomains,
-      globalEmails,
-      globalPhones,
-      accountData,
-    ] = await Promise.all([
-      // Campaign-level contact suppressions
-      contactIds.length > 0
-        ? db.select({ contactId: campaignSuppressionContacts.contactId })
-            .from(campaignSuppressionContacts)
-            .where(
-              and(
-                eq(campaignSuppressionContacts.campaignId, campaignId),
-                inArray(campaignSuppressionContacts.contactId, contactIds)
-              )
-            )
-        : Promise.resolve([]),
-      
-      // Campaign-level account suppressions
-      accountIds.length > 0
-        ? db.select({ accountId: campaignSuppressionAccounts.accountId })
-            .from(campaignSuppressionAccounts)
-            .where(
-              and(
-                eq(campaignSuppressionAccounts.campaignId, campaignId),
-                inArray(campaignSuppressionAccounts.accountId, accountIds)
-              )
-            )
-        : Promise.resolve([]),
-      
-      // Campaign-level email suppressions
-      emailsNorm.length > 0
-        ? db.select({ emailNorm: campaignSuppressionEmails.emailNorm })
-            .from(campaignSuppressionEmails)
-            .where(
-              and(
-                eq(campaignSuppressionEmails.campaignId, campaignId),
-                inArray(campaignSuppressionEmails.emailNorm, emailsNorm)
-              )
-            )
-        : Promise.resolve([]),
-      
-      // Campaign-level domain suppressions
-      db.select({ domainNorm: campaignSuppressionDomains.domainNorm })
-        .from(campaignSuppressionDomains)
-        .where(eq(campaignSuppressionDomains.campaignId, campaignId)),
-      
+    // Parallel bulk queries for global suppressions only
+    const [globalEmails, globalPhones] = await Promise.all([
       // Global email suppressions
       emailsNorm.length > 0
         ? db.select({ email: suppressionEmails.email })
@@ -527,245 +510,14 @@ export class ManualQueueService {
             .from(suppressionPhones)
             .where(inArray(suppressionPhones.phoneE164, phones))
         : Promise.resolve([]),
-      
-      // Account domains (for domain-based suppression checks)
-      accountIds.length > 0
-        ? db.select({ id: accounts.id, domain: accounts.domain })
-            .from(accounts)
-            .where(inArray(accounts.id, accountIds))
-        : Promise.resolve([]),
     ]);
 
-    // Build accountDomains map: contactId -> accountDomain
-    const accountDomainsMap = new Map<string, string>();
-    const accountDomainLookup = new Map(
-      accountData.map(a => [a.id, a.domain]).filter(([_, domain]) => domain) as [string, string][]
-    );
-    
-    for (const contact of contacts) {
-      if (contact.accountId) {
-        const domain = accountDomainLookup.get(contact.accountId);
-        if (domain) {
-          accountDomainsMap.set(contact.id, domain);
-        }
-      }
-    }
-
     return {
-      campaignContactIds: new Set(campaignContacts.map(c => c.contactId)),
-      campaignAccountIds: new Set(campaignAccounts.map(a => a.accountId)),
-      campaignEmailsNorm: new Set(campaignEmails.map(e => e.emailNorm)),
-      campaignDomainsNorm: new Set(campaignDomains.map(d => d.domainNorm)),
-      globalEmailsNorm: new Set(globalEmails.map(e => e.email)),
-      globalPhonesE164: new Set(globalPhones.map(p => p.phoneE164)),
-      accountDomains: accountDomainsMap,
+      emailsNorm: new Set(globalEmails.map(e => e.email)),
+      phonesE164: new Set(globalPhones.map(p => p.phoneE164)),
     };
   }
 
-  /**
-   * Check if contact is suppressed using prefetched suppression sets (in-memory)
-   * Much faster than individual DB queries for each contact
-   */
-  private isContactSuppressedBulk(
-    contact: Contact,
-    suppressionSets: {
-      campaignContactIds: Set<string>;
-      campaignAccountIds: Set<string>;
-      campaignEmailsNorm: Set<string>;
-      campaignDomainsNorm: Set<string>;
-      globalEmailsNorm: Set<string>;
-      globalPhonesE164: Set<string>;
-      accountDomains: Map<string, string>;
-    }
-  ): boolean {
-    // 1. Campaign-level contact suppression
-    if (suppressionSets.campaignContactIds.has(contact.id)) {
-      console.log(`[ManualQueue] Contact ${contact.id} is campaign-suppressed`);
-      return true;
-    }
-
-    // 2. Campaign-level account suppression
-    if (contact.accountId && suppressionSets.campaignAccountIds.has(contact.accountId)) {
-      console.log(`[ManualQueue] Account ${contact.accountId} is campaign-suppressed`);
-      return true;
-    }
-
-    // 3. Campaign-level email suppression
-    if (contact.email) {
-      const emailNorm = contact.email.toLowerCase().trim();
-      if (suppressionSets.campaignEmailsNorm.has(emailNorm)) {
-        console.log(`[ManualQueue] Email ${contact.email} is campaign-suppressed`);
-        return true;
-      }
-    }
-
-    // 4. Campaign-level domain suppression
-    // Check both email-derived domain AND account domain
-    const domainsToCheck: string[] = [];
-    
-    // Extract domain from email
-    if (contact.email) {
-      const match = contact.email.match(/@(.+)$/);
-      if (match) {
-        domainsToCheck.push(match[1]);
-      }
-    }
-    
-    // Add account domain (canonical domain)
-    const accountDomain = suppressionSets.accountDomains.get(contact.id);
-    if (accountDomain) {
-      domainsToCheck.push(accountDomain);
-    }
-    
-    for (const domain of domainsToCheck) {
-      const domainNorm = domain.toLowerCase().trim().replace(/^www\./, '');
-      if (suppressionSets.campaignDomainsNorm.has(domainNorm)) {
-        console.log(`[ManualQueue] Domain ${domain} is campaign-suppressed`);
-        return true;
-      }
-    }
-
-    // 5. Global email suppression
-    if (contact.email) {
-      const emailNorm = contact.email.toLowerCase().trim();
-      if (suppressionSets.globalEmailsNorm.has(emailNorm)) {
-        console.log(`[ManualQueue] Email ${contact.email} is globally suppressed`);
-        return true;
-      }
-    }
-
-    // 6. Global phone suppression (DNC)
-    if (contact.directPhoneE164 && suppressionSets.globalPhonesE164.has(contact.directPhoneE164)) {
-      console.log(`[ManualQueue] Direct phone is on global DNC`);
-      return true;
-    }
-    if (contact.mobilePhoneE164 && suppressionSets.globalPhonesE164.has(contact.mobilePhoneE164)) {
-      console.log(`[ManualQueue] Mobile phone is on global DNC`);
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Check if contact is on global or campaign-level suppression lists
-   * NOTE: This is the legacy per-contact method, kept for single-contact operations
-   * For bulk operations, use prefetchSuppressionSets + isContactSuppressedBulk
-   */
-  private async isContactSuppressed(
-    contactId: string, 
-    accountId: string | null, 
-    campaignId: string,
-    email?: string
-  ): Promise<boolean> {
-    // 1. Check campaign-level contact suppression (highest priority)
-    const campaignContactSuppression = await db.query.campaignSuppressionContacts.findFirst({
-      where: and(
-        eq(campaignSuppressionContacts.campaignId, campaignId),
-        eq(campaignSuppressionContacts.contactId, contactId)
-      ),
-    });
-    if (campaignContactSuppression) {
-      console.log(`[ManualQueue] Contact ${contactId} is suppressed for campaign ${campaignId}`);
-      return true;
-    }
-
-    // 2. Check campaign-level account suppression (suppresses entire account)
-    if (accountId) {
-      const campaignAccountSuppression = await db.query.campaignSuppressionAccounts.findFirst({
-        where: and(
-          eq(campaignSuppressionAccounts.campaignId, campaignId),
-          eq(campaignSuppressionAccounts.accountId, accountId)
-        ),
-      });
-      if (campaignAccountSuppression) {
-        console.log(`[ManualQueue] Account ${accountId} is suppressed for campaign ${campaignId}, skipping contact ${contactId}`);
-        return true;
-      }
-    }
-
-    // Get contact details for email/domain checking
-    const contact = await storage.getContact(contactId);
-    
-    // 3. Check campaign-level email suppression
-    if (email) {
-      const emailNorm = email.toLowerCase().trim();
-      const campaignEmailSuppression = await db.query.campaignSuppressionEmails.findFirst({
-        where: and(
-          eq(campaignSuppressionEmails.campaignId, campaignId),
-          eq(campaignSuppressionEmails.emailNorm, emailNorm)
-        ),
-      });
-      if (campaignEmailSuppression) {
-        console.log(`[ManualQueue] Email ${email} is suppressed for campaign ${campaignId}`);
-        return true;
-      }
-    }
-
-    // 4. Check campaign-level domain suppression
-    if (contact && (email || contact.accountId)) {
-      // Extract domain from email or fetch account domain
-      let domain: string | null = null;
-      
-      // Try to get domain from account
-      if (contact.accountId) {
-        const account = await db.query.accounts.findFirst({
-          where: eq(accounts.id, contact.accountId),
-        });
-        domain = account?.domain || null;
-      }
-      
-      // If no domain from account, extract from email
-      if (!domain && email) {
-        const match = email.match(/@(.+)$/);
-        domain = match ? match[1] : null;
-      }
-
-      if (domain) {
-        const domainNorm = domain.toLowerCase().trim().replace(/^www\./, '');
-        const campaignDomainSuppression = await db.query.campaignSuppressionDomains.findFirst({
-          where: and(
-            eq(campaignSuppressionDomains.campaignId, campaignId),
-            eq(campaignSuppressionDomains.domainNorm, domainNorm)
-          ),
-        });
-        if (campaignDomainSuppression) {
-          console.log(`[ManualQueue] Domain ${domain} is suppressed for campaign ${campaignId}`);
-          return true;
-        }
-      }
-    }
-
-    // 5. Check global email suppression (DNC)
-    if (email) {
-      const emailSuppression = await db.query.suppressionEmails.findFirst({
-        where: eq(suppressionEmails.email, email),
-      });
-      if (emailSuppression) {
-        console.log(`[ManualQueue] Email ${email} is on global suppression list`);
-        return true;
-      }
-    }
-
-    // 6. Check global phone suppression (DNC)
-    if (contact) {
-      const phonesToCheck: string[] = [];
-      if (contact.directPhoneE164) phonesToCheck.push(contact.directPhoneE164);
-      if (contact.mobilePhoneE164) phonesToCheck.push(contact.mobilePhoneE164);
-
-      if (phonesToCheck.length > 0) {
-        const suppressedPhones = await db.query.suppressionPhones.findFirst({
-          where: inArray(suppressionPhones.phoneE164, phonesToCheck),
-        });
-        if (suppressedPhones) {
-          console.log(`[ManualQueue] Phone is on global DNC list`);
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
 
   /**
    * Bulk clear completed items from queue

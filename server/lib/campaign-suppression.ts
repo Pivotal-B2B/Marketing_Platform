@@ -255,6 +255,8 @@ export async function checkCampaignSuppression(
  * - Campaign's account cap setting (leadCapPerAccount or accountCapValue)
  * - Number of contacts already queued/called from this account
  * - Campaign suppression list (if ANY contact from account is suppressed, entire account is blocked when cap=1)
+ * 
+ * NOTE: For bulk operations, use batchCheckAccountCaps instead
  */
 export async function checkAccountCapReached(
   campaignId: string,
@@ -328,13 +330,13 @@ export async function checkAccountCapReached(
     let currentCount = 0;
     
     if (campaign.accountCapMode === 'queue_size') {
-      // Count queued contacts
+      // Count queued/locked/in_progress contacts (all active queue states)
       const [result] = await db.execute(sql`
         SELECT COUNT(*)::int as count
         FROM agent_queue
         WHERE campaign_id = ${campaignId}
           AND account_id = ${accountId}
-          AND status = 'queued'
+          AND queue_state IN ('queued', 'locked', 'in_progress')
       `);
       currentCount = result.count || 0;
     } else if (campaign.accountCapMode === 'connected_calls') {
@@ -372,6 +374,150 @@ export async function checkAccountCapReached(
     return { capReached: false, reason: null, currentCount, cap };
   } catch (error) {
     console.error('[Campaign Suppression] Error checking account cap:', error);
+    throw error;
+  }
+}
+
+/**
+ * Bulk check account caps for multiple accounts
+ * Returns a Map of accountId => cap status
+ * More efficient than checking accounts one by one
+ */
+export async function batchCheckAccountCaps(
+  campaignId: string,
+  accountIds: string[]
+): Promise<Map<string, { capReached: boolean; reason: string | null; currentCount: number; cap: number }>> {
+  const results = new Map<string, { capReached: boolean; reason: string | null; currentCount: number; cap: number }>();
+  
+  if (accountIds.length === 0) return results;
+  
+  try {
+    // Get campaign settings
+    const [campaign] = await db
+      .select({
+        accountCapEnabled: campaigns.accountCapEnabled,
+        accountCapValue: campaigns.accountCapValue,
+        accountCapMode: campaigns.accountCapMode,
+      })
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+    
+    if (!campaign || !campaign.accountCapEnabled) {
+      // No caps enabled, all accounts are OK
+      for (const accountId of accountIds) {
+        results.set(accountId, { capReached: false, reason: null, currentCount: 0, cap: 0 });
+      }
+      return results;
+    }
+    
+    const cap = campaign.accountCapValue || 10;
+    
+    // SPECIAL RULE: When cap = 1, check if ANY contact from these accounts is suppressed
+    if (cap === 1) {
+      // Get contacts belonging to these accounts
+      const accountContacts = await db.execute(sql`
+        SELECT DISTINCT c.account_id
+        FROM contacts c
+        WHERE c.account_id = ANY(${sql.array(accountIds)})
+          AND c.id IN (
+            SELECT contact_id FROM campaign_suppression_contacts WHERE campaign_id = ${campaignId}
+          )
+      `);
+      
+      const accountsWithSuppressedContacts = new Set(
+        accountContacts.rows.map((r: any) => r.account_id)
+      );
+      
+      // Also check if entire account is suppressed
+      const suppressedAccounts = await db
+        .select({ accountId: campaignSuppressionAccounts.accountId })
+        .from(campaignSuppressionAccounts)
+        .where(
+          and(
+            eq(campaignSuppressionAccounts.campaignId, campaignId),
+            inArray(campaignSuppressionAccounts.accountId, accountIds)
+          )
+        );
+      
+      for (const { accountId } of suppressedAccounts) {
+        accountsWithSuppressedContacts.add(accountId);
+      }
+      
+      // Mark all accounts with ANY suppressed contact as capped
+      for (const accountId of accountsWithSuppressedContacts) {
+        results.set(accountId, {
+          capReached: true,
+          reason: 'Cap=1: One or more contacts from this account are suppressed',
+          currentCount: 0,
+          cap: 1
+        });
+      }
+    }
+    
+    // Get counts for all accounts in one query based on mode
+    let countsMap = new Map<string, number>();
+    
+    if (campaign.accountCapMode === 'queue_size') {
+      const queryResult = await db.execute(sql`
+        SELECT account_id, COUNT(*)::int as count
+        FROM agent_queue
+        WHERE campaign_id = ${campaignId}
+          AND account_id = ANY(${sql.array(accountIds)})
+          AND queue_state IN ('queued', 'locked', 'in_progress')
+        GROUP BY account_id
+      `);
+      countsMap = new Map(queryResult.rows.map((r: any) => [r.account_id, r.count || 0]));
+    } else if (campaign.accountCapMode === 'connected_calls') {
+      const queryResult = await db.execute(sql`
+        SELECT account_id, COUNT(*)::int as count
+        FROM call_attempts
+        WHERE campaign_id = ${campaignId}
+          AND account_id = ANY(${sql.array(accountIds)})
+          AND call_connected = true
+        GROUP BY account_id
+      `);
+      countsMap = new Map(queryResult.rows.map((r: any) => [r.account_id, r.count || 0]));
+    } else if (campaign.accountCapMode === 'positive_disp') {
+      const queryResult = await db.execute(sql`
+        SELECT ca.account_id, COUNT(*)::int as count
+        FROM call_attempts ca
+        INNER JOIN dispositions d ON ca.disposition_id = d.id
+        WHERE ca.campaign_id = ${campaignId}
+          AND ca.account_id = ANY(${sql.array(accountIds)})
+          AND d.system_action IN ('qualify', 'schedule_callback', 'convert')
+        GROUP BY ca.account_id
+      `);
+      countsMap = new Map(queryResult.rows.map((r: any) => [r.account_id, r.count || 0]));
+    }
+    
+    // Process all accounts
+    for (const accountId of accountIds) {
+      // Skip if already marked as cap reached due to suppression
+      if (results.has(accountId)) continue;
+      
+      const currentCount = countsMap.get(accountId) || 0;
+      
+      if (currentCount >= cap) {
+        results.set(accountId, {
+          capReached: true,
+          reason: `Account cap reached: ${currentCount}/${cap} (mode: ${campaign.accountCapMode})`,
+          currentCount,
+          cap
+        });
+      } else {
+        results.set(accountId, {
+          capReached: false,
+          reason: null,
+          currentCount,
+          cap
+        });
+      }
+    }
+    
+    return results;
+  } catch (error) {
+    console.error('[Campaign Suppression] Error in batch check account caps:', error);
     throw error;
   }
 }
@@ -488,7 +634,7 @@ export async function batchCheckCampaignSuppression(
       }
     }
     
-    // Rule 4, 5, 6: Check domain suppressions
+    // Rule 4, 5, 6: Check domain and company name suppressions
     const allDomains = new Set<string>();
     const allCompanyNames = new Set<string>();
     
@@ -525,11 +671,10 @@ export async function batchCheckCampaignSuppression(
       }
       
       if (allCompanyNames.size > 0) {
+        // Use raw SQL with proper array binding
+        const companyNamesArray = Array.from(allCompanyNames);
         domainConditions.push(
-          sql`LOWER(${campaignSuppressionDomains.companyName}) IN (${sql.join(
-            Array.from(allCompanyNames).map(name => sql`${name}`),
-            sql`, `
-          )})`
+          sql`LOWER(${campaignSuppressionDomains.companyName}) = ANY(${sql.array(companyNamesArray)})`
         );
       }
       
