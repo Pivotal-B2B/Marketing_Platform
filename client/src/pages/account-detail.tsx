@@ -440,12 +440,19 @@ export default function AccountDetailPage() {
 
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">{ACCOUNT_FIELD_LABELS.mainPhone}</p>
-                  {account.mainPhoneE164 ? (
+                  {account.mainPhone || account.mainPhoneE164 ? (
                     <div className="space-y-1">
-                      <a href={`tel:${account.mainPhoneE164}`} className="font-medium font-mono text-primary hover:underline flex items-center gap-2">
-                        <Phone className="w-4 h-4" />
-                        {account.mainPhone}
-                      </a>
+                      {account.mainPhoneE164 ? (
+                        <a href={`tel:${account.mainPhoneE164}`} className="font-medium font-mono text-primary hover:underline flex items-center gap-2">
+                          <Phone className="w-4 h-4" />
+                          {account.mainPhone || account.mainPhoneE164}
+                        </a>
+                      ) : (
+                        <p className="font-medium font-mono flex items-center gap-2">
+                          <Phone className="w-4 h-4" />
+                          {account.mainPhone}
+                        </p>
+                      )}
                       {account.mainPhoneExtension && (
                         <p className="text-xs text-muted-foreground pl-5">Ext: {account.mainPhoneExtension}</p>
                       )}
