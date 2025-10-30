@@ -82,6 +82,20 @@ async function processEnrichmentQueue(): Promise<void> {
 }
 
 /**
+ * Manually trigger AI enrichment (for on-demand execution)
+ */
+export async function triggerAiEnrichment(): Promise<{ success: boolean; message: string; stats?: any }> {
+  try {
+    console.log('[AI Enrichment Job] Manual trigger initiated');
+    await processEnrichmentQueue();
+    return { success: true, message: 'AI enrichment completed successfully' };
+  } catch (error: any) {
+    console.error('[AI Enrichment Job] Manual trigger error:', error);
+    return { success: false, message: error.message || 'AI enrichment failed' };
+  }
+}
+
+/**
  * Start the continuous AI enrichment job
  */
 export function startAiEnrichmentJob(): void {

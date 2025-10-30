@@ -7084,4 +7084,64 @@ export function registerRoutes(app: Express) {
       res.status(500).json({ message: "Failed to update phone numbers" });
     }
   });
+
+  // =============================================================================
+  // MANUAL JOB TRIGGERS
+  // =============================================================================
+
+  // Manually trigger email validation job
+  app.post("/api/jobs/trigger-email-validation", requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
+    try {
+      const { triggerEmailValidation } = await import('./jobs/email-validation-job');
+      const result = await triggerEmailValidation();
+      
+      if (result.success) {
+        res.json({ message: result.message, stats: result.stats });
+      } else {
+        res.status(500).json({ message: result.message });
+      }
+    } catch (error: any) {
+      console.error('Error triggering email validation:', error);
+      res.status(500).json({ message: error.message || "Failed to trigger email validation" });
+    }
+  });
+
+  // Manually trigger AI enrichment job
+  app.post("/api/jobs/trigger-ai-enrichment", requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
+    try {
+      const { triggerAiEnrichment } = await import('./jobs/ai-enrichment-job');
+      const result = await triggerAiEnrichment();
+      
+      if (result.success) {
+        res.json({ message: result.message, stats: result.stats });
+      } else {
+        res.status(500).json({ message: result.message });
+      }
+    } catch (error: any) {
+      console.error('Error triggering AI enrichment:', error);
+      res.status(500).json({ message: error.message || "Failed to trigger AI enrichment" });
+    }
+  });
+
+  // Get background job status
+  app.get("/api/jobs/status", requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
+    try {
+      const ENABLE_EMAIL_VALIDATION = process.env.ENABLE_EMAIL_VALIDATION !== 'false';
+      const ENABLE_AI_ENRICHMENT = process.env.ENABLE_AI_ENRICHMENT !== 'false';
+      
+      res.json({
+        emailValidation: {
+          enabled: ENABLE_EMAIL_VALIDATION,
+          mode: ENABLE_EMAIL_VALIDATION ? 'automatic' : 'manual'
+        },
+        aiEnrichment: {
+          enabled: ENABLE_AI_ENRICHMENT,
+          mode: ENABLE_AI_ENRICHMENT ? 'automatic' : 'manual'
+        }
+      });
+    } catch (error: any) {
+      console.error('Error getting job status:', error);
+      res.status(500).json({ message: "Failed to get job status" });
+    }
+  });
 }

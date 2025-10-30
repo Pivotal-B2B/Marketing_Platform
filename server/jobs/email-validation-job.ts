@@ -160,6 +160,20 @@ async function processPendingEmailValidations() {
 }
 
 /**
+ * Manually trigger email validation (for on-demand execution)
+ */
+export async function triggerEmailValidation(): Promise<{ success: boolean; message: string; stats?: any }> {
+  try {
+    console.log('[EmailValidationJob] Manual trigger initiated');
+    await processPendingEmailValidations();
+    return { success: true, message: 'Email validation completed successfully' };
+  } catch (error: any) {
+    console.error('[EmailValidationJob] Manual trigger error:', error);
+    return { success: false, message: error.message || 'Email validation failed' };
+  }
+}
+
+/**
  * Start the email validation background job
  */
 export function startEmailValidationJob() {

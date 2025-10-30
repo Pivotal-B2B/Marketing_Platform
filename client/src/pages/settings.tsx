@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Settings, User, Bell, Shield, Mail, Phone, Database, Plus, Pencil, Trash2 } from "lucide-react";
+import { Settings, User, Bell, Shield, Mail, Phone, Database, Plus, Pencil, Trash2, Play, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -219,6 +219,10 @@ export default function SettingsPage() {
           <TabsTrigger value="security" data-testid="tab-security">
             <Shield className="mr-2 h-4 w-4" />
             Security
+          </TabsTrigger>
+          <TabsTrigger value="background-jobs" data-testid="tab-background-jobs">
+            <Clock className="mr-2 h-4 w-4" />
+            Background Jobs
           </TabsTrigger>
         </TabsList>
 
@@ -730,7 +734,158 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="background-jobs" className="space-y-4 mt-6">
+          <BackgroundJobsTab />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// Background Jobs Tab Component
+function BackgroundJobsTab() {
+  const { toast } = useToast();
+  const [isTriggeringEmail, setIsTriggeringEmail] = useState(false);
+  const [isTriggeringAI, setIsTriggeringAI] = useState(false);
+
+  const { data: jobStatus, isLoading } = useQuery({
+    queryKey: ['/api/jobs/status'],
+  });
+
+  const triggerEmailValidation = async () => {
+    setIsTriggeringEmail(true);
+    try {
+      const result = await apiRequest('POST', '/api/jobs/trigger-email-validation');
+      toast({
+        title: "Email Validation Started",
+        description: result.message || "Email validation job has been triggered successfully",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to trigger email validation",
+      });
+    } finally {
+      setIsTriggeringEmail(false);
+    }
+  };
+
+  const triggerAiEnrichment = async () => {
+    setIsTriggeringAI(true);
+    try {
+      const result = await apiRequest('POST', '/api/jobs/trigger-ai-enrichment');
+      toast({
+        title: "AI Enrichment Started",
+        description: result.message || "AI enrichment job has been triggered successfully",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to trigger AI enrichment",
+      });
+    } finally {
+      setIsTriggeringAI(false);
+    }
+  };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Background Jobs Management
+          </CardTitle>
+          <CardDescription>
+            Control automated background jobs for email validation and AI enrichment
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Email Validation Job */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Email Validation Job
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Validates pending contact email addresses using DNS and SMTP checks
+                </p>
+              </div>
+              <Badge variant={jobStatus?.emailValidation?.enabled ? "default" : "secondary"}>
+                {jobStatus?.emailValidation?.mode || 'manual'}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={triggerEmailValidation}
+                disabled={isTriggeringEmail}
+                size="sm"
+                data-testid="button-trigger-email-validation"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                {isTriggeringEmail ? 'Triggering...' : 'Run Now'}
+              </Button>
+              {!jobStatus?.emailValidation?.enabled && (
+                <p className="text-xs text-muted-foreground">
+                  Automatic scheduling is disabled - use manual trigger
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* AI Enrichment Job */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  AI Enrichment Job
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Enriches contacts missing phone and address data using AI
+                </p>
+              </div>
+              <Badge variant={jobStatus?.aiEnrichment?.enabled ? "default" : "secondary"}>
+                {jobStatus?.aiEnrichment?.mode || 'manual'}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={triggerAiEnrichment}
+                disabled={isTriggeringAI}
+                size="sm"
+                data-testid="button-trigger-ai-enrichment"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                {isTriggeringAI ? 'Triggering...' : 'Run Now'}
+              </Button>
+              {!jobStatus?.aiEnrichment?.enabled && (
+                <p className="text-xs text-muted-foreground">
+                  Automatic scheduling is disabled - use manual trigger
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Info Alert */}
+          <div className="p-4 bg-muted rounded-lg">
+            <p className="text-sm">
+              <strong>Note:</strong> Background jobs are currently configured for manual execution only. 
+              To enable automatic scheduling, set the environment variables <code>ENABLE_EMAIL_VALIDATION=true</code> and 
+              <code>ENABLE_AI_ENRICHMENT=true</code> and restart the server.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

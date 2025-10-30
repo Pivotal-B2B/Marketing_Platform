@@ -76,11 +76,17 @@ async function sweepExpiredLocks() {
   }
 }
 
+// Configuration flags for disabling specific jobs
+const ENABLE_EMAIL_VALIDATION = process.env.ENABLE_EMAIL_VALIDATION !== 'false';
+const ENABLE_AI_ENRICHMENT = process.env.ENABLE_AI_ENRICHMENT !== 'false';
+
 /**
  * Start all background jobs
  */
 export function startBackgroundJobs() {
   console.log('[Background Jobs] Starting AI-powered QA background jobs and queue maintenance...');
+  console.log(`[Background Jobs] Email Validation: ${ENABLE_EMAIL_VALIDATION ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`[Background Jobs] AI Enrichment: ${ENABLE_AI_ENRICHMENT ? 'ENABLED' : 'DISABLED'}`);
 
   // Transcription processing job
   transcriptionInterval = setInterval(async () => {
@@ -133,11 +139,19 @@ export function startBackgroundJobs() {
     }
   }, LOCK_SWEEPER_INTERVAL);
 
-  // Email validation job (cron-based)
-  startEmailValidationJob();
+  // Email validation job (cron-based) - Only start if enabled
+  if (ENABLE_EMAIL_VALIDATION) {
+    startEmailValidationJob();
+  } else {
+    console.log('[Background Jobs] Email validation job DISABLED - use manual trigger');
+  }
   
-  // AI enrichment job (cron-based, targets contacts missing BOTH phone and address)
-  startAiEnrichmentJob();
+  // AI enrichment job (cron-based, targets contacts missing BOTH phone and address) - Only start if enabled
+  if (ENABLE_AI_ENRICHMENT) {
+    startAiEnrichmentJob();
+  } else {
+    console.log('[Background Jobs] AI enrichment job DISABLED - use manual trigger');
+  }
 
   console.log('[Background Jobs] All jobs started successfully');
   console.log(`[Background Jobs] - Transcription job: every ${TRANSCRIPTION_JOB_INTERVAL/1000}s`);
