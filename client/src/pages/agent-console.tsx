@@ -358,7 +358,7 @@ export default function AgentConsolePage() {
     enabled: !!currentQueueItem?.contactId && !!selectedCampaignId,
   });
 
-  // Professional script renderer with improved readability
+  // Clean, readable script renderer
   const renderFormattedScript = (script: string) => {
     if (!script) return null;
 
@@ -366,7 +366,7 @@ export default function AgentConsolePage() {
     const paragraphs = script.split(/\n\n+/);
     
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         {paragraphs.map((paragraph, pIndex) => {
           const lines = paragraph.split('\n').filter(l => l.trim());
           if (lines.length === 0) return null;
@@ -375,52 +375,45 @@ export default function AgentConsolePage() {
           const hasBullets = lines.some(line => line.match(/^(\s*)([-*•]|\d+\.)\s+/));
           
           return (
-            <div 
-              key={pIndex}
-              className="p-4 rounded-lg border bg-card shadow-sm hover-elevate transition-all"
-            >
-              <div className="space-y-2">
-                {lines.map((line, lineIndex) => {
-                  const bulletMatch = line.match(/^(\s*)([-*•]|\d+\.)\s+(.*)$/);
+            <div key={pIndex} className="space-y-2.5">
+              {lines.map((line, lineIndex) => {
+                const bulletMatch = line.match(/^(\s*)([-*•]|\d+\.)\s+(.*)$/);
+                
+                if (bulletMatch) {
+                  const [, indent, bullet, content] = bulletMatch;
+                  const indentLevel = indent.length / 2;
                   
-                  if (bulletMatch) {
-                    const [, indent, bullet, content] = bulletMatch;
-                    const indentLevel = indent.length / 2;
-                    
-                    return (
-                      <div 
-                        key={lineIndex}
-                        className="flex items-start gap-3 leading-relaxed"
-                        style={{ marginLeft: `${indentLevel * 1.25}rem` }}
-                      >
-                        <div className="flex-shrink-0 mt-1 h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-primary font-semibold text-xs">
-                            {bullet.match(/\d+\./) ? bullet.replace('.', '') : '•'}
-                          </span>
-                        </div>
-                        <div className="text-foreground text-sm flex-1">
-                          {renderLineWithBoldPlaceholders(content)}
-                        </div>
-                      </div>
-                    );
-                  }
-                  
-                  // Regular line - make it stand out if it's the first line (likely a heading)
-                  const isFirstLine = lineIndex === 0 && !hasBullets;
                   return (
                     <div 
-                      key={lineIndex} 
-                      className={`leading-relaxed ${
-                        isFirstLine 
-                          ? 'text-base font-bold text-primary border-b pb-2 mb-2' 
-                          : 'text-sm text-foreground'
-                      }`}
+                      key={lineIndex}
+                      className="flex items-start gap-2.5 leading-relaxed"
+                      style={{ marginLeft: `${indentLevel * 1.5}rem` }}
                     >
-                      {renderLineWithBoldPlaceholders(line)}
+                      <span className="text-primary font-bold text-base mt-0.5 flex-shrink-0 w-4">
+                        {bullet.match(/\d+\./) ? bullet.replace('.', '') + '.' : '•'}
+                      </span>
+                      <div className="text-foreground text-[15px] flex-1 leading-relaxed">
+                        {renderLineWithBoldPlaceholders(content)}
+                      </div>
                     </div>
                   );
-                })}
-              </div>
+                }
+                
+                // Regular line - headings are bold and larger
+                const isHeading = lineIndex === 0 && !hasBullets;
+                return (
+                  <div 
+                    key={lineIndex} 
+                    className={`leading-relaxed ${
+                      isHeading 
+                        ? 'text-lg font-bold text-foreground mb-2' 
+                        : 'text-[15px] text-foreground/90'
+                    }`}
+                  >
+                    {renderLineWithBoldPlaceholders(line)}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -1482,53 +1475,40 @@ export default function AgentConsolePage() {
 
           {/* BOTTOM SPLIT: Script | Dispositions - Premium Design */}
           <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
-            {/* LEFT: SCRIPT PANEL - Professional Design */}
-            <div className="w-full lg:flex-[2] border-b lg:border-b-0 lg:border-r p-4 bg-background min-h-[300px] lg:min-h-0">
-              <Card className="shadow-lg h-full flex flex-col">
-                <CardHeader className="pb-4 border-b flex-shrink-0">
-                  <CardTitle className="flex items-center gap-3 text-lg">
-                    <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shadow-md">
-                      <FileText className="h-5 w-5 text-primary-foreground" />
-                    </div>
-                    <span className="font-bold text-foreground">Call Script</span>
-                  </CardTitle>
-                  <CardDescription className="text-sm mt-1">
-                    Follow this script to guide the conversation
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 min-h-0 pt-4 px-4">
+            {/* LEFT: SCRIPT PANEL - Clean & Readable */}
+            <div className="w-full lg:flex-[2] border-b lg:border-b-0 lg:border-r bg-white dark:bg-background min-h-[300px] lg:min-h-0 flex flex-col">
+              <div className="flex-shrink-0 px-6 py-4 border-b bg-muted/30">
+                <div className="flex items-center gap-2.5">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <h3 className="font-semibold text-base text-foreground">Call Script</h3>
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 overflow-auto">
+                <div className="p-6">
                   {(assignedScript?.content || campaignDetails?.callScript) ? (
-                    <div className="h-full overflow-auto pr-2">
-                      {renderFormattedScript(assignedScript?.content || campaignDetails?.callScript || '')}
-                    </div>
+                    renderFormattedScript(assignedScript?.content || campaignDetails?.callScript || '')
                   ) : (
-                    <div className="space-y-3 h-full flex flex-col justify-center">
-                      <div className="p-4 bg-muted rounded-lg border">
-                        <p className="text-sm leading-relaxed">
-                          "Hello, this is [Your Name] calling from Pivotal CRM. May I speak with{' '}
-                          <span className="font-semibold text-primary">
-                            {currentQueueItem?.contactName || '[Contact Name]'}
-                          </span>?"
-                        </p>
-                      </div>
-                      <div className="p-4 bg-muted rounded-lg border">
-                        <p className="text-sm leading-relaxed">
-                          "I'm calling to discuss how our B2B solutions can help{' '}
-                          <span className="font-semibold text-primary">
-                            {currentQueueItem?.accountName || '[Company Name]'}
-                          </span>{' '}
-                          streamline their customer engagement..."
-                        </p>
-                      </div>
-                      <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                        <p className="text-xs leading-relaxed text-gray-700">
-                          "We specialize in Account-Based Marketing. Do you have a few minutes to discuss your marketing challenges?"
-                        </p>
-                      </div>
+                    <div className="space-y-5 text-foreground/80">
+                      <p className="text-base leading-relaxed">
+                        "Hello, this is <strong>[Your Name]</strong> calling from Pivotal CRM. May I speak with{' '}
+                        <strong className="text-primary">
+                          {currentQueueItem?.contactName || '[Contact Name]'}
+                        </strong>?"
+                      </p>
+                      <p className="text-base leading-relaxed">
+                        "I'm calling to discuss how our B2B solutions can help{' '}
+                        <strong className="text-primary">
+                          {currentQueueItem?.accountName || '[Company Name]'}
+                        </strong>{' '}
+                        streamline their customer engagement..."
+                      </p>
+                      <p className="text-base leading-relaxed text-foreground/70 italic">
+                        "We specialize in Account-Based Marketing. Do you have a few minutes to discuss your marketing challenges?"
+                      </p>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
 
             {/* RIGHT: DISPOSITIONS PANEL - Premium Cards */}
