@@ -631,26 +631,42 @@ export default function AgentConsolePage() {
       return;
     }
 
-    // Use contact's country for phone validation, fallback to GB (UK) for UKEF campaigns
-    const contactCountry = fullContactDetails?.country || 'GB';
+    // Convert country name to ISO code
+    const countryNameToCode: Record<string, string> = {
+      'United Kingdom': 'GB',
+      'UK': 'GB',
+      'United States': 'US',
+      'USA': 'US',
+      'US': 'US',
+    };
+    
+    const rawCountry = fullContactDetails?.country || 'GB';
+    const contactCountry = countryNameToCode[rawCountry] || rawCountry;
     
     // Debug logging
     console.log('🔍 Phone Validation Debug:', {
       phoneNumber,
+      rawCountry,
       contactCountry,
       phoneType: selectedPhoneType,
       label: phoneLabel
     });
     
-    let e164Phone = normalizePhoneToE164(phoneNumber, contactCountry);
-    
-    // If validation fails with contact country, try with explicit +44 if it's a UK number
-    if (!e164Phone && contactCountry === 'GB') {
-      // Try adding +44 if not present
-      const withCountryCode = phoneNumber.startsWith('+') ? phoneNumber : `+44${phoneNumber.replace(/^0/, '')}`;
-      console.log('🔄 Retry with country code:', withCountryCode);
-      e164Phone = normalizePhoneToE164(withCountryCode, 'GB');
+    // Handle phone numbers that already have country code but no +
+    let normalizedPhone = phoneNumber;
+    if (contactCountry === 'GB' && phoneNumber.match(/^44\d{10}$/)) {
+      // UK number starting with 44 (missing +)
+      normalizedPhone = `+${phoneNumber}`;
+      console.log('📞 Added + to UK number:', normalizedPhone);
+    } else if (!phoneNumber.startsWith('+')) {
+      // Add + if missing
+      normalizedPhone = phoneNumber.startsWith('0') 
+        ? `+44${phoneNumber.substring(1)}` // UK landline with leading 0
+        : `+${phoneNumber}`;
+      console.log('📞 Normalized phone:', normalizedPhone);
     }
+    
+    let e164Phone = normalizePhoneToE164(normalizedPhone, contactCountry);
     
     console.log('✅ E164 Result:', e164Phone);
     
