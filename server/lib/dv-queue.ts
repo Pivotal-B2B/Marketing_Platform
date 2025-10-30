@@ -354,12 +354,21 @@ export async function runJob(stage: JobStage, ctx: JobContext): Promise<void> {
   }
 }
 
+// Execution guard to prevent overlapping runs
+let isDVSchedulerRunning = false;
+
 /**
  * Start background job scheduler
  */
 export function startJobScheduler(): void {
   // Run every minute
   cron.schedule('* * * * *', async () => {
+    if (isDVSchedulerRunning) {
+      console.log('[DV Scheduler] Previous execution still running, skipping this interval');
+      return;
+    }
+    
+    isDVSchedulerRunning = true;
     try {
       // Get all active projects from database
       const activeProjects = await db.select({ id: dvProjects.id })
@@ -378,7 +387,9 @@ export function startJobScheduler(): void {
         await runJob('enqueue', ctx);
       }
     } catch (error) {
-      console.error('Job scheduler error:', error);
+      console.error('[DV Scheduler] Job scheduler error:', error);
+    } finally {
+      isDVSchedulerRunning = false;
     }
   });
   

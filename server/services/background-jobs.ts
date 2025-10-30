@@ -20,6 +20,11 @@ let transcriptionInterval: NodeJS.Timeout | null = null;
 let analysisInterval: NodeJS.Timeout | null = null;
 let lockSweeperInterval: NodeJS.Timeout | null = null;
 
+// Execution guards to prevent overlapping runs
+let isTranscriptionRunning = false;
+let isAnalysisRunning = false;
+let isLockSweeperRunning = false;
+
 /**
  * Lock Sweeper - Release expired locks and stuck queue entries
  */
@@ -79,28 +84,52 @@ export function startBackgroundJobs() {
 
   // Transcription processing job
   transcriptionInterval = setInterval(async () => {
+    if (isTranscriptionRunning) {
+      console.log('[Background Jobs] Transcription job still running, skipping this execution');
+      return;
+    }
+    
+    isTranscriptionRunning = true;
     try {
       await processPendingTranscriptions();
     } catch (error) {
       console.error('[Background Jobs] Transcription job error:', error);
+    } finally {
+      isTranscriptionRunning = false;
     }
   }, TRANSCRIPTION_JOB_INTERVAL);
 
   // AI analysis processing job
   analysisInterval = setInterval(async () => {
+    if (isAnalysisRunning) {
+      console.log('[Background Jobs] AI analysis job still running, skipping this execution');
+      return;
+    }
+    
+    isAnalysisRunning = true;
     try {
       await processUnanalyzedLeads();
     } catch (error) {
       console.error('[Background Jobs] AI analysis job error:', error);
+    } finally {
+      isAnalysisRunning = false;
     }
   }, AI_ANALYSIS_JOB_INTERVAL);
 
   // Lock sweeper job
   lockSweeperInterval = setInterval(async () => {
+    if (isLockSweeperRunning) {
+      console.log('[Background Jobs] Lock sweeper still running, skipping this execution');
+      return;
+    }
+    
+    isLockSweeperRunning = true;
     try {
       await sweepExpiredLocks();
     } catch (error) {
       console.error('[Background Jobs] Lock sweeper job error:', error);
+    } finally {
+      isLockSweeperRunning = false;
     }
   }, LOCK_SWEEPER_INTERVAL);
 
