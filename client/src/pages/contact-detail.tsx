@@ -554,6 +554,10 @@ export default function ContactDetailPage() {
                     <p className="font-medium">{account.annualRevenue || "-"}</p>
                   </div>
                   <div>
+                    <p className="text-sm text-muted-foreground">HQ Phone</p>
+                    <p className="font-medium font-mono">{account.mainPhone || account.mainPhoneE164 || "-"}</p>
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground">Location</p>
                     <p className="font-medium">
                       {[account.hqCity, account.hqState].filter(Boolean).join(", ") || "-"}
