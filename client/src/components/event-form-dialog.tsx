@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Event } from "@shared/schema";
+import { EVENT_FIELD_LABELS } from "@shared/field-labels";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -160,7 +161,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Title</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.title}</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="Event title" data-testid="input-event-title" />
                     </FormControl>
@@ -173,7 +174,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="slug"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Slug</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.slug}</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="event-slug" data-testid="input-event-slug" />
                     </FormControl>
@@ -189,7 +190,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="eventType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Event Type</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.eventType}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-event-type">
@@ -213,7 +214,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="locationType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Location Type</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.locationType}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-location-type">
@@ -235,7 +236,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="community"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Community</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.community}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-community">
@@ -264,7 +265,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="organizer"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Organizer</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.organizer}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                       <FormControl>
                         <SelectTrigger data-testid="select-organizer">
@@ -288,7 +289,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="sponsor"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Sponsor</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.sponsor}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
                       <FormControl>
                         <SelectTrigger data-testid="select-sponsor">
@@ -314,7 +315,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
               name="speakers"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Speakers</FormLabel>
+                  <FormLabel>{EVENT_FIELD_LABELS.speakers}</FormLabel>
                   <div className="space-y-2">
                     {selectedSpeakers.length > 0 && (
                       <div className="flex flex-wrap gap-1">
@@ -400,7 +401,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="startIso"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Start Date</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.startIso}</FormLabel>
                     <FormControl>
                       <Input {...field} type="datetime-local" data-testid="input-start-date" />
                     </FormControl>
@@ -413,7 +414,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="endIso"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>End Date (Optional)</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.endIso}</FormLabel>
                     <FormControl>
                       <Input {...field} type="datetime-local" data-testid="input-end-date" />
                     </FormControl>
@@ -426,7 +427,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="timezone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Timezone (Optional)</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.timezone}</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="America/New_York" data-testid="input-timezone" />
                     </FormControl>
@@ -441,7 +442,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
               name="overviewHtml"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Overview (Optional)</FormLabel>
+                  <FormLabel>{EVENT_FIELD_LABELS.overviewHtml}</FormLabel>
                   <FormControl>
                     <Textarea {...field} placeholder="Event overview..." rows={4} data-testid="textarea-overview" />
                   </FormControl>
@@ -456,7 +457,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="thumbnailUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Thumbnail URL (Optional)</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.thumbnailUrl}</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="https://..." data-testid="input-thumbnail" />
                     </FormControl>
@@ -469,7 +470,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="ctaLink"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>CTA Link (Optional)</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.ctaLink}</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="https://..." data-testid="input-cta-link" />
                     </FormControl>
@@ -485,7 +486,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="formId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Form ID (Optional)</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.formId}</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="form-id" data-testid="input-form-id" />
                     </FormControl>
@@ -498,7 +499,7 @@ export function EventFormDialog({ open, onOpenChange, event }: EventFormDialogPr
                 name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Status</FormLabel>
+                    <FormLabel>{EVENT_FIELD_LABELS.status}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-status">

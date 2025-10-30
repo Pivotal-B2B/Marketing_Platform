@@ -18,6 +18,13 @@ The system employs a modern web stack: **React 18 + Vite, TypeScript, TailwindCS
 - **COUNT Query Optimization**: Implemented getAccountsCount() and getContactsCount() methods using efficient SQL COUNT queries instead of loading full datasets
 - **Dashboard Caching**: Added 5-minute in-memory cache to /api/dashboard/stats endpoint with automatic invalidation on data mutations
 - **Query Limits**: Optional limit parameter on getAccounts/getContacts methods (no default to preserve export functionality)
+- **Critical Bug Fix**: Fixed getContact() query that only fetched 18 fields instead of all contact data, causing most contact information to appear empty in detail pages
+
+**Field Label Standardization (October 2025):**
+- **Centralized Label System**: All UI labels, CSV headers, filter labels, and form fields use centralized constants from `shared/field-labels.ts`
+- **Available Label Sets**: CONTACT_FIELD_LABELS, CONTACT_ADDRESS_LABELS, ACCOUNT_FIELD_LABELS, ACCOUNT_ADDRESS_LABELS, AI_ENRICHMENT_LABELS, BEST_DATA_LABELS, EVENT_FIELD_LABELS
+- **Presentation Layer Only**: Database schema unchanged; labels are applied at UI/export layer only
+- **Complete Coverage**: Contact detail pages, account detail pages, CSV import/export, filter configurations, form dialogs (including event forms)
 
 **UI/UX Design:**
 - **Color Scheme:** Primary Royal Blue with Teal accent, adaptive light/dark surfaces, and semantic status colors.

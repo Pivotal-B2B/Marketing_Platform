@@ -239,6 +239,45 @@ export const BEST_DATA_LABELS = {
 } as const;
 
 // ============================================
+// EVENT INFORMATION
+// ============================================
+export const EVENT_FIELD_LABELS = {
+  // Identity
+  id: "Event ID",
+  title: "Title",
+  slug: "Slug",
+  
+  // Event Details
+  eventType: "Event Type",
+  locationType: "Location Type",
+  community: "Community",
+  organizer: "Organizer",
+  sponsor: "Sponsor",
+  speakers: "Speakers",
+  
+  // Schedule
+  startIso: "Start Date",
+  endIso: "End Date (Optional)",
+  timezone: "Timezone (Optional)",
+  
+  // Content
+  overviewHtml: "Overview (Optional)",
+  thumbnailUrl: "Thumbnail URL (Optional)",
+  ctaLink: "CTA Link (Optional)",
+  formId: "Form ID (Optional)",
+  
+  // Status
+  status: "Status",
+  
+  // Metadata
+  ownerId: "Owner",
+  createdBy: "Created By",
+  createdAt: "Created At",
+  updatedAt: "Updated At",
+  publishedIso: "Published Date",
+} as const;
+
+// ============================================
 // COMBINED MAPPING (ALL FIELDS)
 // ============================================
 export const FIELD_LABELS = {
@@ -248,6 +287,7 @@ export const FIELD_LABELS = {
   ...ACCOUNT_ADDRESS_LABELS,
   ...AI_ENRICHMENT_LABELS,
   ...BEST_DATA_LABELS,
+  ...EVENT_FIELD_LABELS,
 } as const;
 
 // ============================================
