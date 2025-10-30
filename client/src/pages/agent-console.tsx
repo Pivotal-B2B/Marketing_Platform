@@ -311,48 +311,129 @@ export default function AgentConsolePage() {
   const dialMode = campaignDetails?.dialMode || 'manual';
   const amdEnabled = campaignDetails?.powerSettings?.amd?.enabled ?? false;
 
-  // Function to render formatted script with auto bullets, bold placeholders, and reduced line spacing
+  // Enhanced function to render beautifully formatted script with unique styling per paragraph
   const renderFormattedScript = (script: string) => {
     if (!script) return null;
 
-    // Split into lines first (before replacing placeholders)
-    const lines = script.split('\n');
+    // Split into paragraphs (double line breaks)
+    const paragraphs = script.split(/\n\n+/);
+    
+    // Color schemes for different paragraphs (rotating through beautiful gradients)
+    const colorSchemes = [
+      { 
+        bg: 'from-blue-50 via-indigo-50 to-purple-50',
+        border: 'border-blue-200/60',
+        bullet: 'text-blue-600',
+        text: 'text-gray-800',
+        icon: '💬',
+        shadow: 'shadow-blue-100/50'
+      },
+      { 
+        bg: 'from-purple-50 via-pink-50 to-rose-50',
+        border: 'border-purple-200/60',
+        bullet: 'text-purple-600',
+        text: 'text-gray-800',
+        icon: '🎯',
+        shadow: 'shadow-purple-100/50'
+      },
+      { 
+        bg: 'from-emerald-50 via-teal-50 to-cyan-50',
+        border: 'border-emerald-200/60',
+        bullet: 'text-emerald-600',
+        text: 'text-gray-800',
+        icon: '✅',
+        shadow: 'shadow-emerald-100/50'
+      },
+      { 
+        bg: 'from-orange-50 via-amber-50 to-yellow-50',
+        border: 'border-orange-200/60',
+        bullet: 'text-orange-600',
+        text: 'text-gray-800',
+        icon: '⚡',
+        shadow: 'shadow-orange-100/50'
+      },
+      { 
+        bg: 'from-rose-50 via-pink-50 to-fuchsia-50',
+        border: 'border-rose-200/60',
+        bullet: 'text-rose-600',
+        text: 'text-gray-800',
+        icon: '💡',
+        shadow: 'shadow-rose-100/50'
+      },
+      { 
+        bg: 'from-cyan-50 via-sky-50 to-blue-50',
+        border: 'border-cyan-200/60',
+        bullet: 'text-cyan-600',
+        text: 'text-gray-800',
+        icon: '🚀',
+        shadow: 'shadow-cyan-100/50'
+      },
+    ];
     
     return (
-      <div className="space-y-1.5">
-        {lines.map((line, index) => {
-          // Skip empty lines (but preserve them as spacing)
-          if (line.trim() === '') {
-            return <div key={index} className="h-1" />;
-          }
-
-          // Check if line is a bullet point
-          const bulletMatch = line.match(/^(\s*)([-*•]|\d+\.)\s+(.*)$/);
+      <div className="space-y-4">
+        {paragraphs.map((paragraph, pIndex) => {
+          const lines = paragraph.split('\n').filter(l => l.trim());
+          if (lines.length === 0) return null;
           
-          if (bulletMatch) {
-            const [, indent, bullet, content] = bulletMatch;
-            const indentLevel = indent.length / 2; // Assume 2 spaces per indent level
-            
-            return (
-              <div 
-                key={index} 
-                className="flex items-start gap-2.5 leading-snug"
-                style={{ marginLeft: `${indentLevel * 1.25}rem` }}
-              >
-                <span className="text-indigo-600 font-bold flex-shrink-0 mt-0.5 text-base">
-                  {bullet.match(/\d+\./) ? bullet : '•'}
-                </span>
-                <div className="text-gray-700 text-sm flex-1">
-                  {renderLineWithBoldPlaceholders(content)}
-                </div>
-              </div>
-            );
-          }
+          const scheme = colorSchemes[pIndex % colorSchemes.length];
           
-          // Regular line (not a bullet) - preserve whitespace
+          // Check if this paragraph has bullets
+          const hasBullets = lines.some(line => line.match(/^(\s*)([-*•]|\d+\.)\s+/));
+          
           return (
-            <div key={index} className="text-sm leading-snug text-gray-700 whitespace-pre-wrap">
-              {renderLineWithBoldPlaceholders(line)}
+            <div 
+              key={pIndex}
+              className={`relative p-4 rounded-xl border-2 bg-gradient-to-br ${scheme.bg} ${scheme.border} ${scheme.shadow} shadow-lg transform transition-all hover:scale-[1.01] hover:shadow-xl`}
+            >
+              {/* Decorative corner accent */}
+              <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-white/40 to-transparent rounded-bl-3xl"></div>
+              
+              {/* Icon indicator */}
+              <div className="absolute -top-3 -left-3 text-2xl bg-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg border-2 border-white">
+                {scheme.icon}
+              </div>
+              
+              <div className="space-y-2 pt-2">
+                {lines.map((line, lineIndex) => {
+                  const bulletMatch = line.match(/^(\s*)([-*•]|\d+\.)\s+(.*)$/);
+                  
+                  if (bulletMatch) {
+                    const [, indent, bullet, content] = bulletMatch;
+                    const indentLevel = indent.length / 2;
+                    
+                    return (
+                      <div 
+                        key={lineIndex}
+                        className="flex items-start gap-3 leading-relaxed group"
+                        style={{ marginLeft: `${indentLevel * 1.25}rem` }}
+                      >
+                        <div className={`flex-shrink-0 mt-1 w-6 h-6 rounded-lg ${scheme.bullet} bg-white/60 flex items-center justify-center font-bold text-sm shadow-sm group-hover:scale-110 transition-transform`}>
+                          {bullet.match(/\d+\./) ? bullet.charAt(0) : '•'}
+                        </div>
+                        <div className={`${scheme.text} text-sm flex-1 font-medium`}>
+                          {renderLineWithBoldPlaceholders(content)}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
+                  // Regular line - make it stand out if it's the first line (likely a heading)
+                  const isFirstLine = lineIndex === 0 && !hasBullets;
+                  return (
+                    <div 
+                      key={lineIndex} 
+                      className={`leading-relaxed ${
+                        isFirstLine 
+                          ? `text-base font-bold ${scheme.bullet} border-b-2 ${scheme.border} pb-2 mb-2` 
+                          : `text-sm ${scheme.text} font-medium`
+                      }`}
+                    >
+                      {renderLineWithBoldPlaceholders(line)}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
@@ -1331,7 +1412,7 @@ export default function AgentConsolePage() {
                 </CardHeader>
                 <CardContent className="flex-1 min-h-0 pt-3">
                   {(assignedScript?.content || campaignDetails?.callScript) ? (
-                    <div className="p-5 bg-gradient-to-br from-white to-purple-50/30 rounded-xl border-2 border-purple-100 shadow-inner h-full overflow-auto">
+                    <div className="p-6 bg-gradient-to-br from-slate-50 via-gray-50 to-zinc-50 rounded-2xl border border-gray-200/50 shadow-inner h-full overflow-auto">
                       {renderFormattedScript(assignedScript?.content || campaignDetails?.callScript || '')}
                     </div>
                   ) : (
