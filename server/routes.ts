@@ -2775,13 +2775,18 @@ export function registerRoutes(app: Express) {
           }
         }
 
-        // Convert contact IDs to full contact objects
+        // Convert contact IDs to full contact objects (with batching for large datasets)
         if (uniqueContactIds.size > 0) {
           const contactIdsArray = Array.from(uniqueContactIds);
-          campaignContacts = await db.select()
-            .from(contactsTable)
-            .where(inArray(contactsTable.id, contactIdsArray))
-            .limit(10000);
+          const batchSize = 500; // Batch to avoid PostgreSQL parameter limits
+          
+          for (let i = 0; i < contactIdsArray.length; i += batchSize) {
+            const batch = contactIdsArray.slice(i, i + batchSize);
+            const batchContacts = await db.select()
+              .from(contactsTable)
+              .where(inArray(contactsTable.id, batch));
+            campaignContacts.push(...batchContacts);
+          }
         }
 
         // Remove duplicates and filter valid contacts
@@ -2838,15 +2843,21 @@ export function registerRoutes(app: Express) {
             
             const dncContactIds = new Set<string>();
             if (uniquePhones.size > 0) {
-              const suppressedPhones = await db.select({ phoneE164: suppressionPhones.phoneE164 })
-                .from(suppressionPhones)
-                .where(inArray(suppressionPhones.phoneE164, Array.from(uniquePhones)));
+              const phonesArray = Array.from(uniquePhones);
+              const batchSize = 500; // Batch to avoid PostgreSQL parameter limits
               
-              for (const row of suppressedPhones) {
-                const contactIds = contactPhoneMap.get(row.phoneE164);
-                if (contactIds) {
-                  for (const contactId of contactIds) {
-                    dncContactIds.add(contactId);
+              for (let i = 0; i < phonesArray.length; i += batchSize) {
+                const batch = phonesArray.slice(i, i + batchSize);
+                const suppressedPhones = await db.select({ phoneE164: suppressionPhones.phoneE164 })
+                  .from(suppressionPhones)
+                  .where(inArray(suppressionPhones.phoneE164, batch));
+                
+                for (const row of suppressedPhones) {
+                  const contactIds = contactPhoneMap.get(row.phoneE164);
+                  if (contactIds) {
+                    for (const contactId of contactIds) {
+                      dncContactIds.add(contactId);
+                    }
                   }
                 }
               }
@@ -2865,11 +2876,20 @@ export function registerRoutes(app: Express) {
             
             // PHONE VALIDATION: Filter contacts with callable phone numbers
             const nonSuppressedContactIds = nonSuppressedContacts.map(c => c.id);
-            const fullContactsForPhoneCheck = await db
-              .select()
-              .from(contactsTable)
-              .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
-              .where(inArray(contactsTable.id, nonSuppressedContactIds));
+            
+            // Batch large arrays to avoid PostgreSQL parameter limits (max ~1000)
+            const fullContactsForPhoneCheck: any[] = [];
+            const batchSize = 500;
+            
+            for (let i = 0; i < nonSuppressedContactIds.length; i += batchSize) {
+              const batch = nonSuppressedContactIds.slice(i, i + batchSize);
+              const batchResults = await db
+                .select()
+                .from(contactsTable)
+                .leftJoin(accountsTable, eq(contactsTable.accountId, accountsTable.id))
+                .where(inArray(contactsTable.id, batch));
+              fullContactsForPhoneCheck.push(...batchResults);
+            }
 
             const contactsWithCallablePhones = fullContactsForPhoneCheck.filter(row => {
               const contact = row.contacts;
