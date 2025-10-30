@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  ACCOUNT_FIELD_LABELS,
+  ACCOUNT_ADDRESS_LABELS,
+  CONTACT_FIELD_LABELS,
+  CONTACT_ADDRESS_LABELS
+} from "./field-labels";
 
 /**
  * Simplified Unified Operator Model
@@ -109,19 +115,19 @@ export const operatorsByFieldType: Record<FilterFieldType, Operator[]> = {
 export const accountFilterFields: Record<string, FieldConfig> = {
   // Text fields
   name: {
-    label: 'Company Name',
+    label: ACCOUNT_FIELD_LABELS.name,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text
   },
   domain: {
-    label: 'Domain',
+    label: ACCOUNT_FIELD_LABELS.domain,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text
   },
   industryStandardized: {
-    label: 'Industry',
+    label: ACCOUNT_FIELD_LABELS.industryStandardized,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text,
@@ -129,13 +135,13 @@ export const accountFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'industries'
   },
   description: {
-    label: 'Description',
+    label: ACCOUNT_FIELD_LABELS.description,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text
   },
   hqCity: {
-    label: 'HQ City',
+    label: ACCOUNT_ADDRESS_LABELS.hqCity,
     type: 'text',
     category: 'Account Geography',
     applicableOperators: operatorsByFieldType.text,
@@ -143,7 +149,7 @@ export const accountFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'cities'
   },
   hqState: {
-    label: 'HQ State / Province',
+    label: ACCOUNT_ADDRESS_LABELS.hqState,
     type: 'text',
     category: 'Account Geography',
     applicableOperators: operatorsByFieldType.text,
@@ -151,7 +157,7 @@ export const accountFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'states'
   },
   hqCountry: {
-    label: 'HQ Country',
+    label: ACCOUNT_ADDRESS_LABELS.hqCountry,
     type: 'text',
     category: 'Account Geography',
     applicableOperators: operatorsByFieldType.text,
@@ -159,25 +165,25 @@ export const accountFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'countries'
   },
   sicCode: {
-    label: 'SIC Code',
+    label: ACCOUNT_FIELD_LABELS.sicCode,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text
   },
   naicsCode: {
-    label: 'NAICS Code',
+    label: ACCOUNT_FIELD_LABELS.naicsCode,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text
   },
   mainPhone: {
-    label: 'Main Phone',
+    label: ACCOUNT_FIELD_LABELS.mainPhone,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text
   },
   linkedinUrl: {
-    label: 'LinkedIn URL',
+    label: ACCOUNT_FIELD_LABELS.linkedinUrl,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text
@@ -185,7 +191,7 @@ export const accountFilterFields: Record<string, FieldConfig> = {
   
   // Enum/Text fields with complete operators (treating as text for full filtering)
   employeesSizeRange: {
-    label: 'Company Size',
+    label: ACCOUNT_FIELD_LABELS.employeesSizeRange,
     type: 'text', // Changed from enum to text for complete operators
     category: 'Account - Firmographic',
     applicableOperators: operatorsByFieldType.text, // Full 8 operators
@@ -193,7 +199,7 @@ export const accountFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'company-sizes'
   },
   annualRevenue: {
-    label: 'Annual Revenue',
+    label: ACCOUNT_FIELD_LABELS.annualRevenue,
     type: 'text', // Changed from enum to text for complete operators
     category: 'Account - Firmographic',
     applicableOperators: operatorsByFieldType.text, // Full 8 operators
@@ -203,13 +209,13 @@ export const accountFilterFields: Record<string, FieldConfig> = {
   
   // Number fields with complete operators
   staffCount: {
-    label: 'Staff Count',
+    label: ACCOUNT_FIELD_LABELS.staffCount,
     type: 'text', // Treat as text for complete operator support
     category: 'Account - Firmographic',
     applicableOperators: operatorsByFieldType.text
   },
   yearFounded: {
-    label: 'Year Founded',
+    label: ACCOUNT_FIELD_LABELS.yearFounded,
     type: 'text', // Treat as text for complete operator support
     category: 'Account - Firmographic',
     applicableOperators: operatorsByFieldType.text
@@ -217,7 +223,7 @@ export const accountFilterFields: Record<string, FieldConfig> = {
   
   // Array fields with complete operators
   techStack: {
-    label: 'Technologies',
+    label: ACCOUNT_FIELD_LABELS.techStack,
     type: 'text', // Treat as text for complete operator support
     category: 'Account - Technology',
     applicableOperators: operatorsByFieldType.text, // Full 8 operators
@@ -225,7 +231,7 @@ export const accountFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'technologies'
   },
   tags: {
-    label: 'Account Tags',
+    label: ACCOUNT_FIELD_LABELS.tags,
     type: 'text',
     category: 'Account - Metadata',
     applicableOperators: operatorsByFieldType.text,
@@ -233,7 +239,7 @@ export const accountFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'account-tags'
   },
   ownerId: {
-    label: 'Account Owner',
+    label: ACCOUNT_FIELD_LABELS.ownerId,
     type: 'text',
     category: 'Ownership',
     applicableOperators: operatorsByFieldType.text,
@@ -246,31 +252,31 @@ export const accountFilterFields: Record<string, FieldConfig> = {
 export const contactFilterFields: Record<string, FieldConfig> = {
   // Text fields
   fullName: {
-    label: 'Full Name',
+    label: CONTACT_FIELD_LABELS.fullName,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text
   },
   firstName: {
-    label: 'First Name',
+    label: CONTACT_FIELD_LABELS.firstName,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text
   },
   lastName: {
-    label: 'Last Name',
+    label: CONTACT_FIELD_LABELS.lastName,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text
   },
   email: {
-    label: 'Email',
+    label: CONTACT_FIELD_LABELS.email,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text
   },
   jobTitle: {
-    label: 'Job Title',
+    label: CONTACT_FIELD_LABELS.jobTitle,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text,
@@ -278,7 +284,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'job-titles'
   },
   department: {
-    label: 'Department',
+    label: CONTACT_FIELD_LABELS.department,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text,
@@ -286,7 +292,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'departments'
   },
   seniorityLevel: {
-    label: 'Seniority Level',
+    label: CONTACT_FIELD_LABELS.seniorityLevel,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text,
@@ -294,25 +300,25 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'seniority-levels'
   },
   directPhone: {
-    label: 'Direct Phone',
+    label: CONTACT_FIELD_LABELS.directPhone,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text
   },
   mobilePhone: {
-    label: 'Mobile Phone',
+    label: CONTACT_FIELD_LABELS.mobilePhone,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text
   },
   linkedinUrl: {
-    label: 'LinkedIn URL',
+    label: CONTACT_FIELD_LABELS.linkedinUrl,
     type: 'text',
     category: 'Contact Information',
     applicableOperators: operatorsByFieldType.text
   },
   city: {
-    label: 'Contact City',
+    label: CONTACT_ADDRESS_LABELS.city,
     type: 'text',
     category: 'Contact Geography',
     applicableOperators: operatorsByFieldType.text,
@@ -320,7 +326,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'cities'
   },
   state: {
-    label: 'Contact State / Province',
+    label: CONTACT_ADDRESS_LABELS.state,
     type: 'text',
     category: 'Contact Geography',
     applicableOperators: operatorsByFieldType.text,
@@ -328,7 +334,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'states'
   },
   country: {
-    label: 'Contact Country',
+    label: CONTACT_ADDRESS_LABELS.country,
     type: 'text',
     category: 'Contact Geography',
     applicableOperators: operatorsByFieldType.text,
@@ -336,7 +342,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'countries'
   },
   consentBasis: {
-    label: 'Consent Basis',
+    label: CONTACT_FIELD_LABELS.consentBasis,
     type: 'text',
     category: 'Compliance',
     applicableOperators: operatorsByFieldType.text,
@@ -344,7 +350,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'consent-basis'
   },
   consentSource: {
-    label: 'Consent Source',
+    label: CONTACT_FIELD_LABELS.consentSource,
     type: 'text',
     category: 'Compliance',
     applicableOperators: operatorsByFieldType.text,
@@ -352,7 +358,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'consent-source'
   },
   list: {
-    label: 'Source List',
+    label: CONTACT_FIELD_LABELS.list,
     type: 'text',
     category: 'Lists & Segments',
     applicableOperators: operatorsByFieldType.text
@@ -386,7 +392,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
   
   // Array fields
   tags: {
-    label: 'Tags',
+    label: CONTACT_FIELD_LABELS.tags,
     type: 'array',
     category: 'General',
     applicableOperators: operatorsByFieldType.array,
@@ -396,7 +402,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
   
   // Company fields (via JOIN to accounts table)
   accountName: {
-    label: 'Account Name',
+    label: ACCOUNT_FIELD_LABELS.name,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text,
@@ -404,7 +410,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'account-names'
   },
   accountDomain: {
-    label: 'Account Domain',
+    label: ACCOUNT_FIELD_LABELS.domain,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text,
@@ -412,7 +418,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'account-domains'
   },
   industryStandardized: {
-    label: 'Industry (Company)',
+    label: ACCOUNT_FIELD_LABELS.industryStandardized,
     type: 'text',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.text,
@@ -420,7 +426,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'industries'
   },
   employeesSizeRange: {
-    label: 'Company Size',
+    label: ACCOUNT_FIELD_LABELS.employeesSizeRange,
     type: 'enum',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.enum,
@@ -428,7 +434,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'company-sizes'
   },
   annualRevenue: {
-    label: 'Company Revenue',
+    label: ACCOUNT_FIELD_LABELS.annualRevenue,
     type: 'enum',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.enum,
@@ -436,7 +442,7 @@ export const contactFilterFields: Record<string, FieldConfig> = {
     typeAheadSource: 'company-revenue'
   },
   techStack: {
-    label: 'Technologies (Company)',
+    label: ACCOUNT_FIELD_LABELS.techStack,
     type: 'array',
     category: 'Company Information',
     applicableOperators: operatorsByFieldType.array,
