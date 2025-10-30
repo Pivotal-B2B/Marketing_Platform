@@ -229,6 +229,13 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
 
   const isPending = replaceQueueMutation.isPending || clearQueueMutation.isPending || clearAllQueuesMutation.isPending;
 
+  // Check if current filters are valid (have values for non-empty operators)
+  const hasIncompleteFilters = filterGroup && filterGroup.conditions && filterGroup.conditions.some(condition => {
+    const needsValues = condition.operator !== 'is_empty' && condition.operator !== 'has_any_value';
+    const hasValues = condition.values && condition.values.length > 0;
+    return needsValues && !hasValues;
+  });
+
   // Render dialogs once at the end (shared between compact and full card modes)
   const renderSharedDialogs = () => {
     if (!renderDialogs) return null;
@@ -274,12 +281,13 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
               <AlertDialogCancel disabled={isPending} data-testid="button-cancel-replace" className="h-9">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => replaceQueueMutation.mutate()}
-                disabled={isPending}
+                disabled={isPending || hasIncompleteFilters}
                 data-testid="button-confirm-replace"
                 className="h-9"
+                title={hasIncompleteFilters ? "Please click 'Apply Filters' or press Enter to add filter values" : undefined}
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Save Queue
+                {hasIncompleteFilters ? "Add Filter Values First" : "Set Queue"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
