@@ -1251,25 +1251,41 @@ router.post('/:campaignId/suppressions/domains/upload', async (req: Request, res
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
-    // Parse CSV
+    // Parse CSV - flexible parsing to handle various formats
     const domainEntries: Array<{ domain: string; companyName: string | null }> = [];
     const stream = Readable.from([csvContent]);
 
     await new Promise<void>((resolve, reject) => {
       stream
-        .pipe(csv.parse({ headers: true, trim: true }))
-        .on('data', (row: any) => {
-          // Try to extract domain or company name from various column names
-          const domain = row.domain || row.Domain || row.DOMAIN;
-          const companyName = row.company_name || row.companyName || row['Company Name'] || 
-                            row.company || row.Company || row.COMPANY;
+        .pipe(csv.parse({ headers: false, trim: true, skipEmptyLines: true }))
+        .on('data', (row: string[]) => {
+          // Skip header row if it looks like a header
+          const firstCol = row[0]?.toLowerCase() || '';
+          if (firstCol.includes('domain') || firstCol.includes('company')) {
+            return; // Skip header row
+          }
 
-          if (domain && typeof domain === 'string') {
-            const domainNorm = domain.trim().toLowerCase().replace(/^www\./, '');
-            domainEntries.push({ domain: domainNorm, companyName: null });
-          } else if (companyName && typeof companyName === 'string') {
-            const companyNorm = companyName.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-            domainEntries.push({ domain: companyNorm, companyName: companyName.trim() });
+          // Process data rows - support 1 or 2 columns
+          const col1 = row[0]?.trim();
+          const col2 = row[1]?.trim();
+
+          if (!col1) return; // Skip empty rows
+
+          // Check if first column looks like a domain or company name
+          const isDomain = col1.includes('.') || col1.includes('@');
+          
+          if (isDomain) {
+            // Extract domain from email or URL
+            let domain = col1;
+            if (domain.includes('@')) {
+              domain = domain.split('@')[1] || domain;
+            }
+            const domainNorm = domain.toLowerCase().replace(/^www\./, '').replace(/^https?:\/\//, '').split('/')[0];
+            domainEntries.push({ domain: domainNorm, companyName: col2 || null });
+          } else {
+            // Treat as company name
+            const companyNorm = col1.toLowerCase().replace(/[^a-z0-9]/g, '');
+            domainEntries.push({ domain: companyNorm, companyName: col1 });
           }
         })
         .on('end', resolve)
