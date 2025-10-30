@@ -2591,56 +2591,69 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
 
+    // Batch to avoid PostgreSQL parameter limits (max ~1000)
+    const BATCH_SIZE = 500;
+    const allRecords: any[] = [];
+
     if (list.entityType === 'account') {
-      const accountsList = await db
-        .select()
-        .from(accounts)
-        .where(inArray(accounts.id, list.recordIds));
-      return accountsList;
+      for (let i = 0; i < list.recordIds.length; i += BATCH_SIZE) {
+        const batch = list.recordIds.slice(i, i + BATCH_SIZE);
+        const accountsList = await db
+          .select()
+          .from(accounts)
+          .where(inArray(accounts.id, batch));
+        allRecords.push(...accountsList);
+      }
+      return allRecords;
     } else {
       // For contacts, join with accounts to get account names
-      const contactsWithAccounts = await db
-        .select({
-          id: contacts.id,
-          accountId: contacts.accountId,
-          fullName: contacts.fullName,
-          firstName: contacts.firstName,
-          lastName: contacts.lastName,
-          jobTitle: contacts.jobTitle,
-          email: contacts.email,
-          emailNormalized: contacts.emailNormalized,
-          emailVerificationStatus: contacts.emailVerificationStatus,
-          directPhone: contacts.directPhone,
-          directPhoneE164: contacts.directPhoneE164,
-          phoneExtension: contacts.phoneExtension,
-          phoneVerifiedAt: contacts.phoneVerifiedAt,
-          seniorityLevel: contacts.seniorityLevel,
-          department: contacts.department,
-          address: contacts.address,
-          linkedinUrl: contacts.linkedinUrl,
-          intentTopics: contacts.intentTopics,
-          tags: contacts.tags,
-          consentBasis: contacts.consentBasis,
-          consentSource: contacts.consentSource,
-          consentTimestamp: contacts.consentTimestamp,
-          ownerId: contacts.ownerId,
-          customFields: contacts.customFields,
-          emailStatus: contacts.emailStatus,
-          phoneStatus: contacts.phoneStatus,
-          sourceSystem: contacts.sourceSystem,
-          sourceRecordId: contacts.sourceRecordId,
-          sourceUpdatedAt: contacts.sourceUpdatedAt,
-          deletedAt: contacts.deletedAt,
-          createdAt: contacts.createdAt,
-          updatedAt: contacts.updatedAt,
-          accountName: accounts.name,
-        })
-        .from(contacts)
-        .leftJoin(accounts, eq(contacts.accountId, accounts.id))
-        .where(inArray(contacts.id, list.recordIds));
+      for (let i = 0; i < list.recordIds.length; i += BATCH_SIZE) {
+        const batch = list.recordIds.slice(i, i + BATCH_SIZE);
+        const contactsWithAccounts = await db
+          .select({
+            id: contacts.id,
+            accountId: contacts.accountId,
+            fullName: contacts.fullName,
+            firstName: contacts.firstName,
+            lastName: contacts.lastName,
+            jobTitle: contacts.jobTitle,
+            email: contacts.email,
+            emailNormalized: contacts.emailNormalized,
+            emailVerificationStatus: contacts.emailVerificationStatus,
+            directPhone: contacts.directPhone,
+            directPhoneE164: contacts.directPhoneE164,
+            phoneExtension: contacts.phoneExtension,
+            phoneVerifiedAt: contacts.phoneVerifiedAt,
+            seniorityLevel: contacts.seniorityLevel,
+            department: contacts.department,
+            address: contacts.address,
+            linkedinUrl: contacts.linkedinUrl,
+            intentTopics: contacts.intentTopics,
+            tags: contacts.tags,
+            consentBasis: contacts.consentBasis,
+            consentSource: contacts.consentSource,
+            consentTimestamp: contacts.consentTimestamp,
+            ownerId: contacts.ownerId,
+            customFields: contacts.customFields,
+            emailStatus: contacts.emailStatus,
+            phoneStatus: contacts.phoneStatus,
+            sourceSystem: contacts.sourceSystem,
+            sourceRecordId: contacts.sourceRecordId,
+            sourceUpdatedAt: contacts.sourceUpdatedAt,
+            deletedAt: contacts.deletedAt,
+            createdAt: contacts.createdAt,
+            updatedAt: contacts.updatedAt,
+            accountName: accounts.name,
+          })
+          .from(contacts)
+          .leftJoin(accounts, eq(contacts.accountId, accounts.id))
+          .where(inArray(contacts.id, batch));
+
+        allRecords.push(...contactsWithAccounts);
+      }
 
       // Map back to Contact type with account name embedded
-      return contactsWithAccounts.map(c => ({
+      return allRecords.map(c => ({
         ...c,
         // Store account name in a way the frontend can access it
         account: c.accountName ? { name: c.accountName } : undefined
