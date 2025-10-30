@@ -117,10 +117,13 @@ router.post(
 
       // Execute queue replacement using filter system
       const result = await db.transaction(async (tx) => {
-        // Step 1: Release existing queued/locked items (keep in_progress if requested)
+        // Step 1: Release existing queued/locked items BUT preserve scheduled retry dates
+        // CRITICAL: Don't delete contacts with future scheduledFor dates (voicemail/callback retries)
         const releaseConditions = [
           eq(agentQueue.agentId, agent_id),
           eq(agentQueue.campaignId, campaignId),
+          // PRESERVE contacts with future retry dates
+          sql`(${agentQueue.scheduledFor} IS NULL OR ${agentQueue.scheduledFor} <= NOW())`,
         ];
         
         if (keep_in_progress) {
@@ -137,6 +140,8 @@ router.post(
           .returning();
         
         const released = releaseResult.length;
+        
+        console.log(`[queues:set] Released ${released} items (preserved scheduled retries)`);
 
         // Step 2: Get campaign to check audience refs
         const [campaign] = await tx.select()
@@ -384,14 +389,43 @@ router.post(
         const skippedNoPhone = contactIds.length - contactsWithCallablePhones.length;
         let availableContacts = contactsWithCallablePhones;
         let skippedCollision = 0;
+        let skippedScheduled = 0;
+
+        // CRITICAL FIX: Exclude contacts already scheduled for future retry (preserved in Step 1)
+        // Query for contacts that STILL EXIST in queue with future scheduledFor dates
+        const callableContactIds = contactsWithCallablePhones.map(c => c.id);
+        
+        const scheduledContacts = await tx.select({
+          contactId: agentQueue.contactId,
+          scheduledFor: agentQueue.scheduledFor,
+        })
+        .from(agentQueue)
+        .where(
+          and(
+            eq(agentQueue.campaignId, campaignId),
+            eq(agentQueue.agentId, agent_id),
+            inArray(agentQueue.contactId, callableContactIds),
+            sql`${agentQueue.scheduledFor} IS NOT NULL AND ${agentQueue.scheduledFor} > NOW()`
+          )
+        );
+
+        console.log('[queues:set] Contacts preserved with future scheduled dates:', scheduledContacts.length);
+        
+        const scheduledContactIds = new Set(scheduledContacts.map(s => s.contactId));
+        if (scheduledContacts.length > 0) {
+          availableContacts = contactsWithCallablePhones.filter(c => !scheduledContactIds.has(c.id));
+          skippedScheduled = contactsWithCallablePhones.length - availableContacts.length;
+          console.log('[queues:set] Excluded contacts with future retry dates:', skippedScheduled);
+          scheduledContacts.forEach(sc => {
+            console.log(`  - Contact ${sc.contactId} scheduled for ${sc.scheduledFor}`);
+          });
+        }
 
         // Collision prevention (only if sharing is disabled)
         if (!allow_sharing) {
           console.log('[queues:set] Collision prevention enabled - checking for conflicts');
           // Only check active states from OTHER agents - released/completed contacts can be reassigned
           const activeStates: Array<'queued' | 'locked' | 'in_progress'> = ['queued', 'locked', 'in_progress'];
-          
-          const callableContactIds = contactsWithCallablePhones.map(c => c.id);
           
           const existingAssignments = await tx.select({
             contactId: agentQueue.contactId,
@@ -400,7 +434,7 @@ router.post(
           .where(
             and(
               eq(agentQueue.campaignId, campaignId),
-              inArray(agentQueue.contactId, callableContactIds),
+              inArray(agentQueue.contactId, availableContacts.map(c => c.id)),
               inArray(agentQueue.queueState, activeStates),
               sql`${agentQueue.agentId} != ${agent_id}`
             )
@@ -409,17 +443,17 @@ router.post(
           console.log('[queues:set] Existing assignments in campaign (other agents):', existingAssignments.length);
 
           const assignedContactIds = new Set(existingAssignments.map(a => a.contactId));
-          availableContacts = contactsWithCallablePhones.filter(c => !assignedContactIds.has(c.id));
-          skippedCollision = contactsWithCallablePhones.length - availableContacts.length;
+          availableContacts = availableContacts.filter(c => !assignedContactIds.has(c.id));
+          skippedCollision = existingAssignments.length;
 
           console.log('[queues:set] Available contacts after collision check:', availableContacts.length);
           console.log('[queues:set] Skipped due to collision:', skippedCollision);
-          console.log('[queues:set] Total skipped (no phone + collision):', skippedNoPhone + skippedCollision);
         } else {
           console.log('[queues:set] Contact sharing enabled - allowing duplicates across agents');
         }
 
-        const totalSkipped = skippedNoPhone + skippedCollision;
+        const totalSkipped = skippedNoPhone + skippedScheduled + skippedCollision;
+        console.log('[queues:set] Total skipped:', totalSkipped, '(no phone:', skippedNoPhone, ', scheduled:', skippedScheduled, ', collision:', skippedCollision, ')');
 
         // Step 5: Delete existing entries for this agent + contacts (to avoid unique constraint violation)
         if (availableContacts.length > 0) {
@@ -456,6 +490,7 @@ router.post(
           assigned: availableContacts.length,
           skipped_due_to_collision: skippedCollision,
           skipped_no_phone: skippedNoPhone,
+          skipped_scheduled_retry: skippedScheduled,
           total_skipped: totalSkipped,
         };
       });
