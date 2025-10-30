@@ -6900,7 +6900,7 @@ export function registerRoutes(app: Express) {
   // Search for contacts and accounts with phone pattern matching
   app.post("/api/phone-bulk/search", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { searchType, phonePattern, additionalFilters, listId } = req.body;
+      const { searchType, phonePattern, contactFilters: contactFilterConditions, accountFilters: accountFilterConditions, listId } = req.body;
 
       if (!searchType || !phonePattern) {
         return res.status(400).json({ message: "searchType and phonePattern are required" });
@@ -6919,9 +6919,9 @@ export function registerRoutes(app: Express) {
 
       if (searchType === 'contacts' || searchType === 'both') {
         // Build filter for contacts
-        const contactFilters: FilterGroup | undefined = additionalFilters ? {
+        const contactFilters: FilterGroup | undefined = contactFilterConditions ? {
           operator: 'and',
-          conditions: additionalFilters
+          conditions: contactFilterConditions
         } : undefined;
 
         let allContacts = await storage.getContacts(contactFilters);
@@ -6963,9 +6963,9 @@ export function registerRoutes(app: Express) {
 
       if (searchType === 'accounts' || searchType === 'both') {
         // Build filter for accounts
-        const accountFilters: FilterGroup | undefined = additionalFilters ? {
+        const accountFilters: FilterGroup | undefined = accountFilterConditions ? {
           operator: 'and',
-          conditions: additionalFilters
+          conditions: accountFilterConditions
         } : undefined;
 
         let allAccounts = await storage.getAccounts(accountFilters);

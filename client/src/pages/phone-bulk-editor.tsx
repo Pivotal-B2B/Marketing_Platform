@@ -104,54 +104,77 @@ export default function PhoneBulkEditor() {
 
     setIsSearching(true);
     try {
-      // Build additional filters
-      const conditions: any[] = [];
+      // Build separate filters for contacts and accounts
+      const contactConditions: any[] = [];
+      const accountConditions: any[] = [];
       
+      // Location filters
       if (selectedCountry) {
-        conditions.push({
-          field: searchType === 'accounts' ? 'account.hqCountry' : 'contact.country',
-          operator: 'equals',
-          value: selectedCountry
-        });
+        if (searchType !== 'accounts') {
+          contactConditions.push({
+            field: 'contact.country',
+            operator: 'equals',
+            value: selectedCountry
+          });
+        }
+        if (searchType !== 'contacts') {
+          accountConditions.push({
+            field: 'account.hqCountry',
+            operator: 'equals',
+            value: selectedCountry
+          });
+        }
       }
       
       if (selectedState) {
-        conditions.push({
-          field: searchType === 'accounts' ? 'account.hqState' : 'contact.state',
-          operator: 'equals',
-          value: selectedState
-        });
+        if (searchType !== 'accounts') {
+          contactConditions.push({
+            field: 'contact.state',
+            operator: 'equals',
+            value: selectedState
+          });
+        }
+        if (searchType !== 'contacts') {
+          accountConditions.push({
+            field: 'account.hqState',
+            operator: 'equals',
+            value: selectedState
+          });
+        }
       }
       
       if (selectedCity) {
-        conditions.push({
-          field: searchType === 'accounts' ? 'account.hqCity' : 'contact.city',
-          operator: 'equals',
-          value: selectedCity
-        });
+        if (searchType !== 'accounts') {
+          contactConditions.push({
+            field: 'contact.city',
+            operator: 'equals',
+            value: selectedCity
+          });
+        }
+        if (searchType !== 'contacts') {
+          accountConditions.push({
+            field: 'account.hqCity',
+            operator: 'equals',
+            value: selectedCity
+          });
+        }
       }
       
+      // Department (contacts only)
       if (selectedDepartment && searchType !== 'accounts') {
-        conditions.push({
+        contactConditions.push({
           field: 'contact.department',
           operator: 'equals',
           value: selectedDepartment
         });
       }
       
+      // Industry (accounts only)
       if (selectedIndustry && searchType !== 'contacts') {
-        conditions.push({
+        accountConditions.push({
           field: 'account.industry',
           operator: 'equals',
           value: selectedIndustry
-        });
-      }
-      
-      if (selectedList) {
-        conditions.push({
-          field: 'list',
-          operator: 'in',
-          value: [selectedList]
         });
       }
 
@@ -161,7 +184,8 @@ export default function PhoneBulkEditor() {
         data: {
           searchType,
           phonePattern: phonePattern.trim(),
-          additionalFilters: conditions.length > 0 ? conditions : null,
+          contactFilters: contactConditions.length > 0 ? contactConditions : null,
+          accountFilters: accountConditions.length > 0 ? accountConditions : null,
           listId: selectedList || null
         }
       });
