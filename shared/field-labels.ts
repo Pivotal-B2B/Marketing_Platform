@@ -81,14 +81,14 @@ export const CONTACT_FIELD_LABELS = {
 // CONTACT ADDRESS FIELDS
 // ============================================
 export const CONTACT_ADDRESS_LABELS = {
-  address: "contact_street_1",
-  city: "contact_city",
-  state: "contact_state",
-  stateAbbr: "contact_state_abbr",
-  postalCode: "contact_postal_code",
-  country: "contact_country",
+  address: "Street Address",
+  city: "City",
+  state: "State",
+  stateAbbr: "State Abbr",
+  postalCode: "Postal Code",
+  country: "Country",
   county: "County",
-  contactLocation: "contact_location_snap",
+  contactLocation: "Location",
   timezone: "Timezone",
 } as const;
 
@@ -185,16 +185,16 @@ export const ACCOUNT_FIELD_LABELS = {
 // ACCOUNT HQ ADDRESS FIELDS
 // ============================================
 export const ACCOUNT_ADDRESS_LABELS = {
-  hqStreet1: "account_hq_street_1",
-  hqStreet2: "account_hq_street_2",
-  hqStreet3: "account_hq_street_3",
+  hqStreet1: "HQ Street 1",
+  hqStreet2: "HQ Street 2",
+  hqStreet3: "HQ Street 3",
   hqAddress: "HQ Address (Legacy)",
-  hqCity: "account_city",
-  hqState: "account_state",
-  hqStateAbbr: "account_state_abbr",
-  hqPostalCode: "account_postal_code",
-  hqCountry: "account_country",
-  companyLocation: "account_location_snap",
+  hqCity: "HQ City",
+  hqState: "HQ State",
+  hqStateAbbr: "HQ State Abbr",
+  hqPostalCode: "HQ Postal Code",
+  hqCountry: "HQ Country",
+  companyLocation: "Company Location",
 } as const;
 
 // ============================================
@@ -202,40 +202,40 @@ export const ACCOUNT_ADDRESS_LABELS = {
 // ============================================
 export const AI_ENRICHMENT_LABELS = {
   // Status Fields
-  addressEnrichmentStatus: "address_enrichment_status",
-  phoneEnrichmentStatus: "phone_enrichment_status",
+  addressEnrichmentStatus: "Address Enrichment Status",
+  phoneEnrichmentStatus: "Phone Enrichment Status",
   
   // Confidence Scores
-  aiAddressConfidence: "ai_address_confidence",
-  aiPhoneConfidence: "ai_phone_confidence",
+  aiAddressConfidence: "AI Address Confidence",
+  aiPhoneConfidence: "AI Phone Confidence",
   
   // Enriched Data
-  aiEnrichedPhone: "ai_enriched_phone",
-  aiEnrichedStreet1: "ai_enriched_street_1",
-  aiEnrichedStreet2: "ai_enriched_street_2",
-  aiEnrichedStreet3: "ai_enriched_street_3",
-  aiEnrichedCity: "ai_enriched_city",
-  aiEnrichedState: "ai_enriched_state",
-  aiEnrichedPostalCode: "ai_enriched_postal_code",
+  aiEnrichedPhone: "AI Enriched Phone",
+  aiEnrichedStreet1: "AI Enriched Street 1",
+  aiEnrichedStreet2: "AI Enriched Street 2",
+  aiEnrichedStreet3: "AI Enriched Street 3",
+  aiEnrichedCity: "AI Enriched City",
+  aiEnrichedState: "AI Enriched State",
+  aiEnrichedPostalCode: "AI Enriched Postal Code",
   
   // Metadata
-  enrichmentSource: "enrichment_source",
-  lastEnrichmentRun: "last_enrichment_run",
-  aiIndustryClassificationOverview: "ai_industry_classification_overview",
-  aiAccountKeywords: "ai_account_keywords",
+  enrichmentSource: "Enrichment Source",
+  lastEnrichmentRun: "Last Enrichment Run",
+  aiIndustryClassificationOverview: "AI Industry Classification Overview",
+  aiAccountKeywords: "AI Account Keywords",
 } as const;
 
 // ============================================
 // SMART TEMPLATE - BEST DATA FIELDS
 // ============================================
 export const BEST_DATA_LABELS = {
-  bestAddressLine1: "best_address_line_1",
-  bestAddressLine2: "best_address_line_2",
-  bestAddressLine3: "best_address_line_3",
-  bestCity: "best_city",
-  bestState: "best_state",
-  bestPostalCode: "best_postal_code",
-  bestPhoneNumber: "best_phone_number",
+  bestAddressLine1: "Best Address Line 1",
+  bestAddressLine2: "Best Address Line 2",
+  bestAddressLine3: "Best Address Line 3",
+  bestCity: "Best City",
+  bestState: "Best State",
+  bestPostalCode: "Best Postal Code",
+  bestPhoneNumber: "Best Phone Number",
 } as const;
 
 // ============================================
