@@ -436,7 +436,7 @@ export function CSVFieldMapper({
                     <SelectTrigger className="w-[150px]" data-testid={`select-entity-${mapping.csvColumn}`}>
                       <SelectValue placeholder="Select entity" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent position="popper" sideOffset={4}>
                       <SelectItem value="contact">Contact</SelectItem>
                       <SelectItem value="account">Account</SelectItem>
                       <SelectItem value="skip">Skip Column</SelectItem>
@@ -457,7 +457,7 @@ export function CSVFieldMapper({
                       <SelectTrigger className="flex-1" data-testid={`select-field-${mapping.csvColumn}`}>
                         <SelectValue placeholder="Select field" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" sideOffset={4} className="max-h-[300px]">
                         <SelectItem value="__CREATE_NEW__" className="font-medium text-primary">
                           <div className="flex items-center gap-2">
                             <Plus className="h-3 w-3" />
@@ -542,7 +542,7 @@ export function CSVFieldMapper({
                 <SelectTrigger id="field-type" data-testid="select-field-type">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" sideOffset={4}>
                   <SelectItem value="text">Text</SelectItem>
                   <SelectItem value="number">Number</SelectItem>
                   <SelectItem value="date">Date</SelectItem>
