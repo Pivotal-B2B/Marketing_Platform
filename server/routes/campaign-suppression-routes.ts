@@ -270,10 +270,10 @@ router.post('/:campaignId/suppressions/accounts/upload', async (req: Request, re
       });
     }
 
-    // Find matching accounts
+    // Find matching accounts - OPTIMIZED with bulk queries
     const matchedAccountIds = new Set<string>();
 
-    // Match by account ID
+    // Match by account ID (bulk query)
     const directIds = accountIdentifiers.filter(i => i.type === 'id').map(i => i.value);
     if (directIds.length > 0) {
       const found = await db
@@ -283,23 +283,31 @@ router.post('/:campaignId/suppressions/accounts/upload', async (req: Request, re
       found.forEach(a => matchedAccountIds.add(a.id));
     }
 
-    // Match by domain (case-insensitive)
-    const domains = accountIdentifiers.filter(i => i.type === 'domain').map(i => i.value);
-    for (const domain of domains) {
+    // Match by domain (bulk query with case-insensitive OR conditions)
+    const domains = accountIdentifiers.filter(i => i.type === 'domain').map(i => i.value.toLowerCase());
+    if (domains.length > 0) {
+      // Build OR conditions: LOWER(domain) = 'domain1' OR LOWER(domain) = 'domain2' ...
+      const domainConditions = domains.map(domain => 
+        sql`LOWER(${accounts.domain}) = ${domain}`
+      );
       const found = await db
         .select({ id: accounts.id })
         .from(accounts)
-        .where(sql`LOWER(${accounts.domain}) = ${domain.toLowerCase()}`);
+        .where(or(...domainConditions));
       found.forEach(a => matchedAccountIds.add(a.id));
     }
 
-    // Match by company name (case-insensitive exact match)
+    // Match by company name (bulk query with case-insensitive OR conditions)
     const companyNames = accountIdentifiers.filter(i => i.type === 'company').map(i => i.value);
-    for (const companyName of companyNames) {
+    if (companyNames.length > 0) {
+      // Build OR conditions: LOWER(name) = LOWER('name1') OR LOWER(name) = LOWER('name2') ...
+      const nameConditions = companyNames.map(name => 
+        sql`LOWER(${accounts.name}) = LOWER(${name})`
+      );
       const found = await db
         .select({ id: accounts.id })
         .from(accounts)
-        .where(sql`LOWER(${accounts.name}) = LOWER(${companyName})`);
+        .where(or(...nameConditions));
       found.forEach(a => matchedAccountIds.add(a.id));
     }
 
