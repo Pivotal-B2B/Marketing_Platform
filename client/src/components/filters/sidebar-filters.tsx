@@ -122,10 +122,15 @@ export function SidebarFilters({
   const handleApply = async () => {
     setIsApplying(true);
     
+    // NOTE: This function receives the FINAL filterGroup state from parent
+    // The parent is responsible for auto-completing any partially-typed values
+    // before calling this function
+    
     // Validate: Remove conditions with empty values (except is_empty/has_any_value operators)
     const validConditions = filterGroup.conditions.filter(condition => {
       const needsValues = condition.operator !== 'is_empty' && condition.operator !== 'has_any_value';
-      return !needsValues || condition.values.length > 0;
+      const hasValues = condition.values && condition.values.length > 0;
+      return !needsValues || hasValues;
     });
     
     const filterToApply = validConditions.length === 0 ? undefined : {

@@ -88,12 +88,47 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
   // Set Queue (Replace) mutation
   const replaceQueueMutation = useMutation({
     mutationFn: async () => {
+      // IMPORTANT: Validate filterGroup before submitting
+      // Remove conditions with empty values (except is_empty/has_any_value operators)
+      let validatedFilters = undefined;
+      if (filterGroup && filterGroup.conditions && filterGroup.conditions.length > 0) {
+        const validConditions = filterGroup.conditions.filter(condition => {
+          const needsValues = condition.operator !== 'is_empty' && condition.operator !== 'has_any_value';
+          const hasValues = condition.values && condition.values.length > 0;
+          return !needsValues || hasValues;
+        });
+        
+        const removedCount = filterGroup.conditions.length - validConditions.length;
+        
+        console.log('[QUEUE_CONTROLS] Validating filters before submit:', {
+          originalCount: filterGroup.conditions.length,
+          validCount: validConditions.length,
+          removedInvalid: removedCount
+        });
+        
+        // Warn user if any filters were removed
+        if (removedCount > 0) {
+          toast({
+            title: "Incomplete Filters Removed",
+            description: `${removedCount} filter(s) had no values and were skipped. Press Enter to add values, or click "Apply Filters" before setting queue.`,
+            variant: "default",
+          });
+        }
+        
+        if (validConditions.length > 0) {
+          validatedFilters = {
+            ...filterGroup,
+            conditions: validConditions
+          };
+        }
+      }
+      
       const response = await apiRequest(
         'POST',
         `/api/campaigns/${campaignId}/queues/set`,
         {
           agent_id: effectiveAgentId,
-          filters: filterGroup && filterGroup.conditions && filterGroup.conditions.length > 0 ? filterGroup : undefined,
+          filters: validatedFilters,
           per_account_cap: null,
           max_queue_size: maxQueueSize || null,
           keep_in_progress: true,
