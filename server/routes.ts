@@ -23,6 +23,7 @@ import verificationPriorityConfigRouter from './routes/verification-priority-con
 import suppressionRouter from './routes/suppression-routes';
 import s3FilesRouter from './routes/s3-files';
 import csvImportJobsRouter from './routes/csv-import-jobs';
+import contactsCSVImportRouter from './routes/contacts-csv-import';
 import emailValidationTestRouter from './routes/email-validation-test';
 import verificationExportRouter from './routes/verification-export';
 import exportTemplatesRouter from './routes/export-templates';
@@ -6882,6 +6883,7 @@ export function registerRoutes(app: Express) {
 
   // ==================== CSV IMPORT JOBS (BullMQ) ====================
   app.use(csvImportJobsRouter);
+  app.use(contactsCSVImportRouter);
 
   // ==================== EMAIL VALIDATION TESTING ====================
   app.use(emailValidationTestRouter);

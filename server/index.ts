@@ -101,6 +101,10 @@ app.use((req, res, next) => {
   const { initializeBulkListQueue } = await import("./lib/bulk-list-queue");
   initializeBulkListQueue();
   
+  // Initialize contacts CSV import queue and worker (BullMQ)
+  const { initializeContactsCSVImportQueue } = await import("./lib/contacts-csv-import-queue");
+  initializeContactsCSVImportQueue();
+  
   // Auto-resume stuck email validation jobs
   const { resumeStuckEmailValidationJobs } = await import("./lib/resume-validation-jobs");
   setTimeout(() => resumeStuckEmailValidationJobs(), 5000); // Wait 5 seconds after startup
