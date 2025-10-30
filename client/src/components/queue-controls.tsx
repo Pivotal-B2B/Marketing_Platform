@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { Separator } from "@/components/ui/separator";
-import { SimpleQueueFilter } from "@/components/simple-queue-filter";
+import { SidebarFilters } from "@/components/filters/sidebar-filters";
 import type { FilterGroup } from "@shared/filter-types";
 
 interface QueueControlsProps {
@@ -207,11 +207,14 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
             </AlertDialogHeader>
 
             <div className="space-y-4 py-2">
-              <SimpleQueueFilter
-                onChange={(filter) => {
-                  console.log('[QUEUE_CONTROLS] Received filter from SimpleQueueFilter:', filter);
+              <SidebarFilters
+                entityType="contact"
+                onApplyFilter={(filter) => {
+                  console.log('[QUEUE_CONTROLS] Filter applied:', filter);
                   setFilterGroup(filter || undefined);
                 }}
+                initialFilter={filterGroup}
+                embedded={true}
               />
 
               <Separator />
