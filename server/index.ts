@@ -97,6 +97,10 @@ app.use((req, res, next) => {
   const { initializeCapEnforcementQueue } = await import("./lib/cap-enforcement-queue");
   initializeCapEnforcementQueue();
   
+  // Initialize bulk list operation queue and worker (BullMQ)
+  const { initializeBulkListQueue } = await import("./lib/bulk-list-queue");
+  initializeBulkListQueue();
+  
   // Auto-resume stuck email validation jobs
   const { resumeStuckEmailValidationJobs } = await import("./lib/resume-validation-jobs");
   setTimeout(() => resumeStuckEmailValidationJobs(), 5000); // Wait 5 seconds after startup

@@ -335,22 +335,136 @@ export default function ContactsPage() {
     },
   });
 
+  // State for bulk job tracking
+  const [bulkJobId, setBulkJobId] = React.useState<string | null>(null);
+  const [isPollingJob, setIsPollingJob] = React.useState(false);
+  const [jobProgress, setJobProgress] = React.useState<any>(null);
+  const [pollRetries, setPollRetries] = React.useState(0);
+
   const addToListMutation = useMutation({
     mutationFn: async (listId: string) => {
-      return await apiRequest('POST', `/api/lists/${listId}/contacts`, {
-        contactIds: Array.from(selectedIds)
-      });
+      // If selecting all across pages, always use bulk API (backend decides processing method)
+      if (selectAllPages) {
+        const response = await apiRequest('POST', `/api/lists/${listId}/contacts/bulk`, {
+          filterCriteria: {
+            searchQuery,
+            filterGroup,
+            appliedFilters,
+          }
+        });
+        const data = await response.json();
+        return { jobId: data.jobId, usedBulk: data.useBackgroundJob !== false };
+      } else {
+        // Direct API for page-level selections
+        await apiRequest('POST', `/api/lists/${listId}/contacts`, {
+          contactIds: Array.from(selectedIds)
+        });
+        return { usedBulk: false };
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
-      toast({ title: "Success", description: `Added ${selectedCount} contacts to list` });
-      clearSelection();
-      setAddToListDialogOpen(false);
+    onSuccess: (data: any) => {
+      if (data.usedBulk) {
+        // Start polling for job status
+        setBulkJobId(data.jobId);
+        setIsPollingJob(true);
+        setPollRetries(0);
+        setJobProgress(null);
+        toast({ 
+          title: "Processing", 
+          description: "Adding contacts in background. This may take a moment..." 
+        });
+      } else {
+        // Immediate success (no background job needed)
+        queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
+        
+        if (data.totalAdded !== undefined) {
+          toast({ 
+            title: "Success", 
+            description: `Added ${data.totalAdded} contacts to list (${data.totalProcessed} matched your filters)` 
+          });
+        } else {
+          toast({ title: "Success", description: `Added ${selectedCount} contacts to list` });
+        }
+        
+        clearSelection();
+        setSelectAllPages(false);
+        setAddToListDialogOpen(false);
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message || "Failed to add contacts to list", variant: "destructive" });
     },
   });
+
+  // Poll for bulk job status with retry logic
+  React.useEffect(() => {
+    if (!isPollingJob || !bulkJobId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await apiRequest('GET', `/api/jobs/bulk-list/${bulkJobId}`);
+        const status = await response.json();
+        
+        // Reset retry counter on successful poll
+        setPollRetries(0);
+        
+        // Update progress
+        if (status.progress) {
+          setJobProgress(status.progress);
+        }
+
+        if (status.state === 'completed') {
+          setIsPollingJob(false);
+          setBulkJobId(null);
+          setJobProgress(null);
+          queryClient.invalidateQueries({ queryKey: ['/api/lists'] });
+          
+          if (status.result?.success) {
+            toast({ 
+              title: "Success", 
+              description: `Added ${status.result.totalAdded} contacts to list (${status.result.totalProcessed} matched your filters)` 
+            });
+          } else {
+            toast({ 
+              title: "Error", 
+              description: status.result?.error || "Failed to add contacts",
+              variant: "destructive"
+            });
+          }
+          
+          clearSelection();
+          setSelectAllPages(false);
+          setAddToListDialogOpen(false);
+        } else if (status.state === 'failed') {
+          setIsPollingJob(false);
+          setBulkJobId(null);
+          setJobProgress(null);
+          toast({ 
+            title: "Error", 
+            description: status.error || "Job failed",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error('Error polling job status:', error);
+        setPollRetries(prev => prev + 1);
+        
+        // Stop polling after 5 consecutive failures
+        if (pollRetries >= 5) {
+          setIsPollingJob(false);
+          setBulkJobId(null);
+          setJobProgress(null);
+          toast({
+            title: "Error",
+            description: "Lost connection to background job. The operation may still complete successfully.",
+            variant: "destructive"
+          });
+        }
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [isPollingJob, bulkJobId, queryClient, clearSelection, pollRetries]);
 
   const createListMutation = useMutation({
     mutationFn: async ({ name, description }: { name: string; description: string }) => {
@@ -630,20 +744,34 @@ export default function ContactsPage() {
       {selectedCount > 0 && (
         <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div>
+            <div className="flex items-center gap-4 flex-1">
+              <div className="flex-1">
                 <p className="font-medium">
                   {selectAllPages 
-                    ? `All ${selectedCount} contacts selected across all pages` 
+                    ? `All ${filteredContacts.length} contacts selected (smart mode - processes in background)` 
                     : `${selectedCount} contact${selectedCount !== 1 ? 's' : ''} selected on this page`}
                 </p>
                 {!selectAllPages && filteredContacts.length > paginatedContacts.length && (
                   <button
                     onClick={handleSelectAllPages}
                     className="text-sm text-primary hover:underline mt-1"
+                    data-testid="button-select-all-pages"
                   >
-                    Select all {filteredContacts.length} contacts across all pages
+                    Select all {filteredContacts.length} contacts across all pages (recommended for 1000+)
                   </button>
+                )}
+                {selectAllPages && filteredContacts.length > 1000 && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Large selections will be processed in the background without performance impact
+                  </p>
+                )}
+                {isPollingJob && jobProgress && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Processing: {jobProgress.processed || 0} contacts...</span>
+                      {jobProgress.percent && <span>({jobProgress.percent}%)</span>}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

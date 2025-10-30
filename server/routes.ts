@@ -2029,7 +2029,7 @@ export function registerRoutes(app: Express) {
     }
   });
 
-  // Add contacts to list
+  // Add contacts to list (direct - for small batches)
   app.post("/api/lists/:id/contacts", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
     try {
       const { contactIds } = req.body;
@@ -2055,6 +2055,92 @@ export function registerRoutes(app: Express) {
     } catch (error) {
       console.error('Add contacts to list error:', error);
       res.status(500).json({ message: "Failed to add contacts to list" });
+    }
+  });
+
+  // Add contacts to list in bulk using filter criteria (background job for large datasets)
+  app.post("/api/lists/:id/contacts/bulk", requireAuth, requireRole('admin', 'campaign_manager', 'data_ops'), async (req, res) => {
+    try {
+      const { filterCriteria } = req.body;
+      
+      if (!filterCriteria) {
+        return res.status(400).json({ message: "filterCriteria is required" });
+      }
+
+      const list = await storage.getList(req.params.id);
+      if (!list) {
+        return res.status(404).json({ message: "List not found" });
+      }
+
+      if (list.entityType !== 'contact') {
+        return res.status(400).json({ message: "This list is not for contacts" });
+      }
+
+      // Import bulk list queue functions
+      const { addBulkListJob, bulkListQueue } = await import('./lib/bulk-list-queue');
+
+      // Check if queue is available - if not, process directly for small datasets
+      if (!bulkListQueue) {
+        console.warn('[Bulk List] Queue not available - processing directly');
+        
+        // Build where clause and count
+        const { buildWhereClauseForFilters } = await import('./workers/bulk-list-worker');
+        const whereClause = buildWhereClauseForFilters(filterCriteria);
+        
+        // Get count first
+        const countQuery = db.select({ count: sql<number>`count(*)` })
+          .from(contacts);
+        
+        if (whereClause) {
+          countQuery.where(whereClause);
+        }
+        
+        const [{ count }] = await countQuery;
+        
+        if (count > 5000) {
+          return res.status(503).json({ 
+            message: "Background job queue not available and dataset too large. Please contact support or try with smaller selection." 
+          });
+        }
+        
+        // Process directly for small datasets
+        const matchedContacts = await db.select({ id: contacts.id })
+          .from(contacts)
+          .where(whereClause || sql`1=1`)
+          .limit(5000);
+        
+        const contactIds = matchedContacts.map(c => c.id);
+        const existingIds = list.recordIds || [];
+        const mergedIds = Array.from(new Set([...existingIds, ...contactIds]));
+        const addedCount = mergedIds.length - existingIds.length;
+        
+        await storage.updateList(req.params.id, { recordIds: mergedIds });
+        
+        return res.json({
+          useBackgroundJob: false,
+          message: "Contacts added successfully",
+          totalAdded: addedCount,
+          totalProcessed: contactIds.length
+        });
+      }
+
+      // Add job to queue for large datasets
+      const jobId = await addBulkListJob({
+        listId: req.params.id,
+        entityType: 'contact',
+        filterCriteria,
+        userId: req.user!.id,
+      });
+
+      res.json({ 
+        jobId,
+        useBackgroundJob: true,
+        message: "Bulk operation started - this may take a few moments",
+        status: "processing"
+      });
+    } catch (error) {
+      console.error('Bulk add contacts to list error:', error);
+      res.status(500).json({ message: "Failed to start bulk operation" });
     }
   });
 
@@ -7186,6 +7272,23 @@ export function registerRoutes(app: Express) {
     } catch (error: any) {
       console.error('Error triggering AI enrichment:', error);
       res.status(500).json({ message: error.message || "Failed to trigger AI enrichment" });
+    }
+  });
+
+  // Get bulk list job status
+  app.get("/api/jobs/bulk-list/:jobId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { getBulkListJobStatus } = await import('./lib/bulk-list-queue');
+      const status = await getBulkListJobStatus(req.params.jobId);
+      
+      if (!status) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      
+      res.json(status);
+    } catch (error) {
+      console.error('Get bulk list job status error:', error);
+      res.status(500).json({ message: "Failed to get job status" });
     }
   });
 
