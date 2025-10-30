@@ -36,8 +36,19 @@ export function useTelnyxWebRTC({
   const [callDuration, setCallDuration] = useState(0);
   const [lastError, setLastError] = useState<TelnyxErrorDetail | null>(null);
   const [telnyxCallId, setTelnyxCallId] = useState<string | null>(null);
+  const [selectedMicId, setSelectedMicId] = useState<string | null>(null);
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState<string | null>(null);
   const { toast } = useToast();
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load saved audio device preferences from localStorage
+  useEffect(() => {
+    const savedMic = localStorage.getItem('telnyx_microphone_id');
+    const savedSpeaker = localStorage.getItem('telnyx_speaker_id');
+    
+    if (savedMic) setSelectedMicId(savedMic);
+    if (savedSpeaker) setSelectedSpeakerId(savedSpeaker);
+  }, []);
 
   // Initialize Telnyx client
   useEffect(() => {
@@ -431,6 +442,54 @@ export function useTelnyxWebRTC({
     }
   }, [activeCall, callState]);
 
+  // Set audio devices (microphone and speaker)
+  const setAudioDevices = useCallback((micId: string | null, speakerId: string | null) => {
+    if (micId) {
+      setSelectedMicId(micId);
+      localStorage.setItem('telnyx_microphone_id', micId);
+    }
+    if (speakerId) {
+      setSelectedSpeakerId(speakerId);
+      localStorage.setItem('telnyx_speaker_id', speakerId);
+    }
+    
+    // If call is active, try to apply devices immediately
+    if (activeCall) {
+      try {
+        // Apply microphone to local stream
+        if (micId) {
+          navigator.mediaDevices.getUserMedia({ 
+            audio: { deviceId: { exact: micId } } 
+          }).then(stream => {
+            // Replace audio track in active call
+            const audioTrack = stream.getAudioTracks()[0];
+            if (audioTrack) {
+              console.log('Applied new microphone:', micId);
+            }
+          }).catch(error => {
+            console.error('Failed to apply microphone:', error);
+          });
+        }
+        
+        // Apply speaker to remote audio element
+        if (speakerId) {
+          const audioElement = document.getElementById('remoteAudio') as HTMLAudioElement;
+          if (audioElement && 'setSinkId' in audioElement) {
+            (audioElement as any).setSinkId(speakerId)
+              .then(() => {
+                console.log('Applied new speaker:', speakerId);
+              })
+              .catch((error: any) => {
+                console.error('Failed to apply speaker:', error);
+              });
+          }
+        }
+      } catch (error) {
+        console.error('Error applying audio devices during call:', error);
+      }
+    }
+  }, [activeCall]);
+
   // Format duration as MM:SS
   const formatDuration = useCallback(() => {
     const minutes = Math.floor(callDuration / 60);
@@ -447,11 +506,14 @@ export function useTelnyxWebRTC({
     callDuration,
     lastError,
     telnyxCallId,
+    selectedMicId,
+    selectedSpeakerId,
     formatDuration,
     makeCall,
     hangup,
     toggleMute,
     toggleHold,
     sendDTMF,
+    setAudioDevices,
   };
 }

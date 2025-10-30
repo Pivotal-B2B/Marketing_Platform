@@ -31,6 +31,8 @@ import {
   Lightbulb,
   Sparkles,
   Hash,
+  Settings,
+  Volume2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -40,6 +42,7 @@ import type { CallState } from "@/hooks/useTelnyxWebRTC";
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { CONTACT_FIELD_LABELS, ACCOUNT_FIELD_LABELS } from '@shared/field-labels';
 import { QueueControls } from "@/components/queue-controls";
+import { AudioDeviceSettings } from "@/components/audio-device-settings";
 
 // Backwards compatibility type alias
 type CallStatus = CallState | 'wrap-up';
@@ -134,6 +137,7 @@ export default function AgentConsolePage() {
   const [dispositionSaved, setDispositionSaved] = useState(false);
   const [callMadeToContact, setCallMadeToContact] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
+  const [showAudioSettings, setShowAudioSettings] = useState(false);
 
   // Fetch SIP trunk credentials
   const { data: sipConfig } = useQuery<{
@@ -164,11 +168,14 @@ export default function AgentConsolePage() {
     callDuration,
     lastError,
     telnyxCallId,
+    selectedMicId,
+    selectedSpeakerId,
     formatDuration,
     makeCall,
     hangup,
     toggleMute,
     sendDTMF,
+    setAudioDevices,
   } = useTelnyxWebRTC({
     sipUsername: sipConfig?.sipUsername,
     sipPassword: sipConfig?.sipPassword,
@@ -846,6 +853,17 @@ export default function AgentConsolePage() {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => setShowAudioSettings(true)}
+              className="h-10 w-10 p-0 text-white hover:bg-white/10"
+              data-testid="button-audio-settings"
+              title="Audio Settings"
+            >
+              <Volume2 className="h-4 w-4" />
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => refetchQueue()}
               className="h-10 w-10 p-0 text-white hover:bg-white/10"
               data-testid="button-refresh"
@@ -942,6 +960,17 @@ export default function AgentConsolePage() {
             )}
             
             {getStatusBadge()}
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowAudioSettings(true)}
+              className="text-white hover:bg-white/10"
+              data-testid="button-audio-settings-desktop"
+              title="Audio Settings"
+            >
+              <Volume2 className="h-4 w-4" />
+            </Button>
             
             <Button
               variant="ghost"
@@ -1610,6 +1639,17 @@ export default function AgentConsolePage() {
 
       {/* Hidden audio element for Telnyx */}
       <audio id="remoteAudio" autoPlay playsInline style={{ display: 'none' }} />
+      
+      {/* Audio Device Settings Dialog */}
+      <AudioDeviceSettings
+        open={showAudioSettings}
+        onOpenChange={setShowAudioSettings}
+        onDevicesSelected={(micId, speakerId) => {
+          if (setAudioDevices) {
+            setAudioDevices(micId, speakerId);
+          }
+        }}
+      />
     </div>
   );
 }
