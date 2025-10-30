@@ -1285,7 +1285,7 @@ export function PhoneCampaignSuppressionManager({
                     {domainSuppressions.map((suppression: SuppressionDomain) => (
                       <TableRow key={suppression.id}>
                         <TableCell className="font-mono text-sm">
-                          {suppression.domain}
+                          {suppression.domain || <span className="text-muted-foreground italic">Company-based</span>}
                         </TableCell>
                         <TableCell className="font-medium">
                           {suppression.companyName || "—"}

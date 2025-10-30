@@ -1231,7 +1231,9 @@ export function CampaignSuppressionManager({ campaignId }: CampaignSuppressionMa
                   <TableBody>
                     {domains.map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell className="font-mono text-sm">{item.domain}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {item.domain || <span className="text-muted-foreground italic">Company-based</span>}
+                        </TableCell>
                         <TableCell className="text-muted-foreground">{item.companyName || "—"}</TableCell>
                         <TableCell className="text-muted-foreground">{item.reason || "—"}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">
