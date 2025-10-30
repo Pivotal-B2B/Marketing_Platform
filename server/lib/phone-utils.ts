@@ -122,14 +122,30 @@ export function normalizePhoneWithCountryCode(
   }
 
   try {
+    // Clean the phone first - remove any non-digit characters except leading +
+    let cleanPhone = phone.replace(/[^\d+]/g, '');
+    
+    // If phone doesn't start with + but starts with digits, try adding +
+    // This handles cases like "4401234567890" which should be "+4401234567890"
+    if (!cleanPhone.startsWith('+') && /^\d/.test(cleanPhone)) {
+      // Try parsing with + prefix first (in case it's already in E.164 format minus the +)
+      try {
+        const withPlus = '+' + cleanPhone;
+        const testParse = parsePhoneNumber(withPlus);
+        if (testParse && testParse.isValid()) {
+          // If it parses with just +, use it
+          cleanPhone = withPlus;
+        }
+      } catch (e) {
+        // Ignore - will try adding country code next
+      }
+    }
+    
     // Try parsing with country code in the number first
-    let parsedPhone = parsePhoneNumber(phone, { defaultCountry: countryCode });
+    let parsedPhone = parsePhoneNumber(cleanPhone, { defaultCountry: countryCode });
     
     // If parsing failed or phone doesn't have country code, add it
     if (!parsedPhone || !parsedPhone.country) {
-      // Remove any non-digit characters except leading +
-      const cleanPhone = phone.replace(/[^\d+]/g, '');
-      
       // If phone doesn't start with +, add country code
       if (!cleanPhone.startsWith('+')) {
         const dialCode = getCountryDialCode(countryCode);
@@ -264,7 +280,14 @@ export function getBestPhoneForContact(contact: {
     } else {
       // No country set - try to parse as international number
       try {
-        const parsed = parsePhoneNumber(contact.directPhone.trim());
+        let phoneToTest = contact.directPhone.trim();
+        
+        // If phone doesn't start with + but starts with digits, try adding + prefix
+        if (!phoneToTest.startsWith('+') && /^\d/.test(phoneToTest)) {
+          phoneToTest = '+' + phoneToTest;
+        }
+        
+        const parsed = parsePhoneNumber(phoneToTest);
         if (parsed && parsed.isValid()) {
           return { phone: parsed.format('E.164'), type: 'direct' };
         }
@@ -285,7 +308,14 @@ export function getBestPhoneForContact(contact: {
     } else {
       // No country set - try to parse as international number
       try {
-        const parsed = parsePhoneNumber(contact.mobilePhone.trim());
+        let phoneToTest = contact.mobilePhone.trim();
+        
+        // If phone doesn't start with + but starts with digits, try adding + prefix
+        if (!phoneToTest.startsWith('+') && /^\d/.test(phoneToTest)) {
+          phoneToTest = '+' + phoneToTest;
+        }
+        
+        const parsed = parsePhoneNumber(phoneToTest);
         if (parsed && parsed.isValid()) {
           return { phone: parsed.format('E.164'), type: 'mobile' };
         }
