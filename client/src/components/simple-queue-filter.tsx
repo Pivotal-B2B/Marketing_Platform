@@ -105,14 +105,40 @@ export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
             <SelectTrigger className="h-9">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="jobTitle">Job Title</SelectItem>
+            <SelectContent className="max-h-[300px]">
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Contact Information</div>
+              <SelectItem value="fullName">Full Name</SelectItem>
               <SelectItem value="firstName">First Name</SelectItem>
               <SelectItem value="lastName">Last Name</SelectItem>
               <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="jobTitle">Job Title</SelectItem>
+              <SelectItem value="department">Department</SelectItem>
+              <SelectItem value="seniorityLevel">Seniority Level</SelectItem>
+              <SelectItem value="directPhone">Direct Phone</SelectItem>
+              <SelectItem value="mobilePhone">Mobile Phone</SelectItem>
+              <SelectItem value="linkedinUrl">LinkedIn URL</SelectItem>
+              
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Geography</div>
               <SelectItem value="city">City</SelectItem>
               <SelectItem value="state">State/Region</SelectItem>
               <SelectItem value="country">Country</SelectItem>
+              
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Company Information</div>
+              <SelectItem value="companyName">Company Name</SelectItem>
+              <SelectItem value="companyWebsite">Company Website</SelectItem>
+              <SelectItem value="hqCity">HQ City</SelectItem>
+              <SelectItem value="hqState">HQ State</SelectItem>
+              <SelectItem value="hqCountry">HQ Country</SelectItem>
+              <SelectItem value="industry">Industry</SelectItem>
+              <SelectItem value="employeeCount">Employee Count</SelectItem>
+              
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Compliance</div>
+              <SelectItem value="consentBasis">Consent Basis</SelectItem>
+              <SelectItem value="consentSource">Consent Source</SelectItem>
+              
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">Lists & Segments</div>
+              <SelectItem value="listName">Static List</SelectItem>
+              <SelectItem value="segmentName">Dynamic Segment</SelectItem>
             </SelectContent>
           </Select>
         </div>
