@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { Separator } from "@/components/ui/separator";
-import { QueueFilterComposer } from "@/components/queue-filter-composer";
+import { SimpleQueueFilter } from "@/components/simple-queue-filter";
 import type { FilterGroup } from "@shared/filter-types";
 
 interface QueueControlsProps {
@@ -54,7 +54,6 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
 
   // State for replace queue options
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
-  const [hasIncompleteFilters, setHasIncompleteFilters] = useState(false);
   const [maxQueueSize, setMaxQueueSize] = useState<number | ''>(300);
 
   // Check if user has admin or manager role
@@ -72,19 +71,13 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
     enabled: !!campaignId && !!effectiveAgentId,
   });
 
-  // Reset filter to campaign's latest filter whenever dialog opens
+  // Reset state whenever dialog opens
   useEffect(() => {
-    if (showReplaceDialog && campaign) {
-      if (campaign.audienceRefs?.filterGroup) {
-        console.log('[QUEUE_CONTROLS] Resetting filter from campaign:', campaign.audienceRefs.filterGroup);
-        setFilterGroup(campaign.audienceRefs.filterGroup);
-      } else {
-        console.log('[QUEUE_CONTROLS] Campaign has no filter, clearing filter');
-        setFilterGroup(undefined);
-      }
+    if (showReplaceDialog) {
+      setFilterGroup(undefined);
       setMaxQueueSize(300);
     }
-  }, [showReplaceDialog, campaign]);
+  }, [showReplaceDialog]);
 
   // Set Queue (Replace) mutation
   const replaceQueueMutation = useMutation({
@@ -212,13 +205,8 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
             </AlertDialogHeader>
 
             <div className="space-y-4 py-2">
-              <QueueFilterComposer
-                entityType="contact"
-                onChange={(filter, hasIncomplete) => {
-                  setFilterGroup(filter || undefined);
-                  setHasIncompleteFilters(hasIncomplete || false);
-                }}
-                initialFilters={filterGroup}
+              <SimpleQueueFilter
+                onChange={(filter) => setFilterGroup(filter || undefined)}
               />
 
               <Separator />
@@ -243,13 +231,12 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
               <AlertDialogCancel disabled={isPending} data-testid="button-cancel-replace" className="h-9">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => replaceQueueMutation.mutate()}
-                disabled={isPending || hasIncompleteFilters}
+                disabled={isPending}
                 data-testid="button-confirm-replace"
                 className="h-9"
-                title={hasIncompleteFilters ? "Please complete all filters by pressing Enter to add values" : undefined}
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {hasIncompleteFilters ? "Complete Filters First" : "Set Queue"}
+                Set Queue
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
