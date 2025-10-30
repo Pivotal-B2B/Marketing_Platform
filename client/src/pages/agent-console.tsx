@@ -30,6 +30,7 @@ import {
   Target,
   Lightbulb,
   Sparkles,
+  Hash,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
