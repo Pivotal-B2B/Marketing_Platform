@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,8 @@ import {
   XCircle, 
   Clock,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 import {
   Table,
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Campaign = typeof campaigns.$inferSelect;
 type QueueStatus = "queued" | "in_progress" | "done" | "skipped" | "removed";
@@ -67,6 +69,7 @@ export default function CampaignQueuePage() {
   const { id: campaignId } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const { data: campaign } = useQuery<Campaign>({
     queryKey: ["/api/campaigns", campaignId],
@@ -80,6 +83,58 @@ export default function CampaignQueuePage() {
   const { data: accountStats = [] } = useQuery<AccountStats[]>({
     queryKey: ["/api/campaigns", campaignId, "account-stats"],
     enabled: !!campaignId,
+  });
+
+  // Add more contacts to queue mutation
+  const refillQueueMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest(
+        'POST',
+        `/api/campaigns/${campaignId}/queues/set`,
+        {
+          agent_id: user?.id,
+          filters: undefined,
+          per_account_cap: null,
+          max_queue_size: 5000,
+          keep_in_progress: true,
+          allow_sharing: true,
+        }
+      );
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      const totalSkipped = (data.skipped_due_to_collision || 0) + (data.skipped_no_phone || 0);
+      const descriptionParts = [
+        `Assigned: ${data.assigned}`,
+        `Released: ${data.released}`,
+      ];
+      
+      if (totalSkipped > 0) {
+        descriptionParts.push(`Filtered out: ${totalSkipped}`);
+        if (data.skipped_no_phone > 0) {
+          descriptionParts.push(`  - No valid phone: ${data.skipped_no_phone}`);
+        }
+        if (data.skipped_due_to_collision > 0) {
+          descriptionParts.push(`  - Already assigned: ${data.skipped_due_to_collision}`);
+        }
+      }
+      
+      toast({
+        title: data.assigned > 0 ? "Queue Refilled Successfully" : "Queue Refilled - Low Results",
+        description: descriptionParts.join('\n'),
+        variant: data.assigned === 0 ? "destructive" : "default",
+        duration: 8000,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "account-stats"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to refill queue",
+        variant: "destructive",
+      });
+    },
   });
 
   const handleRemoveFromQueue = async (queueItemId: string) => {
@@ -131,14 +186,21 @@ export default function CampaignQueuePage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "queue"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "account-stats"] });
-            }}
-            data-testid="button-refresh"
+            onClick={() => refillQueueMutation.mutate()}
+            disabled={refillQueueMutation.isPending}
+            data-testid="button-refill-queue"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            {refillQueueMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Adding Contacts...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refill Queue
+              </>
+            )}
           </Button>
         </div>
       </div>
