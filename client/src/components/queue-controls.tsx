@@ -82,6 +82,8 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
   // Set Queue (Replace) mutation
   const replaceQueueMutation = useMutation({
     mutationFn: async () => {
+      console.log('[QUEUE_CONTROLS] Sending queue set request with filters:', filterGroup);
+      
       const response = await apiRequest(
         'POST',
         `/api/campaigns/${campaignId}/queues/set`,
@@ -206,7 +208,10 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
 
             <div className="space-y-4 py-2">
               <SimpleQueueFilter
-                onChange={(filter) => setFilterGroup(filter || undefined)}
+                onChange={(filter) => {
+                  console.log('[QUEUE_CONTROLS] Received filter from SimpleQueueFilter:', filter);
+                  setFilterGroup(filter || undefined);
+                }}
               />
 
               <Separator />

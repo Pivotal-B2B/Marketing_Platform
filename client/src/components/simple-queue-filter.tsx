@@ -54,6 +54,13 @@ export function SimpleQueueFilter({ onChange }: SimpleQueueFilterProps) {
         }]
       };
       
+      console.log('[SimpleQueueFilter] Creating filter with values:', {
+        field,
+        operator,
+        values: newChips,
+        filter
+      });
+      
       setCurrentFilter(filter);
       onChange(filter);
     }
