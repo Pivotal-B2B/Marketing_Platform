@@ -80,10 +80,12 @@ export default function SipTrunkSettingsPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
+      provider: "telnyx",
       sipUsername: "",
       sipPassword: "",
       sipDomain: "sip.telnyx.com",
       isActive: true,
+      isDefault: false,
     },
   });
 
