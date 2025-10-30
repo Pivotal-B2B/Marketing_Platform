@@ -374,6 +374,35 @@ export function registerRoutes(app: Express) {
 
   // ==================== AUTH ====================
 
+  // ONE-TIME SETUP: Create initial admin user (REMOVE THIS ENDPOINT AFTER SETUP!)
+  app.post("/api/setup/create-admin", async (req, res) => {
+    try {
+      // Create admin user with known password
+      const hashedPassword = await hashPassword("admin123");
+      const adminUser = await storage.createUser({
+        username: "admin",
+        email: "admin@crm.local",
+        password: hashedPassword,
+        role: "admin",
+        firstName: "Admin",
+        lastName: "User"
+      });
+
+      // Assign admin role
+      await storage.assignRole(adminUser.id, 'admin');
+
+      res.json({ 
+        message: "Admin user created successfully",
+        username: "admin",
+        password: "admin123",
+        warning: "Change this password immediately after login!"
+      });
+    } catch (error: any) {
+      console.error('[SETUP] Error creating admin:', error);
+      res.status(500).json({ message: error.message || "Failed to create admin user" });
+    }
+  });
+
   // Apply strict rate limiting to login endpoint (5 attempts per 15 minutes)
   app.post("/api/auth/login", authLimiter, validate({ body: loginSchema }), async (req, res) => {
     try {
