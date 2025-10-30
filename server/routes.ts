@@ -4088,17 +4088,22 @@ export function registerRoutes(app: Express) {
   // Create SIP trunk config
   app.post("/api/sip-trunks", requireAuth, requireRole('admin'), async (req, res) => {
     try {
+      console.log('[SIP-TRUNK] Creating SIP trunk with data:', JSON.stringify(req.body, null, 2));
       const validated = insertSipTrunkConfigSchema.parse(req.body);
+      console.log('[SIP-TRUNK] Validation passed:', JSON.stringify(validated, null, 2));
       const config = await storage.createSipTrunkConfig({
         ...validated,
         createdById: req.user?.userId,
       });
+      console.log('[SIP-TRUNK] Successfully created SIP trunk:', config.id);
       res.status(201).json(config);
     } catch (error) {
+      console.error('[SIP-TRUNK] Error creating SIP trunk:', error);
       if (error instanceof z.ZodError) {
+        console.error('[SIP-TRUNK] Zod validation errors:', JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Failed to create SIP trunk configuration" });
+      res.status(500).json({ message: "Failed to create SIP trunk configuration", error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
