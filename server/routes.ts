@@ -374,11 +374,27 @@ export function registerRoutes(app: Express) {
 
   // ==================== AUTH ====================
 
-  // ONE-TIME SETUP: Create initial admin user (REMOVE THIS ENDPOINT AFTER SETUP!)
+  // ONE-TIME SETUP: Create or reset admin user (REMOVE THIS ENDPOINT AFTER SETUP!)
   app.post("/api/setup/create-admin", async (req, res) => {
     try {
-      // Create admin user with known password
       const hashedPassword = await hashPassword("admin123");
+      
+      // Check if admin user exists
+      const existingUser = await storage.getUserByUsername("admin");
+      
+      if (existingUser) {
+        // Reset password for existing admin
+        await storage.updateUser(existingUser.id, { password: hashedPassword });
+        
+        return res.json({ 
+          message: "Admin password reset successfully",
+          username: "admin",
+          password: "admin123",
+          warning: "Change this password immediately after login!"
+        });
+      }
+
+      // Create new admin user
       const adminUser = await storage.createUser({
         username: "admin",
         email: "admin@crm.local",
@@ -398,8 +414,8 @@ export function registerRoutes(app: Express) {
         warning: "Change this password immediately after login!"
       });
     } catch (error: any) {
-      console.error('[SETUP] Error creating admin:', error);
-      res.status(500).json({ message: error.message || "Failed to create admin user" });
+      console.error('[SETUP] Error with admin user:', error);
+      res.status(500).json({ message: error.message || "Failed to create/reset admin user" });
     }
   });
 
