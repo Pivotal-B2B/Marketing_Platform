@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Edit, CheckSquare, Square, Phone, Building2, Users, AlertCircle } from "lucide-react";
+import { Search, Edit, CheckSquare, Square, Phone, Building2, Users, AlertCircle, Filter, ChevronDown } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -27,6 +27,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface PhoneRecord {
   id: string;
@@ -67,6 +72,25 @@ export default function PhoneBulkEditor() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [previewUpdates, setPreviewUpdates] = useState<Array<{ record: PhoneRecord; updates: any }>>([]);
   const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Advanced filters
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [selectedList, setSelectedList] = useState<string>('');
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [selectedState, setSelectedState] = useState<string>('');
+  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
+  const [selectedIndustry, setSelectedIndustry] = useState<string>('');
+  
+  // Fetch lists for filtering
+  const { data: lists = [] } = useQuery({
+    queryKey: ['/api/segments'],
+  });
+  
+  // Fetch filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['/api/filter-options'],
+  });
 
   const handleSearch = async () => {
     if (!phonePattern.trim()) {
@@ -80,13 +104,65 @@ export default function PhoneBulkEditor() {
 
     setIsSearching(true);
     try {
+      // Build additional filters
+      const conditions: any[] = [];
+      
+      if (selectedCountry) {
+        conditions.push({
+          field: searchType === 'accounts' ? 'account.hqCountry' : 'contact.country',
+          operator: 'equals',
+          value: selectedCountry
+        });
+      }
+      
+      if (selectedState) {
+        conditions.push({
+          field: searchType === 'accounts' ? 'account.hqState' : 'contact.state',
+          operator: 'equals',
+          value: selectedState
+        });
+      }
+      
+      if (selectedCity) {
+        conditions.push({
+          field: searchType === 'accounts' ? 'account.hqCity' : 'contact.city',
+          operator: 'equals',
+          value: selectedCity
+        });
+      }
+      
+      if (selectedDepartment && searchType !== 'accounts') {
+        conditions.push({
+          field: 'contact.department',
+          operator: 'equals',
+          value: selectedDepartment
+        });
+      }
+      
+      if (selectedIndustry && searchType !== 'contacts') {
+        conditions.push({
+          field: 'account.industry',
+          operator: 'equals',
+          value: selectedIndustry
+        });
+      }
+      
+      if (selectedList) {
+        conditions.push({
+          field: 'list',
+          operator: 'in',
+          value: [selectedList]
+        });
+      }
+
       const response = await apiRequest({
         method: 'POST',
         url: '/api/phone-bulk/search',
         data: {
           searchType,
           phonePattern: phonePattern.trim(),
-          additionalFilters: null
+          additionalFilters: conditions.length > 0 ? conditions : null,
+          listId: selectedList || null
         }
       });
 
@@ -286,6 +362,152 @@ export default function PhoneBulkEditor() {
               </div>
             </div>
           </div>
+          
+          {/* Advanced Filters */}
+          <Collapsible open={showAdvancedFilters} onOpenChange={setShowAdvancedFilters}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" className="w-full justify-between" data-testid="button-toggle-filters">
+                <span className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  Advanced Filters
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-4">
+              <Separator />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* List/Segment Filter */}
+                <div className="space-y-2">
+                  <Label htmlFor="filterList">List / Segment</Label>
+                  <Select value={selectedList} onValueChange={setSelectedList}>
+                    <SelectTrigger id="filterList" data-testid="select-filter-list">
+                      <SelectValue placeholder="All lists" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All lists</SelectItem>
+                      {lists.map((list: any) => (
+                        <SelectItem key={list.id} value={list.id}>
+                          {list.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Country Filter */}
+                <div className="space-y-2">
+                  <Label htmlFor="filterCountry">Country</Label>
+                  <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                    <SelectTrigger id="filterCountry" data-testid="select-filter-country">
+                      <SelectValue placeholder="All countries" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All countries</SelectItem>
+                      {filterOptions?.countries?.map((country: string) => (
+                        <SelectItem key={country} value={country}>
+                          {country}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* State Filter */}
+                <div className="space-y-2">
+                  <Label htmlFor="filterState">State / Region</Label>
+                  <Select value={selectedState} onValueChange={setSelectedState}>
+                    <SelectTrigger id="filterState" data-testid="select-filter-state">
+                      <SelectValue placeholder="All states" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All states</SelectItem>
+                      {filterOptions?.states?.map((state: string) => (
+                        <SelectItem key={state} value={state}>
+                          {state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* City Filter */}
+                <div className="space-y-2">
+                  <Label htmlFor="filterCity">City</Label>
+                  <Select value={selectedCity} onValueChange={setSelectedCity}>
+                    <SelectTrigger id="filterCity" data-testid="select-filter-city">
+                      <SelectValue placeholder="All cities" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All cities</SelectItem>
+                      {filterOptions?.cities?.map((city: string) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Department Filter (Contacts Only) */}
+                {searchType !== 'accounts' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="filterDepartment">Department</Label>
+                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                      <SelectTrigger id="filterDepartment" data-testid="select-filter-department">
+                        <SelectValue placeholder="All departments" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All departments</SelectItem>
+                        {filterOptions?.departments?.map((dept: string) => (
+                          <SelectItem key={dept} value={dept}>
+                            {dept}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                
+                {/* Industry Filter (Accounts Only) */}
+                {searchType !== 'contacts' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="filterIndustry">Industry</Label>
+                    <Select value={selectedIndustry} onValueChange={setSelectedIndustry}>
+                      <SelectTrigger id="filterIndustry" data-testid="select-filter-industry">
+                        <SelectValue placeholder="All industries" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All industries</SelectItem>
+                        {filterOptions?.industries?.map((industry: string) => (
+                          <SelectItem key={industry} value={industry}>
+                            {industry}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              
+              {/* Clear Filters Button */}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => {
+                  setSelectedList('');
+                  setSelectedCountry('');
+                  setSelectedState('');
+                  setSelectedCity('');
+                  setSelectedDepartment('');
+                  setSelectedIndustry('');
+                }}
+                data-testid="button-clear-filters"
+              >
+                Clear All Filters
+              </Button>
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
 

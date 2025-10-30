@@ -6900,7 +6900,7 @@ export function registerRoutes(app: Express) {
   // Search for contacts and accounts with phone pattern matching
   app.post("/api/phone-bulk/search", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { searchType, phonePattern, additionalFilters } = req.body;
+      const { searchType, phonePattern, additionalFilters, listId } = req.body;
 
       if (!searchType || !phonePattern) {
         return res.status(400).json({ message: "searchType and phonePattern are required" });
@@ -6924,7 +6924,14 @@ export function registerRoutes(app: Express) {
           conditions: additionalFilters
         } : undefined;
 
-        const allContacts = await storage.getContacts(contactFilters);
+        let allContacts = await storage.getContacts(contactFilters);
+        
+        // If list filtering is specified, filter by list membership
+        if (listId) {
+          const listContacts = await storage.getListContacts(listId);
+          const listContactIds = new Set(listContacts.map(lc => lc.contactId));
+          allContacts = allContacts.filter(c => listContactIds.has(c.id));
+        }
         
         // Filter by phone pattern
         const matchingContacts = allContacts.filter(contact => 
@@ -6961,7 +6968,14 @@ export function registerRoutes(app: Express) {
           conditions: additionalFilters
         } : undefined;
 
-        const allAccounts = await storage.getAccounts(accountFilters);
+        let allAccounts = await storage.getAccounts(accountFilters);
+        
+        // If list filtering is specified, filter by list membership  
+        if (listId) {
+          const listAccounts = await storage.getListAccounts(listId);
+          const listAccountIds = new Set(listAccounts.map(la => la.accountId));
+          allAccounts = allAccounts.filter(a => listAccountIds.has(a.id));
+        }
         
         // Filter by phone pattern
         const matchingAccounts = allAccounts.filter(account => 
