@@ -16,7 +16,7 @@ const filterConditionSchema = z.object({
   id: z.string(),
   field: z.string(),
   operator: z.string(),
-  value: z.any(),
+  values: z.array(z.any()).optional(), // Array of values for the filter
 });
 
 // Schema for filter group (matches FilterGroup from @shared/filter-types)
