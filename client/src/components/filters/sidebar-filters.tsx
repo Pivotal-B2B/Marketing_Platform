@@ -101,21 +101,12 @@ export function SidebarFilters({
 
   // Update condition
   const updateCondition = (id: string, updatedCondition: FilterCondition) => {
-    console.log('[SIDEBAR_FILTERS] Updating condition:', {
-      id,
-      updatedCondition,
-      currentConditions: filterGroup.conditions
-    });
-    
-    const newFilterGroup = {
+    setFilterGroup({
       ...filterGroup,
       conditions: filterGroup.conditions.map((c) =>
         c.id === id ? updatedCondition : c
       ),
-    };
-    
-    console.log('[SIDEBAR_FILTERS] New filterGroup:', newFilterGroup);
-    setFilterGroup(newFilterGroup);
+    });
   };
 
   // Apply filters with animation
@@ -137,13 +128,6 @@ export function SidebarFilters({
       ...filterGroup,
       conditions: validConditions
     };
-    
-    console.log('[SIDEBAR_FILTERS] Applying filters:', {
-      originalCount: filterGroup.conditions.length,
-      validCount: validConditions.length,
-      logic: filterGroup.logic,
-      filterToApply
-    });
     
     // Update local state to remove invalid conditions
     if (validConditions.length !== filterGroup.conditions.length) {
