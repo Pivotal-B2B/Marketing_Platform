@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { Separator } from "@/components/ui/separator";
-import { SidebarFilters } from "@/components/filters/sidebar-filters";
+import { QueueFilterComposer } from "@/components/queue-filter-composer";
 import type { FilterGroup } from "@shared/filter-types";
 
 interface QueueControlsProps {
@@ -54,6 +54,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
 
   // State for replace queue options
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
+  const [hasIncompleteFilters, setHasIncompleteFilters] = useState(false);
   const [maxQueueSize, setMaxQueueSize] = useState<number | ''>(300);
 
   // Check if user has admin or manager role
@@ -88,47 +89,12 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
   // Set Queue (Replace) mutation
   const replaceQueueMutation = useMutation({
     mutationFn: async () => {
-      // IMPORTANT: Validate filterGroup before submitting
-      // Remove conditions with empty values (except is_empty/has_any_value operators)
-      let validatedFilters = undefined;
-      if (filterGroup && filterGroup.conditions && filterGroup.conditions.length > 0) {
-        const validConditions = filterGroup.conditions.filter(condition => {
-          const needsValues = condition.operator !== 'is_empty' && condition.operator !== 'has_any_value';
-          const hasValues = condition.values && condition.values.length > 0;
-          return !needsValues || hasValues;
-        });
-        
-        const removedCount = filterGroup.conditions.length - validConditions.length;
-        
-        console.log('[QUEUE_CONTROLS] Validating filters before submit:', {
-          originalCount: filterGroup.conditions.length,
-          validCount: validConditions.length,
-          removedInvalid: removedCount
-        });
-        
-        // Warn user if any filters were removed
-        if (removedCount > 0) {
-          toast({
-            title: "Incomplete Filters Removed",
-            description: `${removedCount} filter(s) had no values and were skipped. Press Enter to add values, or click "Apply Filters" before setting queue.`,
-            variant: "default",
-          });
-        }
-        
-        if (validConditions.length > 0) {
-          validatedFilters = {
-            ...filterGroup,
-            conditions: validConditions
-          };
-        }
-      }
-      
       const response = await apiRequest(
         'POST',
         `/api/campaigns/${campaignId}/queues/set`,
         {
           agent_id: effectiveAgentId,
-          filters: validatedFilters,
+          filters: filterGroup || undefined,
           per_account_cap: null,
           max_queue_size: maxQueueSize || null,
           keep_in_progress: true,
@@ -229,13 +195,6 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
 
   const isPending = replaceQueueMutation.isPending || clearQueueMutation.isPending || clearAllQueuesMutation.isPending;
 
-  // Check if current filters are valid (have values for non-empty operators)
-  const hasIncompleteFilters = filterGroup && filterGroup.conditions && filterGroup.conditions.some(condition => {
-    const needsValues = condition.operator !== 'is_empty' && condition.operator !== 'has_any_value';
-    const hasValues = condition.values && condition.values.length > 0;
-    return needsValues && !hasValues;
-  });
-
   // Render dialogs once at the end (shared between compact and full card modes)
   const renderSharedDialogs = () => {
     if (!renderDialogs) return null;
@@ -252,18 +211,20 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
               </AlertDialogDescription>
             </AlertDialogHeader>
 
-            <div className="space-y-3 py-2">
-              <SidebarFilters
+            <div className="space-y-4 py-2">
+              <QueueFilterComposer
                 entityType="contact"
-                onApplyFilter={(filter) => setFilterGroup(filter)}
-                initialFilter={filterGroup}
-                embedded={true}
+                onChange={(filter, hasIncomplete) => {
+                  setFilterGroup(filter || undefined);
+                  setHasIncompleteFilters(hasIncomplete || false);
+                }}
+                initialFilters={filterGroup}
               />
 
               <Separator />
 
               <div className="space-y-2">
-                <Label htmlFor="maxQueueSize" className="text-sm">Max Queue Size</Label>
+                <Label htmlFor="maxQueueSize" className="text-sm font-medium">Max Queue Size</Label>
                 <Input
                   id="maxQueueSize"
                   type="number"
@@ -274,6 +235,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
                   data-testid="input-max-queue-size"
                   className="h-9"
                 />
+                <p className="text-xs text-muted-foreground">Maximum number of contacts to queue</p>
               </div>
             </div>
 
@@ -284,10 +246,10 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
                 disabled={isPending || hasIncompleteFilters}
                 data-testid="button-confirm-replace"
                 className="h-9"
-                title={hasIncompleteFilters ? "Please click 'Apply Filters' or press Enter to add filter values" : undefined}
+                title={hasIncompleteFilters ? "Please complete all filters by pressing Enter to add values" : undefined}
               >
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {hasIncompleteFilters ? "Add Filter Values First" : "Set Queue"}
+                {hasIncompleteFilters ? "Complete Filters First" : "Set Queue"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
