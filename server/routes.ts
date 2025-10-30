@@ -43,7 +43,7 @@ import {
   userIdSchema
 } from "./validation/schemas";
 import { db } from "./db";
-import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts, lists, segments, leads, verificationCampaigns, verificationContacts, verificationLeadSubmissions, suppressionPhones } from "@shared/schema";
+import { customFieldDefinitions, accounts as accountsTable, contacts as contactsTable, domainSetItems, users, campaignAgentAssignments, campaignQueue, agentQueue, campaigns, contacts, accounts, lists, segments, leads, verificationCampaigns, verificationContacts, verificationLeadSubmissions, suppressionPhones, campaignSuppressionContacts, campaignSuppressionAccounts, campaignSuppressionEmails, campaignSuppressionDomains } from "@shared/schema";
 import {
   insertAccountSchema,
   insertContactSchema,
@@ -2475,6 +2475,51 @@ export function registerRoutes(app: Express) {
       res.json(campaign);
     } catch (error) {
       res.status(500).json({ message: "Failed to update campaign" });
+    }
+  });
+
+  app.delete("/api/campaigns/:id", requireAuth, requireRole('admin', 'campaign_manager'), async (req, res) => {
+    try {
+      const campaignId = req.params.id;
+      
+      // Check if campaign exists
+      const campaign = await storage.getCampaign(campaignId);
+      if (!campaign) {
+        return res.status(404).json({ message: "Campaign not found" });
+      }
+
+      // Delete related data first (cascading delete)
+      // 1. Release all agent assignments
+      await db.delete(campaignAgentAssignments)
+        .where(eq(campaignAgentAssignments.campaignId, campaignId));
+
+      // 2. Clear agent queues
+      await db.delete(agentQueue)
+        .where(eq(agentQueue.campaignId, campaignId));
+
+      // 3. Clear campaign queue
+      await db.delete(campaignQueue)
+        .where(eq(campaignQueue.campaignId, campaignId));
+
+      // 4. Delete campaign suppressions
+      await db.delete(campaignSuppressionContacts)
+        .where(eq(campaignSuppressionContacts.campaignId, campaignId));
+      await db.delete(campaignSuppressionAccounts)
+        .where(eq(campaignSuppressionAccounts.campaignId, campaignId));
+      await db.delete(campaignSuppressionEmails)
+        .where(eq(campaignSuppressionEmails.campaignId, campaignId));
+      await db.delete(campaignSuppressionDomains)
+        .where(eq(campaignSuppressionDomains.campaignId, campaignId));
+
+      // 5. Delete the campaign itself
+      await db.delete(campaigns)
+        .where(eq(campaigns.id, campaignId));
+
+      invalidateDashboardCache();
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      res.status(500).json({ message: "Failed to delete campaign" });
     }
   });
 
