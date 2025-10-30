@@ -4,24 +4,13 @@ import {
   Users,
   Megaphone,
   CheckCircle,
-  BarChart3, // Changed from BarChart to BarChart3
+  BarChart3,
   Briefcase,
-  Settings,
   LogOut,
   ChevronDown,
-  Phone,
-  Settings2,
-  Sparkles,
-  Cloud,
-  Zap,
-  Palette,
-  Share2,
-  ShieldCheck,
-  UserCog,
-  Mail,
   Headphones,
-  Activity, // Added Activity icon
-  Database, // Added for Data Verification
+  Activity,
+  Database,
 } from "lucide-react";
 import {
   Sidebar,
@@ -134,30 +123,6 @@ const getNavSections = (): NavSection[] => [
     ],
   },
 
-  // Creative & Content Section
-  {
-    label: "Creative & Content",
-    roles: ["admin", "campaign_manager", "content_creator"],
-    items: [
-      {
-        title: "Content Studio",
-        icon: Palette,
-        roles: ["admin", "campaign_manager", "content_creator"],
-        items: [
-          { title: "Content Library", url: "/content-studio", roles: ["admin", "campaign_manager", "content_creator"] },
-          { title: "AI Content Generator", url: "/content-studio/ai-generator", roles: ["admin", "campaign_manager", "content_creator"] },
-          { title: "Social Media Publisher", url: "/content-studio/social-publisher", roles: ["admin", "campaign_manager", "content_creator"] },
-        ],
-      },
-      {
-        title: "Resources Centre",
-        url: "/resources-centre",
-        icon: Cloud,
-        roles: ["admin", "campaign_manager", "data_ops", "content_creator"],
-      },
-    ],
-  },
-
   // Analytics & Reporting Section
   {
     label: "Analytics & Reporting",
@@ -197,12 +162,6 @@ const getNavSections = (): NavSection[] => [
         title: "Verification Campaigns",
         url: "/verification/campaigns",
         icon: Database,
-        roles: ["admin", "data_ops", "quality_analyst"],
-      },
-      {
-        title: "DV Projects",
-        url: "/dv/projects",
-        icon: Briefcase,
         roles: ["admin", "data_ops", "quality_analyst"],
       },
     ],
