@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, Trash2, Plus, FileText, AlertCircle, Building2, Mail, Globe, Phone } from "lucide-react";
+import { Upload, Trash2, Plus, FileText, AlertCircle, CheckCircle2, Building2, Mail, Globe, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -90,6 +90,7 @@ export function CampaignSuppressionManager({ campaignId }: CampaignSuppressionMa
   // === SMART UPLOAD ===
   const [smartUploadContent, setSmartUploadContent] = useState("");
   const [smartUploadDialogOpen, setSmartUploadDialogOpen] = useState(false);
+  const [smartUploadFileName, setSmartUploadFileName] = useState<string | null>(null);
 
   const smartUploadMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -118,6 +119,7 @@ export function CampaignSuppressionManager({ campaignId }: CampaignSuppressionMa
         queryKey: ['/api/campaigns', campaignId, 'suppressions'] 
       });
       setSmartUploadContent("");
+      setSmartUploadFileName(null);
       setSmartUploadDialogOpen(false);
     },
     onError: (error: any) => {
@@ -133,12 +135,48 @@ export function CampaignSuppressionManager({ campaignId }: CampaignSuppressionMa
     if (!smartUploadContent.trim()) {
       toast({
         title: "No Data",
-        description: "Please enter company names or email addresses",
+        description: "Please upload a CSV file or paste company names / email addresses",
         variant: "destructive",
       });
       return;
     }
     smartUploadMutation.mutate(smartUploadContent);
+  };
+
+  const handleSmartUploadFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type (case-insensitive)
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload a CSV file (.csv)",
+        variant: "destructive",
+      });
+      // Clear input to allow retry
+      e.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setSmartUploadContent(content.trim());
+      setSmartUploadFileName(file.name);
+      // Clear input to allow re-uploading same filename
+      e.target.value = "";
+    };
+    reader.onerror = () => {
+      toast({
+        title: "File Read Error",
+        description: "Failed to read the CSV file",
+        variant: "destructive",
+      });
+      // Clear input to allow retry
+      e.target.value = "";
+    };
+    reader.readAsText(file);
   };
 
   // === EMAIL SUPPRESSIONS ===
@@ -634,31 +672,81 @@ export function CampaignSuppressionManager({ campaignId }: CampaignSuppressionMa
                       Smart Suppression Upload
                     </DialogTitle>
                     <DialogDescription className="text-base">
-                      Paste company names and email addresses - one per line or comma-separated
+                      Upload a CSV file or paste company names / emails directly
                     </DialogDescription>
                   </DialogHeader>
-                  <Textarea
-                    placeholder="Acme Corporation&#10;competitor.com&#10;john@example.com&#10;jane@company.co.uk&#10;Bad Company Inc"
-                    value={smartUploadContent}
-                    onChange={(e) => setSmartUploadContent(e.target.value)}
-                    rows={14}
-                    className="font-mono text-sm"
-                    data-testid="textarea-smart-upload"
-                  />
+
+                  {/* File Upload Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleSmartUploadFileChange}
+                        className="hidden"
+                        id="smart-upload-file-input-email"
+                        data-testid="input-smart-upload-file-email"
+                      />
+                      <label htmlFor="smart-upload-file-input-email">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          className="gap-2 cursor-pointer" 
+                          asChild
+                        >
+                          <span>
+                            <FileText className="w-4 h-4" />
+                            Choose CSV File
+                          </span>
+                        </Button>
+                      </label>
+                      {smartUploadFileName && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-md">
+                          <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-700">{smartUploadFileName}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">
+                          Or paste directly
+                        </span>
+                      </div>
+                    </div>
+
+                    <Textarea
+                      placeholder="Email,Company Name&#10;iain.summerfield@laser24.co.uk,LASER 24&#10;&#10;Or paste company names/emails one per line:&#10;Acme Corporation&#10;competitor.com&#10;john@example.com"
+                      value={smartUploadContent}
+                      onChange={(e) => setSmartUploadContent(e.target.value)}
+                      rows={10}
+                      className="font-mono text-sm"
+                      data-testid="textarea-smart-upload"
+                    />
+                  </div>
+
                   <Alert className="bg-indigo-50/50 border-indigo-200">
                     <AlertCircle className="w-4 h-4 text-indigo-600" />
                     <AlertDescription>
-                      <strong className="text-indigo-900">How it works:</strong>
+                      <strong className="text-indigo-900">Supported formats:</strong>
                       <ul className="mt-2 space-y-1 text-sm text-indigo-800">
-                        <li>✅ <strong>Emails</strong> → Suppresses specific email addresses</li>
-                        <li>✅ <strong>Domains</strong> → Automatically extracted from emails</li>
-                        <li>✅ <strong>Companies</strong> → Matches by name (normalized)</li>
-                        <li>✅ <strong>Lead Cap</strong> → Enforced by both domain AND company name</li>
+                        <li>✅ <strong>CSV with headers:</strong> "Email,Company Name" - processes both columns</li>
+                        <li>✅ <strong>Simple list:</strong> One email or company name per line</li>
+                        <li>✅ <strong>Auto-detection:</strong> Automatically identifies emails vs company names</li>
+                        <li>✅ <strong>Domain extraction:</strong> Automatically extracts domains from emails</li>
                       </ul>
                     </AlertDescription>
                   </Alert>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setSmartUploadDialogOpen(false)}>
+                    <Button variant="outline" onClick={() => {
+                      setSmartUploadDialogOpen(false);
+                      setSmartUploadContent("");
+                      setSmartUploadFileName(null);
+                    }}>
                       Cancel
                     </Button>
                     <Button
