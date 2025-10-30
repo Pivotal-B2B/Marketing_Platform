@@ -3876,99 +3876,98 @@ export function registerRoutes(app: Express) {
       }
 
       // 4. QUEUE MANAGEMENT - Intelligent next actions based on disposition
+      // CRITICAL: Queue cleanup must succeed or whole request fails
       if (contactId && campaignId) {
-        try {
-          // Define final dispositions (contact should be removed from campaign immediately)
-          const finalDispositions = ['qualified', 'lead', 'not_interested', 'dnc-request', 'callback-requested'];
-          
-          // Define retry dispositions (contact should be requeued after delay)
-          const retryDispositions = ['no-answer', 'busy', 'voicemail'];
-          
-          // Define invalid dispositions (contact should be marked invalid and removed)
-          const invalidDispositions = ['wrong_number', 'invalid_data'];
+        // Define final dispositions (contact should be removed from campaign immediately)
+        const finalDispositions = ['qualified', 'lead', 'not_interested', 'dnc-request', 'callback-requested'];
+        
+        // Define retry dispositions (contact should be requeued after delay)
+        const retryDispositions = ['no-answer', 'busy', 'voicemail'];
+        
+        // Define invalid dispositions (contact should be marked invalid and removed)
+        const invalidDispositions = ['wrong_number', 'invalid_data'];
 
-          if (finalDispositions.includes(disposition)) {
-            // Remove from ALL agents' queues (final disposition - contact is done)
-            console.log(`[DISPOSITION] Final disposition "${disposition}" - removing contact ${contactId} from ALL queues in campaign ${campaignId}`);
-            
-            const removed = await db.delete(agentQueue)
-              .where(
-                and(
-                  eq(agentQueue.contactId, contactId),
-                  eq(agentQueue.campaignId, campaignId)
-                )
+        if (finalDispositions.includes(disposition)) {
+          // Remove from ALL agents' queues (final disposition - contact is done)
+          console.log(`[DISPOSITION] Final disposition "${disposition}" - removing contact ${contactId} from ALL queues in campaign ${campaignId}`);
+          
+          const removed = await db.delete(agentQueue)
+            .where(
+              and(
+                eq(agentQueue.contactId, contactId),
+                eq(agentQueue.campaignId, campaignId)
               )
-              .returning({ agentId: agentQueue.agentId, queueState: agentQueue.queueState });
+            )
+            .returning({ agentId: agentQueue.agentId, queueState: agentQueue.queueState });
 
-            if (removed.length > 0) {
-              console.log(`[DISPOSITION] Removed from ${removed.length} agents' queues`);
-            }
-          } else if (retryDispositions.includes(disposition)) {
-            // Requeue with 3-day delay
-            console.log(`[DISPOSITION] Retry disposition "${disposition}" - requeuing contact ${contactId} with 3-day delay`);
-            
-            const retryDate = new Date();
-            retryDate.setDate(retryDate.getDate() + 3);
-            
-            // Update queue item to schedule for retry
-            await db.update(agentQueue)
-              .set({
-                queueState: 'queued',
-                scheduledFor: retryDate,
-                lockedBy: null,
-                lockedAt: null,
-                updatedAt: new Date(),
-              })
-              .where(
-                and(
-                  eq(agentQueue.contactId, contactId),
-                  eq(agentQueue.campaignId, campaignId),
-                  eq(agentQueue.agentId, agentId)
-                )
-              );
-            
-            console.log(`[DISPOSITION] Contact requeued for retry at ${retryDate.toISOString()}`);
-          } else if (invalidDispositions.includes(disposition)) {
-            // Mark contact as invalid and remove from campaign
-            console.log(`[DISPOSITION] Invalid disposition "${disposition}" - marking contact ${contactId} as invalid`);
-            
-            // Mark contact as invalid
-            if (contact) {
-              await db.update(contactsTable)
-                .set({
-                  isInvalid: true,
-                  invalidReason: `Agent marked as ${disposition}`,
-                  invalidatedAt: new Date(),
-                  invalidatedBy: agentId,
-                })
-                .where(eq(contactsTable.id, contactId));
-            }
-            
-            // Remove from ALL queues
-            await db.delete(agentQueue)
-              .where(
-                and(
-                  eq(agentQueue.contactId, contactId),
-                  eq(agentQueue.campaignId, campaignId)
-                )
-              );
-            
-            console.log(`[DISPOSITION] Contact marked invalid and removed from campaign`);
-          } else {
-            // Default behavior for other dispositions - remove from current agent's queue only
-            console.log(`[DISPOSITION] Standard disposition "${disposition}" - removing from current agent's queue`);
-            
-            await db.delete(agentQueue)
-              .where(
-                and(
-                  eq(agentQueue.contactId, contactId),
-                  eq(agentQueue.campaignId, campaignId),
-                  eq(agentQueue.agentId, agentId)
-                )
-              );
+          if (removed.length > 0) {
+            console.log(`[DISPOSITION] ✅ Successfully removed from ${removed.length} agents' queues`);
           }
-        } catch (error) {
-          console.error('[DISPOSITION] Error managing queue:', error);
+        } else if (retryDispositions.includes(disposition)) {
+          // Requeue with 3-day delay
+          console.log(`[DISPOSITION] Retry disposition "${disposition}" - requeuing contact ${contactId} with 3-day delay`);
+          
+          const retryDate = new Date();
+          retryDate.setDate(retryDate.getDate() + 3);
+          
+          // Update queue item to schedule for retry
+          await db.update(agentQueue)
+            .set({
+              queueState: 'queued',
+              scheduledFor: retryDate,
+              lockedBy: null,
+              lockedAt: null,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(agentQueue.contactId, contactId),
+                eq(agentQueue.campaignId, campaignId),
+                eq(agentQueue.agentId, agentId)
+              )
+            );
+          
+          console.log(`[DISPOSITION] ✅ Contact requeued for retry at ${retryDate.toISOString()}`);
+        } else if (invalidDispositions.includes(disposition)) {
+          // Mark contact as invalid and remove from campaign
+          console.log(`[DISPOSITION] Invalid disposition "${disposition}" - marking contact ${contactId} as invalid`);
+          
+          // Mark contact as invalid
+          if (contact) {
+            await db.update(contactsTable)
+              .set({
+                isInvalid: true,
+                invalidReason: `Agent marked as ${disposition}`,
+                invalidatedAt: new Date(),
+                invalidatedBy: agentId,
+              })
+              .where(eq(contactsTable.id, contactId));
+          }
+          
+          // Remove from ALL queues
+          await db.delete(agentQueue)
+            .where(
+              and(
+                eq(agentQueue.contactId, contactId),
+                eq(agentQueue.campaignId, campaignId)
+              )
+            );
+          
+          console.log(`[DISPOSITION] ✅ Contact marked invalid and removed from campaign`);
+        } else {
+          // Default behavior for other dispositions - remove from current agent's queue only
+          console.log(`[DISPOSITION] Standard disposition "${disposition}" - removing from current agent's queue`);
+          
+          await db.delete(agentQueue)
+            .where(
+              and(
+                eq(agentQueue.contactId, contactId),
+                eq(agentQueue.campaignId, campaignId),
+                eq(agentQueue.agentId, agentId)
+              )
+            );
+          
+          console.log(`[DISPOSITION] ✅ Removed from queue`);
         }
       }
 
