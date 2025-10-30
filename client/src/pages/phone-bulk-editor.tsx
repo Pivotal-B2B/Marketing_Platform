@@ -152,19 +152,19 @@ export default function PhoneBulkEditor() {
       const updates: any = {};
       
       if (record.type === 'contact') {
-        // Check each phone field
+        // Check each phone field - use replaceAll for simple string replacement (handles special chars like +, (, ), etc.)
         if (record.phone && record.phone.includes(findValue)) {
-          updates.phone = record.phone.replace(new RegExp(findValue, 'g'), replaceValue);
+          updates.phone = record.phone.replaceAll(findValue, replaceValue);
         }
         if (record.mobile && record.mobile.includes(findValue)) {
-          updates.mobile = record.mobile.replace(new RegExp(findValue, 'g'), replaceValue);
+          updates.mobile = record.mobile.replaceAll(findValue, replaceValue);
         }
         if (record.tel && record.tel.includes(findValue)) {
-          updates.tel = record.tel.replace(new RegExp(findValue, 'g'), replaceValue);
+          updates.tel = record.tel.replaceAll(findValue, replaceValue);
         }
       } else if (record.type === 'account') {
         if (record.phone && record.phone.includes(findValue)) {
-          updates.phone = record.phone.replace(new RegExp(findValue, 'g'), replaceValue);
+          updates.phone = record.phone.replaceAll(findValue, replaceValue);
         }
       }
 
