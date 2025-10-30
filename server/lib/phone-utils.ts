@@ -179,7 +179,8 @@ export function normalizePhoneWithCountryCode(
       countryMatches,
     };
   } catch (error) {
-    console.error('[PhoneUtils] Error normalizing phone:', error);
+    // Silently return null for parsing errors (invalid numbers, malformed data, etc.)
+    // Logging thousands of these errors causes performance issues during campaign launch
     return {
       normalized: null,
       e164: null,
