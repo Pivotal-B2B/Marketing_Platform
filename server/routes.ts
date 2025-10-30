@@ -2437,23 +2437,15 @@ export function registerRoutes(app: Express) {
 
           console.log(`[Campaign Creation] Phone validation: ${contactsWithCallablePhones.length}/${contactIds.length} contacts have callable phones`);
 
-          // Enqueue contacts with callable phones only
-          let enqueuedCount = 0;
-          for (const row of contactsWithCallablePhones) {
-            try {
-              await storage.enqueueContact(
-                campaign.id,
-                row.contacts.id,
-                row.contacts.accountId!,
-                0
-              );
-              enqueuedCount++;
-            } catch (error) {
-              // Skip contacts that can't be enqueued (e.g., already in queue)
-            }
-          }
+          // Bulk enqueue all contacts with callable phones
+          const contactsToEnqueue = contactsWithCallablePhones.map(row => ({
+            contactId: row.contacts.id,
+            accountId: row.contacts.accountId!,
+            priority: 0
+          }));
 
-          console.log(`[Campaign Creation] Auto-populated ${enqueuedCount} contacts to queue for campaign ${campaign.id}`);
+          const { enqueued } = await storage.bulkEnqueueContacts(campaign.id, contactsToEnqueue);
+          console.log(`[Campaign Creation] Auto-populated ${enqueued} contacts to queue for campaign ${campaign.id}`);
         }
       }
 

@@ -150,6 +150,7 @@ export interface IStorage {
   // Campaign Queue (Account Lead Cap)
   getCampaignQueue(campaignId: string, status?: string): Promise<any[]>;
   enqueueContact(campaignId: string, contactId: string, accountId: string, priority?: number): Promise<any>;
+  bulkEnqueueContacts(campaignId: string, contacts: Array<{ contactId: string; accountId: string; priority?: number }>): Promise<{ enqueued: number }>;
   updateQueueStatus(id: string, status: string, removedReason?: string, isPositiveDisposition?: boolean): Promise<any>;
   removeFromQueue(campaignId: string, contactId: string, reason: string): Promise<void>;
   removeFromQueueById(campaignId: string, queueId: string, reason: string): Promise<void>;
@@ -1486,6 +1487,49 @@ export class DatabaseStorage implements IStorage {
       });
 
       return queueItem;
+    });
+  }
+
+  async bulkEnqueueContacts(campaignId: string, contacts: Array<{ contactId: string; accountId: string; priority?: number }>): Promise<{ enqueued: number }> {
+    if (contacts.length === 0) {
+      return { enqueued: 0 };
+    }
+
+    return await db.transaction(async (tx) => {
+      // Batch insert all queue items
+      const queueValues = contacts.map(c => ({
+        campaignId,
+        contactId: c.contactId,
+        accountId: c.accountId,
+        priority: c.priority ?? 0,
+        status: 'queued' as const,
+      }));
+
+      await tx.insert(campaignQueue).values(queueValues);
+
+      // Count contacts per account for batch stats update
+      const accountCounts = new Map<string, number>();
+      for (const contact of contacts) {
+        accountCounts.set(contact.accountId, (accountCounts.get(contact.accountId) || 0) + 1);
+      }
+
+      // Batch upsert account stats
+      for (const [accountId, count] of Array.from(accountCounts.entries())) {
+        await tx.insert(campaignAccountStats).values({
+          campaignId,
+          accountId,
+          queuedCount: count,
+          connectedCount: 0,
+          positiveDispCount: 0,
+        }).onConflictDoUpdate({
+          target: [campaignAccountStats.campaignId, campaignAccountStats.accountId],
+          set: {
+            queuedCount: sql`${campaignAccountStats.queuedCount} + ${count}`,
+          },
+        });
+      }
+
+      return { enqueued: contacts.length };
     });
   }
 
