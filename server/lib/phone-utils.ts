@@ -207,7 +207,8 @@ export function validatePhoneCountryMatch(
 
     return parsedPhone.country === countryCode;
   } catch (error) {
-    console.error('[PhoneUtils] Error validating phone country match:', error);
+    // Silently return false for parsing errors (invalid countries, malformed numbers, etc.)
+    // Logging thousands of these errors causes performance issues
     return false;
   }
 }
