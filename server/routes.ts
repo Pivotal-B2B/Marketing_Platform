@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { eq, and, inArray, isNotNull, sql, desc } from "drizzle-orm";
 import { storage } from "./storage";
 import { comparePassword, generateToken, requireAuth, requireRole, hashPassword } from "./auth";
+import { getBestPhoneForContact } from "./lib/phone-utils";
 import { buildFilterQuery } from "./filter-builder";
 import webhooksRouter from "./routes/webhooks";
 import dvRouter from "./routes/dv-routes";
