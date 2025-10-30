@@ -54,7 +54,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
 
   // State for replace queue options
   const [filterGroup, setFilterGroup] = useState<FilterGroup | undefined>();
-  const [maxQueueSize, setMaxQueueSize] = useState<number | ''>(300);
+  const [maxQueueSize, setMaxQueueSize] = useState<number | ''>(5000);
 
   // Check if user has admin or manager role
   const isAdminOrManager = user?.role === 'admin' || user?.role === 'campaign_manager';
@@ -75,7 +75,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
   useEffect(() => {
     if (showReplaceDialog) {
       setFilterGroup(undefined);
-      setMaxQueueSize(300);
+      setMaxQueueSize(5000);
     }
   }, [showReplaceDialog]);
 
@@ -97,9 +97,27 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
       return response.json();
     },
     onSuccess: (data: any) => {
+      const totalSkipped = (data.skipped_due_to_collision || 0) + (data.skipped_no_phone || 0);
+      const descriptionParts = [
+        `Assigned: ${data.assigned}`,
+        `Released: ${data.released}`,
+      ];
+      
+      if (totalSkipped > 0) {
+        descriptionParts.push(`Filtered out: ${totalSkipped}`);
+        if (data.skipped_no_phone > 0) {
+          descriptionParts.push(`  - No valid phone: ${data.skipped_no_phone}`);
+        }
+        if (data.skipped_due_to_collision > 0) {
+          descriptionParts.push(`  - Already assigned: ${data.skipped_due_to_collision}`);
+        }
+      }
+      
       toast({
-        title: "Queue Replaced",
-        description: `Released: ${data.released}, Assigned: ${data.assigned}, Skipped: ${data.skipped_due_to_collision}`,
+        title: data.assigned > 0 ? "Queue Replaced Successfully" : "Queue Replaced - Low Results",
+        description: descriptionParts.join('\n'),
+        variant: data.assigned === 0 ? "destructive" : "default",
+        duration: 8000,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/campaigns', campaignId, 'queues/stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/agent-queue', effectiveAgentId] });
@@ -107,7 +125,7 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
       onQueueUpdated?.();
       // Reset form
       setFilterGroup(undefined);
-      setMaxQueueSize(300);
+      setMaxQueueSize(5000);
     },
     onError: (error: any) => {
       if (error.message === 'not_found') {
@@ -237,13 +255,15 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
                         id="maxQueueSize"
                         type="number"
                         min="1"
-                        placeholder="300"
+                        placeholder="5000"
                         value={maxQueueSize}
-                        onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : 300)}
+                        onChange={(e) => setMaxQueueSize(e.target.value ? parseInt(e.target.value) : 5000)}
                         data-testid="input-max-queue-size"
                         className="h-9"
                       />
-                      <p className="text-xs text-muted-foreground">Maximum contacts to queue (leave empty for no limit)</p>
+                      <p className="text-xs text-muted-foreground">
+                        Maximum contacts to queue. Set higher for large campaigns (e.g., 10000+)
+                      </p>
                     </div>
                   </div>
 
@@ -257,8 +277,25 @@ export function QueueControls({ campaignId, agentId, onQueueUpdated, compact = f
                           <li>Add filters to narrow down contacts</li>
                           <li>Apply filters to see result count</li>
                           <li>Click "Set Queue" to replace your current queue</li>
-                          <li>Only contacts with valid phone numbers will be queued</li>
+                          <li className="font-semibold">Only contacts with valid phone numbers will be queued</li>
                         </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phone Validation Warning */}
+                  <div className="p-4 rounded-lg border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30">
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-2 text-xs text-orange-900 dark:text-orange-100">
+                        <p className="font-bold">Phone Validation Filter</p>
+                        <p>Contacts are automatically filtered during queue setting:</p>
+                        <ul className="space-y-1 list-disc list-inside text-orange-800 dark:text-orange-200 mt-1">
+                          <li>Must have Contact Phone, Mobile, or HQ Phone</li>
+                          <li>HQ Phone requires country match with contact</li>
+                          <li>Invalid/missing phones are excluded</li>
+                        </ul>
+                        <p className="font-semibold mt-2">Tip: If getting fewer contacts than expected, many may lack valid phone numbers</p>
                       </div>
                     </div>
                   </div>
