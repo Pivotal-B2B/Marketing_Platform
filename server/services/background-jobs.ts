@@ -11,10 +11,10 @@ import { db } from '../db';
 import { agentQueue, campaignQueue } from '@shared/schema';
 import { eq, lt, and, inArray, sql } from 'drizzle-orm';
 
-// Job intervals (in milliseconds)
-const TRANSCRIPTION_JOB_INTERVAL = 30000; // Every 30 seconds
-const AI_ANALYSIS_JOB_INTERVAL = 45000; // Every 45 seconds
-const LOCK_SWEEPER_INTERVAL = 300000; // Every 5 minutes
+// Job intervals (in milliseconds) - reduced frequency to minimize connections
+const TRANSCRIPTION_JOB_INTERVAL = 60000; // Every 60 seconds (was 30s)
+const AI_ANALYSIS_JOB_INTERVAL = 90000; // Every 90 seconds (was 45s)
+const LOCK_SWEEPER_INTERVAL = 600000; // Every 10 minutes (was 5 min)
 
 let transcriptionInterval: NodeJS.Timeout | null = null;
 let analysisInterval: NodeJS.Timeout | null = null;
@@ -24,6 +24,11 @@ let lockSweeperInterval: NodeJS.Timeout | null = null;
 let isTranscriptionRunning = false;
 let isAnalysisRunning = false;
 let isLockSweeperRunning = false;
+
+// Configuration flags for disabling background jobs
+const ENABLE_TRANSCRIPTION = process.env.ENABLE_TRANSCRIPTION_JOB !== 'false';
+const ENABLE_AI_ANALYSIS = process.env.ENABLE_AI_ANALYSIS_JOB !== 'false';
+const ENABLE_LOCK_SWEEPER = process.env.ENABLE_LOCK_SWEEPER !== 'false';
 
 /**
  * Lock Sweeper - Release expired locks and stuck queue entries
@@ -76,7 +81,7 @@ async function sweepExpiredLocks() {
   }
 }
 
-// Configuration flags for disabling specific jobs
+// Additional configuration flags for disabling specific jobs
 const ENABLE_EMAIL_VALIDATION = process.env.ENABLE_EMAIL_VALIDATION !== 'false';
 const ENABLE_AI_ENRICHMENT = process.env.ENABLE_AI_ENRICHMENT !== 'false';
 
@@ -85,59 +90,65 @@ const ENABLE_AI_ENRICHMENT = process.env.ENABLE_AI_ENRICHMENT !== 'false';
  */
 export function startBackgroundJobs() {
   console.log('[Background Jobs] Starting AI-powered QA background jobs and queue maintenance...');
+  console.log(`[Background Jobs] Transcription: ${ENABLE_TRANSCRIPTION ? 'ENABLED (60s)' : 'DISABLED'}`);
+  console.log(`[Background Jobs] AI Analysis: ${ENABLE_AI_ANALYSIS ? 'ENABLED (90s)' : 'DISABLED'}`);
+  console.log(`[Background Jobs] Lock Sweeper: ${ENABLE_LOCK_SWEEPER ? 'ENABLED (10min)' : 'DISABLED'}`);
   console.log(`[Background Jobs] Email Validation: ${ENABLE_EMAIL_VALIDATION ? 'ENABLED' : 'DISABLED'}`);
   console.log(`[Background Jobs] AI Enrichment: ${ENABLE_AI_ENRICHMENT ? 'ENABLED' : 'DISABLED'}`);
 
-  // Transcription processing job
-  transcriptionInterval = setInterval(async () => {
-    if (isTranscriptionRunning) {
-      console.log('[Background Jobs] Transcription job still running, skipping this execution');
-      return;
-    }
-    
-    isTranscriptionRunning = true;
-    try {
-      await processPendingTranscriptions();
-    } catch (error) {
-      console.error('[Background Jobs] Transcription job error:', error);
-    } finally {
-      isTranscriptionRunning = false;
-    }
-  }, TRANSCRIPTION_JOB_INTERVAL);
+  // Transcription processing job (optional)
+  if (ENABLE_TRANSCRIPTION) {
+    transcriptionInterval = setInterval(async () => {
+      if (isTranscriptionRunning) {
+        return; // Skip if still running
+      }
+      
+      isTranscriptionRunning = true;
+      try {
+        await processPendingTranscriptions();
+      } catch (error) {
+        console.error('[Background Jobs] Transcription job error:', error);
+      } finally {
+        isTranscriptionRunning = false;
+      }
+    }, TRANSCRIPTION_JOB_INTERVAL);
+  }
 
-  // AI analysis processing job
-  analysisInterval = setInterval(async () => {
-    if (isAnalysisRunning) {
-      console.log('[Background Jobs] AI analysis job still running, skipping this execution');
-      return;
-    }
-    
-    isAnalysisRunning = true;
-    try {
-      await processUnanalyzedLeads();
-    } catch (error) {
-      console.error('[Background Jobs] AI analysis job error:', error);
-    } finally {
-      isAnalysisRunning = false;
-    }
-  }, AI_ANALYSIS_JOB_INTERVAL);
+  // AI analysis processing job (optional)
+  if (ENABLE_AI_ANALYSIS) {
+    analysisInterval = setInterval(async () => {
+      if (isAnalysisRunning) {
+        return; // Skip if still running
+      }
+      
+      isAnalysisRunning = true;
+      try {
+        await processUnanalyzedLeads();
+      } catch (error) {
+        console.error('[Background Jobs] AI analysis job error:', error);
+      } finally {
+        isAnalysisRunning = false;
+      }
+    }, AI_ANALYSIS_JOB_INTERVAL);
+  }
 
-  // Lock sweeper job
-  lockSweeperInterval = setInterval(async () => {
-    if (isLockSweeperRunning) {
-      console.log('[Background Jobs] Lock sweeper still running, skipping this execution');
-      return;
-    }
-    
-    isLockSweeperRunning = true;
-    try {
-      await sweepExpiredLocks();
-    } catch (error) {
-      console.error('[Background Jobs] Lock sweeper job error:', error);
-    } finally {
-      isLockSweeperRunning = false;
-    }
-  }, LOCK_SWEEPER_INTERVAL);
+  // Lock sweeper job (optional)
+  if (ENABLE_LOCK_SWEEPER) {
+    lockSweeperInterval = setInterval(async () => {
+      if (isLockSweeperRunning) {
+        return; // Skip if still running
+      }
+      
+      isLockSweeperRunning = true;
+      try {
+        await sweepExpiredLocks();
+      } catch (error) {
+        console.error('[Background Jobs] Lock sweeper job error:', error);
+      } finally {
+        isLockSweeperRunning = false;
+      }
+    }, LOCK_SWEEPER_INTERVAL);
+  }
 
   // Email validation job (cron-based) - Only start if enabled
   if (ENABLE_EMAIL_VALIDATION) {

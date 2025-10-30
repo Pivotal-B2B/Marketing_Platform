@@ -29,13 +29,13 @@ if (!hasPooler) {
 console.log('[DB] Using Neon connection pooler:', hasPooler ? 'YES ✓ (already configured)' : 'YES ✓ (added -pooler)');
 
 // Optimized connection pool for 10+ concurrent agents + background jobs
-// With Neon pooler, we can be more conservative with client-side pooling
+// With Neon pooler, we can be very conservative with client-side pooling
 export const pool = new Pool({ 
   connectionString: databaseUrl,
-  max: 20, // Lower client-side pool (pooler handles the rest)
-  min: 5, // Fewer idle connections (pooler manages efficiently)
-  idleTimeoutMillis: 30000, // Release idle connections faster (30s)
-  connectionTimeoutMillis: 10000, // Shorter timeout (pooler is fast)
+  max: 15, // Lower client-side pool (pooler handles the rest)
+  min: 0, // NO idle connections - create on demand only
+  idleTimeoutMillis: 20000, // Aggressive idle release (20s)
+  connectionTimeoutMillis: 10000, // Fast timeout (pooler is fast)
   maxUses: 7500, // Recycle connections periodically to prevent stale connections
 });
 
