@@ -1413,24 +1413,45 @@ router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: 
       return null;
     };
 
-    // Parse CSV content
+    // Parse CSV content - handle both headerless lists and CSV with headers
+    const lines = csvContent.trim().split('\n').filter(l => l.trim());
+    
+    // Simple headerless list detection: if first line looks like data (email or company), treat as headerless
+    const firstLine = lines[0]?.trim();
+    const looksLikeHeader = firstLine && 
+      (firstLine.toLowerCase().includes('email') || 
+       firstLine.toLowerCase().includes('company') ||
+       firstLine.toLowerCase().includes('name') ||
+       firstLine.toLowerCase().includes('domain'));
+    
+    const hasHeaders = looksLikeHeader && lines.length > 1;
+    
+    console.log('[SMART UPLOAD] Detected format:', hasHeaders ? 'CSV with headers' : 'Headerless list');
+    
     const stream = Readable.from([csvContent]);
     
     await new Promise<void>((resolve, reject) => {
-      csv.parseStream(stream, { headers: true, trim: true })
+      csv.parseStream(stream, { headers: hasHeaders, trim: true })
         .on('data', (row: any) => {
-          // Try to find data in various column names
-          const value = (
-            row.value || 
-            row.company_name || 
-            row.companyName || 
-            row.company || 
-            row.email || 
-            row.Email ||
-            row.domain ||
-            row.Domain ||
-            Object.values(row)[0] // Fallback to first column
-          )?.toString().trim();
+          let value: string | null = null;
+          
+          if (hasHeaders) {
+            // Try to find data in various column names
+            value = (
+              row.value || 
+              row.company_name || 
+              row.companyName || 
+              row.company || 
+              row.email || 
+              row.Email ||
+              row.domain ||
+              row.Domain ||
+              Object.values(row)[0] // Fallback to first column
+            )?.toString().trim();
+          } else {
+            // Headerless: row is an array, take first element
+            value = (Array.isArray(row) ? row[0] : Object.values(row)[0])?.toString().trim();
+          }
 
           if (!value) return;
 
