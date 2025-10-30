@@ -87,6 +87,60 @@ export function CampaignSuppressionManager({ campaignId }: CampaignSuppressionMa
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("emails");
 
+  // === SMART UPLOAD ===
+  const [smartUploadContent, setSmartUploadContent] = useState("");
+  const [smartUploadDialogOpen, setSmartUploadDialogOpen] = useState(false);
+
+  const smartUploadMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return await apiRequest(
+        "POST",
+        `/api/campaigns/${campaignId}/suppressions/smart-upload`,
+        { csvContent: content }
+      );
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "✅ Smart Upload Complete",
+        description: (
+          <div className="space-y-1">
+            <p><strong>{data.totalAdded}</strong> suppressions added</p>
+            <p className="text-xs">
+              Companies: {data.summary.companyNames.added} | 
+              Emails: {data.summary.emails.added} | 
+              Domains: {data.summary.domains.added}
+            </p>
+          </div>
+        ),
+      });
+      // Invalidate all suppression queries
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/campaigns', campaignId, 'suppressions'] 
+      });
+      setSmartUploadContent("");
+      setSmartUploadDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Upload Failed",
+        description: error?.message || "Failed to process CSV file",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSmartUpload = () => {
+    if (!smartUploadContent.trim()) {
+      toast({
+        title: "No Data",
+        description: "Please enter company names or email addresses",
+        variant: "destructive",
+      });
+      return;
+    }
+    smartUploadMutation.mutate(smartUploadContent);
+  };
+
   // === EMAIL SUPPRESSIONS ===
   const [emailManualInput, setEmailManualInput] = useState("");
   const [emailCsvContent, setEmailCsvContent] = useState("");
@@ -547,6 +601,119 @@ export function CampaignSuppressionManager({ campaignId }: CampaignSuppressionMa
         </div>
       </CardHeader>
       <CardContent>
+        {/* SMART UPLOAD SECTION */}
+        <Card className="mb-6 border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/50 to-purple-50/30">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+                  <Upload className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                    Smart Suppression Upload
+                  </CardTitle>
+                  <CardDescription>
+                    Upload company names & emails in one file - we'll handle the rest
+                  </CardDescription>
+                </div>
+              </div>
+              <Dialog open={smartUploadDialogOpen} onOpenChange={setSmartUploadDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="lg" className="gap-2" data-testid="button-smart-upload">
+                    <Upload className="w-4 h-4" />
+                    Upload Suppressions
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                        <Upload className="h-4 w-4 text-white" />
+                      </div>
+                      Smart Suppression Upload
+                    </DialogTitle>
+                    <DialogDescription className="text-base">
+                      Paste company names and email addresses - one per line or comma-separated
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Textarea
+                    placeholder="Acme Corporation&#10;competitor.com&#10;john@example.com&#10;jane@company.co.uk&#10;Bad Company Inc"
+                    value={smartUploadContent}
+                    onChange={(e) => setSmartUploadContent(e.target.value)}
+                    rows={14}
+                    className="font-mono text-sm"
+                    data-testid="textarea-smart-upload"
+                  />
+                  <Alert className="bg-indigo-50/50 border-indigo-200">
+                    <AlertCircle className="w-4 h-4 text-indigo-600" />
+                    <AlertDescription>
+                      <strong className="text-indigo-900">How it works:</strong>
+                      <ul className="mt-2 space-y-1 text-sm text-indigo-800">
+                        <li>✅ <strong>Emails</strong> → Suppresses specific email addresses</li>
+                        <li>✅ <strong>Domains</strong> → Automatically extracted from emails</li>
+                        <li>✅ <strong>Companies</strong> → Matches by name (normalized)</li>
+                        <li>✅ <strong>Lead Cap</strong> → Enforced by both domain AND company name</li>
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setSmartUploadDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSmartUpload}
+                      disabled={smartUploadMutation.isPending}
+                      className="gap-2"
+                      data-testid="button-submit-smart-upload"
+                    >
+                      {smartUploadMutation.isPending ? (
+                        <>Processing...</>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          Upload & Process
+                        </>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white/70 rounded-lg p-4 border border-indigo-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building2 className="w-5 h-5 text-indigo-600" />
+                  <p className="font-semibold text-sm text-gray-700">Company Names</p>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Blocks all contacts from matching companies
+                </p>
+              </div>
+              <div className="bg-white/70 rounded-lg p-4 border border-purple-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Mail className="w-5 h-5 text-purple-600" />
+                  <p className="font-semibold text-sm text-gray-700">Email Addresses</p>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Blocks specific email addresses + extracts domains
+                </p>
+              </div>
+              <div className="bg-white/70 rounded-lg p-4 border border-pink-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Globe className="w-5 h-5 text-pink-600" />
+                  <p className="font-semibold text-sm text-gray-700">Auto Domain Matching</p>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Automatically blocks entire email domains
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="emails" className="gap-2" data-testid="tab-emails">

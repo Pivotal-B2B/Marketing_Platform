@@ -1357,4 +1357,194 @@ router.post('/:campaignId/suppressions/domains/upload', async (req: Request, res
   }
 });
 
+// ============================================================================
+// SMART UNIFIED SUPPRESSION UPLOAD
+// ============================================================================
+
+/**
+ * POST /api/campaigns/:campaignId/suppressions/smart-upload
+ * Smart CSV upload that accepts company names and/or emails in a single file
+ * Automatically extracts domains from emails and categorizes suppressions
+ * Body: { csvContent: string }
+ */
+router.post('/:campaignId/suppressions/smart-upload', async (req: Request, res: Response) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = (req as any).user?.id;
+
+    const bodySchema = z.object({
+      csvContent: z.string().min(1),
+    });
+
+    const { csvContent } = bodySchema.parse(req.body);
+
+    // Validate campaign exists
+    const [campaign] = await db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, campaignId))
+      .limit(1);
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    const results = {
+      companyNames: new Set<string>(),
+      emails: new Set<string>(),
+      domains: new Set<string>(),
+    };
+
+    // Helper to normalize company names
+    const normalizeCompanyName = (name: string): string => {
+      return name
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/\b(inc|ltd|llc|corp|corporation|limited|company|co)\b\.?/gi, '')
+        .trim();
+    };
+
+    // Helper to extract domain from email
+    const extractDomain = (email: string): string | null => {
+      const match = email.match(/@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$/);
+      if (match) {
+        return match[1].toLowerCase().replace(/^www\./, '');
+      }
+      return null;
+    };
+
+    // Parse CSV content
+    const stream = Readable.from([csvContent]);
+    
+    await new Promise<void>((resolve, reject) => {
+      csv.parseStream(stream, { headers: true, trim: true })
+        .on('data', (row: any) => {
+          // Try to find data in various column names
+          const value = (
+            row.value || 
+            row.company_name || 
+            row.companyName || 
+            row.company || 
+            row.email || 
+            row.Email ||
+            row.domain ||
+            row.Domain ||
+            Object.values(row)[0] // Fallback to first column
+          )?.toString().trim();
+
+          if (!value) return;
+
+          // Check if it's an email
+          if (value.includes('@') && value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+            results.emails.add(value.toLowerCase());
+            const domain = extractDomain(value);
+            if (domain) {
+              results.domains.add(domain);
+            }
+          } 
+          // Otherwise treat as company name
+          else {
+            const normalized = normalizeCompanyName(value);
+            if (normalized) {
+              results.companyNames.add(value); // Store original for display
+            }
+          }
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    // Insert company name suppressions (as domains)
+    const companyInserted = [];
+    if (results.companyNames.size > 0) {
+      const companySuppressions = Array.from(results.companyNames).map(name => ({
+        campaignId,
+        domain: null,
+        domainNorm: normalizeCompanyName(name),
+        companyName: name,
+        reason: 'Smart CSV upload',
+        addedBy: userId,
+      }));
+
+      const inserted = await db
+        .insert(campaignSuppressionDomains)
+        .values(companySuppressions)
+        .onConflictDoNothing()
+        .returning();
+      
+      companyInserted.push(...inserted);
+    }
+
+    // Insert email suppressions
+    const emailInserted = [];
+    if (results.emails.size > 0) {
+      const emailSuppressions = Array.from(results.emails).map(email => ({
+        campaignId,
+        email,
+        emailNorm: email.toLowerCase(),
+        reason: 'Smart CSV upload',
+        addedBy: userId,
+      }));
+
+      const inserted = await db
+        .insert(campaignSuppressionEmails)
+        .values(emailSuppressions)
+        .onConflictDoNothing()
+        .returning();
+      
+      emailInserted.push(...inserted);
+    }
+
+    // Insert domain suppressions (extracted from emails)
+    const domainInserted = [];
+    if (results.domains.size > 0) {
+      const domainSuppressions = Array.from(results.domains).map(domain => ({
+        campaignId,
+        domain,
+        domainNorm: domain.toLowerCase(),
+        companyName: null,
+        reason: 'Smart CSV upload (extracted from email)',
+        addedBy: userId,
+      }));
+
+      const inserted = await db
+        .insert(campaignSuppressionDomains)
+        .values(domainSuppressions)
+        .onConflictDoNothing()
+        .returning();
+      
+      domainInserted.push(...inserted);
+    }
+
+    res.status(201).json({
+      message: 'Successfully processed smart CSV upload',
+      summary: {
+        companyNames: {
+          found: results.companyNames.size,
+          added: companyInserted.length,
+          duplicates: results.companyNames.size - companyInserted.length,
+        },
+        emails: {
+          found: results.emails.size,
+          added: emailInserted.length,
+          duplicates: results.emails.size - emailInserted.length,
+        },
+        domains: {
+          found: results.domains.size,
+          added: domainInserted.length,
+          duplicates: results.domains.size - domainInserted.length,
+        },
+      },
+      totalProcessed: results.companyNames.size + results.emails.size,
+      totalAdded: companyInserted.length + emailInserted.length + domainInserted.length,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation failed', details: error.errors });
+    }
+    console.error('Error processing smart CSV upload:', error);
+    res.status(500).json({ error: 'Failed to process smart CSV upload' });
+  }
+});
+
 export default router;
