@@ -228,26 +228,36 @@ router.post('/:campaignId/suppressions/accounts/upload', async (req: Request, re
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
-    // Parse CSV
+    // Parse CSV - flexible parsing to handle various formats
     const accountIdentifiers: Array<{ type: 'id' | 'domain' | 'company', value: string }> = [];
     const stream = Readable.from([csvContent]);
 
     await new Promise<void>((resolve, reject) => {
       stream
-        .pipe(csv.parse({ headers: true, trim: true }))
-        .on('data', (row: any) => {
-          // Try to extract account identifier from various column names
-          const accountId = row.account_id || row.accountId || row.AccountID || row['Account ID'];
-          const domain = row.domain || row.Domain || row.DOMAIN;
-          const companyName = row.company_name || row.companyName || row['Company Name'] || 
-                            row.company || row.Company || row.COMPANY;
+        .pipe(csv.parse({ headers: false, trim: true, skipEmptyLines: true }))
+        .on('data', (row: string[]) => {
+          // Skip header row if it looks like a header
+          const firstCol = row[0]?.toLowerCase() || '';
+          if (firstCol.includes('account') || firstCol.includes('domain') || firstCol.includes('company') || firstCol.includes('id')) {
+            return; // Skip header row
+          }
 
-          if (accountId && typeof accountId === 'string') {
-            accountIdentifiers.push({ type: 'id', value: accountId.trim() });
-          } else if (domain && typeof domain === 'string') {
-            accountIdentifiers.push({ type: 'domain', value: domain.trim().toLowerCase() });
-          } else if (companyName && typeof companyName === 'string') {
-            accountIdentifiers.push({ type: 'company', value: companyName.trim() });
+          // Process data rows - intelligently detect type
+          const col1 = row[0]?.trim();
+          if (!col1) return; // Skip empty rows
+
+          // Check if it's a UUID (account ID)
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(col1)) {
+            accountIdentifiers.push({ type: 'id', value: col1 });
+          } 
+          // Check if it's a domain (contains dot and looks like domain)
+          else if (col1.includes('.') && /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(col1.replace(/^www\./i, ''))) {
+            accountIdentifiers.push({ type: 'domain', value: col1.toLowerCase() });
+          }
+          // Otherwise treat as company name
+          else {
+            accountIdentifiers.push({ type: 'company', value: col1 });
           }
         })
         .on('end', resolve)
@@ -1252,7 +1262,7 @@ router.post('/:campaignId/suppressions/domains/upload', async (req: Request, res
     }
 
     // Parse CSV - flexible parsing to handle various formats
-    const domainEntries: Array<{ domain: string; companyName: string | null }> = [];
+    const domainEntries: Array<{ domain: string; domainNorm: string; companyName: string | null }> = [];
     const stream = Readable.from([csvContent]);
 
     await new Promise<void>((resolve, reject) => {
@@ -1281,11 +1291,21 @@ router.post('/:campaignId/suppressions/domains/upload', async (req: Request, res
               domain = domain.split('@')[1] || domain;
             }
             const domainNorm = domain.toLowerCase().replace(/^www\./, '').replace(/^https?:\/\//, '').split('/')[0];
-            domainEntries.push({ domain: domainNorm, companyName: col2 || null });
+            domainEntries.push({ 
+              domain: domainNorm,      // Store normalized domain for display
+              domainNorm: domainNorm,  // Store normalized domain for matching
+              companyName: col2 || null 
+            });
           } else {
             // Treat as company name
+            // Store original company name in domain field for display
+            // Store normalized version in domainNorm for matching
             const companyNorm = col1.toLowerCase().replace(/[^a-z0-9]/g, '');
-            domainEntries.push({ domain: companyNorm, companyName: col1 });
+            domainEntries.push({ 
+              domain: col1,           // Original company name for display
+              domainNorm: companyNorm, // Normalized for matching
+              companyName: col1       // Original company name
+            });
           }
         })
         .on('end', resolve)
@@ -1302,7 +1322,7 @@ router.post('/:campaignId/suppressions/domains/upload', async (req: Request, res
     const suppressionsToInsert = domainEntries.map(entry => ({
       campaignId,
       domain: entry.domain,
-      domainNorm: entry.domain,
+      domainNorm: entry.domainNorm,
       companyName: entry.companyName,
       reason: 'CSV bulk upload',
       addedBy: userId,
