@@ -375,7 +375,7 @@ export function registerRoutes(app: Express) {
   // ==================== AUTH ====================
 
   // ONE-TIME SETUP: Create or reset admin user (REMOVE THIS ENDPOINT AFTER SETUP!)
-  app.post("/api/setup/create-admin", async (req, res) => {
+  const setupAdminHandler = async (req: any, res: any) => {
     try {
       const hashedPassword = await hashPassword("admin123");
       
@@ -417,7 +417,10 @@ export function registerRoutes(app: Express) {
       console.error('[SETUP] Error with admin user:', error);
       res.status(500).json({ message: error.message || "Failed to create/reset admin user" });
     }
-  });
+  };
+  
+  app.post("/api/setup/create-admin", setupAdminHandler);
+  app.get("/api/setup/create-admin", setupAdminHandler);
 
   // Apply strict rate limiting to login endpoint (5 attempts per 15 minutes)
   app.post("/api/auth/login", authLimiter, validate({ body: loginSchema }), async (req, res) => {
