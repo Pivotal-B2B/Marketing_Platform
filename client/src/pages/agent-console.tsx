@@ -315,79 +315,18 @@ export default function AgentConsolePage() {
   const dialMode = campaignDetails?.dialMode || 'manual';
   const amdEnabled = campaignDetails?.powerSettings?.amd?.enabled ?? false;
 
-  // Enhanced function to render beautifully formatted script with unique styling per paragraph
+  // Simplified compact script renderer - optimized for minimal scrolling
   const renderFormattedScript = (script: string) => {
     if (!script) return null;
 
     // Split into paragraphs (double line breaks)
     const paragraphs = script.split(/\n\n+/);
     
-    // Color schemes for different paragraphs (rotating through beautiful gradients)
-    const colorSchemes = [
-      { 
-        bg: 'from-blue-50 via-indigo-50 to-purple-50',
-        border: 'border-blue-200/60',
-        bullet: 'text-blue-600',
-        text: 'text-gray-800',
-        icon: MessageSquare,
-        iconBg: 'from-blue-500 to-indigo-600',
-        shadow: 'shadow-blue-100/50'
-      },
-      { 
-        bg: 'from-purple-50 via-pink-50 to-rose-50',
-        border: 'border-purple-200/60',
-        bullet: 'text-purple-600',
-        text: 'text-gray-800',
-        icon: Target,
-        iconBg: 'from-purple-500 to-pink-600',
-        shadow: 'shadow-purple-100/50'
-      },
-      { 
-        bg: 'from-emerald-50 via-teal-50 to-cyan-50',
-        border: 'border-emerald-200/60',
-        bullet: 'text-emerald-600',
-        text: 'text-gray-800',
-        icon: CheckCircle2,
-        iconBg: 'from-emerald-500 to-teal-600',
-        shadow: 'shadow-emerald-100/50'
-      },
-      { 
-        bg: 'from-orange-50 via-amber-50 to-yellow-50',
-        border: 'border-orange-200/60',
-        bullet: 'text-orange-600',
-        text: 'text-gray-800',
-        icon: Zap,
-        iconBg: 'from-orange-500 to-amber-600',
-        shadow: 'shadow-orange-100/50'
-      },
-      { 
-        bg: 'from-rose-50 via-pink-50 to-fuchsia-50',
-        border: 'border-rose-200/60',
-        bullet: 'text-rose-600',
-        text: 'text-gray-800',
-        icon: Lightbulb,
-        iconBg: 'from-rose-500 to-pink-600',
-        shadow: 'shadow-rose-100/50'
-      },
-      { 
-        bg: 'from-cyan-50 via-sky-50 to-blue-50',
-        border: 'border-cyan-200/60',
-        bullet: 'text-cyan-600',
-        text: 'text-gray-800',
-        icon: Sparkles,
-        iconBg: 'from-cyan-500 to-sky-600',
-        shadow: 'shadow-cyan-100/50'
-      },
-    ];
-    
     return (
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         {paragraphs.map((paragraph, pIndex) => {
           const lines = paragraph.split('\n').filter(l => l.trim());
           if (lines.length === 0) return null;
-          
-          const scheme = colorSchemes[pIndex % colorSchemes.length];
-          const IconComponent = scheme.icon;
           
           // Check if this paragraph has bullets
           const hasBullets = lines.some(line => line.match(/^(\s*)([-*•]|\d+\.)\s+/));
@@ -395,17 +334,9 @@ export default function AgentConsolePage() {
           return (
             <div 
               key={pIndex}
-              className={`relative p-4 rounded-xl border-2 bg-gradient-to-br ${scheme.bg} ${scheme.border} ${scheme.shadow} shadow-lg transition-shadow hover:shadow-xl`}
+              className="p-2.5 rounded-lg border border-indigo-200/50 bg-gradient-to-br from-indigo-50/30 to-purple-50/20"
             >
-              {/* Decorative corner accent */}
-              <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-white/40 to-transparent rounded-bl-3xl"></div>
-              
-              {/* Icon indicator */}
-              <div className={`absolute -top-3 -left-3 bg-gradient-to-br ${scheme.iconBg} rounded-full w-10 h-10 flex items-center justify-center shadow-lg border-2 border-white`}>
-                <IconComponent className="h-5 w-5 text-white" />
-              </div>
-              
-              <div className="space-y-2 pt-2">
+              <div className="space-y-1">
                 {lines.map((line, lineIndex) => {
                   const bulletMatch = line.match(/^(\s*)([-*•]|\d+\.)\s+(.*)$/);
                   
@@ -416,13 +347,13 @@ export default function AgentConsolePage() {
                     return (
                       <div 
                         key={lineIndex}
-                        className="flex items-start gap-3 leading-relaxed"
-                        style={{ marginLeft: `${indentLevel * 1.25}rem` }}
+                        className="flex items-start gap-2 leading-snug"
+                        style={{ marginLeft: `${indentLevel * 1}rem` }}
                       >
-                        <div className={`flex-shrink-0 mt-1 w-6 h-6 rounded-lg ${scheme.bullet} bg-white/60 flex items-center justify-center font-bold text-sm shadow-sm`}>
-                          {bullet.match(/\d+\./) ? bullet.charAt(0) : '•'}
+                        <div className="flex-shrink-0 mt-0.5 text-indigo-600 font-semibold text-xs">
+                          {bullet.match(/\d+\./) ? bullet : '•'}
                         </div>
-                        <div className={`${scheme.text} text-sm flex-1 font-medium`}>
+                        <div className="text-gray-800 text-xs flex-1">
                           {renderLineWithBoldPlaceholders(content)}
                         </div>
                       </div>
@@ -434,10 +365,10 @@ export default function AgentConsolePage() {
                   return (
                     <div 
                       key={lineIndex} 
-                      className={`leading-relaxed ${
+                      className={`leading-snug ${
                         isFirstLine 
-                          ? `text-base font-bold ${scheme.bullet} border-b-2 ${scheme.border} pb-2 mb-2` 
-                          : `text-sm ${scheme.text} font-medium`
+                          ? 'text-sm font-bold text-indigo-700 border-b border-indigo-200 pb-1 mb-1' 
+                          : 'text-xs text-gray-800'
                       }`}
                     >
                       {renderLineWithBoldPlaceholders(line)}
@@ -1421,32 +1352,32 @@ export default function AgentConsolePage() {
                     <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent font-bold">Call Script</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="flex-1 min-h-0 pt-3">
+                <CardContent className="flex-1 min-h-0 pt-2 px-3">
                   {(assignedScript?.content || campaignDetails?.callScript) ? (
-                    <div className="p-6 bg-gradient-to-br from-slate-50 via-gray-50 to-zinc-50 rounded-2xl border border-gray-200/50 shadow-inner h-full overflow-auto">
+                    <div className="p-3 bg-gradient-to-br from-slate-50 to-gray-50 rounded-lg border border-gray-200/50 h-full overflow-auto">
                       {renderFormattedScript(assignedScript?.content || campaignDetails?.callScript || '')}
                     </div>
                   ) : (
-                    <div className="space-y-3 h-full flex flex-col justify-center">
-                      <div className="p-5 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-xl border-2 border-blue-200 shadow-lg backdrop-blur-sm">
-                        <p className="text-sm leading-relaxed text-gray-700">
+                    <div className="space-y-2 h-full flex flex-col justify-center">
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-xs leading-relaxed text-gray-700">
                           "Hello, this is [Your Name] calling from Pivotal CRM. May I speak with{' '}
-                          <span className="font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                          <span className="font-bold text-indigo-700">
                             {currentQueueItem?.contactName || '[Contact Name]'}
                           </span>?"
                         </p>
                       </div>
-                      <div className="p-5 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl border-2 border-purple-200 shadow-lg backdrop-blur-sm">
-                        <p className="text-sm leading-relaxed text-gray-700">
+                      <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <p className="text-xs leading-relaxed text-gray-700">
                           "I'm calling to discuss how our B2B solutions can help{' '}
-                          <span className="font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                          <span className="font-bold text-purple-700">
                             {currentQueueItem?.accountName || '[Company Name]'}
                           </span>{' '}
                           streamline their customer engagement..."
                         </p>
                       </div>
-                      <div className="p-5 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-xl border-2 border-emerald-200 shadow-lg backdrop-blur-sm">
-                        <p className="text-sm leading-relaxed text-gray-700">
+                      <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                        <p className="text-xs leading-relaxed text-gray-700">
                           "We specialize in Account-Based Marketing. Do you have a few minutes to discuss your marketing challenges?"
                         </p>
                       </div>
