@@ -166,6 +166,7 @@ export default function AgentConsolePage() {
     makeCall,
     hangup,
     toggleMute,
+    sendDTMF,
   } = useTelnyxWebRTC({
     sipUsername: sipConfig?.sipUsername,
     sipPassword: sipConfig?.sipPassword,
@@ -1188,6 +1189,27 @@ export default function AgentConsolePage() {
                     )}
                   </div>
                 </div>
+
+                {/* DTMF Keypad - Shows during active call */}
+                {callStatus === 'active' && (
+                  <div className="bg-white/10 backdrop-blur-sm rounded-lg p-3 border border-white/20">
+                    <div className="text-[10px] text-white/70 text-center mb-2">Dial Extensions</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
+                        <Button
+                          key={digit}
+                          variant="outline"
+                          size="icon"
+                          onClick={() => sendDTMF?.(digit)}
+                          className="bg-white/20 hover:bg-white/30 border-white/30 text-white text-base font-bold"
+                          data-testid={`button-dtmf-${digit}`}
+                        >
+                          {digit}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Desktop Layout - Original */}
@@ -1296,35 +1318,58 @@ export default function AgentConsolePage() {
                 </div>
 
                 {/* Call Button - Premium Design */}
-                <div className="flex items-center gap-2">
-                  {!isCallActive && callStatus !== 'wrap-up' && (
-                    <Button
-                      size="lg"
-                      className="h-16 w-36 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-base"
-                      onClick={handleDial}
-                      disabled={!currentQueueItem}
-                      data-testid="button-dial"
-                    >
-                      <Phone className="h-5 w-5 mr-2" />
-                      Call
-                    </Button>
-                  )}
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {!isCallActive && callStatus !== 'wrap-up' && (
+                      <Button
+                        size="lg"
+                        className="h-16 w-36 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-base"
+                        onClick={handleDial}
+                        disabled={!currentQueueItem}
+                        data-testid="button-dial"
+                      >
+                        <Phone className="h-5 w-5 mr-2" />
+                        Call
+                      </Button>
+                    )}
 
-                  {isCallActive && (
-                    <Button
-                      size="lg"
-                      className="h-16 w-36 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-base"
-                      onClick={handleHangup}
-                      data-testid="button-hangup"
-                    >
-                      <PhoneOff className="h-5 w-5 mr-2" />
-                      Hang Up
-                    </Button>
-                  )}
+                    {isCallActive && (
+                      <Button
+                        size="lg"
+                        className="h-16 w-36 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bold shadow-2xl transform hover:scale-105 transition-all border-2 border-white/30 text-base"
+                        onClick={handleHangup}
+                        data-testid="button-hangup"
+                      >
+                        <PhoneOff className="h-5 w-5 mr-2" />
+                        Hang Up
+                      </Button>
+                    )}
 
-                  {callStatus === 'wrap-up' && (
-                    <div className="h-16 w-36 flex items-center justify-center text-sm text-white font-medium text-center bg-white/20 backdrop-blur-sm rounded-2xl border-2 border-white/30 shadow-xl px-2">
-                      Complete disposition below
+                    {callStatus === 'wrap-up' && (
+                      <div className="h-16 w-36 flex items-center justify-center text-sm text-white font-medium text-center bg-white/20 backdrop-blur-sm rounded-2xl border-2 border-white/30 shadow-xl px-2">
+                        Complete disposition below
+                      </div>
+                    )}
+                  </div>
+
+                  {/* DTMF Keypad - Shows during active call */}
+                  {callStatus === 'active' && (
+                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20 shadow-xl">
+                      <div className="text-xs text-white/80 text-center mb-2 font-medium">Dial Extensions</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((digit) => (
+                          <Button
+                            key={digit}
+                            variant="outline"
+                            size="icon"
+                            onClick={() => sendDTMF?.(digit)}
+                            className="bg-white/20 hover:bg-white/30 border-white/30 text-white text-base font-bold"
+                            data-testid={`button-dtmf-${digit}`}
+                          >
+                            {digit}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
