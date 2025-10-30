@@ -58,7 +58,7 @@ export default function CampaignSuppressionsPage() {
         <div>
           <h1 className="text-2xl font-bold">{campaign.name}</h1>
           <p className="text-muted-foreground">
-            Manage campaign-level email suppression list
+            Manage campaign-level suppressions: emails, accounts, domains, and contacts
           </p>
         </div>
       </div>
