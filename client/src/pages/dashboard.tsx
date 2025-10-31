@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { StatCard } from "@/components/shared/stat-card";
-import { Users, Building2, Mail, CheckCircle, Phone, Clock, TrendingUp, Award } from "lucide-react";
+import { Users, Building2, Mail, MailCheck, CheckCircle, Phone, Clock, TrendingUp, Award } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,9 @@ export default function Dashboard() {
   
   // Get user roles array (support both legacy single role and new multi-role system)
   const userRoles = (user as any)?.roles || [user?.role || ''];
+  const canAccessEmailValidation = userRoles.some((role: string) =>
+    ["admin", "data_ops", "quality_analyst"].includes(role)
+  );
   
   // Show agent dashboard ONLY if user has agent role and NO other elevated roles
   // Users with quality_analyst, admin, or campaign_manager roles should see the full dashboard
@@ -287,7 +290,7 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-3">
+              <div className={`grid gap-3 sm:gap-4 grid-cols-1 ${canAccessEmailValidation ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
                 <Card
                   role="button"
                   tabIndex={0}
@@ -332,16 +335,36 @@ export default function Dashboard() {
                   onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/call-reports')}
                   data-testid="quick-action-call-reports"
                 >
-                  <CardContent className="pt-6">
-                    <div className="text-center">
-                      <div className="h-16 w-16 mx-auto mb-3 bg-teal-500/20 rounded-2xl flex items-center justify-center group-hover:bg-teal-500/30 transition-colors">
-                        <CheckCircle className="h-8 w-8 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
+                    <CardContent className="pt-6">
+                      <div className="text-center">
+                        <div className="h-16 w-16 mx-auto mb-3 bg-teal-500/20 rounded-2xl flex items-center justify-center group-hover:bg-teal-500/30 transition-colors">
+                          <CheckCircle className="h-8 w-8 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
+                        </div>
+                        <h3 className="font-semibold text-lg">Call Reports</h3>
+                        <p className="text-sm text-muted-foreground mt-1">View performance</p>
                       </div>
-                      <h3 className="font-semibold text-lg">Call Reports</h3>
-                      <p className="text-sm text-muted-foreground mt-1">View performance</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                {canAccessEmailValidation && (
+                  <Card
+                    role="button"
+                    tabIndex={0}
+                    className="card-hover cursor-pointer border-0 shadow-smooth bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 group"
+                    onClick={() => setLocation('/email-validation-test')}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLocation('/email-validation-test')}
+                    data-testid="quick-action-email-validation"
+                  >
+                    <CardContent className="pt-6">
+                      <div className="text-center">
+                        <div className="h-16 w-16 mx-auto mb-3 bg-emerald-500/20 rounded-2xl flex items-center justify-center group-hover:bg-emerald-500/30 transition-colors">
+                          <MailCheck className="h-8 w-8 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                        </div>
+                        <h3 className="font-semibold text-lg">Email Validation</h3>
+                        <p className="text-sm text-muted-foreground mt-1">Check deliverability instantly</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </CardContent>
           </Card>

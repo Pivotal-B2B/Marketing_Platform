@@ -41,7 +41,7 @@ const batchEmailTestSchema = z.object({
 router.post(
   "/api/test/email-validation/single",
   requireAuth,
-  requireRole("admin"),
+  requireRole("admin", "data_ops", "quality_analyst"),
   async (req, res) => {
     try {
       // Validate request body
@@ -115,7 +115,7 @@ router.post(
 router.post(
   "/api/test/email-validation/batch",
   requireAuth,
-  requireRole("admin"),
+  requireRole("admin", "data_ops", "quality_analyst"),
   async (req, res) => {
     try {
       // Validate request body
@@ -197,7 +197,7 @@ router.post(
 router.get(
   "/api/test/email-validation/status",
   requireAuth,
-  requireRole("admin"),
+  requireRole("admin", "data_ops", "quality_analyst"),
   async (req, res) => {
     try {
       const { db } = await import("../db");

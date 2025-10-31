@@ -171,7 +171,7 @@ const getNavSections = (): NavSection[] => [
         title: "Email Validation Test",
         url: "/email-validation-test",
         icon: Mail,
-        roles: ["admin", "data_ops"],
+        roles: ["admin", "data_ops", "quality_analyst"],
       },
     ],
   },
