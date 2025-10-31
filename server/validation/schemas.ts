@@ -1,9 +1,17 @@
 import { z } from 'zod';
+import { USER_ROLE_VALUES } from '@shared/user-roles';
 
 /**
  * VALIDATION SCHEMAS
  * Zod schemas for request validation to prevent injection attacks and ensure data integrity
  */
+
+const ROLE_ENUM_VALUES = [...USER_ROLE_VALUES] as [
+  (typeof USER_ROLE_VALUES)[number],
+  ...(typeof USER_ROLE_VALUES)[number][]
+];
+
+const roleEnum = z.enum(ROLE_ENUM_VALUES);
 
 // Authentication schemas
 export const loginSchema = z.object({
@@ -26,7 +34,7 @@ export const createUserSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
-  role: z.enum(['admin', 'campaign_manager', 'quality_analyst', 'agent']),
+  role: roleEnum,
 });
 
 export const updateUserSchema = z.object({
@@ -35,13 +43,13 @@ export const updateUserSchema = z.object({
   password: z.string().min(8).optional(),
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
-  role: z.enum(['admin', 'campaign_manager', 'quality_analyst', 'agent']).optional(),
+  role: roleEnum.optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'At least one field must be provided for update',
 });
 
 export const assignRoleSchema = z.object({
-  role: z.enum(['admin', 'campaign_manager', 'quality_analyst', 'agent']),
+  role: roleEnum,
 });
 
 // Contact schemas

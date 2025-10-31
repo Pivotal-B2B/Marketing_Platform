@@ -14,16 +14,19 @@ import { Plus, Pencil, Trash2, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import type { User as UserType } from "@shared/schema";
+import { USER_ROLE_VALUES, USER_ROLE_LABELS, type UserRole } from "@shared/user-roles";
 
-type UserWithRoles = Omit<UserType, 'password'> & { roles?: string[] };
+type UserWithRoles = Omit<UserType, 'password'> & { roles?: UserRole[] };
 
-const AVAILABLE_ROLES = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'agent', label: 'Agent' },
-  { value: 'quality_analyst', label: 'Quality Analyst' },
-  { value: 'content_creator', label: 'Content Creator' },
-  { value: 'campaign_manager', label: 'Campaign Manager' },
-];
+const AVAILABLE_ROLES = USER_ROLE_VALUES.map((role) => ({
+  value: role,
+  label: USER_ROLE_LABELS[role],
+}));
+
+const DEFAULT_ROLE: UserRole = 'agent';
+
+const isKnownRole = (role: string): role is UserRole =>
+  USER_ROLE_VALUES.includes(role as UserRole);
 
 export default function UserManagementPage() {
   const { toast } = useToast();
@@ -37,7 +40,7 @@ export default function UserManagementPage() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [selectedRoles, setSelectedRoles] = useState<string[]>(['agent']);
+  const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([DEFAULT_ROLE]);
 
   const { data: users, isLoading } = useQuery<UserWithRoles[]>({
     queryKey: ['/api/users'],
@@ -139,8 +142,23 @@ export default function UserManagementPage() {
     setPassword("");
     setFirstName("");
     setLastName("");
-    setSelectedRoles(['agent']);
+    setSelectedRoles([DEFAULT_ROLE]);
     setEditingUser(null);
+  };
+
+  const deriveSelectedRoles = (roles?: string[] | null, fallbackRole?: string | null) => {
+    const sourceRoles = Array.isArray(roles) ? roles : [];
+    const potentialRoles = [...sourceRoles];
+
+    if (fallbackRole && typeof fallbackRole === 'string') {
+      potentialRoles.push(fallbackRole);
+    }
+
+    const validRoles = potentialRoles
+      .filter((role): role is string => typeof role === 'string')
+      .filter(isKnownRole);
+
+    return (validRoles.length > 0 ? Array.from(new Set(validRoles)) : [DEFAULT_ROLE]);
   };
 
   const handleSaveUser = () => {
@@ -208,14 +226,14 @@ export default function UserManagementPage() {
         password,
         firstName,
         lastName,
-        role: selectedRoles[0] || 'agent', // Legacy role field
+        role: selectedRoles[0] ?? DEFAULT_ROLE, // Legacy role field
       };
       createUserMutation.mutate(data);
     }
   };
 
-  const toggleRole = (roleValue: string) => {
-    setSelectedRoles(prev => 
+  const toggleRole = (roleValue: UserRole) => {
+    setSelectedRoles(prev =>
       prev.includes(roleValue)
         ? prev.filter(r => r !== roleValue)
         : [...prev, roleValue]
@@ -223,25 +241,32 @@ export default function UserManagementPage() {
   };
 
   const getRoleBadgeVariant = (userRole: string) => {
+    if (!isKnownRole(userRole)) {
+      return 'outline';
+    }
+
     switch (userRole) {
       case 'admin':
         return 'destructive';
       case 'campaign_manager':
+      case 'data_ops':
         return 'default';
       case 'quality_analyst':
+      case 'client_user':
         return 'secondary';
-      case 'content_creator':
-        return 'outline';
       case 'agent':
-        return 'outline';
+      case 'content_creator':
       default:
         return 'outline';
     }
   };
 
   const getRoleLabel = (userRole: string) => {
-    const role = AVAILABLE_ROLES.find(r => r.value === userRole);
-    return role?.label || userRole;
+    if (isKnownRole(userRole)) {
+      return USER_ROLE_LABELS[userRole];
+    }
+
+    return userRole;
   };
 
   return (
@@ -401,8 +426,11 @@ export default function UserManagementPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  users.map((user) => (
-                    <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                  users.map((user) => {
+                    const displayRoles = deriveSelectedRoles(user.roles, user.role);
+
+                    return (
+                      <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-muted-foreground" />
@@ -417,17 +445,11 @@ export default function UserManagementPage() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
                         <div className="flex gap-1 flex-wrap">
-                          {user.roles && user.roles.length > 0 ? (
-                            user.roles.map((role) => (
-                              <Badge key={role} variant={getRoleBadgeVariant(role)} data-testid={`badge-role-${role}`}>
-                                {getRoleLabel(role)}
-                              </Badge>
-                            ))
-                          ) : (
-                            <Badge variant={getRoleBadgeVariant(user.role)}>
-                              {getRoleLabel(user.role)}
+                          {displayRoles.map((role) => (
+                            <Badge key={role} variant={getRoleBadgeVariant(role)} data-testid={`badge-role-${role}`}>
+                              {getRoleLabel(role)}
                             </Badge>
-                          )}
+                          ))}
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -446,7 +468,7 @@ export default function UserManagementPage() {
                               setFirstName(user.firstName || '');
                               setLastName(user.lastName || '');
                               setPassword('');
-                              setSelectedRoles(user.roles || [user.role]);
+                              setSelectedRoles(deriveSelectedRoles(user.roles, user.role));
                               setDialogOpen(true);
                             }}
                           >
@@ -468,8 +490,9 @@ export default function UserManagementPage() {
                           </Button>
                         </div>
                       </TableCell>
-                    </TableRow>
-                  ))
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -499,6 +522,12 @@ export default function UserManagementPage() {
               </p>
             </div>
             <div className="flex items-start gap-3">
+              <Badge>Data Operations</Badge>
+              <p className="text-sm text-muted-foreground">
+                Manage imports, enrichment, verification workflows, and suppression policies
+              </p>
+            </div>
+            <div className="flex items-start gap-3">
               <Badge variant="secondary">Quality Analyst</Badge>
               <p className="text-sm text-muted-foreground">
                 Review and approve leads, access quality assurance tools
@@ -514,6 +543,12 @@ export default function UserManagementPage() {
               <Badge variant="outline">Agent</Badge>
               <p className="text-sm text-muted-foreground">
                 Access agent console, make calls, view assigned queue
+              </p>
+            </div>
+            <div className="flex items-start gap-3">
+              <Badge variant="secondary">Client Portal User</Badge>
+              <p className="text-sm text-muted-foreground">
+                Collaborate on campaign orders, review analytics, and monitor delivery progress
               </p>
             </div>
           </div>

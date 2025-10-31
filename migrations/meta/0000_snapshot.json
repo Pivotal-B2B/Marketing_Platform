@@ -17071,10 +17071,12 @@
       "schema": "public",
       "values": [
         "admin",
-        "agent",
+        "campaign_manager",
+        "data_ops",
         "quality_analyst",
+        "agent",
         "content_creator",
-        "campaign_manager"
+        "client_user"
       ]
     },
     "public.verification_eligibility_status": {
