@@ -1,25 +1,77 @@
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, AlertCircle, Mail } from "lucide-react";
+import { CheckCircle, XCircle, AlertCircle, Mail, Loader2 } from "lucide-react";
+
+interface ValidationResult {
+  email: string;
+  duration: string;
+  result: {
+    status: string;
+    confidence: number;
+    summary: {
+      syntaxValid: boolean;
+      hasMx: boolean;
+      hasSmtp: boolean;
+      smtpAccepted: boolean;
+      isRole: boolean;
+      isFree: boolean;
+      isDisposable: boolean;
+      deliverability: string;
+      isDeliverable: boolean;
+    };
+    trace: any;
+  };
+  metadata: {
+    skipSmtpValidation: boolean;
+    dnsCacheTtl: string;
+    dnsTimeout: string;
+    smtpTimeout: string;
+  };
+}
 
 export default function EmailValidationTest() {
   const [email, setEmail] = useState("");
-  const [testEmail, setTestEmail] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<ValidationResult | null>(null);
 
-  const { data: testResult, isLoading } = useQuery({
-    queryKey: ['/api/test/email-validation'],
-    enabled: false,
+  const validateMutation = useMutation({
+    mutationFn: async (emailToTest: string) => {
+      const response = await fetch('/api/test/email-validation/single', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: emailToTest,
+          skipCache: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Validation failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setTestResult(data);
+    },
   });
 
   const handleTest = () => {
     if (email) {
-      setTestEmail(email);
-      // Trigger validation test - you can implement this with a mutation
+      validateMutation.mutate(email);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && email && !validateMutation.isPending) {
+      handleTest();
     }
   };
 
@@ -41,29 +93,57 @@ export default function EmailValidationTest() {
               placeholder="Enter email to test..."
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onKeyPress={handleKeyPress}
               className="flex-1"
+              disabled={validateMutation.isPending}
             />
-            <Button onClick={handleTest} disabled={!email || isLoading}>
-              <Mail className="mr-2 h-4 w-4" />
-              Test Email
+            <Button 
+              onClick={handleTest} 
+              disabled={!email || validateMutation.isPending}
+            >
+              {validateMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Test Email
+                </>
+              )}
             </Button>
           </div>
+
+          {validateMutation.isError && (
+            <div className="mt-4 p-4 bg-destructive/10 border border-destructive rounded-lg">
+              <p className="text-sm text-destructive">
+                Error: {validateMutation.error instanceof Error ? validateMutation.error.message : 'Validation failed'}
+              </p>
+            </div>
+          )}
 
           {testResult && (
             <div className="mt-6 space-y-4">
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-semibold">Validation Results</h3>
+                <Badge variant={testResult.result.summary.isDeliverable ? "default" : "destructive"}>
+                  {testResult.result.status}
+                </Badge>
                 <Badge variant="outline">
-                  {testResult.valid ? "Valid" : "Invalid"}
+                  Confidence: {testResult.result.confidence}%
+                </Badge>
+                <Badge variant="outline">
+                  {testResult.duration}
                 </Badge>
               </div>
 
-              <div className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Format Valid</span>
-                      {testResult.formatValid ? (
+                      {testResult.result.summary.syntaxValid ? (
                         <CheckCircle className="h-5 w-5 text-success" />
                       ) : (
                         <XCircle className="h-5 w-5 text-destructive" />
@@ -76,7 +156,7 @@ export default function EmailValidationTest() {
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Domain Valid</span>
-                      {testResult.domainValid ? (
+                      {testResult.result.summary.hasMx ? (
                         <CheckCircle className="h-5 w-5 text-success" />
                       ) : (
                         <XCircle className="h-5 w-5 text-destructive" />
@@ -88,8 +168,21 @@ export default function EmailValidationTest() {
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">MX Records</span>
-                      {testResult.mxValid ? (
+                      <span className="text-sm font-medium">SMTP Responded</span>
+                      {testResult.result.summary.hasSmtp ? (
+                        <CheckCircle className="h-5 w-5 text-success" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">SMTP Accepted</span>
+                      {testResult.result.summary.smtpAccepted ? (
                         <CheckCircle className="h-5 w-5 text-success" />
                       ) : (
                         <XCircle className="h-5 w-5 text-destructive" />
@@ -97,7 +190,85 @@ export default function EmailValidationTest() {
                     </div>
                   </CardContent>
                 </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Role Account</span>
+                      {testResult.result.summary.isRole ? (
+                        <AlertCircle className="h-5 w-5 text-warning" />
+                      ) : (
+                        <CheckCircle className="h-5 w-5 text-success" />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Free Provider</span>
+                      {testResult.result.summary.isFree ? (
+                        <AlertCircle className="h-5 w-5 text-warning" />
+                      ) : (
+                        <CheckCircle className="h-5 w-5 text-success" />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Disposable</span>
+                      {testResult.result.summary.isDisposable ? (
+                        <XCircle className="h-5 w-5 text-destructive" />
+                      ) : (
+                        <CheckCircle className="h-5 w-5 text-success" />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Deliverability</span>
+                      <Badge variant={testResult.result.summary.isDeliverable ? "default" : "destructive"}>
+                        {testResult.result.summary.deliverability}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+
+              {testResult.metadata && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Configuration</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">SMTP Validation:</span>
+                        <span>{testResult.metadata.skipSmtpValidation ? 'Disabled' : 'Enabled'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">DNS Cache TTL:</span>
+                        <span>{testResult.metadata.dnsCacheTtl}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">DNS Timeout:</span>
+                        <span>{testResult.metadata.dnsTimeout}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">SMTP Timeout:</span>
+                        <span>{testResult.metadata.smtpTimeout}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </CardContent>
