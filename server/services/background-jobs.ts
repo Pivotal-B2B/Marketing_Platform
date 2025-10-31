@@ -10,6 +10,7 @@ import { startAiEnrichmentJob } from '../jobs/ai-enrichment-job';
 import { db } from '../db';
 import { agentQueue, campaignQueue } from '@shared/schema';
 import { eq, lt, and, inArray, sql } from 'drizzle-orm';
+import cron from 'node-cron';
 
 // Job intervals (in milliseconds) - reduced frequency to minimize connections
 const TRANSCRIPTION_JOB_INTERVAL = 60000; // Every 60 seconds (was 30s)
@@ -37,10 +38,10 @@ async function sweepExpiredLocks() {
   try {
     // 1. Release expired locks in agent_queue (manual dial)
     const releasedAgentLocks = await db.update(agentQueue)
-      .set({ 
+      .set({
         queueState: 'queued',
-        lockedBy: null, 
-        lockedAt: null, 
+        lockedBy: null,
+        lockedAt: null,
         lockExpiresAt: null,
         updatedAt: new Date()
       })
@@ -57,7 +58,7 @@ async function sweepExpiredLocks() {
     // 2. Release stuck entries in campaign_queue (power dial)
     // If a contact is in 'in_progress' state for > 10 minutes, something went wrong
     const releasedPowerEntries = await db.update(campaignQueue)
-      .set({ 
+      .set({
         status: 'queued',
         updatedAt: new Date()
       })
@@ -102,7 +103,7 @@ export function startBackgroundJobs() {
       if (isTranscriptionRunning) {
         return; // Skip if still running
       }
-      
+
       isTranscriptionRunning = true;
       try {
         await processPendingTranscriptions();
@@ -120,7 +121,7 @@ export function startBackgroundJobs() {
       if (isAnalysisRunning) {
         return; // Skip if still running
       }
-      
+
       isAnalysisRunning = true;
       try {
         await processUnanalyzedLeads();
@@ -138,7 +139,7 @@ export function startBackgroundJobs() {
       if (isLockSweeperRunning) {
         return; // Skip if still running
       }
-      
+
       isLockSweeperRunning = true;
       try {
         await sweepExpiredLocks();
@@ -150,16 +151,30 @@ export function startBackgroundJobs() {
     }, LOCK_SWEEPER_INTERVAL);
   }
 
-  // Email validation job (cron-based) - Only start if enabled
+  // Email validation job (cron-based, every 5 minutes to prevent overlap)
   if (ENABLE_EMAIL_VALIDATION) {
-    startEmailValidationJob();
+    console.log('[Background Jobs] Email Validation: ENABLED');
+    cron.schedule('*/5 * * * *', async () => {
+      try {
+        await startEmailValidationJob();
+      } catch (error) {
+        console.error('[Background Jobs] Email validation job error:', error);
+      }
+    });
   } else {
     console.log('[Background Jobs] Email validation job DISABLED - use manual trigger');
   }
-  
-  // AI enrichment job (cron-based, targets contacts missing BOTH phone and address) - Only start if enabled
+
+  // AI enrichment job (cron-based, every 20 minutes to prevent overlap with validation)
   if (ENABLE_AI_ENRICHMENT) {
-    startAiEnrichmentJob();
+    console.log('[Background Jobs] AI Enrichment: ENABLED');
+    cron.schedule('*/20 * * * *', async () => {
+      try {
+        await startAiEnrichmentJob();
+      } catch (error) {
+        console.error('[Background Jobs] AI enrichment job error:', error);
+      }
+    });
   } else {
     console.log('[Background Jobs] AI enrichment job DISABLED - use manual trigger');
   }
@@ -168,8 +183,8 @@ export function startBackgroundJobs() {
   console.log(`[Background Jobs] - Transcription job: every ${TRANSCRIPTION_JOB_INTERVAL/1000}s`);
   console.log(`[Background Jobs] - AI analysis job: every ${AI_ANALYSIS_JOB_INTERVAL/1000}s`);
   console.log(`[Background Jobs] - Lock sweeper: every ${LOCK_SWEEPER_INTERVAL/1000}s`);
-  console.log(`[Background Jobs] - Email validation job: cron-based (every 2 minutes)`);
-  console.log(`[Background Jobs] - AI enrichment job: cron-based (every 15 minutes, targets contacts missing BOTH phone and address)`);
+  console.log(`[Background Jobs] - Email validation job: cron-based (every 5 minutes)`);
+  console.log(`[Background Jobs] - AI enrichment job: cron-based (every 20 minutes)`);
 }
 
 /**
