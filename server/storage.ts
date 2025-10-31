@@ -1,5 +1,5 @@
 // Storage layer - referenced from blueprint:javascript_database
-import { eq, sql, and, or, isNull, isNotNull, like, ilike, gte, lte, gt, lt, desc, inArray } from "drizzle-orm";
+import { eq, sql, and, or, isNull, isNotNull, like, ilike, gte, lte, gt, lt, desc, inArray, asc } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "./db";
 import { buildFilterQuery, buildSuppressionFilter } from "./filter-builder";
@@ -19,6 +19,7 @@ import {
   speakers, organizers, sponsors,
   userRoles,
   autoDialerQueues, agentStatus,
+  callSessions, // Imported callSessions
   type User, type InsertUser, type UserRole, type InsertUserRole,
   type Account, type InsertAccount,
   type Contact, type InsertContact,
@@ -68,6 +69,7 @@ import {
   type Speaker, type InsertSpeaker,
   type Organizer, type InsertOrganizer,
   type Sponsor, type InsertSponsor,
+  type CallSession, type InsertCallSession, // Imported CallSession type
   domainAuth, trackingDomains, ipPools, warmupPlans, sendPolicies,
   domainReputationSnapshots, perDomainStats,
   type DomainAuth, type InsertDomainAuth,
@@ -479,6 +481,11 @@ export interface IStorage {
   // Auto-dialer Queues
   getAllAutoDialerQueues(activeOnly?: boolean): Promise<any[]>;
   getAutoDialerQueue(campaignId: string): Promise<any | undefined>;
+
+  // Agent Status Management
+  getAvailableAgents(): Promise<any[]>;
+  updateAgentStatus(agentId: string, data: any): Promise<any>;
+  upsertAgentStatus(data: any): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1795,7 +1802,7 @@ export class DatabaseStorage implements IStorage {
 
   async assignQueueToAgents(campaignId: string, agentIds: string[], mode: 'round_robin' | 'weighted' = 'round_robin'): Promise<{ assigned: number }> {
     console.log(`[assignQueueToAgents] Starting assignment for campaign ${campaignId}, ${agentIds.length} agents, mode: ${mode}`);
-    
+
     // Get all unassigned queued items for this campaign (only IDs and priority for performance)
     const queueItems = await db
       .select({ id: campaignQueue.id, priority: campaignQueue.priority })
@@ -1853,13 +1860,13 @@ export class DatabaseStorage implements IStorage {
 
     for (let i = 0; i < entries.length; i += BATCH_SIZE) {
       const batch = entries.slice(i, Math.min(i + BATCH_SIZE, entries.length));
-      
+
       // Use CASE statement for bulk update with different agent IDs per row
       const ids = batch.map(([id]) => id);
       const caseStatements = batch.map(([id, agentId]) => 
         `WHEN id = '${id}' THEN '${agentId}'`
       ).join(' ');
-      
+
       await db.execute(sql.raw(`
         UPDATE campaign_queue
         SET 
@@ -1867,9 +1874,9 @@ export class DatabaseStorage implements IStorage {
           updated_at = NOW()
         WHERE id IN (${ids.map(id => `'${id}'`).join(', ')})
       `));
-      
+
       assignedCount += batch.length;
-      
+
       if ((i + BATCH_SIZE) % 5000 === 0 || i + BATCH_SIZE >= entries.length) {
         console.log(`[assignQueueToAgents] Progress: ${Math.min(i + BATCH_SIZE, entries.length)}/${entries.length} items assigned`);
       }
@@ -1924,7 +1931,7 @@ export class DatabaseStorage implements IStorage {
       .from(agentQueue)
       .where(eq(agentQueue.id, id))
       .limit(1);
-    
+
     if (agentQueueItem) {
       return { ...agentQueueItem, _queueTable: 'agent_queue' };
     }
@@ -1935,7 +1942,7 @@ export class DatabaseStorage implements IStorage {
       .from(campaignQueue)
       .where(eq(campaignQueue.id, id))
       .limit(1);
-    
+
     if (campaignQueueItem) {
       return { ...campaignQueueItem, _queueTable: 'campaign_queue' };
     }
@@ -1951,7 +1958,7 @@ export class DatabaseStorage implements IStorage {
     if (call.queueItemId && call.disposition) {
       // Get queue item to determine which table to update
       const queueItem = await this.getQueueItemById(call.queueItemId);
-      
+
       if (queueItem) {
         // Update the appropriate queue table based on dial mode
         if (queueItem._queueTable === 'agent_queue') {
@@ -2015,6 +2022,8 @@ export class DatabaseStorage implements IStorage {
               qaStatus: 'new',
               notes: call.notes || null,
               checklistJson: call.qualificationData || null,
+              callAttemptId: call.callAttemptId, // Link to call attempt
+              callSessionId: call.callSessionId, // Link to call session
             }).returning();
 
             console.log('[LEAD CREATION] ✅ Lead created successfully:', {
@@ -2225,6 +2234,7 @@ export class DatabaseStorage implements IStorage {
     campaignId: string;
     startedAt: Date;
     telnyxCallId?: string;
+    callSessionId?: string; // Added callSessionId
   }): Promise<CallAttempt> {
     const attempt = {
       id: crypto.randomUUID(),
@@ -2740,7 +2750,7 @@ export class DatabaseStorage implements IStorage {
   async getLeads(filters?: FilterGroup): Promise<LeadWithAccount[]> {
     // Create an alias for the agent user
     const agentUser = alias(users, 'agent');
-    
+
     // Join with contacts, accounts, and users (agents) to get full details
     let query = db
       .select({
@@ -2788,7 +2798,7 @@ export class DatabaseStorage implements IStorage {
         query = query.where(filterCondition) as any;
       }
     }
-    
+
     const results = await query.orderBy(desc(leads.createdAt));
     return results;
   }
@@ -2809,7 +2819,7 @@ export class DatabaseStorage implements IStorage {
   async getLeadWithDetails(id: string): Promise<any | undefined> {
     const agentUser = alias(users, 'agentUser');
     const approverUser = alias(users, 'approverUser');
-    
+
     const [result] = await db
       .select({
         // Lead fields
@@ -2838,6 +2848,21 @@ export class DatabaseStorage implements IStorage {
         submissionResponse: leads.submissionResponse,
         createdAt: leads.createdAt,
         updatedAt: leads.updatedAt,
+        // Join call attempt and call session info
+        callAttempt: {
+          id: callAttempts.id,
+          startedAt: callAttempts.startedAt,
+          endedAt: callAttempts.endedAt,
+          duration: callAttempts.duration,
+          telnyxCallId: callAttempts.telnyxCallId,
+          recordingUrl: callAttempts.recordingUrl,
+        },
+        callSession: {
+          id: callSessions.id,
+          startTime: callSessions.startTime,
+          endTime: callSessions.endTime,
+          recordingUrl: callSessions.recordingUrl,
+        },
         // Contact info
         contact: {
           id: contacts.id,
@@ -2887,8 +2912,10 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(agentUser, eq(leads.agentId, agentUser.id))
       .leftJoin(approverUser, eq(leads.approvedById, approverUser.id))
       .leftJoin(campaigns, eq(leads.campaignId, campaigns.id))
+      .leftJoin(callAttempts, eq(leads.callAttemptId, callAttempts.id))
+      .leftJoin(callSessions, eq(leads.callSessionId, callSessions.id)) // Join with callSessions
       .where(eq(leads.id, id));
-    
+
     return result || undefined;
   }
 
@@ -2911,6 +2938,12 @@ export class DatabaseStorage implements IStorage {
     if (attempt.disposition !== 'qualified') {
       console.log('[LEAD CREATION] ⏭️ Skipping - disposition is not qualified:', attempt.disposition);
       return undefined;
+    }
+
+    // Get call session info
+    let callSession: CallSession | undefined;
+    if (attempt.callSessionId) {
+      callSession = await db.select().from(callSessions).where(eq(callSessions.id, attempt.callSessionId)).limit(1).then(rows => rows[0]);
     }
 
     // Get contact info
@@ -2950,8 +2983,9 @@ export class DatabaseStorage implements IStorage {
       contactEmail: contact.email || undefined,
       campaignId: attempt.campaignId,
       callAttemptId: callAttemptId,
-      recordingUrl: attempt.recordingUrl || undefined,
-      callDuration: attempt.duration || undefined,
+      callSessionId: attempt.callSessionId, // Link to call session
+      recordingUrl: attempt.recordingUrl || callSession?.recordingUrl || undefined, // Prioritize attempt recording, fallback to session
+      callDuration: attempt.duration || callSession?.duration || undefined,
       agentId: attempt.agentId,
       qaStatus: 'new',
     };
@@ -3590,7 +3624,7 @@ export class DatabaseStorage implements IStorage {
     // Process each domain item
     for (const item of items) {
       const normalizedDomain = normalizeDomain(item.domain);
-      
+
       // Try exact domain match first
       const exactDomainMatch = allAccounts.find(acc => 
         acc.domain && normalizeDomain(acc.domain) === normalizedDomain
