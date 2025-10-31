@@ -34,7 +34,6 @@ import LeadsPage from "@/pages/leads";
 import LeadDetailPage from "@/pages/lead-detail";
 import ContentStudioPage from "@/pages/content-studio";
 import AIContentGeneratorPage from "@/pages/ai-content-generator";
-import AITemplateWizardPage from "@/pages/ai-template-wizard";
 import SocialMediaPublisherPage from "@/pages/social-media-publisher";
 import SuppressionsPage from "@/pages/suppressions";
 import OrdersPage from "@/pages/orders";
@@ -123,7 +122,6 @@ function AuthenticatedApp() {
               <Route path="/leads" component={LeadsPage} />
               <Route path="/suppressions" component={SuppressionsPage} />
               <Route path="/content-studio/ai-generator" component={AIContentGeneratorPage} />
-              <Route path="/campaigns/templates/ai" component={AITemplateWizardPage} />
               <Route path="/content-studio/social-publisher" component={SocialMediaPublisherPage} />
               <Route path="/content-studio" component={ContentStudioPage} />
               <Route path="/events" component={EventsPage} />

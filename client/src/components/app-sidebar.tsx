@@ -108,11 +108,6 @@ const getNavSections = (): NavSection[] => [
           { title: "All Campaigns", url: "/campaigns", roles: ["admin", "campaign_manager"] },
           { title: "Email Campaigns", url: "/campaigns/email", roles: ["admin", "campaign_manager"] },
           { title: "Pipeline Dialer", url: "/campaigns/telemarketing", roles: ["admin", "campaign_manager"] },
-          {
-            title: "AI Template Wizard",
-            url: "/campaigns/templates/ai",
-            roles: ["admin", "campaign_manager", "quality_analyst", "content_creator"],
-          },
           { title: "Campaign Configuration", url: "/campaigns/config", roles: ["admin", "campaign_manager"] },
         ],
       },
