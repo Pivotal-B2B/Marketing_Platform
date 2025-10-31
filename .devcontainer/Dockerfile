@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/typescript-node:20
+FROM mcr.microsoft.com/devcontainers/typescript-node:24
 
 # Install PostgreSQL client tools
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
