@@ -22,15 +22,10 @@ import {
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { USER_ROLE_VALUES } from "./user-roles";
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', [
-  'admin',
-  'agent',
-  'quality_analyst',
-  'content_creator',
-  'campaign_manager'
-]);
+export const userRoleEnum = pgEnum('user_role', USER_ROLE_VALUES);
 
 export const campaignTypeEnum = pgEnum('campaign_type', ['email', 'call', 'combo']);
 export const accountCapModeEnum = pgEnum('account_cap_mode', ['queue_size', 'connected_calls', 'positive_disp']);

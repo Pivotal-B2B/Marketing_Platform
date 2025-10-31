@@ -28,6 +28,7 @@ import emailValidationTestRouter from './routes/email-validation-test';
 import verificationExportRouter from './routes/verification-export';
 import exportTemplatesRouter from './routes/export-templates';
 import { z } from "zod";
+import { USER_ROLE_VALUES } from "@shared/user-roles";
 import {
   apiLimiter,
   authLimiter,
@@ -162,6 +163,8 @@ function convertFilterValuesToFilterGroup(filterValues: FilterValues): FilterGro
     conditions
   };
 }
+
+const ALLOWED_USER_ROLES = new Set(USER_ROLE_VALUES);
 
 export function registerRoutes(app: Express) {
   // Apply general rate limiting to all API routes (100 req/15min)
@@ -310,8 +313,21 @@ export function registerRoutes(app: Express) {
         return res.status(400).json({ message: "Roles must be an array" });
       }
 
-      await storage.updateUserRoles(userId, roles, req.user!.userId);
-      res.json({ message: "Roles updated successfully", roles });
+      if (roles.some(role => typeof role !== "string")) {
+        return res.status(400).json({ message: "Roles must be an array of strings" });
+      }
+
+      const uniqueRoles = Array.from(new Set(roles as string[]));
+      const invalidRoles = uniqueRoles.filter(role => !ALLOWED_USER_ROLES.has(role));
+
+      if (invalidRoles.length > 0) {
+        return res.status(400).json({
+          message: `Invalid roles: ${invalidRoles.join(", ")}`,
+        });
+      }
+
+      await storage.updateUserRoles(userId, uniqueRoles, req.user!.userId);
+      res.json({ message: "Roles updated successfully", roles: uniqueRoles });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
