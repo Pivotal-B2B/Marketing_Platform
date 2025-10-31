@@ -53,18 +53,21 @@ console.log('[DB] Using Neon connection pooler:', hasPooler ? 'YES ✓ (already 
 
 // Optimized connection pool for 10+ concurrent agents + background jobs
 // With Neon pooler, we can be very conservative with client-side pooling
+// REDUCED: Lower max pool to prevent connection exhaustion in production
 export const pool = new Pool({ 
   connectionString: databaseUrl,
-  max: 15, // Lower client-side pool (pooler handles the rest)
+  max: 5, // CRITICAL: Keep low - Neon pooler handles scale, not client pool
   min: 0, // NO idle connections - create on demand only
-  idleTimeoutMillis: 20000, // Aggressive idle release (20s)
-  connectionTimeoutMillis: 10000, // Fast timeout (pooler is fast)
-  maxUses: 7500, // Recycle connections periodically to prevent stale connections
+  idleTimeoutMillis: 10000, // AGGRESSIVE: Release idle connections fast (10s)
+  connectionTimeoutMillis: 8000, // Fast timeout (pooler is fast)
+  maxUses: 5000, // Recycle connections more frequently
+  allowExitOnIdle: true, // Allow pool to shut down when idle
 });
 
-// Log connection pool events to help diagnose issues
+// GRACEFUL error handling - prevent crashes from connection errors
 pool.on('error', (err) => {
-  console.error('[DB Pool] Unexpected error on idle client:', err);
+  console.error('[DB Pool] Connection error (non-fatal):', err.message);
+  // Don't crash - let pool recover naturally
 });
 
 pool.on('connect', () => {
