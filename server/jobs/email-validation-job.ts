@@ -8,7 +8,7 @@ import cron from 'node-cron';
 import { db } from '../db';
 import { verificationContacts, verificationCampaigns } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
-import { validateAndStoreEmail } from '../lib/email-validation-engine';
+import { validateAndStoreBusinessEmail } from '../services/email-validation';
 import { finalizeEligibilityAfterEmailValidation } from '../lib/verification-utils';
 
 // OPTIMIZED SETTINGS FOR HIGH PERFORMANCE
@@ -40,12 +40,10 @@ async function processEmailBatch(contacts: any[]): Promise<{ validated: number; 
         }
         
         // Validate email
-        const validation = await validateAndStoreEmail(
-          contact.id,
-          contact.email,
-          'api_free',
-          { skipSmtp: SKIP_SMTP_DEFAULT }
-        );
+        const validation = await validateAndStoreBusinessEmail(contact.id, contact.email, {
+          provider: 'api_free',
+          skipSmtp: SKIP_SMTP_DEFAULT,
+        });
         
         // Determine eligibility
         const finalEligibility = finalizeEligibilityAfterEmailValidation(
