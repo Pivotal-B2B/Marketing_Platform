@@ -4,7 +4,7 @@
  */
 
 import { Router } from "express";
-import { summarizeBusinessEmailValidation, validateBusinessEmail } from "../services/email-validation";
+import { validateEmail } from "../lib/email-validation-engine";
 import { requireAuth, requireRole } from "../auth";
 import { z } from "zod";
 
@@ -58,9 +58,7 @@ router.post(
       console.log(`[EMAIL VALIDATION TEST] Testing email: ${email}, skipCache: ${skipCache}`);
 
       const startTime = Date.now();
-      const options = { useCache: !skipCache } as const;
-      const result = await validateBusinessEmail(email, options);
-      const summary = summarizeBusinessEmailValidation(result, options);
+      const result = await validateEmail(email, skipCache);
       const duration = Date.now() - startTime;
 
       res.json({
@@ -77,9 +75,6 @@ router.post(
             isRole: result.isRole,
             isFree: result.isFree,
             isDisposable: result.isDisposable,
-            isCatchAll: result.isAcceptAll,
-            deliverability: summary.deliverability,
-            isDeliverable: summary.isDeliverable,
           },
           trace: result.trace,
         },
@@ -137,9 +132,7 @@ router.post(
       for (const email of emails) {
         const emailStartTime = Date.now();
         try {
-          const options = { useCache: !skipCache } as const;
-          const result = await validateBusinessEmail(email, options);
-          const summary = summarizeBusinessEmailValidation(result, options);
+          const result = await validateEmail(email, skipCache);
           results.push({
             email,
             duration: `${Date.now() - emailStartTime}ms`,
@@ -153,9 +146,6 @@ router.post(
               isRole: result.isRole,
               isFree: result.isFree,
               isDisposable: result.isDisposable,
-              isCatchAll: result.isAcceptAll,
-              deliverability: summary.deliverability,
-              isDeliverable: summary.isDeliverable,
             },
             trace: result.trace,
           });

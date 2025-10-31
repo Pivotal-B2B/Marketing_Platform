@@ -64,7 +64,6 @@ import VerificationUploadPage from "@/pages/verification-upload";
 import VerificationSuppressionUploadPage from "@/pages/verification-suppression-upload";
 import AdminDataManagementPage from "@/pages/admin-data-management";
 import PhoneBulkEditorPage from "@/pages/phone-bulk-editor";
-import EmailValidationTest from "./pages/email-validation-test";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -77,7 +76,7 @@ function AuthenticatedApp() {
 
   // Get user roles array (support both legacy single role and new multi-role system)
   const userRoles = (user as any)?.roles || [user?.role || 'agent'];
-
+  
   // Debug log to help troubleshoot role issues
   console.log('=== AUTH DEBUG ===');
   console.log('Current user:', user);
@@ -93,8 +92,8 @@ function AuthenticatedApp() {
       <div className="flex h-screen w-full">
         <AppSidebar userRoles={userRoles} />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <TopBar
-            userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || 'User'}
+          <TopBar 
+            userName={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.username || 'User'} 
             userRoles={userRoles}
           />
           <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 bg-background">
@@ -134,9 +133,9 @@ function AuthenticatedApp() {
               <Route path="/orders" component={OrdersPage} />
               <Route path="/imports" component={ImportsPage} />
               <Route path="/reports" component={ReportsPage} />
-              <Route path="/call-reports" component={CallReportsPage} />
-              <Route path="/call-reports/details" component={CallReportsDetailsPage} />
-              <Route path="/engagement-analytics" component={EngagementAnalyticsPage} />
+        <Route path="/call-reports" component={CallReportsPage} />
+        <Route path="/call-reports/details" component={CallReportsDetailsPage} />
+          <Route path="/engagement-analytics" component={EngagementAnalyticsPage} />
               <Route path="/phone-bulk-editor" component={PhoneBulkEditorPage} />
               <Route path="/settings/users" component={UserManagementPage} />
               <Route path="/settings/data-management" component={AdminDataManagementPage} />
@@ -154,7 +153,6 @@ function AuthenticatedApp() {
               <Route path="/verification/suppression-upload" component={VerificationSuppressionUploadPage} />
               <Route path="/verification/campaigns/:id" component={VerificationCampaignConfigPage} />
               <Route path="/verification/campaigns" component={VerificationCampaignsPage} />
-              <Route path="/email-validation-test" component={EmailValidationTest} />
               <Route component={NotFound} />
             </Switch>
           </main>

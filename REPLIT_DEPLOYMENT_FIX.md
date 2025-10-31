@@ -40,24 +40,6 @@ END;
 
 ## How to Apply the Fix on Replit
 
-### Required environment variable
-
-The server now reads the production Neon connection string from a
-`REPLIT_PRODUCTION_DATABASE_URL` secret whenever
-`REPLIT_DEPLOYMENT=1`. This avoids hard-coding credentials in the
-repository and lets you rotate the value safely.
-
-1. In your Replit project, open the **Secrets** panel.
-2. Add a new secret named `REPLIT_PRODUCTION_DATABASE_URL` with the
-   exact connection string for your production database.
-3. Ensure `REPLIT_DEPLOYMENT` is set to `1` in the deployment
-   environment (Replit does this automatically for production).
-4. Redeploy — the app will log which Neon endpoint is being used without
-   printing the full credentials.
-
-> **Tip:** If the secret is missing, the deployment will fail fast with a
-> clear error. Double-check the spelling if you see that message.
-
 ### Method 1: Using Replit Database Pane
 
 1. Open your Replit project

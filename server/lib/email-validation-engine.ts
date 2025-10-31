@@ -555,11 +555,7 @@ export async function validateAndStoreEmail(
   contactId: string,
   email: string,
   provider: 'api_free' = 'api_free',
-  options: {
-    skipSmtp?: boolean;
-    useCache?: boolean;
-    detectAcceptAll?: boolean;
-  } = {}
+  options: { skipSmtp?: boolean } = {}
 ): Promise<ValidationResult & { validatedAt: Date }> {
   const emailLower = email.toLowerCase().trim();
   

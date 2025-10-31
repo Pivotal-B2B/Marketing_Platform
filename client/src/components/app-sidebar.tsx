@@ -12,7 +12,6 @@ import {
   Activity,
   Database,
   Phone,
-  Mail, // Added Mail icon
 } from "lucide-react";
 import {
   Sidebar,
@@ -166,12 +165,6 @@ const getNavSections = (): NavSection[] => [
         url: "/verification/campaigns",
         icon: Database,
         roles: ["admin", "data_ops", "quality_analyst"],
-      },
-      {
-        title: "Email Validation Test",
-        url: "/email-validation-test",
-        icon: Mail,
-        roles: ["admin", "data_ops"],
       },
     ],
   },

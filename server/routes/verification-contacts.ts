@@ -529,7 +529,7 @@ router.post("/api/verification-contacts/:id/qa", async (req, res) => {
 
 router.post("/api/verification-contacts/:id/validate-email", async (req, res) => {
   try {
-    const { validateAndStoreBusinessEmail } = await import("../services/email-validation");
+    const { validateAndStoreEmail } = await import("../lib/email-validation-engine");
     
     const [contact] = await db
       .select()
@@ -549,10 +549,12 @@ router.post("/api/verification-contacts/:id/validate-email", async (req, res) =>
     }
     
     // Use built-in validator
-    const validation = await validateAndStoreBusinessEmail(contact.id, contact.email, {
-      provider: 'api_free',
-      skipSmtp: process.env.SKIP_SMTP_VALIDATION === 'true',
-    });
+    const validation = await validateAndStoreEmail(
+      contact.id,
+      contact.email,
+      'api_free',
+      { skipSmtp: process.env.SKIP_SMTP_VALIDATION === 'true' }
+    );
     
     res.json({
       emailStatus: validation.status,
@@ -866,11 +868,13 @@ router.post("/api/verification-campaigns/:campaignId/contacts/bulk-validate-emai
         }
         
         // Use built-in email validator
-        const { validateAndStoreBusinessEmail } = await import('../services/email-validation');
-        const validation = await validateAndStoreBusinessEmail(contactId, contact.email, {
-          provider: 'api_free',
-          skipSmtp: process.env.SKIP_SMTP_VALIDATION === 'true',
-        });
+        const { validateAndStoreEmail } = await import('../lib/email-validation-engine');
+        const validation = await validateAndStoreEmail(
+          contactId,
+          contact.email,
+          'api_free',
+          { skipSmtp: process.env.SKIP_SMTP_VALIDATION === 'true' }
+        );
         
         validatedCount++;
         results.push({ contactId, email: contact.email, status: validation.status });
@@ -994,7 +998,7 @@ router.post("/api/verification-campaigns/:campaignId/contacts/run-email-validati
     console.log(`[RUN EMAIL VALIDATION] Found ${contactsToValidate.length} contacts to validate`);
     
     // Import validation function
-    const { validateAndStoreBusinessEmail } = await import('../services/email-validation');
+    const { validateAndStoreEmail } = await import('../lib/email-validation-engine');
     
     let validated = 0;
     let failed = 0;
@@ -1020,10 +1024,12 @@ router.post("/api/verification-campaigns/:campaignId/contacts/run-email-validati
         
         try {
           // Validate email
-          const validation = await validateAndStoreBusinessEmail(contact.id, contact.email, {
-            provider: 'api_free',
-            skipSmtp: process.env.SKIP_SMTP_VALIDATION === 'true',
-          });
+          const validation = await validateAndStoreEmail(
+            contact.id,
+            contact.email,
+            'api_free',
+            { skipSmtp: process.env.SKIP_SMTP_VALIDATION === 'true' }
+          );
           
           // Update contact with email_status
           await db
