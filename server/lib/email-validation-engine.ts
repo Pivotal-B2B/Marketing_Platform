@@ -481,11 +481,65 @@ export async function validateEmail(
       // anonymous SMTP probes as anti-spam protection - even for valid emails!
       // Treat as "unknown" unless corroborated by other signals
       if (smtp.code && (smtp.code === 550 || smtp.code === 551 || smtp.code === 552 || smtp.code === 553)) {
-        // Downgrade to "unknown" to avoid false positives from corporate anti-spam
-        result.status = 'unknown';
-        result.isDisabled = true; // Flag for telemetry/analysis
-        result.confidence = 60; // Lower confidence since this may be anti-spam protection
-        return result;
+        const transcriptParts: string[] = [];
+        if (smtp.banner) transcriptParts.push(smtp.banner);
+        if (smtp.raw?.length) transcriptParts.push(...smtp.raw);
+        const transcript = transcriptParts.join(' ').toLowerCase();
+
+        const mailboxDisabledIndicators = [
+          'mailbox full',
+          'mailbox is full',
+          'over quota',
+          'quota exceeded',
+          'mailbox disabled',
+          'mailbox unavailable',
+          'mailbox busy',
+          'temporary error',
+          'try again later',
+          'temporarily deferred',
+          'temporarily unavailable',
+          'greylisted',
+          'greylist',
+          'temporarily rejected',
+        ];
+
+        const hardBounceIndicators = [
+          'user unknown',
+          'unknown user',
+          'unknown recipient',
+          'recipient unknown',
+          'recipient not found',
+          'no such user',
+          'no such recipient',
+          'mailbox not found',
+          'mailbox does not exist',
+          'invalid recipient',
+          'bad destination mailbox',
+          'unrouteable address',
+          'recipient address rejected',
+          'not a valid mailbox',
+          'account disabled',
+          'user not found',
+        ];
+
+        const matchesIndicator = (phrases: string[]) =>
+          transcript.length > 0 && phrases.some(phrase => transcript.includes(phrase));
+
+        if (matchesIndicator(mailboxDisabledIndicators)) {
+          result.status = 'disabled';
+          result.isDisabled = true;
+          result.confidence = 70;
+          return result;
+        }
+
+        if (!matchesIndicator(hardBounceIndicators)) {
+          // Downgrade to "unknown" to avoid false positives from corporate anti-spam
+          result.status = 'unknown';
+          result.isDisabled = true; // Flag for telemetry/analysis
+          result.confidence = 60; // Lower confidence since this may be anti-spam protection
+          return result;
+        }
+        // If we reach here it's a hard bounce – let the standard mapping mark it invalid
       }
       
       // Detect accept-all if requested
