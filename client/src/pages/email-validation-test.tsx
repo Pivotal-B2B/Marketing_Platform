@@ -40,10 +40,12 @@ export default function EmailValidationTest() {
 
   const validateMutation = useMutation({
     mutationFn: async (emailToTest: string) => {
+      const token = localStorage.getItem('authToken');
       const response = await fetch('/api/test/email-validation/single', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
         },
         credentials: 'include',
         body: JSON.stringify({
@@ -53,7 +55,8 @@ export default function EmailValidationTest() {
       });
 
       if (!response.ok) {
-        throw new Error('Validation failed');
+        const errorData = await response.json().catch(() => ({ error: 'Validation failed' }));
+        throw new Error(errorData.error || errorData.message || 'Validation failed');
       }
 
       return response.json();
