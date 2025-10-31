@@ -326,7 +326,7 @@ Emit canonical events with `tenantId` and relevant entity references:
 ```
 
 ## Telephony Widget
-- In-app WebRTC softphone with support for SIP and Twilio providers.
+- In-app WebRTC softphone powered by Telnyx WebRTC SIP, matching the provider used in our call campaign.
 - Offers call controls (mute, hold, transfer, dial pad), warm transfer, callback scheduling, and power dialer mode.
 - Automatically logs engagements with duration, disposition, and optional recording/transcript attachments.
 - Consent toggles per tenant/region with visual indicators when recording.
@@ -397,7 +397,7 @@ Emit canonical events with `tenantId` and relevant entity references:
 ## Runbooks
 - **O365 Consent Troubleshooting**: validate OAuth configuration, refresh tokens, inspect Graph API errors.
 - **Sync Backoff**: monitor throttling, adjust retry intervals, purge stuck deltas, rehydrate index.
-- **Telephony QoS**: monitor WebRTC stats, diagnose SIP/Twilio connectivity, fall back to PSTN if WebRTC fails.
+- **Telephony QoS**: monitor WebRTC stats, diagnose Telnyx SIP connectivity, fall back to PSTN if WebRTC fails.
 
 ## Thoughtful Extras
 - Opportunity health scoring with visual cues in pipeline and opportunity detail views.
